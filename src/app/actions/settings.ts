@@ -14,18 +14,26 @@ const createShiftSchema = z.object({
   endTime: z.string().regex(/^([01]\d|2[0-3]):?([0-5]\d)$/, "Invalid end time format (HH:MM)"),
 });
 
-export const createShift = safeAction(createShiftSchema, async (data) => {
-  const shift = await db.shift.create({
-    data: {
-      name: data.name,
-      startTime: data.startTime,
-      endTime: data.endTime,
-    },
-  });
+export const createShift = safeAction(
+  createShiftSchema, 
+  async (data) => {
+    const shift = await db.shift.create({
+      data: {
+        name: data.name,
+        startTime: data.startTime,
+        endTime: data.endTime,
+      },
+    });
 
-  revalidatePath("/settings/shifts");
-  return shift;
-});
+    revalidatePath("/settings/shifts");
+    return shift;
+  },
+  {
+    action: "CREATE_SHIFT",
+    module: "SETTINGS",
+    logInput: true,
+  }
+);
 
 // --- UNIT OF MEASUREMENT (UOM) ---
 
@@ -35,18 +43,26 @@ const createUomSchema = z.object({
   type: z.nativeEnum(UomType),
 });
 
-export const createUom = safeAction(createUomSchema, async (data) => {
-  const uom = await db.unitOfMeasurement.create({
-    data: {
-      name: data.name,
-      abbreviation: data.abbreviation,
-      type: data.type,
-    },
-  });
+export const createUom = safeAction(
+  createUomSchema, 
+  async (data) => {
+    const uom = await db.unitOfMeasurement.create({
+      data: {
+        name: data.name,
+        abbreviation: data.abbreviation,
+        type: data.type,
+      },
+    });
 
-  revalidatePath("/settings/uom");
-  return uom;
-});
+    revalidatePath("/settings/uom");
+    return uom;
+  },
+  {
+    action: "CREATE_UOM",
+    module: "SETTINGS",
+    logInput: true,
+  }
+);
 
 // --- CATEGORIES ---
 
@@ -56,15 +72,23 @@ const createCategorySchema = z.object({
   itemType: z.nativeEnum(ItemType),
 });
 
-export const createCategory = safeAction(createCategorySchema, async (data) => {
-  const category = await db.category.create({
-    data: {
-      name: data.name,
-      description: data.description,
-      itemType: data.itemType,
-    },
-  });
+export const createCategory = safeAction(
+  createCategorySchema, 
+  async (data) => {
+    const category = await db.category.create({
+      data: {
+        name: data.name,
+        description: data.description,
+        itemType: data.itemType,
+      },
+    });
 
-  revalidatePath("/settings/categories");
-  return category;
-});
+    revalidatePath("/settings/categories");
+    return category;
+  },
+  {
+    action: "CREATE_CATEGORY",
+    module: "SETTINGS",
+    logInput: true,
+  }
+);
