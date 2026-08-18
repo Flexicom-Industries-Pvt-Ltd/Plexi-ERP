@@ -12,9 +12,38 @@ datasource db {
   provider = "postgresql"
 }
 
-enum Role {
-  ADMIN
-  USER
+enum Module {
+  SETTINGS
+  USERS
+  SECURITY_GATE
+  INVENTORY
+  PRODUCTION
+  QUALITY_CONTROL
+  DISPATCH
+}
+
+model Role {
+  id          String           @id @default(cuid())
+  name        String           @unique
+  description String?
+  permissions RolePermission[]
+  users       User[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+}
+
+model RolePermission {
+  id        String   @id @default(cuid())
+  roleId    String
+  module    Module
+  canCreate Boolean  @default(false)
+  canRead   Boolean  @default(false)
+  canUpdate Boolean  @default(false)
+  canDelete Boolean  @default(false)
+
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, module])
 }
 
 model User {
@@ -24,7 +53,8 @@ model User {
   emailVerified DateTime?
   image         String?
   password      String?
-  role          Role      @default(USER)
+  roleId        String?
+  role          Role?     @relation(fields: [roleId], references: [id])
   accounts      Account[]
   sessions      Session[]
   createdAt     DateTime  @default(now())
