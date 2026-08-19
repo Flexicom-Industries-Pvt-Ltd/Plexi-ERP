@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
@@ -27,6 +28,7 @@ import {
   SidebarMenuSub,
   SidebarMenuSubButton,
   SidebarMenuSubItem,
+  SidebarRail,
 } from "@/components/ui/sidebar";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -51,15 +53,15 @@ export function AppSidebar() {
   const pathname = usePathname();
 
   return (
-    <Sidebar className="border-r border-border/50 bg-white shadow-sm" variant="inset">
-      <SidebarHeader className="h-16 flex items-center px-4 border-b border-border/50 bg-gradient-brand">
+    <Sidebar className="border-r border-border/50 bg-white shadow-sm transition-all duration-300" variant="inset" collapsible="icon">
+      <SidebarHeader className="h-16 flex items-center px-4 border-b border-border/50 bg-white overflow-hidden transition-all duration-300">
         <Link href="/dashboard" className="flex items-center gap-3 font-semibold w-full">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/20 backdrop-blur-md text-white shadow-sm ring-1 ring-white/20">
-            <Building2 className="h-5 w-5" />
+          <div className="flex shrink-0 items-center justify-center rounded-md hover:opacity-80 transition-opacity">
+            <Image src="/logo.png" alt="Flexicom Logo" width={32} height={32} className="object-contain" />
           </div>
-          <div className="flex flex-col">
-            <span className="text-lg font-bold text-white leading-tight">Flexicom</span>
-            <span className="text-[10px] text-white/70 uppercase tracking-widest font-medium">ERP System</span>
+          <div className="flex flex-col truncate group-data-[collapsible=icon]:hidden transition-all duration-300 opacity-100 group-data-[collapsible=icon]:opacity-0">
+            <span className="text-lg font-bold text-primary leading-tight">Flexicom</span>
+            <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-medium">ERP System</span>
           </div>
         </Link>
       </SidebarHeader>
@@ -113,10 +115,10 @@ export function AppSidebar() {
                   className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground hover:bg-secondary/10 transition-colors rounded-xl"
                 />
               }>
-                  <Avatar className="h-9 w-9 rounded-xl border border-primary/20 shadow-sm">
+                  <Avatar className="h-9 w-9 shrink-0 rounded-xl border border-primary/20 shadow-sm transition-transform group-hover:scale-105">
                     <AvatarFallback className="rounded-xl bg-gradient-brand text-white text-xs font-bold">AD</AvatarFallback>
                   </Avatar>
-                  <div className="grid flex-1 text-left text-sm leading-tight">
+                  <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden transition-all duration-300 opacity-100 group-data-[collapsible=icon]:opacity-0">
                     <span className="truncate font-semibold text-primary">Admin User</span>
                     <span className="truncate text-xs text-muted-foreground">admin@plexierp.com</span>
                   </div>
@@ -134,7 +136,7 @@ export function AppSidebar() {
                     </Avatar>
                     <div className="grid flex-1 text-left text-sm leading-tight">
                       <span className="truncate font-semibold">Admin User</span>
-                      <span className="truncate text-xs text-muted-foreground">admin@flexicom.com</span>
+                      <span className="truncate text-xs text-muted-foreground">admin@plexierp.com</span>
                     </div>
                   </div>
                 </DropdownMenuLabel>
@@ -146,6 +148,7 @@ export function AppSidebar() {
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>
+      <SidebarRail />
     </Sidebar>
   );
 }
