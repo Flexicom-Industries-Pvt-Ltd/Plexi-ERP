@@ -7,13 +7,11 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   Settings,
-  Users,
   ShieldCheck,
   PackageSearch,
   Factory,
   CheckCircle,
   Truck,
-  Building2,
   ChevronDown,
 } from "lucide-react";
 
@@ -31,7 +29,7 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 const navItems = [
@@ -45,7 +43,8 @@ const navItems = [
 
 const settingsItems = [
   { title: "General Settings", url: "/dashboard/settings" },
-  { title: "Users & Roles", url: "/dashboard/settings/users" },
+  { title: "Users", url: "/dashboard/settings/users" },
+  { title: "Roles", url: "/dashboard/settings/roles" },
   { title: "Branches & Locations", url: "/dashboard/settings/branches" },
 ];
 
