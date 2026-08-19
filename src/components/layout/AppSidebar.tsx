@@ -57,11 +57,11 @@ export function AppSidebar() {
       <SidebarHeader className="h-16 flex items-center px-4 border-b border-border/50 bg-white overflow-hidden transition-all duration-300">
         <Link href="/dashboard" className="flex items-center gap-3 font-semibold w-full">
           <div className="flex shrink-0 items-center justify-center rounded-md hover:opacity-80 transition-opacity">
-            <Image src="/logo.png" alt="Flexicom Logo" width={32} height={32} className="object-contain" />
+            <Image src="/logo.png" alt="Flexicom Logo" width={44} height={44} className="object-contain" />
           </div>
           <div className="flex flex-col truncate group-data-[collapsible=icon]:hidden transition-all duration-300 opacity-100 group-data-[collapsible=icon]:opacity-0">
-            <span className="text-lg font-bold text-primary leading-tight">Flexicom</span>
-            <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-medium">ERP System</span>
+            <span className="text-xl font-bold text-primary leading-tight">Flexicom</span>
+            <span className="text-xs text-muted-foreground uppercase tracking-widest font-medium">ERP System</span>
           </div>
         </Link>
       </SidebarHeader>
