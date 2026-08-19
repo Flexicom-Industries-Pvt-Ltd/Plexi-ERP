@@ -51,13 +51,16 @@ export function AppSidebar() {
   const pathname = usePathname();
 
   return (
-    <Sidebar className="border-r border-border bg-white" variant="inset">
-      <SidebarHeader className="h-16 flex items-center px-4 border-b">
-        <Link href="/dashboard" className="flex items-center gap-2 font-semibold">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-white">
+    <Sidebar className="border-r border-border/50 bg-white shadow-sm" variant="inset">
+      <SidebarHeader className="h-16 flex items-center px-4 border-b border-border/50 bg-gradient-brand">
+        <Link href="/dashboard" className="flex items-center gap-3 font-semibold w-full">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/20 backdrop-blur-md text-white shadow-sm ring-1 ring-white/20">
             <Building2 className="h-5 w-5" />
           </div>
-          <span className="text-xl font-bold text-primary">Flexicom</span>
+          <div className="flex flex-col">
+            <span className="text-lg font-bold text-white leading-tight">Flexicom</span>
+            <span className="text-[10px] text-white/70 uppercase tracking-widest font-medium">ERP System</span>
+          </div>
         </Link>
       </SidebarHeader>
       <SidebarContent className="px-2 py-4">
@@ -107,15 +110,15 @@ export function AppSidebar() {
               <DropdownMenuTrigger render={
                 <SidebarMenuButton
                   size="lg"
-                  className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+                  className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground hover:bg-secondary/10 transition-colors rounded-xl"
                 />
               }>
-                  <Avatar className="h-8 w-8 rounded-lg">
-                    <AvatarFallback className="rounded-lg bg-primary/10 text-primary">AD</AvatarFallback>
+                  <Avatar className="h-9 w-9 rounded-xl border border-primary/20 shadow-sm">
+                    <AvatarFallback className="rounded-xl bg-gradient-brand text-white text-xs font-bold">AD</AvatarFallback>
                   </Avatar>
                   <div className="grid flex-1 text-left text-sm leading-tight">
-                    <span className="truncate font-semibold">Admin User</span>
-                    <span className="truncate text-xs text-muted-foreground">admin@flexicom.com</span>
+                    <span className="truncate font-semibold text-primary">Admin User</span>
+                    <span className="truncate text-xs text-muted-foreground">admin@plexierp.com</span>
                   </div>
               </DropdownMenuTrigger>
               <DropdownMenuContent
