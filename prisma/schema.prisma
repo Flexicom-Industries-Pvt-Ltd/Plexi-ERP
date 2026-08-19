@@ -4,8 +4,8 @@
 // Get a free hosted Postgres database in seconds: `npx create-db`
 
 generator client {
-  provider        = "prisma-client-js"
-  output          = "../src/generated/prisma"
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
 }
 
 datasource db {
@@ -33,13 +33,13 @@ model Role {
 }
 
 model RolePermission {
-  id        String   @id @default(cuid())
+  id        String  @id @default(cuid())
   roleId    String
   module    Module
-  canCreate Boolean  @default(false)
-  canRead   Boolean  @default(false)
-  canUpdate Boolean  @default(false)
-  canDelete Boolean  @default(false)
+  canCreate Boolean @default(false)
+  canRead   Boolean @default(false)
+  canUpdate Boolean @default(false)
+  canDelete Boolean @default(false)
 
   role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
 
@@ -47,35 +47,35 @@ model RolePermission {
 }
 
 model User {
-  id            String    @id @default(cuid())
+  id            String      @id @default(cuid())
   name          String?
-  email         String?   @unique
+  email         String?     @unique
   emailVerified DateTime?
   image         String?
   password      String?
   roleId        String?
-  role          Role?     @relation(fields: [roleId], references: [id])
+  role          Role?       @relation(fields: [roleId], references: [id])
   accounts      Account[]
   sessions      Session[]
   auditLogs     AuditLog[]
   files         FileAsset[]
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
 }
 
 model Account {
-  id                 String  @id @default(cuid())
-  userId             String
-  type               String
-  provider           String
-  providerAccountId  String
-  refresh_token      String?  @db.Text
-  access_token       String?  @db.Text
-  expires_at         Int?
-  token_type         String?
-  scope              String?
-  id_token           String?  @db.Text
-  session_state      String?
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -113,13 +113,13 @@ enum UomType {
 }
 
 model Shift {
-  id          String   @id @default(cuid())
-  name        String   @unique
-  startTime   String
-  endTime     String
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id        String   @id @default(cuid())
+  name      String   @unique
+  startTime String
+  endTime   String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model UnitOfMeasurement {
@@ -133,14 +133,14 @@ model UnitOfMeasurement {
 }
 
 model Category {
-  id            String         @id @default(cuid())
-  name          String         @unique
+  id            String        @id @default(cuid())
+  name          String        @unique
   description   String?
   itemType      ItemType
   subCategories SubCategory[]
-  isActive      Boolean        @default(true)
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  isActive      Boolean       @default(true)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
 }
 
 model SubCategory {
@@ -171,7 +171,7 @@ model AuditLog {
   durationMs    Int?
   createdAt     DateTime @default(now())
 
-  user          User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([correlationId])
   @@index([module])
@@ -182,18 +182,98 @@ model AuditLog {
 }
 
 model FileAsset {
-  id          String   @id @default(cuid())
-  fileName    String
-  fileKey     String   @unique
-  mimeType    String
-  sizeBytes   Int
-  module      Module
-  uploadedBy  String?
-  url         String?  // Presigned URL or public URL
-  createdAt   DateTime @default(now())
+  id         String   @id @default(cuid())
+  fileName   String
+  fileKey    String   @unique
+  mimeType   String
+  sizeBytes  Int
+  module     Module
+  uploadedBy String?
+  url        String? // Presigned URL or public URL
+  createdAt  DateTime @default(now())
 
-  user        User?    @relation(fields: [uploadedBy], references: [id], onDelete: SetNull)
+  user User? @relation(fields: [uploadedBy], references: [id], onDelete: SetNull)
 
   @@index([module])
   @@index([uploadedBy])
+}
+
+// ==========================================
+// Phase 1: Factory & Organization Master Data
+// ==========================================
+
+model Department {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  code        String   @unique
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  sections Section[]
+}
+
+model Section {
+  id           String   @id @default(cuid())
+  departmentId String
+  name         String
+  code         String   @unique
+  description  String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  department Department @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  machines   Machine[]
+
+  @@unique([departmentId, name])
+  @@index([departmentId])
+}
+
+enum LocationType {
+  GATE
+  WAREHOUSE
+  PRODUCTION_FLOOR
+  SCRAP_YARD
+  OFFICE
+}
+
+model Location {
+  id          String       @id @default(cuid())
+  name        String       @unique
+  code        String       @unique
+  type        LocationType
+  description String?
+  isActive    Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+model Machine {
+  id           String   @id @default(cuid())
+  sectionId    String
+  name         String
+  serialNumber String?  @unique
+  make         String?
+  model        String?
+  status       String   @default("ACTIVE") // ACTIVE, MAINTENANCE, INACTIVE
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  section Section @relation(fields: [sectionId], references: [id], onDelete: Restrict)
+
+  @@index([sectionId])
+}
+
+model ConfigParameter {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  value       String
+  description String?
+  isSystem    Boolean  @default(false) // System configs cannot be deleted
+  updatedBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
