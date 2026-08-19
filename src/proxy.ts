@@ -22,7 +22,17 @@ export default auth((req) => {
     return Response.redirect(new URL("/auth/login", req.nextUrl));
   }
 
-  return null;
+  // Inject Correlation ID
+  const correlationId = req.headers.get("x-correlation-id") || crypto.randomUUID();
+  const requestHeaders = new Headers(req.headers);
+  requestHeaders.set("x-correlation-id", correlationId);
+
+  const response = NextResponse.next({
+    request: { headers: requestHeaders },
+  });
+  response.headers.set("x-correlation-id", correlationId);
+
+  return response;
 });
 
 // Optionally, don't invoke Middleware on some paths
