@@ -158,20 +158,22 @@ model SubCategory {
 }
 
 model AuditLog {
-  id          String   @id @default(cuid())
-  userId      String?
-  action      String
-  module      Module
-  entityId    String?
-  oldValues   Json?
-  newValues   Json?
-  ipAddress   String?
-  userAgent   String?
-  durationMs  Int?
-  createdAt   DateTime @default(now())
+  id            String   @id @default(cuid())
+  correlationId String?
+  userId        String?
+  action        String
+  module        Module
+  entityId      String?
+  oldValues     Json?
+  newValues     Json?
+  ipAddress     String?
+  userAgent     String?
+  durationMs    Int?
+  createdAt     DateTime @default(now())
 
-  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  user          User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
 
+  @@index([correlationId])
   @@index([module])
   @@index([action])
   @@index([userId])
