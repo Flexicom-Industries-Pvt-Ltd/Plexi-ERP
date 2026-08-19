@@ -3,35 +3,40 @@
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, UserCog, MoreVertical, ShieldCheck, Mail, Building, Briefcase, KeyRound } from "lucide-react";
+import { PlusCircle, UserCog, ShieldCheck, Mail, Building, Briefcase, KeyRound } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { toggleUserStatus, createUser, updateUser } from "@/actions/users";
 import { toast } from "sonner";
-import { motion } from "framer-motion";
+
 import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-  SheetFooter,
-} from "@/components/ui/sheet";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Props = {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   users: any[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   roles: any[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   departments: any[];
 };
 
 export function UsersClient({ users, roles, departments }: Props) {
   const [isPending, setIsPending] = useState(false);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [editingUser, setEditingUser] = useState<any>(null);
 
   // Form state
@@ -56,6 +61,7 @@ export function UsersClient({ users, roles, departments }: Props) {
     }
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleOpenSheet = (user: any = null) => {
     if (user) {
       setEditingUser(user);
@@ -229,16 +235,16 @@ export function UsersClient({ users, roles, departments }: Props) {
         </CardContent>
       </Card>
 
-      <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-        <SheetContent className="sm:max-w-md border-l-0 shadow-2xl sm:rounded-l-2xl">
-          <SheetHeader className="mb-6">
-            <SheetTitle className="text-2xl text-primary flex items-center gap-2">
+      <Dialog open={isSheetOpen} onOpenChange={setIsSheetOpen}>
+        <DialogContent className="sm:max-w-xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader className="mb-4">
+            <DialogTitle className="text-2xl text-primary flex items-center gap-2">
               {editingUser ? 'Edit User' : 'Add New User'}
-            </SheetTitle>
-            <SheetDescription>
+            </DialogTitle>
+            <DialogDescription>
               {editingUser ? 'Update the details and permissions for this user.' : 'Create a new user account in the system.'}
-            </SheetDescription>
-          </SheetHeader>
+            </DialogDescription>
+          </DialogHeader>
 
           <form onSubmit={handleSave} className="flex flex-col gap-5">
             <div className="space-y-4">
@@ -322,7 +328,7 @@ export function UsersClient({ users, roles, departments }: Props) {
               </div>
             </div>
 
-            <SheetFooter className="mt-8">
+            <DialogFooter className="mt-8">
               <Button 
                 type="button" 
                 variant="outline" 
@@ -335,10 +341,10 @@ export function UsersClient({ users, roles, departments }: Props) {
               <Button type="submit" disabled={isPending} className="w-full sm:w-auto bg-primary text-primary-foreground hover:bg-primary/90">
                 {isPending ? "Saving..." : "Save User"}
               </Button>
-            </SheetFooter>
+            </DialogFooter>
           </form>
-        </SheetContent>
-      </Sheet>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
