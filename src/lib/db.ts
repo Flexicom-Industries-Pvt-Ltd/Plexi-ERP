@@ -1,18 +1,14 @@
-import { Pool, neonConfig } from '@neondatabase/serverless';
-import { PrismaNeon } from '@prisma/adapter-neon';
+import { neon } from '@neondatabase/serverless';
+import { PrismaNeonHttp } from '@prisma/adapter-neon';
 // We will import the client directly from the generated folder as specified in schema.prisma
 import { PrismaClient } from '../generated/prisma';
-import ws from 'ws';
 import { env } from '../env';
 
-// Required for Node.js edge environments / serverless functions
-neonConfig.webSocketConstructor = ws;
-
-// Strip query params (like ?sslmode=require) as they cause Neon Pool to fail in the local runtime
-const connectionString = env.DATABASE_URL.split('?')[0];
-
-const pool = new Pool({ connectionString });
-const adapter = new PrismaNeon(pool as any);
+// Use the HTTP connection which is more stable and avoids the WebSocket connection string bug
+const connectionString = env.DATABASE_URL;
+const adapter = new PrismaNeonHttp(connectionString, {
+  fetchOptions: { cache: 'no-store' }
+});
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
