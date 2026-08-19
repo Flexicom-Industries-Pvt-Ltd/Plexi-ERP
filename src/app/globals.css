@@ -61,9 +61,9 @@
   --primary: #2d2f83;
   --primary-foreground: oklch(0.98 0 0);
   
-  /* Secondary - Red/Orange from Logo (#e64132) */
-  --secondary: #e64132;
-  --secondary-foreground: oklch(0.98 0 0);
+  /* Secondary - Light Blue */
+  --secondary: #e0f2fe;
+  --secondary-foreground: #0284c7;
   
   /* Muted and Accents */
   --muted: oklch(0.96 0.01 283);
