@@ -5,6 +5,8 @@ export const metadata = {
   title: "Organization Settings | Plexi-ERP",
 };
 
+export const dynamic = "force-dynamic";
+
 export default async function OrganizationSettingsPage() {
   // Fetch master data directly from DB in server component
   const [departments, sections, locations, machines] = await Promise.all([
