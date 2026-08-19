@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { withTransaction } from '../transaction';
-import { db } from '~test/prisma-mock';
+import { db } from '../../../test/prisma-mock';
 import { getRequestContext } from '../context';
 import { auth } from '@/auth';
 
@@ -18,10 +18,9 @@ describe('withTransaction', () => {
 
     const result = await withTransaction({
       action: 'TEST_ACTION',
-      module: 'TEST_MODULE',
+      module: 'SETTINGS',
       entityId: 'ent-123',
-      entityType: 'User',
-      details: { change: 'tested something' },
+      newValues: { change: 'tested something' },
     }, async (tx) => {
       // simulate some work with tx
       return mockResult;
@@ -34,7 +33,7 @@ describe('withTransaction', () => {
     expect(db.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({
         action: 'TEST_ACTION',
-        module: 'TEST_MODULE',
+        module: 'SETTINGS',
         correlationId: 'test-correlation-id',
         userId: 'test-user-id',
         ipAddress: '127.0.0.1'
@@ -47,7 +46,7 @@ describe('withTransaction', () => {
     
     await expect(withTransaction({
       action: 'FAIL_ACTION',
-      module: 'TEST_MODULE'
+      module: 'SETTINGS'
     }, async () => {
       throw error;
     })).rejects.toThrow('Database connection failed');
