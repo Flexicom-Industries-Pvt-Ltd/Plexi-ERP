@@ -1,13 +1,18 @@
 import { db } from "@/lib/db";
 import { OrganizationClient } from "./organization-client";
+import { requirePermission } from "@/lib/permissions";
+import { Module } from "@/generated/prisma";
+import { Metadata } from "next";
 
-export const metadata = {
+export const metadata: Metadata = {
   title: "Organization Settings | Plexi-ERP",
 };
 
 export const dynamic = "force-dynamic";
 
 export default async function OrganizationSettingsPage() {
+  await requirePermission(Module.SETTINGS, "canRead");
+
   // Fetch master data directly from DB in server component
   const [departments, sections, locations, machines] = await Promise.all([
     db.department.findMany({
