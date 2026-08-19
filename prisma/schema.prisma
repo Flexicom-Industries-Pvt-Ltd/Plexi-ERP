@@ -53,8 +53,12 @@ model User {
   emailVerified DateTime?
   image         String?
   password      String?
+  phone         String?
+  isActive      Boolean     @default(true)
   roleId        String?
   role          Role?       @relation(fields: [roleId], references: [id])
+  departmentId  String?
+  department    Department? @relation(fields: [departmentId], references: [id])
   accounts      Account[]
   sessions      Session[]
   auditLogs     AuditLog[]
@@ -212,6 +216,7 @@ model Department {
   updatedAt   DateTime @updatedAt
 
   sections Section[]
+  users    User[]
 }
 
 model Section {
