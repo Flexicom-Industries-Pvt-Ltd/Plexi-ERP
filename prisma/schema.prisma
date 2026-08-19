@@ -58,6 +58,7 @@ model User {
   accounts      Account[]
   sessions      Session[]
   auditLogs     AuditLog[]
+  files         FileAsset[]
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 }
@@ -176,4 +177,21 @@ model AuditLog {
   @@index([userId])
   @@index([entityId])
   @@index([createdAt])
+}
+
+model FileAsset {
+  id          String   @id @default(cuid())
+  fileName    String
+  fileKey     String   @unique
+  mimeType    String
+  sizeBytes   Int
+  module      Module
+  uploadedBy  String?
+  url         String?  // Presigned URL or public URL
+  createdAt   DateTime @default(now())
+
+  user        User?    @relation(fields: [uploadedBy], references: [id], onDelete: SetNull)
+
+  @@index([module])
+  @@index([uploadedBy])
 }
