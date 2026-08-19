@@ -20,7 +20,7 @@ export async function createUser(data: any) {
   const result = await withTransaction({
     action: "CREATE_USER",
     module: Module.USERS,
-    newValues: { email: data.email, roleId: data.roleId, departmentId: data.departmentId } // Don't log password in audit!
+    newValues: { email: data.email, roleId: data.roleId, departmentId: data.departmentId, employeeId: data.employeeId } // Don't log password in audit!
   }, async (tx) => {
     const user = await tx.user.create({ data: userData });
     // Strip password from result

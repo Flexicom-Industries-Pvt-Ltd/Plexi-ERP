@@ -48,6 +48,7 @@ export function UsersClient({ users, roles, departments }: Props) {
           <TableHeader>
             <TableRow>
               <TableHead>User</TableHead>
+              <TableHead>Emp ID</TableHead>
               <TableHead>Role</TableHead>
               <TableHead>Department</TableHead>
               <TableHead>Status</TableHead>
@@ -58,7 +59,7 @@ export function UsersClient({ users, roles, departments }: Props) {
           <TableBody>
             {users.length === 0 && (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                   No users found.
                 </TableCell>
               </TableRow>
@@ -70,6 +71,9 @@ export function UsersClient({ users, roles, departments }: Props) {
                     <span className="font-medium">{user.name || 'Unnamed User'}</span>
                     <span className="text-xs text-muted-foreground">{user.email}</span>
                   </div>
+                </TableCell>
+                <TableCell>
+                  <span className="text-sm font-medium">{user.employeeId || '-'}</span>
                 </TableCell>
                 <TableCell>
                   {user.role ? (
