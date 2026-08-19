@@ -5,6 +5,7 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    target-branch: "dev"
     # Auto-assign reviewers and add labels
     reviewers:
       - "Flexicom-Industries-Pvt-Ltd"
@@ -17,6 +18,7 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    target-branch: "dev"
     labels:
       - "dependencies"
       - "github-actions"
