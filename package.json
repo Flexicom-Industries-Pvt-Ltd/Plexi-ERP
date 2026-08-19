@@ -48,7 +48,7 @@
     "@types/react-dom": "^19",
     "@types/ws": "^8.18.1",
     "@vitejs/plugin-react": "^6.0.5",
-    "eslint": "^9",
+    "eslint": "^10",
     "eslint-config-next": "16.3.1",
     "jsdom": "^30.0.1",
     "prettier": "^3.9.6",
