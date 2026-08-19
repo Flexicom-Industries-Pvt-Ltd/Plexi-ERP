@@ -119,6 +119,11 @@ export function ProfileClient({ user }: Props) {
           </div>
 
           <div>
+            <span className="text-sm font-medium text-muted-foreground block mb-1">Employee ID</span>
+            <span className="text-sm">{user.employeeId || <span className="italic text-muted-foreground">Not assigned</span>}</span>
+          </div>
+
+          <div>
             <span className="text-sm font-medium text-muted-foreground block mb-1">Account Status</span>
             <Badge variant={user.isActive ? "default" : "destructive"}>
               {user.isActive ? "Active" : "Inactive / Suspended"}

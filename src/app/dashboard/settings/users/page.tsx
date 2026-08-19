@@ -1,13 +1,18 @@
 import { db } from "@/lib/db";
 import { UsersClient } from "./users-client";
+import { requirePermission } from "@/lib/permissions";
+import { Module } from "@/generated/prisma";
+import { Metadata } from "next";
 
-export const metadata = {
+export const metadata: Metadata = {
   title: "User Management | Plexi-ERP",
 };
 
 export const dynamic = "force-dynamic";
 
-export default async function UsersSettingsPage() {
+export default async function UsersPage() {
+  await requirePermission(Module.SETTINGS, "canRead");
+
   const [users, roles, departments] = await Promise.all([
     db.user.findMany({
       orderBy: { createdAt: 'desc' },
