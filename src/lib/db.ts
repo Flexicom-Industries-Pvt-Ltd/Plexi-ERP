@@ -8,7 +8,8 @@ import { env } from '../env';
 // Required for Node.js edge environments / serverless functions
 neonConfig.webSocketConstructor = ws;
 
-const connectionString = env.DATABASE_URL;
+// Strip query params (like ?sslmode=require) as they cause Neon Pool to fail in the local runtime
+const connectionString = env.DATABASE_URL.split('?')[0];
 
 const pool = new Pool({ connectionString });
 const adapter = new PrismaNeon(pool as any);
