@@ -171,7 +171,9 @@ export function UserFormModal({
                 </Label>
                 <Select value={formData.roleId || ""} onValueChange={(val) => handleSelectChange('roleId', val)}>
                   <SelectTrigger id="roleId" className="bg-secondary/20 focus:ring-primary/30 border-transparent focus:border-primary/50 rounded-lg">
-                    <SelectValue placeholder="Select Role" />
+                    <SelectValue placeholder="Select Role">
+                      {roles.find(r => r.id === formData.roleId)?.name || "Select Role"}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent className="rounded-xl shadow-lg border-border/40">
                     {roles.map((role) => (
@@ -189,7 +191,9 @@ export function UserFormModal({
                 </Label>
                 <Select value={formData.departmentId || ""} onValueChange={(val) => handleSelectChange('departmentId', val)}>
                   <SelectTrigger id="departmentId" className="bg-secondary/20 focus:ring-primary/30 border-transparent focus:border-primary/50 rounded-lg">
-                    <SelectValue placeholder="Select Dept" />
+                    <SelectValue placeholder="Select Dept">
+                      {departments.find(d => d.id === formData.departmentId)?.name || "Select Dept"}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent className="rounded-xl shadow-lg border-border/40">
                     {departments.map((dept) => (
