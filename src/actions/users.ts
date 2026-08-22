@@ -13,6 +13,15 @@ import {
 } from "@/lib/schemas/users";
 
 export const createUser = safeAction(CreateUserSchema, async (data) => {
+  if (data.email) {
+    const existingEmail = await db.user.findUnique({ where: { email: data.email } });
+    if (existingEmail) throw new Error("A user with this email already exists.");
+  }
+  if (data.employeeId) {
+    const existingEmp = await db.user.findUnique({ where: { employeeId: data.employeeId } });
+    if (existingEmp) throw new Error("A user with this Employee ID already exists.");
+  }
+
   let passwordHash = null;
   if (data.password) {
     passwordHash = await bcrypt.hash(data.password, 10);
@@ -42,6 +51,18 @@ export const createUser = safeAction(CreateUserSchema, async (data) => {
 export const updateUser = safeAction(UpdateUserSchema, async (data) => {
   const { id, ...updateData } = data;
   
+  const oldUser = await db.user.findUnique({ where: { id } });
+  if (!oldUser) throw new Error("User not found.");
+
+  if (updateData.email && updateData.email !== oldUser.email) {
+    const existingEmail = await db.user.findUnique({ where: { email: updateData.email } });
+    if (existingEmail) throw new Error("A user with this email already exists.");
+  }
+  if (updateData.employeeId && updateData.employeeId !== oldUser.employeeId) {
+    const existingEmp = await db.user.findUnique({ where: { employeeId: updateData.employeeId } });
+    if (existingEmp) throw new Error("A user with this Employee ID already exists.");
+  }
+
   if (updateData.password) {
     updateData.password = await bcrypt.hash(updateData.password, 10);
   } else {
