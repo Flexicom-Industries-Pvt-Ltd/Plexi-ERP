@@ -45,7 +45,7 @@ const settingsItems = [
   { title: "General Settings", url: "/dashboard/settings" },
   { title: "Users", url: "/dashboard/settings/users" },
   { title: "Roles", url: "/dashboard/settings/roles" },
-  { title: "Branches & Locations", url: "/dashboard/settings/branches" },
+  { title: "Organization", url: "/dashboard/settings/organization" },
 ];
 
 export function AppSidebar() {
