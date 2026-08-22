@@ -11,7 +11,11 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { createRole, updateRole, deleteRole, RolePermissionInput } from "@/actions/roles";
+import { createRole, updateRole, deleteRole } from "@/actions/roles";
+import { z } from "zod";
+import { RolePermissionSchema } from "@/lib/schemas/roles";
+
+type RolePermissionInput = z.infer<typeof RolePermissionSchema>;
 
 type Props = {
   roles: any[];
@@ -81,12 +85,12 @@ export function RolesClient({ roles, modules }: Props) {
 
     try {
       if (editingRole) {
-        const res = await updateRole(editingRole.id, { name, description, permissions: permissionsArray });
+        const res = await updateRole({ id: editingRole.id, name, description, permissions: permissionsArray });
         if (res.success) {
           toast.success("Role updated successfully");
           setIsDialogOpen(false);
         } else {
-          toast.error(res.error);
+          toast.error(res.error.message);
         }
       } else {
         const res = await createRole({ name, description, permissions: permissionsArray });
@@ -94,7 +98,7 @@ export function RolesClient({ roles, modules }: Props) {
           toast.success("Role created successfully");
           setIsDialogOpen(false);
         } else {
-          toast.error(res.error);
+          toast.error(res.error.message);
         }
       }
     } catch (err) {
@@ -108,11 +112,11 @@ export function RolesClient({ roles, modules }: Props) {
     if (!confirm("Are you sure you want to delete this role?")) return;
     setIsPending(true);
     try {
-      const res = await deleteRole(id);
+      const res = await deleteRole({ id });
       if (res.success) {
         toast.success("Role deleted successfully");
       } else {
-        toast.error(res.error);
+        toast.error(res.error.message);
       }
     } catch (err) {
       toast.error("Failed to delete role");
