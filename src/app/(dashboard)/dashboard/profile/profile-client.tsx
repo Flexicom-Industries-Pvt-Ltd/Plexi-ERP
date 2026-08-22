@@ -38,7 +38,12 @@ export function ProfileClient({ user }: Props) {
         dataToUpdate.password = formData.password;
       }
 
-      await updateProfile(user.id, dataToUpdate);
+      dataToUpdate.id = user.id;
+
+      const res = await updateProfile(dataToUpdate);
+      if (!res.success) {
+        throw new Error(res.error.message || "Failed to update profile");
+      }
       toast.success("Profile updated successfully");
       
       // Clear password field after success
