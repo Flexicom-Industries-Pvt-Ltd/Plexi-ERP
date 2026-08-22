@@ -42,8 +42,12 @@ describe('User Actions', () => {
         data: { email: 'test@example.com', password: 'hashed_password', roleId: 'r-1' }
       });
       // Ensure password is not returned
-      expect(result).not.toHaveProperty('password');
-      expect(result.id).toBe('u-1');
+      if (result.success) {
+        expect(result.data).not.toHaveProperty('password');
+        expect(result.data.id).toBe('u-1');
+      } else {
+        throw new Error("Action failed");
+      }
     });
   });
 
@@ -52,13 +56,17 @@ describe('User Actions', () => {
       const mockUser = { id: 'u-1', isActive: false };
       vi.mocked(db.user.update).mockResolvedValue(mockUser as any);
 
-      const result = await toggleUserStatus('u-1', false);
+      const result = await toggleUserStatus({ id: 'u-1', isActive: false });
 
       expect(db.user.update).toHaveBeenCalledWith({
         where: { id: 'u-1' },
         data: { isActive: false }
       });
-      expect(result).toEqual(mockUser);
+      if (result.success) {
+        expect(result.data).toEqual(mockUser);
+      } else {
+        throw new Error("Action failed");
+      }
     });
   });
 });

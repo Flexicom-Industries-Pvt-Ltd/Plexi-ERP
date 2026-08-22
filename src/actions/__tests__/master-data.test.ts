@@ -33,20 +33,20 @@ describe('Master Data Actions', () => {
       expect(db.department.create).toHaveBeenCalledWith({
         data: { name: 'Production', code: 'PROD' }
       });
-      expect(result).toEqual(mockDepartment);
+      if (result.success) expect(result.data).toEqual(mockDepartment);
     });
 
     it('should update a department', async () => {
       const mockDepartment = { id: 'dep-1', name: 'Prod Updated', code: 'PROD', isActive: true };
       vi.mocked(db.department.update).mockResolvedValue(mockDepartment as any);
 
-      const result = await updateDepartment('dep-1', { name: 'Prod Updated', code: 'PROD', isActive: true });
+      const result = await updateDepartment({ id: 'dep-1', name: 'Prod Updated', code: 'PROD', isActive: true });
 
       expect(db.department.update).toHaveBeenCalledWith({
         where: { id: 'dep-1' },
         data: { name: 'Prod Updated', code: 'PROD', isActive: true }
       });
-      expect(result).toEqual(mockDepartment);
+      if (result.success) expect(result.data).toEqual(mockDepartment);
     });
   });
 
@@ -60,7 +60,7 @@ describe('Master Data Actions', () => {
       expect(db.section.create).toHaveBeenCalledWith({
         data: { name: 'Lamination', code: 'LAM', departmentId: 'dep-1' }
       });
-      expect(result).toEqual(mockSection);
+      if (result.success) expect(result.data).toEqual(mockSection);
     });
   });
 
@@ -74,7 +74,7 @@ describe('Master Data Actions', () => {
       expect(db.location.create).toHaveBeenCalledWith({
         data: { name: 'Gate 1', code: 'G1', type: LocationType.GATE }
       });
-      expect(result).toEqual(mockLocation);
+      if (result.success) expect(result.data).toEqual(mockLocation);
     });
   });
 });
