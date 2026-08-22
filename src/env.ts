@@ -12,10 +12,10 @@ export const env = createEnv({
       .default("development"),
     DATABASE_URL: z.string().url("A valid Database URL is required for Prisma"),
     AUTH_SECRET: z.string().min(1, "AUTH_SECRET is required"),
-    S3_BUCKET_NAME: z.string().min(1, "S3_BUCKET_NAME is required"),
-    S3_REGION: z.string().min(1, "S3_REGION is required"),
-    S3_ACCESS_KEY_ID: z.string().min(1, "S3_ACCESS_KEY_ID is required"),
-    S3_SECRET_ACCESS_KEY: z.string().min(1, "S3_SECRET_ACCESS_KEY is required"),
+    S3_BUCKET_NAME: z.string().optional(),
+    S3_REGION: z.string().optional(),
+    S3_ACCESS_KEY_ID: z.string().optional(),
+    S3_SECRET_ACCESS_KEY: z.string().optional(),
     // Add other server secrets here (e.g., API_KEYS)
   },
 
