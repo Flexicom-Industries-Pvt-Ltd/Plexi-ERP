@@ -6,10 +6,10 @@ import { db } from "@/lib/db";
 import { Module } from "@/generated/prisma";
 
 const s3Client = new S3Client({
-  region: env.S3_REGION,
+  region: env.S3_REGION || "us-east-1",
   credentials: {
-    accessKeyId: env.S3_ACCESS_KEY_ID,
-    secretAccessKey: env.S3_SECRET_ACCESS_KEY,
+    accessKeyId: env.S3_ACCESS_KEY_ID || "dummy",
+    secretAccessKey: env.S3_SECRET_ACCESS_KEY || "dummy",
   },
 });
 
@@ -23,7 +23,7 @@ export async function generatePresignedUploadUrl(
   const fileKey = `${module.toLowerCase()}/${randomUUID()}.${extension}`;
 
   const command = new PutObjectCommand({
-    Bucket: env.S3_BUCKET_NAME,
+    Bucket: env.S3_BUCKET_NAME || "dummy-bucket",
     Key: fileKey,
     ContentType: mimeType,
   });
@@ -41,12 +41,12 @@ export async function generatePresignedUploadUrl(
 export async function getPublicUrl(fileKey: string) {
   // Assuming the bucket is public-read or a CDN is in front.
   // Otherwise, you would generate a GET presigned URL.
-  return `https://${env.S3_BUCKET_NAME}.s3.${env.S3_REGION}.amazonaws.com/${fileKey}`;
+  return `https://${env.S3_BUCKET_NAME || "dummy-bucket"}.s3.${env.S3_REGION || "us-east-1"}.amazonaws.com/${fileKey}`;
 }
 
 export async function deleteS3File(fileKey: string) {
   const command = new DeleteObjectCommand({
-    Bucket: env.S3_BUCKET_NAME,
+    Bucket: env.S3_BUCKET_NAME || "dummy-bucket",
     Key: fileKey,
   });
 
