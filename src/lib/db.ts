@@ -1,4 +1,4 @@
-import { Pool, neonConfig } from '@neondatabase/serverless';
+import { neonConfig } from '@neondatabase/serverless';
 import { PrismaNeon } from '@prisma/adapter-neon';
 import ws from 'ws';
 import { PrismaClient } from '../generated/prisma';
@@ -8,8 +8,8 @@ import { env } from '../env';
 neonConfig.webSocketConstructor = ws;
 
 // Use the WebSocket Pool to support interactive transactions (HTTP mode does not support them)
-const pool = new Pool({ connectionString: env.DATABASE_URL });
-const adapter = new PrismaNeon(pool);
+const poolConfig = { connectionString: env.DATABASE_URL };
+const adapter = new PrismaNeon(poolConfig);
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
