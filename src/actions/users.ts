@@ -1,6 +1,7 @@
 "use server";
 
 import { withTransaction } from "@/lib/transaction";
+import { db } from "@/lib/db";
 import { Module } from "@/generated/prisma";
 import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
