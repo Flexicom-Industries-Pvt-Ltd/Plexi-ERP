@@ -1,19 +1,17 @@
 "use client";
 
-import * as React from "react";
+import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   Settings,
-  Users,
   ShieldCheck,
   PackageSearch,
   Factory,
   CheckCircle,
   Truck,
-  Building2,
   ChevronDown,
 } from "lucide-react";
 
@@ -31,7 +29,7 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 const navItems = [
@@ -45,12 +43,14 @@ const navItems = [
 
 const settingsItems = [
   { title: "General Settings", url: "/dashboard/settings" },
-  { title: "Users & Roles", url: "/dashboard/settings/users" },
+  { title: "Users", url: "/dashboard/settings/users" },
+  { title: "Roles", url: "/dashboard/settings/roles" },
   { title: "Branches & Locations", url: "/dashboard/settings/branches" },
 ];
 
 export function AppSidebar() {
   const pathname = usePathname();
+  const [settingsOpen, setSettingsOpen] = useState(pathname.startsWith("/dashboard/settings"));
 
   return (
     <Sidebar className="border-r border-border/50 bg-white shadow-sm transition-all duration-300" variant="inset" collapsible="icon">
@@ -80,7 +80,7 @@ export function AppSidebar() {
             </SidebarMenuItem>
           ))}
           
-          <Collapsible defaultOpen={pathname.startsWith("/dashboard/settings")} className="group/collapsible">
+          <Collapsible open={settingsOpen} onOpenChange={setSettingsOpen} className="group/collapsible">
             <SidebarMenuItem>
               <CollapsibleTrigger render={<SidebarMenuButton tooltip="Settings" />}>
                   <Settings className="h-4 w-4" />

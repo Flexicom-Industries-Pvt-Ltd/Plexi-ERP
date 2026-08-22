@@ -27,11 +27,6 @@ export const createShift = safeAction(
 
     revalidatePath("/settings/shifts");
     return shift;
-  },
-  {
-    action: "CREATE_SHIFT",
-    module: "SETTINGS",
-    logInput: true,
   }
 );
 
@@ -56,11 +51,6 @@ export const createUom = safeAction(
 
     revalidatePath("/settings/uom");
     return uom;
-  },
-  {
-    action: "CREATE_UOM",
-    module: "SETTINGS",
-    logInput: true,
   }
 );
 
@@ -85,10 +75,5 @@ export const createCategory = safeAction(
 
     revalidatePath("/settings/categories");
     return category;
-  },
-  {
-    action: "CREATE_CATEGORY",
-    module: "SETTINGS",
-    logInput: true,
   }
 );
