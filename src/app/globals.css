@@ -16,15 +16,12 @@
   --color-sidebar-primary: var(--sidebar-primary);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar: var(--sidebar);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
-  --color-chart-1: var(--chart-1);
+  
   --color-ring: var(--ring);
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -37,67 +34,61 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+  
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
 }
 
 :root {
-  /* Core Colors */
-  --background: oklch(0.99 0 0); /* Very light gray/white */
-  --foreground: oklch(0.25 0.05 283); /* Very dark blue-gray for text */
+  /* Minimalist, Sleek, Light Blue & White Aesthetic */
   
-  /* Cards and Popovers */
-  --card: oklch(1 0 0);
-  --card-foreground: var(--foreground);
-  --popover: oklch(1 0 0);
-  --popover-foreground: var(--foreground);
+  /* Core Backgrounds */
+  --background: #f8fafc; /* Very light slate/blueish white */
+  --foreground: #0f172a; /* Slate 900 for crisp text */
   
-  /* Primary - Deep Blue/Indigo from Logo (#2d2f83) */
-  --primary: #2d2f83;
-  --primary-foreground: oklch(0.98 0 0);
+  /* Cards and Popovers (Pure White for contrast) */
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  --popover: #ffffff;
+  --popover-foreground: #0f172a;
   
-  /* Secondary - Red/Orange from Logo (#e64132) */
-  --secondary: #e64132;
-  --secondary-foreground: oklch(0.98 0 0);
+  /* Primary - Sleek Ocean Blue */
+  --primary: #0ea5e9; /* Sky 500 */
+  --primary-foreground: #ffffff;
   
-  /* Muted and Accents */
-  --muted: oklch(0.96 0.01 283);
-  --muted-foreground: oklch(0.5 0.05 283);
-  --accent: oklch(0.96 0.01 283);
-  --accent-foreground: var(--primary);
+  /* Secondary - Soft Ice Blue */
+  --secondary: #f0f9ff; /* Sky 50 */
+  --secondary-foreground: #0284c7; /* Sky 600 */
+  
+  /* Muted and Accents - Subtle Blue-Grays */
+  --muted: #f1f5f9; /* Slate 100 */
+  --muted-foreground: #64748b; /* Slate 500 */
+  --accent: #f0f9ff;
+  --accent-foreground: #0ea5e9;
   
   /* Status Colors */
-  --destructive: oklch(0.6 0.22 30); /* Red */
-  --destructive-foreground: oklch(0.98 0 0);
+  --destructive: #ef4444; 
+  --destructive-foreground: #ffffff;
   
-  /* Borders and Rings */
-  --border: oklch(0.92 0.01 283);
-  --input: oklch(0.92 0.01 283);
-  --ring: var(--primary);
+  /* Borders and Rings (Ultra light borders) */
+  --border: #e2e8f0; /* Slate 200 */
+  --input: #e2e8f0;
+  --ring: #38bdf8; /* Sky 400 */
   
-  /* Charts (Themed with blues and oranges) */
-  --chart-1: #2d2f83;
-  --chart-2: #e64132;
-  --chart-3: oklch(0.5 0.15 283);
-  --chart-4: oklch(0.7 0.2 30);
-  --chart-5: oklch(0.8 0.1 283);
+  /* Sharp, Modern Radius */
+  --radius: 0.5rem; 
   
-  --radius: 0.75rem; /* Slightly rounded corners for modern look */
-  
-  /* Sidebar */
-  --sidebar: oklch(0.99 0 0);
-  --sidebar-foreground: var(--foreground);
-  --sidebar-primary: var(--primary);
-  --sidebar-primary-foreground: var(--primary-foreground);
-  --sidebar-accent: var(--muted);
-  --sidebar-accent-foreground: var(--accent-foreground);
-  --sidebar-border: var(--border);
-  --sidebar-ring: var(--ring);
+  /* Sidebar Styling - Clean and Minimal */
+  --sidebar: #ffffff;
+  --sidebar-foreground: #0f172a;
+  --sidebar-primary: #0ea5e9;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f0f9ff;
+  --sidebar-accent-foreground: #0284c7;
+  --sidebar-border: #e2e8f0;
+  --sidebar-ring: #38bdf8;
 }
 
 @layer base {
@@ -113,64 +104,25 @@
 }
 
 @layer utilities {
-  /* Glassmorphism utilities for rich aesthetics */
+  /* Sleek Glassmorphism */
   .glass {
-    @apply bg-white/70 backdrop-blur-md border border-white/20 shadow-sm;
-  }
-  .glass-dark {
-    @apply bg-[#2d2f83]/80 backdrop-blur-md border border-white/10 shadow-md text-white;
+    @apply bg-white/80 backdrop-blur-lg border border-white/40 shadow-sm;
   }
   
-  /* Custom Gradients matching the brand colors */
+  /* Minimalist Gradients */
   .bg-gradient-brand {
-    @apply bg-gradient-to-br from-[#2d2f83] to-[#1a1b5c];
-  }
-  .bg-gradient-accent {
-    @apply bg-gradient-to-br from-[#e64132] to-[#c73426];
+    @apply bg-gradient-to-r from-[#0ea5e9] to-[#38bdf8];
   }
   
-  /* Modern Grid Backgrounds */
+  /* Subtle Grid for background depth without noise */
   .bg-grid-pattern {
-    background-size: 40px 40px;
-    background-image: linear-gradient(to right, rgba(0, 0, 0, 0.05) 1px, transparent 1px),
-      linear-gradient(to bottom, rgba(0, 0, 0, 0.05) 1px, transparent 1px);
-  }
-  
-  .bg-grid-pattern-light {
-    background-size: 40px 40px;
-    background-image: linear-gradient(to right, rgba(255, 255, 255, 0.1) 1px, transparent 1px),
-      linear-gradient(to bottom, rgba(255, 255, 255, 0.1) 1px, transparent 1px);
+    background-size: 30px 30px;
+    background-image: linear-gradient(to right, rgba(14, 165, 233, 0.03) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(14, 165, 233, 0.03) 1px, transparent 1px);
   }
 
-  /* Dot pattern */
-  .bg-dot-pattern {
-    background-image: radial-gradient(rgba(0,0,0,0.1) 1px, transparent 1px);
-    background-size: 20px 20px;
-  }
-
-  /* Micro animations */
+  /* Micro animations for premium feel */
   .hover-lift {
-    @apply transition-transform duration-300 ease-out hover:-translate-y-1 hover:shadow-lg;
-  }
-  
-  /* Shimmer effect for premium loading/empty states */
-  .animate-shimmer {
-    background: linear-gradient(
-      to right,
-      rgba(255, 255, 255, 0) 0%,
-      rgba(255, 255, 255, 0.5) 50%,
-      rgba(255, 255, 255, 0) 100%
-    );
-    background-size: 200% 100%;
-    animation: shimmer 2s infinite linear;
-  }
-}
-
-@keyframes shimmer {
-  0% {
-    background-position: 200% 0;
-  }
-  100% {
-    background-position: -200% 0;
+    @apply transition-all duration-200 ease-in-out hover:-translate-y-0.5 hover:shadow-md;
   }
 }
