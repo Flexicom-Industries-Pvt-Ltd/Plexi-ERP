@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { errorResponse, successResponse, ApiResponse } from "./api-response";
 import { ApiError, ValidationError } from "./exceptions";
-import { Module } from "@/generated/prisma";
+import { Module, Prisma } from "@/generated/prisma";
 
 /**
  * A higher-order function to wrap Next.js Server Actions.
@@ -41,9 +41,18 @@ export function safeAction<TInput, TOutput>(
         return errorResponse(error.message, error.code);
       }
 
-      // Hide internal server crash details from the client
+      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        if (error.code === "P2002") {
+          const target = error.meta?.target as string[];
+          const field = target && target.length > 0 ? target[0] : "field";
+          return errorResponse(`A record with this ${field} already exists.`, "UNIQUE_CONSTRAINT");
+        }
+      }
+
+      // Hide internal server crash details from the client in production
+      const message = error instanceof Error ? error.message : "An unexpected error occurred on the server.";
       return errorResponse(
-        "An unexpected error occurred on the server.",
+        message,
         "INTERNAL_SERVER_ERROR"
       );
     }

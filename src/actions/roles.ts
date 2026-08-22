@@ -8,6 +8,11 @@ import { safeAction } from "@/lib/safe-action";
 import { CreateRoleSchema, UpdateRoleSchema, DeleteRoleSchema } from "@/lib/schemas/roles";
 
 export const createRole = safeAction(CreateRoleSchema, async (data) => {
+  const existingRole = await db.role.findUnique({ where: { name: data.name } });
+  if (existingRole) {
+    throw new Error("A role with this name already exists.");
+  }
+
   const result = await withTransaction({
     action: "CREATE_ROLE",
     module: Module.SETTINGS,
@@ -38,6 +43,11 @@ export const updateRole = safeAction(UpdateRoleSchema, async (data) => {
   
   const oldRole = await db.role.findUnique({ where: { id }, include: { permissions: true } });
   if (!oldRole) throw new Error("Role not found");
+
+  if (updateData.name !== oldRole.name) {
+    const existingName = await db.role.findUnique({ where: { name: updateData.name } });
+    if (existingName) throw new Error("A role with this name already exists.");
+  }
 
   const result = await withTransaction({
     action: "UPDATE_ROLE",
