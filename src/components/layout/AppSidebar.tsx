@@ -165,7 +165,9 @@ export function AppSidebar({ user, allowedModules }: AppSidebarProps) {
                 </DropdownMenuGroup>
                 <DropdownMenuSeparator />
                 <DropdownMenuGroup>
-                  <DropdownMenuItem>Profile</DropdownMenuItem>
+                  <DropdownMenuItem asChild className="cursor-pointer">
+                    <Link href="/dashboard/profile">Profile</Link>
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => signOut({ callbackUrl: '/auth/login' })} className="text-red-600 font-medium cursor-pointer">
                     Log out
                   </DropdownMenuItem>
