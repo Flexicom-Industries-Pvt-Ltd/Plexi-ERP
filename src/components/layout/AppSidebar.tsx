@@ -31,7 +31,9 @@ import {
 } from "@/components/ui/sidebar";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+
+import logoImg from "../../../public/logo.png";
 
 const navItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, module: null },
@@ -47,6 +49,7 @@ const settingsItems = [
   { title: "Users", url: "/dashboard/settings/users" },
   { title: "Roles", url: "/dashboard/settings/roles" },
   { title: "Organization", url: "/dashboard/settings/organization" },
+  { title: "System Logs", url: "/dashboard/settings/logs" },
 ];
 
 type AppSidebarProps = {
@@ -67,15 +70,15 @@ export function AppSidebar({ user, allowedModules }: AppSidebarProps) {
   );
 
   return (
-    <Sidebar className="border-r border-border/50 bg-white shadow-sm transition-all duration-300" variant="inset" collapsible="icon">
-      <SidebarHeader className="h-16 flex items-center px-4 border-b border-border/50 bg-white overflow-hidden transition-all duration-300">
+    <Sidebar className="border-r border-border/50 bg-slate-50 shadow-sm transition-all duration-300 font-sans" variant="inset" collapsible="icon">
+      <SidebarHeader className="h-[72px] flex items-center px-4 border-b border-border/50 bg-white overflow-hidden transition-all duration-300">
         <Link href="/dashboard" className="flex items-center gap-3 font-semibold w-full">
-          <div className="flex shrink-0 items-center justify-center rounded-md hover:opacity-80 transition-opacity">
-            <Image src="/logo.png" alt="Flexicom Logo" width={44} height={44} className="object-contain" />
+          <div className="flex shrink-0 items-center justify-center rounded-lg hover:opacity-80 transition-opacity bg-white p-1 shadow-sm border border-slate-100">
+            <Image src={logoImg} alt="Flexicom Logo" className="h-10 w-10 object-contain" />
           </div>
           <div className="flex flex-col truncate group-data-[collapsible=icon]:hidden transition-all duration-300 opacity-100 group-data-[collapsible=icon]:opacity-0">
-            <span className="text-xl font-bold text-primary leading-tight">Flexicom</span>
-            <span className="text-xs text-muted-foreground uppercase tracking-widest font-medium">ERP System</span>
+            <span className="text-xl font-extrabold text-slate-900 tracking-tight leading-none mb-1">Flexicom</span>
+            <span className="text-[10px] text-primary uppercase tracking-[0.2em] font-bold">ERP System</span>
           </div>
         </Link>
       </SidebarHeader>
@@ -147,24 +150,28 @@ export function AppSidebar({ user, allowedModules }: AppSidebarProps) {
                 align="end"
                 sideOffset={4}
               >
-                <DropdownMenuLabel className="p-0 font-normal">
-                  <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
-                    <Avatar className="h-8 w-8 rounded-lg">
-                      <AvatarFallback className="rounded-lg bg-primary/10 text-primary">
-                        {user?.name ? user.name.substring(0, 2).toUpperCase() : "U"}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="grid flex-1 text-left text-sm leading-tight">
-                      <span className="truncate font-semibold">{user?.name || "User"}</span>
-                      <span className="truncate text-xs text-muted-foreground">{user?.email || ""}</span>
+                <DropdownMenuGroup>
+                  <DropdownMenuLabel className="p-0 font-normal">
+                    <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
+                      <Avatar className="h-8 w-8 rounded-lg">
+                        <AvatarFallback className="rounded-lg bg-primary/10 text-primary">
+                          {user?.name ? user.name.substring(0, 2).toUpperCase() : "U"}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="grid flex-1 text-left text-sm leading-tight">
+                        <span className="truncate font-semibold">{user?.name || "User"}</span>
+                        <span className="truncate text-xs text-muted-foreground">{user?.email || ""}</span>
+                      </div>
                     </div>
-                  </div>
-                </DropdownMenuLabel>
+                  </DropdownMenuLabel>
+                </DropdownMenuGroup>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem>Profile</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => signOut({ callbackUrl: '/auth/login' })} className="text-red-600 font-medium cursor-pointer">
-                  Log out
-                </DropdownMenuItem>
+                <DropdownMenuGroup>
+                  <DropdownMenuItem>Profile</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => signOut({ callbackUrl: '/auth/login' })} className="text-red-600 font-medium cursor-pointer">
+                    Log out
+                  </DropdownMenuItem>
+                </DropdownMenuGroup>
               </DropdownMenuContent>
             </DropdownMenu>
           </SidebarMenuItem>
