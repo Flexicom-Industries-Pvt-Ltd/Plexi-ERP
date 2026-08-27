@@ -50,21 +50,39 @@ export async function GET(request: NextRequest) {
     take: 10000,
   });
 
+  // Enrich with user info
+  const userIds = Array.from(new Set(logs.map((l) => l.userId).filter(Boolean))) as string[];
+  const users = userIds.length > 0
+    ? await db.user.findMany({
+        where: { id: { in: userIds } },
+        select: { id: true, name: true, email: true },
+      })
+    : [];
+  const userMap = new Map(users.map((u) => [u.id, u]));
+
   if (format === 'csv') {
-    const header = 'Timestamp,Correlation ID,Module,Severity,Action,IP,User Agent,Duration (ms),Location\n';
+    const header = 'Timestamp,Correlation ID,Module,Severity,Action,User,Email,HTTP Method,URL,Status Code,IP,Browser,OS,Device,Duration (ms),User Agent\n';
     const rows = logs.map((l) => {
       const ts = new Date(l.timestamp).toISOString();
-      const escape = (v: string | null) => `"${(v || '').replace(/"/g, '""')}"`;
+      const u = l.userId ? userMap.get(l.userId) : null;
+      const escape = (v: string | null | undefined) => `"${(v || '').replace(/"/g, '""')}"`;
       return [
         ts,
         escape(l.correlationId),
         escape(l.module),
         escape(l.severity),
         escape(l.action),
+        escape(u?.name),
+        escape(u?.email),
+        escape(l.httpMethod),
+        escape(l.url),
+        l.statusCode ?? '',
         escape(l.ip),
-        escape(l.userAgent),
+        escape(l.browser),
+        escape(l.os),
+        escape(l.deviceType),
         l.durationMs ?? '',
-        escape(l.location),
+        escape(l.userAgent),
       ].join(',');
     });
 
@@ -77,21 +95,30 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  // JSON export (can be used for PDF generation on client)
+  // JSON export
   return NextResponse.json({
     exportedAt: new Date().toISOString(),
     count: logs.length,
-    data: logs.map((l) => ({
-      timestamp: l.timestamp,
-      correlationId: l.correlationId,
-      module: l.module,
-      severity: l.severity,
-      action: l.action,
-      ip: l.ip,
-      userAgent: l.userAgent,
-      durationMs: l.durationMs,
-      location: l.location,
-      payload: l.redactedPayload,
-    })),
+    data: logs.map((l) => {
+      const u = l.userId ? userMap.get(l.userId) : null;
+      return {
+        timestamp: l.timestamp,
+        correlationId: l.correlationId,
+        module: l.module,
+        severity: l.severity,
+        action: l.action,
+        user: u ? { name: u.name, email: u.email } : null,
+        httpMethod: l.httpMethod,
+        url: l.url,
+        statusCode: l.statusCode,
+        ip: l.ip,
+        browser: l.browser,
+        os: l.os,
+        deviceType: l.deviceType,
+        durationMs: l.durationMs,
+        userAgent: l.userAgent,
+        payload: l.redactedPayload,
+      };
+    }),
   });
 }
