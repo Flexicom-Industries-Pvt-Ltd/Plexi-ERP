@@ -3,6 +3,7 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
+import { headers } from "next/headers";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(db),
@@ -19,6 +20,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           return null;
         }
 
+        const headersList = await headers();
+        const ip = headersList.get("x-forwarded-for") || headersList.get("x-real-ip") || null;
+        const userAgent = headersList.get("user-agent") || null;
+
         const user = await db.user.findUnique({
           where: { email: credentials.email as string },
           include: { role: true }
@@ -32,6 +37,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             severity: "SECURITY",
             action: "Login Failed — User Not Found",
             payload: { email: credentials.email },
+            ip,
+            userAgent,
+            httpMethod: "POST",
+            url: "/api/auth/callback/credentials",
           });
           return null;
         }
@@ -50,6 +59,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             severity: "SECURITY",
             action: "Login Failed — Invalid Password",
             payload: { email: credentials.email },
+            ip,
+            userAgent,
+            httpMethod: "POST",
+            url: "/api/auth/callback/credentials",
           });
           return null;
         }
@@ -83,6 +96,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   events: {
     async signIn({ user }) {
       // Log successful login
+      const headersList = await headers();
+      const ip = headersList.get("x-forwarded-for") || headersList.get("x-real-ip") || null;
+      const userAgent = headersList.get("user-agent") || null;
+      
       const { logEvent } = await import("@/lib/logging");
       await logEvent({
         userId: user.id,
@@ -90,10 +107,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         severity: "INFO",
         action: "Login Success",
         payload: { email: user.email, name: user.name },
+        ip,
+        userAgent,
       });
     },
     async signOut(message) {
       // Log sign-out event
+      const headersList = await headers();
+      const ip = headersList.get("x-forwarded-for") || headersList.get("x-real-ip") || null;
+      const userAgent = headersList.get("user-agent") || null;
+
       const { logEvent } = await import("@/lib/logging");
       const token = 'token' in message ? message.token : null;
       await logEvent({
@@ -102,6 +125,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         severity: "INFO",
         action: "Logout",
         payload: {},
+        ip,
+        userAgent,
       });
     },
   },
