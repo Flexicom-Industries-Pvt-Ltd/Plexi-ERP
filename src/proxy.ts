@@ -22,10 +22,13 @@ export default auth((req) => {
     return Response.redirect(new URL("/auth/login", req.nextUrl));
   }
 
-  // Inject Correlation ID
+  // Inject Correlation ID and Request Metadata
   const correlationId = req.headers.get("x-correlation-id") || crypto.randomUUID();
   const requestHeaders = new Headers(req.headers);
   requestHeaders.set("x-correlation-id", correlationId);
+  requestHeaders.set("x-request-method", req.method);
+  requestHeaders.set("x-request-url", req.nextUrl.pathname);
+  requestHeaders.set("x-request-start", Date.now().toString());
 
   const response = NextResponse.next({
     request: { headers: requestHeaders },
@@ -37,5 +40,5 @@ export default auth((req) => {
 
 // Optionally, don't invoke Middleware on some paths
 export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 };
