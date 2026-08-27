@@ -18,8 +18,8 @@ export default async function DashboardLayout({
   }
 
   const user = await db.user.findUnique({
-    where: { id: session.user.id },
-    include: { role: { include: { permissions: true } } }
+    where: { email: session.user.email as string },
+    include: { role: { include: { permissions: true } } },
   });
 
   const allowedModules: Record<string, boolean> = {};

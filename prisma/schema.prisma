@@ -1,8 +1,6 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
   provider = "prisma-client-js"
   output   = "../src/generated/prisma"
@@ -63,8 +61,10 @@ model User {
   accounts      Account[]
   sessions      Session[]
   auditLogs     AuditLog[]
-  files         FileAsset[]
-  createdAt     DateTime    @default(now())
+  files             FileAsset[]
+  gateEntries       GateEntry[]    @relation("GateEntryCreator")
+  verifiedDocuments GateDocument[] @relation("DocumentVerifier")
+  createdAt         DateTime       @default(now())
   updatedAt     DateTime    @updatedAt
 }
 
@@ -282,4 +282,140 @@ model ConfigParameter {
   updatedBy   String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+model LogEntry {
+  id               String    @id @default(uuid())
+  timestamp        DateTime  @default(now())
+  userId           String?
+  correlationId    String    @unique
+  module           String    // e.g., "business", "security", "offline", "gate"
+  severity         String    // INFO, WARN, ERROR
+  action           String    // descriptive name of the event
+  payload          Json      // original payload (redacted before save)
+  redactedPayload  Json      // payload after redaction (stored for audit)
+  ip               String?
+  location         String?
+  userAgent        String?
+  durationMs       Int?
+  meta             Json?     // any extra data (e.g., requestId, deviceId)
+  diffs            LogDiff[] @relation("LogEntryDiffs")
+}
+
+model LogDiff {
+  id          String   @id @default(uuid())
+  logEntryId  String
+  logEntry    LogEntry @relation("LogEntryDiffs", fields: [logEntryId], references: [id])
+  entity      String   // e.g., "Department", "User"
+  entityId    String
+  before      Json
+  after       Json
+}
+
+// ==========================================
+// Phase 4: Security & Gate Management
+// ==========================================
+
+enum GateEntryStatus {
+  ARRIVED
+  DOCUMENT_VERIFICATION
+  VERIFIED
+  PARKING
+  READY
+  LOADING
+  UNLOADING
+  COMPLETED
+  GATE_OUT
+  ON_HOLD
+  REJECTED
+  CANCELLED
+}
+
+enum GatePurpose {
+  LOADING
+  UNLOADING
+  OTHER
+}
+
+enum DocumentStatus {
+  PENDING
+  UNDER_VERIFICATION
+  VERIFIED
+  REJECTED
+}
+
+model GateEntry {
+  id               String          @id @default(cuid())
+  entryNumber      String          @unique // E.g., GE-20231015-001
+  truckNumber      String
+  driverName       String
+  driverContact    String?
+  transporter      String?
+  supplierCustomer String?
+  purpose          GatePurpose
+  status           GateEntryStatus @default(ARRIVED)
+  
+  arrivalTime      DateTime        @default(now())
+  exitTime         DateTime?
+  
+  expectedMaterial String?
+  expectedQuantity Float?
+  
+  // Parking/Waiting
+  parkingLocation  String?
+  waitingReason    String?
+  
+  // Final Exit
+  finalQuantity    Float?
+  finalRemarks     String?
+  
+  createdBy        String?
+  updatedBy        String?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  stockDetails     TruckStockDetail[]
+  documents        GateDocument[]
+  
+  // Relation to user who created it
+  user             User?           @relation("GateEntryCreator", fields: [createdBy], references: [id])
+
+  @@index([status])
+  @@index([truckNumber])
+  @@index([arrivalTime])
+}
+
+model TruckStockDetail {
+  id               String    @id @default(cuid())
+  gateEntryId      String
+  materialName     String
+  materialType     String?
+  quantity         Float
+  unit             String
+  batchLot         String?
+  supplierCustomer String?
+  expectedQuantity Float?
+  actualQuantity   Float?
+  
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  gateEntry        GateEntry @relation(fields: [gateEntryId], references: [id], onDelete: Cascade)
+}
+
+model GateDocument {
+  id             String         @id @default(cuid())
+  gateEntryId    String
+  documentType   String         // E.g., Invoice, Weighbridge Slip, PO
+  fileUrl        String?        // URL or file reference
+  status         DocumentStatus @default(PENDING)
+  remarks        String?
+  verifiedBy     String?        // User ID
+  verifiedAt     DateTime?
+
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  gateEntry      GateEntry      @relation(fields: [gateEntryId], references: [id], onDelete: Cascade)
+  verifier       User?          @relation("DocumentVerifier", fields: [verifiedBy], references: [id])
 }
