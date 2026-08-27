@@ -44,10 +44,9 @@ const navItems = [
 ];
 
 const settingsItems = [
-  { title: "General Settings", url: "/dashboard/settings" },
+  { title: "General Settings", url: "/dashboard/settings/organization" },
   { title: "Users", url: "/dashboard/settings/users" },
   { title: "Roles", url: "/dashboard/settings/roles" },
-  { title: "Organization", url: "/dashboard/settings/organization" },
   { title: "System Logs", url: "/dashboard/settings/logs" },
 ];
 
