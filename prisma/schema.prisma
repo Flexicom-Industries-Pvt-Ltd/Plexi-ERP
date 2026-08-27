@@ -289,8 +289,8 @@ model LogEntry {
   timestamp        DateTime  @default(now())
   userId           String?
   correlationId    String    @unique
-  module           String    // e.g., "business", "security", "offline", "gate"
-  severity         String    // INFO, WARN, ERROR
+  module           String    // e.g., "AUTH", "SECURITY_GATE", "SETTINGS", "PROFILE"
+  severity         String    // INFO, NOTICE, WARN, ERROR, CRITICAL, SECURITY
   action           String    // descriptive name of the event
   payload          Json      // original payload (redacted before save)
   redactedPayload  Json      // payload after redaction (stored for audit)
@@ -300,6 +300,24 @@ model LogEntry {
   durationMs       Int?
   meta             Json?     // any extra data (e.g., requestId, deviceId)
   diffs            LogDiff[] @relation("LogEntryDiffs")
+
+  // Request-level fields (API/Request Logs per PRD §2)
+  httpMethod       String?   // GET, POST, PATCH, DELETE
+  url              String?   // The request URL/route
+  statusCode       Int?      // HTTP response status code
+
+  // Device/Client fields (per PRD §6)
+  deviceType       String?   // desktop, mobile, tablet
+  browser          String?   // Chrome 126, Firefox 128, etc.
+  os               String?   // Windows 11, macOS 15, etc.
+
+  // Performance indexes for search
+  @@index([timestamp])
+  @@index([module])
+  @@index([severity])
+  @@index([userId])
+  @@index([statusCode])
+  @@index([httpMethod])
 }
 
 model LogDiff {
