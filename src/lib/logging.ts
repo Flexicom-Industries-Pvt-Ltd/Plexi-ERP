@@ -123,7 +123,34 @@ export interface LogEventParams {
 export async function logEvent(params: LogEventParams): Promise<string> {
   const correlationId = uuidv4();
   const { original, redacted } = redactPayload(params.payload ?? {});
-  const ua = parseUserAgent(params.userAgent);
+
+  let ip = params.ip;
+  let userAgent = params.userAgent;
+  let httpMethod = params.httpMethod;
+  let url = params.url;
+  let durationMs = params.durationMs;
+  let statusCode = params.statusCode;
+
+  try {
+    const { headers } = await import("next/headers");
+    const h = await headers();
+    if (ip === undefined) ip = h.get("x-forwarded-for") || h.get("x-real-ip");
+    if (userAgent === undefined) userAgent = h.get("user-agent");
+    if (httpMethod === undefined) httpMethod = h.get("x-request-method");
+    if (url === undefined) url = h.get("x-request-url");
+    if (durationMs === undefined) {
+      const startStr = h.get("x-request-start");
+      if (startStr) {
+        durationMs = Date.now() - parseInt(startStr, 10);
+      }
+    }
+    // We assume 200 for normal flow unless explicitly provided
+    if (statusCode === undefined && httpMethod) statusCode = 200;
+  } catch (err) {
+    // Not running inside a Next.js request context
+  }
+
+  const ua = parseUserAgent(userAgent);
 
   try {
     const entry = await prisma.logEntry.create({
@@ -135,15 +162,15 @@ export async function logEvent(params: LogEventParams): Promise<string> {
         action: params.action,
         payload: original,
         redactedPayload: redacted,
-        ip: params.ip ?? null,
+        ip: ip ?? null,
         location: params.location ?? null,
-        userAgent: params.userAgent ?? null,
-        durationMs: params.durationMs ?? null,
+        userAgent: userAgent ?? null,
+        durationMs: durationMs ?? null,
         meta: params.meta ?? undefined,
         // Request-level
-        httpMethod: params.httpMethod ?? null,
-        url: params.url ?? null,
-        statusCode: params.statusCode ?? null,
+        httpMethod: httpMethod ?? null,
+        url: url ?? null,
+        statusCode: statusCode ?? null,
         // Parsed device info
         deviceType: ua.deviceType,
         browser: ua.browser,

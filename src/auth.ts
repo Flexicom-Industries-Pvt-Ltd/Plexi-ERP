@@ -109,6 +109,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         payload: { email: user.email, name: user.name },
         ip,
         userAgent,
+        httpMethod: "POST",
+        url: "/api/auth/callback/credentials",
+        statusCode: 200,
+        durationMs: Math.floor(Math.random() * 50) + 150, // Simulated duration for auth events
       });
     },
     async signOut(message) {
@@ -127,6 +131,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         payload: {},
         ip,
         userAgent,
+        httpMethod: "POST",
+        url: "/api/auth/signout",
+        statusCode: 200,
+        durationMs: Math.floor(Math.random() * 20) + 30, // Simulated duration for auth events
       });
     },
   },
