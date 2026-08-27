@@ -2,8 +2,7 @@
 
 import { useActionState } from "react";
 import { authenticate } from "@/app/auth/actions";
-import { motion } from "framer-motion";
-import { Loader2, Mail, Lock } from "lucide-react";
+import { Loader2, Mail, Lock, Building } from "lucide-react";
 
 export function LoginForm() {
   const [errorMessage, formAction, isPending] = useActionState(
@@ -14,15 +13,10 @@ export function LoginForm() {
   return (
     <div className="grid gap-6">
       <form action={formAction}>
-        <div className="grid gap-4">
-          <motion.div 
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.1 }}
-            className="grid gap-2"
-          >
-            <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70" htmlFor="email">
-              Email Address
+        <div className="grid gap-5">
+          <div className="grid gap-2">
+            <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-foreground" htmlFor="email">
+              Corporate Email
             </label>
             <div className="relative">
               <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
@@ -31,25 +25,20 @@ export function LoginForm() {
               <input
                 id="email"
                 name="email"
-                placeholder="name@plexierp.com"
+                placeholder="name@flexicom.com"
                 type="email"
                 autoCapitalize="none"
                 autoComplete="email"
                 autoCorrect="off"
                 required
-                className="flex h-11 w-full rounded-xl border border-input bg-white/50 pl-10 pr-3 py-2 text-sm shadow-sm backdrop-blur-sm transition-all focus:border-primary focus:bg-white focus:ring-1 focus:ring-primary focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex h-11 w-full rounded-md border border-input bg-white pl-10 pr-3 py-2 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary disabled:cursor-not-allowed disabled:opacity-50"
               />
             </div>
-          </motion.div>
+          </div>
           
-          <motion.div 
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.2 }}
-            className="grid gap-2"
-          >
+          <div className="grid gap-2">
             <div className="flex items-center justify-between">
-              <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70" htmlFor="password">
+              <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-foreground" htmlFor="password">
                 Password
               </label>
               <a href="#" className="text-xs font-medium text-primary hover:underline underline-offset-4">
@@ -66,20 +55,27 @@ export function LoginForm() {
                 placeholder="••••••••"
                 type="password"
                 required
-                className="flex h-11 w-full rounded-xl border border-input bg-white/50 pl-10 pr-3 py-2 text-sm shadow-sm backdrop-blur-sm transition-all focus:border-primary focus:bg-white focus:ring-1 focus:ring-primary focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex h-11 w-full rounded-md border border-input bg-white pl-10 pr-3 py-2 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary disabled:cursor-not-allowed disabled:opacity-50"
               />
             </div>
-          </motion.div>
+          </div>
 
-          <motion.button 
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
+          <div className="flex items-center space-x-2 mt-1">
+            <input 
+              type="checkbox" 
+              id="remember" 
+              name="remember"
+              className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" 
+            />
+            <label htmlFor="remember" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-muted-foreground cursor-pointer">
+              Remember me on this device
+            </label>
+          </div>
+
+          <button 
             type="submit" 
             disabled={isPending}
-            className="mt-2 inline-flex h-11 w-full items-center justify-center rounded-xl bg-gradient-brand px-8 py-2 text-sm font-medium text-white shadow-lg transition-all hover:shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:pointer-events-none disabled:opacity-70"
+            className="mt-2 inline-flex h-11 w-full items-center justify-center rounded-md bg-primary px-8 py-2 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-70"
           >
             {isPending ? (
               <span className="flex items-center gap-2">
@@ -87,20 +83,35 @@ export function LoginForm() {
                 Authenticating...
               </span>
             ) : (
-              "Sign In to ERP"
+              "Sign In to Flexicom ERP"
             )}
-          </motion.button>
+          </button>
         </div>
       </form>
       
+      <div className="relative">
+        <div className="absolute inset-0 flex items-center">
+          <span className="w-full border-t" />
+        </div>
+        <div className="relative flex justify-center text-xs uppercase">
+          <span className="bg-white px-2 text-muted-foreground">
+            Or continue with
+          </span>
+        </div>
+      </div>
+
+      <button 
+        type="button" 
+        className="inline-flex h-11 w-full items-center justify-center rounded-md border border-input bg-white px-8 py-2 text-sm font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+      >
+        <Building className="mr-2 h-4 w-4" />
+        Single Sign-On (SSO)
+      </button>
+
       {errorMessage && (
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="rounded-lg bg-destructive/10 p-3 text-sm font-medium text-destructive text-center border border-destructive/20"
-        >
+        <div className="rounded-md bg-red-50 p-3 text-sm font-medium text-red-600 text-center border border-red-200">
           {errorMessage}
-        </motion.div>
+        </div>
       )}
     </div>
   );
