@@ -33,7 +33,6 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
-import logoImg from "../../../public/logo.png";
 
 const navItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, module: null },
@@ -74,7 +73,7 @@ export function AppSidebar({ user, allowedModules }: AppSidebarProps) {
       <SidebarHeader className="h-[72px] flex items-center px-4 border-b border-border/50 bg-white overflow-hidden transition-all duration-300">
         <Link href="/dashboard" className="flex items-center gap-3 font-semibold w-full">
           <div className="flex shrink-0 items-center justify-center rounded-lg hover:opacity-80 transition-opacity bg-white p-1 shadow-sm border border-slate-100">
-            <Image src={logoImg} alt="Flexicom Logo" className="h-10 w-10 object-contain" />
+            <Image src="/logo.png" alt="Flexicom Logo" width={40} height={40} className="h-10 w-10 object-contain" />
           </div>
           <div className="flex flex-col truncate group-data-[collapsible=icon]:hidden transition-all duration-300 opacity-100 group-data-[collapsible=icon]:opacity-0">
             <span className="text-xl font-extrabold text-slate-900 tracking-tight leading-none mb-1">Flexicom</span>
