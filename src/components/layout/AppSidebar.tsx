@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import {
   LayoutDashboard,
@@ -55,8 +55,9 @@ type AppSidebarProps = {
   allowedModules: Record<string, boolean>;
 };
 
-export function AppSidebar({ user, allowedModules }: AppSidebarProps) {
+export function AppSidebar({ user, allowedModules, ...props }: AppSidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const [settingsOpen, setSettingsOpen] = useState(pathname.startsWith("/dashboard/settings"));
 
   // Super Admin bypass
@@ -165,7 +166,9 @@ export function AppSidebar({ user, allowedModules }: AppSidebarProps) {
                 </DropdownMenuGroup>
                 <DropdownMenuSeparator />
                 <DropdownMenuGroup>
-                  <DropdownMenuItem>Profile</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => router.push("/dashboard/profile")} className="cursor-pointer">
+                    Profile
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => signOut({ callbackUrl: '/auth/login' })} className="text-red-600 font-medium cursor-pointer">
                     Log out
                   </DropdownMenuItem>
