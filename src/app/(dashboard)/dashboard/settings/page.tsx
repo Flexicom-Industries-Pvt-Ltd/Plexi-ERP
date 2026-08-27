@@ -1,5 +1,5 @@
-import { ComingSoon } from "@/components/ui/coming-soon";
+import { redirect } from "next/navigation";
 
 export default function SettingsPage() {
-  return <ComingSoon title="Settings" description="The global settings and configuration module is currently under development." />;
+  redirect("/dashboard/settings/organization");
 }
