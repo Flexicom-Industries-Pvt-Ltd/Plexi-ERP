@@ -25,6 +25,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         });
 
         if (!user || !user.password) {
+          // Log failed login — user not found
+          const { logEvent } = await import("@/lib/logging");
+          await logEvent({
+            module: "AUTH",
+            severity: "SECURITY",
+            action: "Login Failed — User Not Found",
+            payload: { email: credentials.email },
+          });
           return null;
         }
 
@@ -34,6 +42,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         );
 
         if (!isValidPassword) {
+          // Log failed login — wrong password
+          const { logEvent } = await import("@/lib/logging");
+          await logEvent({
+            userId: user.id,
+            module: "AUTH",
+            severity: "SECURITY",
+            action: "Login Failed — Invalid Password",
+            payload: { email: credentials.email },
+          });
           return null;
         }
 
@@ -63,7 +80,33 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       return session;
     }
   },
+  events: {
+    async signIn({ user }) {
+      // Log successful login
+      const { logEvent } = await import("@/lib/logging");
+      await logEvent({
+        userId: user.id,
+        module: "AUTH",
+        severity: "INFO",
+        action: "Login Success",
+        payload: { email: user.email, name: user.name },
+      });
+    },
+    async signOut(message) {
+      // Log sign-out event
+      const { logEvent } = await import("@/lib/logging");
+      const token = 'token' in message ? message.token : null;
+      await logEvent({
+        userId: (token as any)?.id ?? undefined,
+        module: "AUTH",
+        severity: "INFO",
+        action: "Logout",
+        payload: {},
+      });
+    },
+  },
   pages: {
     signIn: "/auth/login",
   },
 });
+
