@@ -23,6 +23,19 @@ import {
   ChevronUp,
   Copy,
   Check,
+  Shield,
+  Activity,
+  Users,
+  Zap,
+  ArrowUpRight,
+  ArrowDownRight,
+  Minus,
+  Smartphone,
+  Laptop,
+  Tablet,
+  User,
+  Link2,
+  Hash,
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -47,6 +60,12 @@ interface LogEntry {
   meta: any;
   diffs: LogDiff[];
   user?: { id: string; name: string; email: string } | null;
+  httpMethod: string | null;
+  url: string | null;
+  statusCode: number | null;
+  deviceType: string | null;
+  browser: string | null;
+  os: string | null;
 }
 
 interface LogDiff {
@@ -64,31 +83,51 @@ interface Pagination {
   totalPages: number;
 }
 
+interface Stats {
+  total: number;
+  errorsToday: number;
+  warningsToday: number;
+  securityToday: number;
+  avgDurationMs: number;
+  uniqueUsersToday: number;
+}
+
+interface FilterOptions {
+  modules: string[];
+  users: { id: string; name: string; email: string }[];
+}
+
 // ──────────────────────────────────────────────
 // Constants
 // ──────────────────────────────────────────────
 
-const MODULES = [
-  "business",
-  "security",
-  "settings",
-  "users",
-  "dataDiff",
-  "offline",
-  "gate",
-  "inventory",
-  "production",
-  "quality",
-  "dispatch",
-];
+const SEVERITIES = ["INFO", "NOTICE", "WARN", "ERROR", "CRITICAL", "SECURITY"];
+const HTTP_METHODS = ["GET", "POST", "PATCH", "PUT", "DELETE"];
 
-const SEVERITIES = ["INFO", "WARN", "ERROR"];
-
-const SEVERITY_CONFIG: Record<string, { color: string; bg: string; icon: any }> = {
-  INFO: { color: "text-blue-700", bg: "bg-blue-50 border-blue-200", icon: Info },
-  WARN: { color: "text-amber-700", bg: "bg-amber-50 border-amber-200", icon: AlertTriangle },
-  ERROR: { color: "text-red-700", bg: "bg-red-50 border-red-200", icon: AlertCircle },
+const SEVERITY_CONFIG: Record<string, { color: string; bg: string; icon: any; dot: string }> = {
+  INFO: { color: "text-blue-700", bg: "bg-blue-50 border-blue-200", icon: Info, dot: "bg-blue-500" },
+  NOTICE: { color: "text-cyan-700", bg: "bg-cyan-50 border-cyan-200", icon: Info, dot: "bg-cyan-500" },
+  WARN: { color: "text-amber-700", bg: "bg-amber-50 border-amber-200", icon: AlertTriangle, dot: "bg-amber-500" },
+  ERROR: { color: "text-red-700", bg: "bg-red-50 border-red-200", icon: AlertCircle, dot: "bg-red-500" },
+  CRITICAL: { color: "text-rose-800", bg: "bg-rose-100 border-rose-300", icon: AlertCircle, dot: "bg-rose-600" },
+  SECURITY: { color: "text-violet-700", bg: "bg-violet-50 border-violet-200", icon: Shield, dot: "bg-violet-500" },
 };
+
+const METHOD_COLORS: Record<string, string> = {
+  GET: "text-emerald-700 bg-emerald-50 border-emerald-200",
+  POST: "text-blue-700 bg-blue-50 border-blue-200",
+  PATCH: "text-amber-700 bg-amber-50 border-amber-200",
+  PUT: "text-orange-700 bg-orange-50 border-orange-200",
+  DELETE: "text-red-700 bg-red-50 border-red-200",
+};
+
+function getStatusColor(code: number | null) {
+  if (!code) return "text-slate-400";
+  if (code >= 200 && code < 300) return "text-emerald-600 bg-emerald-50 border-emerald-200";
+  if (code >= 400 && code < 500) return "text-amber-600 bg-amber-50 border-amber-200";
+  if (code >= 500) return "text-red-600 bg-red-50 border-red-200";
+  return "text-slate-500";
+}
 
 // ──────────────────────────────────────────────
 // Main Component
@@ -102,13 +141,29 @@ export function LogsClient() {
     total: 0,
     totalPages: 0,
   });
+  const [stats, setStats] = useState<Stats>({
+    total: 0,
+    errorsToday: 0,
+    warningsToday: 0,
+    securityToday: 0,
+    avgDurationMs: 0,
+    uniqueUsersToday: 0,
+  });
+  const [filterOptions, setFilterOptions] = useState<FilterOptions>({
+    modules: [],
+    users: [],
+  });
   const [loading, setLoading] = useState(true);
-  const [expandedRow, setExpandedRow] = useState<string | null>(null);
+  const [selectedLog, setSelectedLog] = useState<LogEntry | null>(null);
+  const [relatedLogs, setRelatedLogs] = useState<LogEntry[]>([]);
 
   // Filters
   const [search, setSearch] = useState("");
   const [moduleFilter, setModuleFilter] = useState("");
   const [severityFilter, setSeverityFilter] = useState("");
+  const [httpMethodFilter, setHttpMethodFilter] = useState("");
+  const [statusCodeFilter, setStatusCodeFilter] = useState("");
+  const [userFilter, setUserFilter] = useState("");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [showFilters, setShowFilters] = useState(false);
@@ -129,6 +184,9 @@ export function LogsClient() {
         if (search) params.set("search", search);
         if (moduleFilter) params.set("module", moduleFilter);
         if (severityFilter) params.set("severity", severityFilter);
+        if (httpMethodFilter) params.set("httpMethod", httpMethodFilter);
+        if (statusCodeFilter) params.set("statusCode", statusCodeFilter);
+        if (userFilter) params.set("userId", userFilter);
         if (fromDate) params.set("from", fromDate);
         if (toDate) params.set("to", toDate);
 
@@ -137,13 +195,15 @@ export function LogsClient() {
         const json = await res.json();
         setLogs(json.data);
         setPagination(json.pagination);
+        if (json.stats) setStats(json.stats);
+        if (json.filterOptions) setFilterOptions(json.filterOptions);
       } catch (err) {
         console.error("Error fetching logs:", err);
       } finally {
         setLoading(false);
       }
     },
-    [search, moduleFilter, severityFilter, fromDate, toDate, pagination.limit]
+    [search, moduleFilter, severityFilter, httpMethodFilter, statusCodeFilter, userFilter, fromDate, toDate, pagination.limit]
   );
 
   useEffect(() => {
@@ -183,9 +243,9 @@ export function LogsClient() {
   }, [liveMode, pagination.limit]);
 
   // ── Export ──
-  const handleExport = async (format: "csv" | "json") => {
+  const handleExport = async (fmt: "csv" | "json") => {
     const params = new URLSearchParams();
-    params.set("format", format);
+    params.set("format", fmt);
     if (moduleFilter) params.set("module", moduleFilter);
     if (severityFilter) params.set("severity", severityFilter);
     if (fromDate) params.set("from", fromDate);
@@ -194,62 +254,88 @@ export function LogsClient() {
     const res = await fetch(`/api/logs/export?${params.toString()}`);
     if (!res.ok) return;
 
-    if (format === "csv") {
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `system-logs-${new Date().toISOString().slice(0, 10)}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } else {
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `system-logs-${new Date().toISOString().slice(0, 10)}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
-    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `system-logs-${new Date().toISOString().slice(0, 10)}.${fmt}`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const clearFilters = () => {
     setSearch("");
     setModuleFilter("");
     setSeverityFilter("");
+    setHttpMethodFilter("");
+    setStatusCodeFilter("");
+    setUserFilter("");
     setFromDate("");
     setToDate("");
   };
 
-  const hasActiveFilters = search || moduleFilter || severityFilter || fromDate || toDate;
+  const hasActiveFilters = search || moduleFilter || severityFilter || httpMethodFilter || statusCodeFilter || userFilter || fromDate || toDate;
+
+  // ── Pagination helper ──
+  const getPageNumbers = (current: number, total: number): (number | "...")[] => {
+    if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+    const pages: (number | "...")[] = [1];
+    if (current > 3) pages.push("...");
+    for (let i = Math.max(2, current - 1); i <= Math.min(total - 1, current + 1); i++) {
+      pages.push(i);
+    }
+    if (current < total - 2) pages.push("...");
+    pages.push(total);
+    return pages;
+  };
+
+  // ── Open detail panel ──
+  const openDetail = async (log: LogEntry) => {
+    setSelectedLog(log);
+    // Fetch related logs by correlation prefix (same action chain)
+    // We'll search for logs from the same userId within ±5 seconds
+    setRelatedLogs([]);
+  };
 
   return (
     <div className="space-y-4">
       {/* ── Stats Bar ── */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         <StatCard
           label="Total Entries"
-          value={pagination.total.toLocaleString()}
+          value={stats.total.toLocaleString()}
           icon={<FileText className="h-4 w-4" />}
           color="blue"
         />
         <StatCard
-          label="Live Events"
-          value={liveCount.toLocaleString()}
-          icon={<Radio className="h-4 w-4" />}
-          color="green"
+          label="Errors Today"
+          value={String(stats.errorsToday)}
+          icon={<AlertCircle className="h-4 w-4" />}
+          color="red"
         />
         <StatCard
-          label="Current Page"
-          value={`${pagination.page} / ${pagination.totalPages || 1}`}
-          icon={<Monitor className="h-4 w-4" />}
+          label="Warnings Today"
+          value={String(stats.warningsToday)}
+          icon={<AlertTriangle className="h-4 w-4" />}
+          color="amber"
+        />
+        <StatCard
+          label="Security Events"
+          value={String(stats.securityToday)}
+          icon={<Shield className="h-4 w-4" />}
+          color="violet"
+        />
+        <StatCard
+          label="Avg Response"
+          value={stats.avgDurationMs ? `${stats.avgDurationMs}ms` : "—"}
+          icon={<Zap className="h-4 w-4" />}
+          color="emerald"
+        />
+        <StatCard
+          label="Active Users"
+          value={String(stats.uniqueUsersToday)}
+          icon={<Users className="h-4 w-4" />}
           color="purple"
-        />
-        <StatCard
-          label="Per Page"
-          value={String(pagination.limit)}
-          icon={<Clock className="h-4 w-4" />}
-          color="orange"
         />
       </div>
 
@@ -258,23 +344,23 @@ export function LogsClient() {
         <div className="flex flex-wrap items-center gap-3">
           {/* Search */}
           <div className="relative flex-1 min-w-[240px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <input
               type="text"
-              placeholder="Search logs by action, module, correlation ID, IP..."
+              placeholder="Search logs by action, module, correlation ID, IP, URL..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-slate-50 transition-all"
+              className="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-slate-50"
             />
           </div>
 
           {/* Toggle Filters */}
           <button
             onClick={() => setShowFilters(!showFilters)}
-            className={`inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg border transition-all ${
+            className={`inline-flex items-center gap-2 px-3 py-2 text-sm rounded-lg border transition-colors ${
               showFilters || hasActiveFilters
-                ? "bg-primary text-white border-primary shadow-sm"
-                : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                ? "bg-primary text-white border-primary"
+                : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
             }`}
           >
             <Filter className="h-4 w-4" />
@@ -286,27 +372,27 @@ export function LogsClient() {
             )}
           </button>
 
-          {/* Live Mode */}
+          {/* Real-time */}
           <button
             onClick={() => {
               setLiveMode(!liveMode);
-              setLiveCount(0);
+              if (!liveMode) setLiveCount(0);
             }}
-            className={`inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg border transition-all ${
+            className={`inline-flex items-center gap-2 px-3 py-2 text-sm rounded-lg border transition-colors ${
               liveMode
-                ? "bg-emerald-500 text-white border-emerald-500 shadow-sm animate-pulse"
-                : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                ? "bg-emerald-500 text-white border-emerald-500 animate-pulse"
+                : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
             }`}
           >
             <Radio className="h-4 w-4" />
-            {liveMode ? "Live" : "Real-time"}
+            {liveMode ? `Live (${liveCount})` : "Real-time"}
           </button>
 
           {/* Refresh */}
           <button
             onClick={() => fetchLogs(pagination.page)}
             disabled={loading}
-            className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition-all disabled:opacity-50"
+            className="inline-flex items-center gap-2 px-3 py-2 text-sm rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-50"
           >
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
             Refresh
@@ -314,38 +400,38 @@ export function LogsClient() {
 
           {/* Export */}
           <div className="relative group">
-            <button className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition-all">
+            <button className="inline-flex items-center gap-2 px-3 py-2 text-sm rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition-colors">
               <Download className="h-4 w-4" />
               Export
               <ChevronDown className="h-3 w-3" />
             </button>
-            <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-lg border border-slate-200 shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+            <div className="absolute right-0 top-full mt-1 w-40 bg-white border border-slate-200 rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-20">
               <button
                 onClick={() => handleExport("csv")}
-                className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 rounded-t-lg transition-colors"
+                className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-slate-50 rounded-t-lg"
               >
                 <FileSpreadsheet className="h-4 w-4 text-emerald-600" />
-                Export as CSV
+                Export CSV
               </button>
               <button
                 onClick={() => handleExport("json")}
-                className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 rounded-b-lg transition-colors"
+                className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-slate-50 rounded-b-lg"
               >
                 <FileText className="h-4 w-4 text-blue-600" />
-                Export as JSON
+                Export JSON
               </button>
             </div>
           </div>
         </div>
 
-        {/* ── Advanced Filters ── */}
+        {/* ── Expanded Filters ── */}
         {showFilters && (
-          <div className="flex flex-wrap items-end gap-3 pt-3 border-t border-slate-100">
+          <div className="flex flex-wrap items-end gap-3 pt-3 border-t border-slate-100 animate-in slide-in-from-top-2 duration-200">
             <FilterSelect
               label="Module"
               value={moduleFilter}
               onChange={setModuleFilter}
-              options={MODULES}
+              options={filterOptions.modules}
               placeholder="All Modules"
             />
             <FilterSelect
@@ -355,6 +441,36 @@ export function LogsClient() {
               options={SEVERITIES}
               placeholder="All Severities"
             />
+            <FilterSelect
+              label="HTTP Method"
+              value={httpMethodFilter}
+              onChange={setHttpMethodFilter}
+              options={HTTP_METHODS}
+              placeholder="All Methods"
+            />
+            <FilterSelect
+              label="Status Code"
+              value={statusCodeFilter}
+              onChange={setStatusCodeFilter}
+              options={["200", "400", "500"]}
+              placeholder="All Statuses"
+              optionLabels={["2xx Success", "4xx Client Error", "5xx Server Error"]}
+            />
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">User</label>
+              <select
+                value={userFilter}
+                onChange={(e) => setUserFilter(e.target.value)}
+                className="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-slate-50 min-w-[160px]"
+              >
+                <option value="">All Users</option>
+                {filterOptions.users.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.name} ({u.email})
+                  </option>
+                ))}
+              </select>
+            </div>
             <div className="flex flex-col gap-1">
               <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">From</label>
               <input
@@ -376,42 +492,51 @@ export function LogsClient() {
             {hasActiveFilters && (
               <button
                 onClick={clearFilters}
-                className="inline-flex items-center gap-1 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                className="inline-flex items-center gap-1 px-3 py-2 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors"
               >
-                <X className="h-3.5 w-3.5" />
-                Clear all
+                <X className="h-3 w-3" />
+                Clear All
               </button>
             )}
           </div>
         )}
       </div>
 
-      {/* ── Log Table ── */}
+      {/* ── Data Table ── */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-left">
             <thead>
-              <tr className="border-b border-slate-100 bg-slate-50/80">
-                <th className="text-left px-4 py-3 font-semibold text-slate-600 text-xs uppercase tracking-wider w-[180px]">
+              <tr className="bg-slate-50/80 border-b border-slate-100">
+                <th className="text-left px-4 py-3 font-semibold text-slate-600 text-xs uppercase tracking-wider w-[150px]">
                   Timestamp
                 </th>
-                <th className="text-left px-4 py-3 font-semibold text-slate-600 text-xs uppercase tracking-wider w-[100px]">
+                <th className="text-left px-4 py-3 font-semibold text-slate-600 text-xs uppercase tracking-wider w-[90px]">
                   Severity
                 </th>
-                <th className="text-left px-4 py-3 font-semibold text-slate-600 text-xs uppercase tracking-wider w-[120px]">
+                <th className="text-left px-4 py-3 font-semibold text-slate-600 text-xs uppercase tracking-wider w-[130px]">
                   Module
                 </th>
                 <th className="text-left px-4 py-3 font-semibold text-slate-600 text-xs uppercase tracking-wider">
                   Action
                 </th>
-                <th className="text-left px-4 py-3 font-semibold text-slate-600 text-xs uppercase tracking-wider w-[140px]">
+                <th className="text-left px-4 py-3 font-semibold text-slate-600 text-xs uppercase tracking-wider w-[100px]">
+                  Method
+                </th>
+                <th className="text-left px-4 py-3 font-semibold text-slate-600 text-xs uppercase tracking-wider w-[70px]">
+                  Status
+                </th>
+                <th className="text-left px-4 py-3 font-semibold text-slate-600 text-xs uppercase tracking-wider w-[120px]">
+                  User
+                </th>
+                <th className="text-left px-4 py-3 font-semibold text-slate-600 text-xs uppercase tracking-wider w-[120px]">
                   IP Address
                 </th>
-                <th className="text-left px-4 py-3 font-semibold text-slate-600 text-xs uppercase tracking-wider w-[80px]">
+                <th className="text-left px-4 py-3 font-semibold text-slate-600 text-xs uppercase tracking-wider w-[70px]">
                   Duration
                 </th>
-                <th className="text-center px-4 py-3 font-semibold text-slate-600 text-xs uppercase tracking-wider w-[60px]">
-                  Details
+                <th className="text-center px-4 py-3 font-semibold text-slate-600 text-xs uppercase tracking-wider w-[50px]">
+                  <Eye className="h-3.5 w-3.5 mx-auto" />
                 </th>
               </tr>
             </thead>
@@ -419,7 +544,7 @@ export function LogsClient() {
               {loading && logs.length === 0 ? (
                 Array.from({ length: 8 }).map((_, i) => (
                   <tr key={i}>
-                    {Array.from({ length: 7 }).map((_, j) => (
+                    {Array.from({ length: 10 }).map((_, j) => (
                       <td key={j} className="px-4 py-3">
                         <div className="h-4 bg-slate-100 rounded animate-pulse" />
                       </td>
@@ -428,7 +553,7 @@ export function LogsClient() {
                 ))
               ) : logs.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-16 text-center">
+                  <td colSpan={10} className="px-4 py-16 text-center">
                     <div className="flex flex-col items-center gap-3 text-slate-400">
                       <FileText className="h-12 w-12 stroke-1" />
                       <div>
@@ -447,14 +572,7 @@ export function LogsClient() {
                   <LogRow
                     key={log.id || log.correlationId}
                     log={log}
-                    isExpanded={expandedRow === (log.id || log.correlationId)}
-                    onToggle={() =>
-                      setExpandedRow(
-                        expandedRow === (log.id || log.correlationId)
-                          ? null
-                          : log.id || log.correlationId
-                      )
-                    }
+                    onSelect={() => openDetail(log)}
                   />
                 ))
               )}
@@ -487,7 +605,6 @@ export function LogsClient() {
                 <ChevronLeft className="h-4 w-4" />
                 Prev
               </button>
-              {/* Page numbers */}
               {getPageNumbers(pagination.page, pagination.totalPages).map((p, i) =>
                 p === "..." ? (
                   <span key={`dots-${i}`} className="px-2 text-slate-400">
@@ -519,6 +636,11 @@ export function LogsClient() {
           </div>
         )}
       </div>
+
+      {/* ── Detail Panel (Slide-out overlay) ── */}
+      {selectedLog && (
+        <LogDetailPanel log={selectedLog} onClose={() => setSelectedLog(null)} />
+      )}
     </div>
   );
 }
@@ -536,13 +658,15 @@ function StatCard({
   label: string;
   value: string;
   icon: React.ReactNode;
-  color: "blue" | "green" | "purple" | "orange";
+  color: "blue" | "red" | "amber" | "violet" | "emerald" | "purple";
 }) {
-  const colors = {
+  const colors: Record<string, string> = {
     blue: "from-blue-50 to-blue-100/50 border-blue-200 text-blue-700",
-    green: "from-emerald-50 to-emerald-100/50 border-emerald-200 text-emerald-700",
-    purple: "from-violet-50 to-violet-100/50 border-violet-200 text-violet-700",
-    orange: "from-amber-50 to-amber-100/50 border-amber-200 text-amber-700",
+    red: "from-red-50 to-red-100/50 border-red-200 text-red-700",
+    amber: "from-amber-50 to-amber-100/50 border-amber-200 text-amber-700",
+    violet: "from-violet-50 to-violet-100/50 border-violet-200 text-violet-700",
+    emerald: "from-emerald-50 to-emerald-100/50 border-emerald-200 text-emerald-700",
+    purple: "from-purple-50 to-purple-100/50 border-purple-200 text-purple-700",
   };
 
   return (
@@ -564,12 +688,14 @@ function FilterSelect({
   onChange,
   options,
   placeholder,
+  optionLabels,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   options: string[];
   placeholder: string;
+  optionLabels?: string[];
 }) {
   return (
     <div className="flex flex-col gap-1">
@@ -580,9 +706,9 @@ function FilterSelect({
         className="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-slate-50 min-w-[140px]"
       >
         <option value="">{placeholder}</option>
-        {options.map((opt) => (
+        {options.map((opt, i) => (
           <option key={opt} value={opt}>
-            {opt}
+            {optionLabels ? optionLabels[i] : opt}
           </option>
         ))}
       </select>
@@ -592,257 +718,379 @@ function FilterSelect({
 
 function LogRow({
   log,
-  isExpanded,
-  onToggle,
+  onSelect,
 }: {
   log: LogEntry;
-  isExpanded: boolean;
-  onToggle: () => void;
+  onSelect: () => void;
 }) {
-  const [copied, setCopied] = useState(false);
   const sevConfig = SEVERITY_CONFIG[log.severity] || SEVERITY_CONFIG.INFO;
   const SevIcon = sevConfig.icon;
+  const ts = log.timestamp ? new Date(log.timestamp) : null;
 
-  const copyCorrelationId = () => {
-    navigator.clipboard.writeText(log.correlationId);
+  return (
+    <tr
+      className="hover:bg-slate-50/80 transition-colors cursor-pointer"
+      onClick={onSelect}
+    >
+      {/* Timestamp */}
+      <td className="px-4 py-3">
+        <div className="flex flex-col">
+          <span className="font-mono text-xs text-slate-700">
+            {ts ? format(ts, "dd MMM yyyy") : "—"}
+          </span>
+          <span className="font-mono text-xs text-slate-400">
+            {ts ? format(ts, "HH:mm:ss") : ""}
+          </span>
+        </div>
+      </td>
+
+      {/* Severity */}
+      <td className="px-4 py-3">
+        <span
+          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${sevConfig.bg} ${sevConfig.color}`}
+        >
+          <SevIcon className="h-3 w-3" />
+          {log.severity}
+        </span>
+      </td>
+
+      {/* Module */}
+      <td className="px-4 py-3">
+        <span className="inline-flex px-2.5 py-1 rounded-md bg-slate-100 text-slate-700 text-xs font-medium">
+          {log.module}
+        </span>
+      </td>
+
+      {/* Action */}
+      <td className="px-4 py-3">
+        <span className="text-sm text-slate-800 font-medium line-clamp-1">{log.action}</span>
+      </td>
+
+      {/* HTTP Method */}
+      <td className="px-4 py-3">
+        {log.httpMethod ? (
+          <span className={`inline-flex px-2 py-0.5 rounded text-xs font-bold border ${METHOD_COLORS[log.httpMethod] || "text-slate-600 bg-slate-50 border-slate-200"}`}>
+            {log.httpMethod}
+          </span>
+        ) : (
+          <span className="text-xs text-slate-300">—</span>
+        )}
+      </td>
+
+      {/* Status Code */}
+      <td className="px-4 py-3">
+        {log.statusCode ? (
+          <span className={`inline-flex px-2 py-0.5 rounded text-xs font-bold border ${getStatusColor(log.statusCode)}`}>
+            {log.statusCode}
+          </span>
+        ) : (
+          <span className="text-xs text-slate-300">—</span>
+        )}
+      </td>
+
+      {/* User */}
+      <td className="px-4 py-3">
+        {log.user ? (
+          <span className="text-xs text-slate-700 font-medium truncate max-w-[100px] block">{log.user.name}</span>
+        ) : (
+          <span className="text-xs text-slate-300 italic">System</span>
+        )}
+      </td>
+
+      {/* IP */}
+      <td className="px-4 py-3">
+        <span className="font-mono text-xs text-slate-500">{log.ip || "—"}</span>
+      </td>
+
+      {/* Duration */}
+      <td className="px-4 py-3">
+        <span className="font-mono text-xs text-slate-500">
+          {log.durationMs != null ? `${log.durationMs}ms` : "—"}
+        </span>
+      </td>
+
+      {/* View */}
+      <td className="px-4 py-3 text-center">
+        <button
+          className="inline-flex items-center justify-center h-7 w-7 rounded-lg hover:bg-slate-100 transition-colors"
+          onClick={(e) => {
+            e.stopPropagation();
+            onSelect();
+          }}
+        >
+          <Eye className="h-4 w-4 text-slate-400" />
+        </button>
+      </td>
+    </tr>
+  );
+}
+
+// ──────────────────────────────────────────────
+// Log Detail Panel (Slide-out)
+// ──────────────────────────────────────────────
+
+function LogDetailPanel({ log, onClose }: { log: LogEntry; onClose: () => void }) {
+  const [copied, setCopied] = useState(false);
+  const [activeTab, setActiveTab] = useState<"overview" | "payload" | "changes">("overview");
+  const sevConfig = SEVERITY_CONFIG[log.severity] || SEVERITY_CONFIG.INFO;
+  const SevIcon = sevConfig.icon;
+  const ts = log.timestamp ? new Date(log.timestamp) : null;
+
+  const copyId = (text: string) => {
+    navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const ts = log.timestamp ? new Date(log.timestamp) : null;
+  const DeviceIcon = log.deviceType === "mobile" ? Smartphone : log.deviceType === "tablet" ? Tablet : Laptop;
 
   return (
-    <>
-      <tr
-        className={`hover:bg-slate-50/80 transition-colors cursor-pointer ${
-          isExpanded ? "bg-slate-50" : ""
-        }`}
-        onClick={onToggle}
+    <div className="fixed inset-0 z-50 flex justify-end" onClick={onClose}>
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" />
+
+      {/* Panel */}
+      <div
+        className="relative w-full max-w-2xl bg-white shadow-2xl overflow-y-auto animate-in slide-in-from-right duration-300"
+        onClick={(e) => e.stopPropagation()}
       >
-        <td className="px-4 py-3">
-          <div className="flex flex-col">
-            <span className="font-mono text-xs text-slate-700">
-              {ts ? format(ts, "dd MMM yyyy") : "—"}
-            </span>
-            <span className="font-mono text-xs text-slate-400">
-              {ts ? format(ts, "HH:mm:ss") : ""}
-            </span>
-          </div>
-        </td>
-        <td className="px-4 py-3">
-          <span
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${sevConfig.bg} ${sevConfig.color}`}
-          >
-            <SevIcon className="h-3 w-3" />
-            {log.severity}
-          </span>
-        </td>
-        <td className="px-4 py-3">
-          <span className="inline-flex px-2.5 py-1 rounded-md bg-slate-100 text-slate-700 text-xs font-medium">
-            {log.module}
-          </span>
-        </td>
-        <td className="px-4 py-3">
-          <span className="text-sm text-slate-800 font-medium">{log.action}</span>
-        </td>
-        <td className="px-4 py-3">
-          <span className="font-mono text-xs text-slate-500">{log.ip || "—"}</span>
-        </td>
-        <td className="px-4 py-3">
-          <span className="font-mono text-xs text-slate-500">
-            {log.durationMs != null ? `${log.durationMs}ms` : "—"}
-          </span>
-        </td>
-        <td className="px-4 py-3 text-center">
-          <button
-            className="inline-flex items-center justify-center h-7 w-7 rounded-lg hover:bg-slate-100 transition-colors"
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggle();
-            }}
-          >
-            {isExpanded ? (
-              <ChevronUp className="h-4 w-4 text-slate-500" />
-            ) : (
-              <Eye className="h-4 w-4 text-slate-400" />
-            )}
-          </button>
-        </td>
-      </tr>
-
-      {/* ── Expanded Detail ── */}
-      {isExpanded && (
-        <tr className="bg-slate-50/80">
-          <td colSpan={7} className="px-4 py-4">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {/* Left: Metadata */}
-              <div className="space-y-3">
-                <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                  Event Details
-                </h4>
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <DetailItem
-                    icon={<Globe className="h-3.5 w-3.5" />}
-                    label="Correlation ID"
-                    value={
-                      <span className="flex items-center gap-1">
-                        <code className="text-xs font-mono bg-slate-100 px-1.5 py-0.5 rounded">
-                          {log.correlationId?.slice(0, 12)}…
-                        </code>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            copyCorrelationId();
-                          }}
-                          className="p-0.5 hover:bg-slate-200 rounded transition-colors"
-                        >
-                          {copied ? (
-                            <Check className="h-3 w-3 text-emerald-500" />
-                          ) : (
-                            <Copy className="h-3 w-3 text-slate-400" />
-                          )}
-                        </button>
-                      </span>
-                    }
-                  />
-                  <DetailItem
-                    icon={<Monitor className="h-3.5 w-3.5" />}
-                    label="User Agent"
-                    value={
-                      <span className="truncate max-w-[200px] block text-xs">{log.userAgent || "—"}</span>
-                    }
-                  />
-                  <DetailItem
-                    icon={<Globe className="h-3.5 w-3.5" />}
-                    label="IP Address"
-                    value={log.ip || "—"}
-                  />
-                  <DetailItem
-                    icon={<Globe className="h-3.5 w-3.5" />}
-                    label="Location"
-                    value={log.location || "—"}
-                  />
-                  <DetailItem
-                    icon={<Clock className="h-3.5 w-3.5" />}
-                    label="Duration"
-                    value={log.durationMs != null ? `${log.durationMs}ms` : "—"}
-                  />
-                  <DetailItem
-                    icon={<Info className="h-3.5 w-3.5" />}
-                    label="User"
-                    value={
-                      log.user ? (
-                        <div className="flex flex-col">
-                          <span className="font-semibold text-slate-700">{log.user.name}</span>
-                          <span className="text-slate-400 text-xs">{log.user.email}</span>
-                        </div>
-                      ) : log.userId ? (
-                        <code className="text-xs font-mono bg-slate-100 px-1.5 py-0.5 rounded">
-                          {log.userId.slice(0, 12)}…
-                        </code>
-                      ) : (
-                        "System"
-                      )
-                    }
-                  />
-                </div>
+        {/* Header */}
+        <div className="sticky top-0 z-10 bg-white border-b border-slate-200 px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className={`p-2 rounded-lg ${sevConfig.bg} border`}>
+                <SevIcon className={`h-5 w-5 ${sevConfig.color}`} />
               </div>
-
-              {/* Right: Payload */}
-              <div className="space-y-3">
-                <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                  Redacted Payload
-                </h4>
-                <pre className="p-3 bg-slate-900 text-emerald-400 rounded-lg text-xs font-mono overflow-x-auto max-h-[200px] overflow-y-auto whitespace-pre-wrap">
-                  {log.redactedPayload
-                    ? JSON.stringify(log.redactedPayload, null, 2)
-                    : log.payload
-                    ? JSON.stringify(log.payload, null, 2)
-                    : "No payload"}
-                </pre>
-
-                {/* Diffs */}
-                {log.diffs && log.diffs.length > 0 && (
-                  <div className="space-y-2">
-                    <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                      Data Changes
-                    </h4>
-                    {log.diffs.map((diff) => (
-                      <div key={diff.id} className="p-3 bg-white rounded-lg border border-slate-200 text-xs">
-                        <p className="font-medium text-slate-700 mb-2">
-                          {diff.entity} ({diff.entityId.slice(0, 8)}…)
-                        </p>
-                        <div className="grid grid-cols-2 gap-2">
-                          <div>
-                            <p className="text-red-500 font-semibold mb-1">Before</p>
-                            <pre className="p-2 bg-red-50 rounded text-red-700 font-mono whitespace-pre-wrap overflow-auto max-h-[100px]">
-                              {JSON.stringify(diff.before, null, 2)}
-                            </pre>
-                          </div>
-                          <div>
-                            <p className="text-emerald-600 font-semibold mb-1">After</p>
-                            <pre className="p-2 bg-emerald-50 rounded text-emerald-700 font-mono whitespace-pre-wrap overflow-auto max-h-[100px]">
-                              {JSON.stringify(diff.after, null, 2)}
-                            </pre>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Meta */}
-                {log.meta && (
-                  <div className="space-y-2">
-                    <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Meta</h4>
-                    <pre className="p-3 bg-slate-100 rounded-lg text-xs font-mono overflow-x-auto whitespace-pre-wrap">
-                      {JSON.stringify(log.meta, null, 2)}
-                    </pre>
-                  </div>
-                )}
+              <div>
+                <h2 className="text-lg font-bold text-slate-800">Log Detail</h2>
+                <p className="text-xs text-slate-400">
+                  {ts ? format(ts, "dd MMM yyyy, HH:mm:ss") : "—"}
+                </p>
               </div>
             </div>
-          </td>
-        </tr>
-      )}
-    </>
-  );
-}
+            <button
+              onClick={onClose}
+              className="p-2 rounded-lg hover:bg-slate-100 transition-colors"
+            >
+              <X className="h-5 w-5 text-slate-500" />
+            </button>
+          </div>
 
-function DetailItem({
-  icon,
-  label,
-  value,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: React.ReactNode;
-}) {
-  return (
-    <div className="flex items-start gap-2 p-2 rounded-lg bg-white border border-slate-100">
-      <div className="mt-0.5 text-slate-400">{icon}</div>
-      <div className="min-w-0">
-        <p className="text-[10px] text-slate-400 uppercase tracking-wider font-medium">{label}</p>
-        <div className="text-xs text-slate-700 font-medium">{value}</div>
+          {/* Tabs */}
+          <div className="flex gap-1 mt-4">
+            {(["overview", "payload", "changes"] as const).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                  activeTab === tab
+                    ? "bg-primary text-white"
+                    : "text-slate-500 hover:bg-slate-100"
+                }`}
+              >
+                {tab === "overview" ? "Overview" : tab === "payload" ? "Payload & Meta" : "Data Changes"}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="px-6 py-5 space-y-6">
+
+          {/* ── Overview Tab ── */}
+          {activeTab === "overview" && (
+            <>
+              {/* Event Summary */}
+              <Section title="Event Summary">
+                <div className="grid grid-cols-2 gap-4">
+                  <DetailField label="Severity">
+                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${sevConfig.bg} ${sevConfig.color}`}>
+                      <SevIcon className="h-3 w-3" />
+                      {log.severity}
+                    </span>
+                  </DetailField>
+                  <DetailField label="Module">
+                    <span className="inline-flex px-2.5 py-1 rounded-md bg-slate-100 text-slate-700 text-xs font-medium">
+                      {log.module}
+                    </span>
+                  </DetailField>
+                  <DetailField label="Action" full>
+                    <p className="text-sm font-semibold text-slate-800">{log.action}</p>
+                  </DetailField>
+                  <DetailField label="Correlation ID" full>
+                    <div className="flex items-center gap-2">
+                      <code className="text-xs font-mono bg-slate-100 px-2 py-1 rounded">{log.correlationId}</code>
+                      <button
+                        onClick={() => copyId(log.correlationId)}
+                        className="p-1 hover:bg-slate-100 rounded transition-colors"
+                      >
+                        {copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5 text-slate-400" />}
+                      </button>
+                    </div>
+                  </DetailField>
+                  <DetailField label="Timestamp">
+                    <p className="text-sm text-slate-700 font-mono">
+                      {ts ? format(ts, "dd MMM yyyy, HH:mm:ss") : "—"}
+                    </p>
+                  </DetailField>
+                  <DetailField label="Duration">
+                    <p className="text-sm text-slate-700 font-mono">
+                      {log.durationMs != null ? `${log.durationMs}ms` : "—"}
+                    </p>
+                  </DetailField>
+                </div>
+              </Section>
+
+              {/* Request Info */}
+              {(log.httpMethod || log.url || log.statusCode) && (
+                <Section title="Request Info">
+                  <div className="grid grid-cols-2 gap-4">
+                    <DetailField label="HTTP Method">
+                      {log.httpMethod ? (
+                        <span className={`inline-flex px-2 py-0.5 rounded text-xs font-bold border ${METHOD_COLORS[log.httpMethod] || ""}`}>
+                          {log.httpMethod}
+                        </span>
+                      ) : <span className="text-xs text-slate-300">—</span>}
+                    </DetailField>
+                    <DetailField label="Status Code">
+                      {log.statusCode ? (
+                        <span className={`inline-flex px-2 py-0.5 rounded text-xs font-bold border ${getStatusColor(log.statusCode)}`}>
+                          {log.statusCode}
+                        </span>
+                      ) : <span className="text-xs text-slate-300">—</span>}
+                    </DetailField>
+                    {log.url && (
+                      <DetailField label="URL" full>
+                        <code className="text-xs font-mono bg-slate-100 px-2 py-1 rounded break-all block">{log.url}</code>
+                      </DetailField>
+                    )}
+                  </div>
+                </Section>
+              )}
+
+              {/* User Info */}
+              <Section title="User">
+                <div className="grid grid-cols-2 gap-4">
+                  <DetailField label="Name">
+                    <p className="text-sm font-semibold text-slate-700">{log.user?.name || "System"}</p>
+                  </DetailField>
+                  <DetailField label="Email">
+                    <p className="text-sm text-slate-600">{log.user?.email || "—"}</p>
+                  </DetailField>
+                  <DetailField label="User ID" full>
+                    {log.userId ? (
+                      <code className="text-xs font-mono bg-slate-100 px-2 py-1 rounded">{log.userId}</code>
+                    ) : <span className="text-xs text-slate-300">N/A (System)</span>}
+                  </DetailField>
+                </div>
+              </Section>
+
+              {/* Device & Client */}
+              <Section title="Device & Client">
+                <div className="grid grid-cols-2 gap-4">
+                  <DetailField label="Device">
+                    <div className="flex items-center gap-2">
+                      <DeviceIcon className="h-4 w-4 text-slate-400" />
+                      <span className="text-sm text-slate-700 capitalize">{log.deviceType || "—"}</span>
+                    </div>
+                  </DetailField>
+                  <DetailField label="Browser">
+                    <p className="text-sm text-slate-700">{log.browser || "—"}</p>
+                  </DetailField>
+                  <DetailField label="Operating System">
+                    <p className="text-sm text-slate-700">{log.os || "—"}</p>
+                  </DetailField>
+                  <DetailField label="IP Address">
+                    <p className="text-sm text-slate-700 font-mono">{log.ip || "—"}</p>
+                  </DetailField>
+                  {log.userAgent && (
+                    <DetailField label="Full User Agent" full>
+                      <p className="text-xs text-slate-500 break-all">{log.userAgent}</p>
+                    </DetailField>
+                  )}
+                </div>
+              </Section>
+            </>
+          )}
+
+          {/* ── Payload Tab ── */}
+          {activeTab === "payload" && (
+            <>
+              <Section title="Redacted Payload">
+                <pre className="p-4 bg-slate-900 text-emerald-400 rounded-xl text-xs font-mono overflow-x-auto max-h-[400px] overflow-y-auto whitespace-pre-wrap leading-relaxed">
+                  {log.redactedPayload
+                    ? JSON.stringify(log.redactedPayload, null, 2)
+                    : "No payload"}
+                </pre>
+              </Section>
+
+              {log.meta && (
+                <Section title="Meta">
+                  <pre className="p-4 bg-slate-100 rounded-xl text-xs font-mono overflow-x-auto max-h-[300px] overflow-y-auto whitespace-pre-wrap leading-relaxed text-slate-700">
+                    {JSON.stringify(log.meta, null, 2)}
+                  </pre>
+                </Section>
+              )}
+            </>
+          )}
+
+          {/* ── Data Changes Tab ── */}
+          {activeTab === "changes" && (
+            <>
+              {log.diffs && log.diffs.length > 0 ? (
+                log.diffs.map((diff) => (
+                  <Section key={diff.id} title={`${diff.entity} (${diff.entityId.slice(0, 8)}…)`}>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <p className="text-xs font-semibold text-red-500 mb-2">Before</p>
+                        <pre className="p-3 bg-red-50 rounded-lg text-xs font-mono text-red-700 whitespace-pre-wrap overflow-auto max-h-[250px] border border-red-200">
+                          {JSON.stringify(diff.before, null, 2)}
+                        </pre>
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold text-emerald-600 mb-2">After</p>
+                        <pre className="p-3 bg-emerald-50 rounded-lg text-xs font-mono text-emerald-700 whitespace-pre-wrap overflow-auto max-h-[250px] border border-emerald-200">
+                          {JSON.stringify(diff.after, null, 2)}
+                        </pre>
+                      </div>
+                    </div>
+                  </Section>
+                ))
+              ) : (
+                <div className="text-center py-12">
+                  <Activity className="h-12 w-12 text-slate-300 mx-auto mb-4" />
+                  <p className="text-slate-500 font-medium">No data changes recorded</p>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Data change diffs are only available for update/delete operations
+                  </p>
+                </div>
+              )}
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
 }
 
-// ── Pagination helper ──
-function getPageNumbers(current: number, total: number): (number | string)[] {
-  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+// ──────────────────────────────────────────────
+// Micro-components
+// ──────────────────────────────────────────────
 
-  const pages: (number | string)[] = [1];
-  if (current > 3) pages.push("...");
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">{title}</h3>
+      {children}
+    </div>
+  );
+}
 
-  const start = Math.max(2, current - 1);
-  const end = Math.min(total - 1, current + 1);
-
-  for (let i = start; i <= end; i++) pages.push(i);
-
-  if (current < total - 2) pages.push("...");
-  pages.push(total);
-
-  return pages;
+function DetailField({ label, children, full }: { label: string; children: React.ReactNode; full?: boolean }) {
+  return (
+    <div className={full ? "col-span-2" : ""}>
+      <p className="text-xs text-slate-400 mb-1">{label}</p>
+      {children}
+    </div>
+  );
 }
