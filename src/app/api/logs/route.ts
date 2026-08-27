@@ -69,8 +69,22 @@ export async function GET(request: NextRequest) {
     db.logEntry.count({ where }),
   ]);
 
+  // Enrich logs with user information
+  const userIds = Array.from(new Set(logs.map((log) => log.userId).filter(Boolean))) as string[];
+  const users = await db.user.findMany({
+    where: { id: { in: userIds } },
+    select: { id: true, name: true, email: true },
+  });
+  
+  const userMap = new Map(users.map((u) => [u.id, u]));
+
+  const enrichedLogs = logs.map((log) => ({
+    ...log,
+    user: log.userId ? userMap.get(log.userId) : null,
+  }));
+
   return NextResponse.json({
-    data: logs,
+    data: enrichedLogs,
     pagination: {
       page,
       limit,

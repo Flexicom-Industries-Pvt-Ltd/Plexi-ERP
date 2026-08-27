@@ -24,6 +24,7 @@ import {
   Copy,
   Check,
 } from "lucide-react";
+import { format } from "date-fns";
 
 // ──────────────────────────────────────────────
 // Types
@@ -45,6 +46,7 @@ interface LogEntry {
   durationMs: number | null;
   meta: any;
   diffs: LogDiff[];
+  user?: { id: string; name: string; email: string } | null;
 }
 
 interface LogDiff {
@@ -620,10 +622,10 @@ function LogRow({
         <td className="px-4 py-3">
           <div className="flex flex-col">
             <span className="font-mono text-xs text-slate-700">
-              {ts ? ts.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—"}
+              {ts ? format(ts, "dd MMM yyyy") : "—"}
             </span>
             <span className="font-mono text-xs text-slate-400">
-              {ts ? ts.toLocaleTimeString("en-IN", { hour12: false, fractionalSecondDigits: 3 }) : ""}
+              {ts ? format(ts, "HH:mm:ss") : ""}
             </span>
           </div>
         </td>
@@ -727,9 +729,14 @@ function LogRow({
                   />
                   <DetailItem
                     icon={<Info className="h-3.5 w-3.5" />}
-                    label="User ID"
+                    label="User"
                     value={
-                      log.userId ? (
+                      log.user ? (
+                        <div className="flex flex-col">
+                          <span className="font-semibold text-slate-700">{log.user.name}</span>
+                          <span className="text-slate-400 text-xs">{log.user.email}</span>
+                        </div>
+                      ) : log.userId ? (
                         <code className="text-xs font-mono bg-slate-100 px-1.5 py-0.5 rounded">
                           {log.userId.slice(0, 12)}…
                         </code>
