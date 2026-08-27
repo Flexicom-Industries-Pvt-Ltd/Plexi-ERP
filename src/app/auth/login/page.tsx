@@ -2,8 +2,6 @@ import { LoginForm } from "@/components/auth/login-form";
 import { Sparkles, Globe, HeadphonesIcon, ShieldCheck } from "lucide-react";
 import Image from "next/image";
 
-import logoImg from "../../../../public/logo.png";
-
 export default function LoginPage() {
   return (
     <div className="flex min-h-screen w-full bg-white">
@@ -15,7 +13,7 @@ export default function LoginPage() {
         <div className="relative z-10 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <div className="flex shrink-0 items-center justify-center rounded-xl bg-white p-2 shadow-md">
-              <Image src={logoImg} alt="Flexicom Logo" className="h-12 w-12 object-contain" />
+              <Image src="/logo.png" alt="Flexicom Logo" width={48} height={48} className="h-12 w-12 object-contain" />
             </div>
             <span className="text-3xl font-bold tracking-tight">Flexicom ERP</span>
           </div>
@@ -54,7 +52,7 @@ export default function LoginPage() {
           {/* Mobile Header - Only visible on small screens */}
           <div className="flex lg:hidden flex-col items-center gap-4 mb-10 w-full max-w-[400px]">
             <div className="flex shrink-0 items-center justify-center rounded-2xl bg-white shadow-md p-4 ring-1 ring-black/5">
-              <Image src={logoImg} alt="Flexicom Logo" className="h-16 w-16 object-contain" />
+              <Image src="/logo.png" alt="Flexicom Logo" width={64} height={64} className="h-16 w-16 object-contain" />
             </div>
             <span className="text-2xl font-bold tracking-tight text-primary">Flexicom ERP</span>
           </div>
