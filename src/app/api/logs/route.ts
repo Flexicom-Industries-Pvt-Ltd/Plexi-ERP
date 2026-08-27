@@ -35,6 +35,9 @@ export async function GET(request: NextRequest) {
   const search = searchParams.get('search') || undefined;
   const from = searchParams.get('from') || undefined;
   const to = searchParams.get('to') || undefined;
+  const httpMethod = searchParams.get('httpMethod') || undefined;
+  const statusCode = searchParams.get('statusCode') || undefined;
+  const userId = searchParams.get('userId') || undefined;
   const sortBy = searchParams.get('sortBy') || 'timestamp';
   const sortOrder = (searchParams.get('sortOrder') || 'desc') as 'asc' | 'desc';
 
@@ -42,13 +45,31 @@ export async function GET(request: NextRequest) {
   const where: any = {};
   if (module) where.module = module;
   if (severity) where.severity = severity;
+  if (httpMethod) where.httpMethod = httpMethod;
+  if (userId) where.userId = userId;
   if (action) where.action = { contains: action, mode: 'insensitive' };
+
+  // Status code range filtering (2xx, 4xx, 5xx)
+  if (statusCode) {
+    const code = parseInt(statusCode);
+    if (code === 200) {
+      where.statusCode = { gte: 200, lt: 300 };
+    } else if (code === 400) {
+      where.statusCode = { gte: 400, lt: 500 };
+    } else if (code === 500) {
+      where.statusCode = { gte: 500, lt: 600 };
+    } else {
+      where.statusCode = code;
+    }
+  }
+
   if (search) {
     where.OR = [
       { action: { contains: search, mode: 'insensitive' } },
       { module: { contains: search, mode: 'insensitive' } },
       { correlationId: { contains: search, mode: 'insensitive' } },
       { ip: { contains: search, mode: 'insensitive' } },
+      { url: { contains: search, mode: 'insensitive' } },
       { userAgent: { contains: search, mode: 'insensitive' } },
     ];
   }
@@ -58,7 +79,11 @@ export async function GET(request: NextRequest) {
     if (to) where.timestamp.lte = new Date(to);
   }
 
-  const [logs, total] = await Promise.all([
+  // ── Parallel: fetch logs, count, and aggregate stats ──
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+
+  const [logs, total, errorsToday, warningsToday, securityToday, avgDuration, uniqueUsers] = await Promise.all([
     db.logEntry.findMany({
       where,
       orderBy: { [sortBy]: sortOrder },
@@ -67,21 +92,53 @@ export async function GET(request: NextRequest) {
       include: { diffs: true },
     }),
     db.logEntry.count({ where }),
+    db.logEntry.count({
+      where: { severity: 'ERROR', timestamp: { gte: todayStart } },
+    }),
+    db.logEntry.count({
+      where: { severity: 'WARN', timestamp: { gte: todayStart } },
+    }),
+    db.logEntry.count({
+      where: { severity: 'SECURITY', timestamp: { gte: todayStart } },
+    }),
+    db.logEntry.aggregate({
+      _avg: { durationMs: true },
+      where: { durationMs: { not: null }, timestamp: { gte: todayStart } },
+    }),
+    db.logEntry.findMany({
+      where: { timestamp: { gte: todayStart }, userId: { not: null } },
+      distinct: ['userId'],
+      select: { userId: true },
+    }),
   ]);
 
   // Enrich logs with user information
   const userIds = Array.from(new Set(logs.map((log) => log.userId).filter(Boolean))) as string[];
-  const users = await db.user.findMany({
-    where: { id: { in: userIds } },
-    select: { id: true, name: true, email: true },
-  });
-  
+  const users = userIds.length > 0
+    ? await db.user.findMany({
+        where: { id: { in: userIds } },
+        select: { id: true, name: true, email: true },
+      })
+    : [];
   const userMap = new Map(users.map((u) => [u.id, u]));
 
   const enrichedLogs = logs.map((log) => ({
     ...log,
-    user: log.userId ? userMap.get(log.userId) : null,
+    user: log.userId ? userMap.get(log.userId) ?? null : null,
   }));
+
+  // Fetch distinct modules for filter options
+  const distinctModules = await db.logEntry.findMany({
+    distinct: ['module'],
+    select: { module: true },
+    orderBy: { module: 'asc' },
+  });
+
+  // Fetch all users for the user filter dropdown
+  const allUsers = await db.user.findMany({
+    select: { id: true, name: true, email: true },
+    orderBy: { name: 'asc' },
+  });
 
   return NextResponse.json({
     data: enrichedLogs,
@@ -90,6 +147,18 @@ export async function GET(request: NextRequest) {
       limit,
       total,
       totalPages: Math.ceil(total / limit),
+    },
+    stats: {
+      total,
+      errorsToday,
+      warningsToday,
+      securityToday,
+      avgDurationMs: Math.round(avgDuration._avg.durationMs ?? 0),
+      uniqueUsersToday: uniqueUsers.length,
+    },
+    filterOptions: {
+      modules: distinctModules.map((m) => m.module),
+      users: allUsers,
     },
   });
 }
