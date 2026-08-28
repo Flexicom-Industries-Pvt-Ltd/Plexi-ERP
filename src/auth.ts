@@ -26,13 +26,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         const user = await db.user.findUnique({
           where: { email: credentials.email as string },
-          include: { role: true }
+          include: { role: { include: { permissions: true } } }
         });
 
         if (!user || !user.password) {
           // Log failed login — user not found
           const { logEvent } = await import("@/lib/logging");
-          await logEvent({
+          logEvent({
             module: "AUTH",
             severity: "SECURITY",
             action: "Login Failed — User Not Found",
@@ -41,7 +41,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             userAgent,
             httpMethod: "POST",
             url: "/api/auth/callback/credentials",
-          });
+          }).catch(console.error);
           return null;
         }
 
@@ -53,7 +53,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (!isValidPassword) {
           // Log failed login — wrong password
           const { logEvent } = await import("@/lib/logging");
-          await logEvent({
+          logEvent({
             userId: user.id,
             module: "AUTH",
             severity: "SECURITY",
@@ -63,7 +63,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             userAgent,
             httpMethod: "POST",
             url: "/api/auth/callback/credentials",
-          });
+          }).catch(console.error);
           return null;
         }
 
@@ -73,6 +73,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           email: user.email,
           name: user.name,
           role: user.role?.name || "USER",
+          permissions: user.role?.permissions || [],
         };
       }
     })
@@ -82,6 +83,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (user) {
         token.role = user.role;
         token.id = user.id;
+        token.permissions = user.permissions;
       }
       return token;
     },
@@ -89,6 +91,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (session.user) {
         session.user.role = token.role as string;
         session.user.id = token.id as string;
+        session.user.permissions = token.permissions as any[];
       }
       return session;
     }
@@ -101,7 +104,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       const userAgent = headersList.get("user-agent") || null;
       
       const { logEvent } = await import("@/lib/logging");
-      await logEvent({
+      logEvent({
         userId: user.id,
         module: "AUTH",
         severity: "INFO",
@@ -113,7 +116,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         url: "/api/auth/callback/credentials",
         statusCode: 200,
         durationMs: Math.floor(Math.random() * 50) + 150, // Simulated duration for auth events
-      });
+      }).catch(console.error);
     },
     async signOut(message) {
       // Log sign-out event
@@ -123,7 +126,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
       const { logEvent } = await import("@/lib/logging");
       const token = 'token' in message ? message.token : null;
-      await logEvent({
+      logEvent({
         userId: (token as any)?.id ?? undefined,
         module: "AUTH",
         severity: "INFO",
@@ -135,7 +138,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         url: "/api/auth/signout",
         statusCode: 200,
         durationMs: Math.floor(Math.random() * 20) + 30, // Simulated duration for auth events
-      });
+      }).catch(console.error);
     },
   },
   pages: {
