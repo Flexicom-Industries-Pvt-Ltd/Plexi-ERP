@@ -65,6 +65,7 @@ model User {
   files             FileAsset[]
   gateEntries       GateEntry[]    @relation("GateEntryCreator")
   verifiedDocuments GateDocument[] @relation("DocumentVerifier")
+  inventoryTransactions InventoryTransaction[]
   createdAt         DateTime       @default(now())
   updatedAt     DateTime    @updatedAt
 }
@@ -136,6 +137,7 @@ model UnitOfMeasurement {
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+  inventoryItems InventoryItem[]
 }
 
 model Category {
@@ -147,6 +149,7 @@ model Category {
   isActive      Boolean       @default(true)
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
+  inventoryItems InventoryItem[]
 }
 
 model Driver {
@@ -169,6 +172,7 @@ model SubCategory {
   updatedAt   DateTime @updatedAt
 
   category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  inventoryItems InventoryItem[]
 
   @@unique([categoryId, name])
 }
@@ -265,6 +269,7 @@ model Location {
   isActive    Boolean      @default(true)
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
+  inventoryItems InventoryItem[]
 }
 
 model Machine {
@@ -448,4 +453,64 @@ model GateDocument {
 
   gateEntry      GateEntry      @relation(fields: [gateEntryId], references: [id], onDelete: Cascade)
   verifier       User?          @relation("DocumentVerifier", fields: [verifiedBy], references: [id])
+}
+
+// ==========================================
+// Phase 3: Materials & Inventory Management
+// ==========================================
+
+model InventoryItem {
+  id              String   @id @default(cuid())
+  code            String   @unique
+  name            String
+  description     String?
+  itemType        ItemType
+  categoryId      String?
+  subCategoryId   String?
+  uomId           String
+  locationId      String?
+  
+  currentStock    Float    @default(0)
+  minimumStock    Float    @default(0)
+  
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  category        Category?    @relation(fields: [categoryId], references: [id])
+  subCategory     SubCategory? @relation(fields: [subCategoryId], references: [id])
+  uom             UnitOfMeasurement @relation(fields: [uomId], references: [id])
+  location        Location?    @relation(fields: [locationId], references: [id])
+  transactions    InventoryTransaction[]
+
+  @@index([itemType])
+  @@index([categoryId])
+  @@index([locationId])
+}
+
+enum TransactionType {
+  IN
+  OUT
+  ADJUSTMENT
+}
+
+model InventoryTransaction {
+  id              String   @id @default(cuid())
+  itemId          String
+  type            TransactionType
+  quantity        Float
+  referenceType   String?  // e.g. "GATE_ENTRY", "MANUAL"
+  referenceId     String?  // e.g. GateEntry.id
+  remarks         String?
+  
+  userId          String?
+  createdAt       DateTime @default(now())
+
+  item            InventoryItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  user            User?         @relation(fields: [userId], references: [id])
+
+  @@index([itemId])
+  @@index([type])
+  @@index([referenceId])
+  @@index([createdAt])
 }
