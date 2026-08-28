@@ -8,14 +8,17 @@ export async function PATCH(request: Request, context: { params: Promise<{ model
   const { model, id } = await context.params;
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const permissions = session.user.permissions || [];
-  const hasAccess =
-    session.user.role === "SUPERADMIN" ||
-    permissions.some((p: any) => p.module === "SETTINGS" && p.canUpdate);
-  if (!hasAccess) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-
+  
   const modelConfig = masterDataConfig[model];
   if (!modelConfig) return NextResponse.json({ error: "Invalid model" }, { status: 400 });
+
+  const requiredModule = modelConfig.requiredModule || "SETTINGS";
+
+  const permissions = (session.user as any).permissions || [];
+  const hasAccess =
+    (session.user as any).role === "SUPERADMIN" ||
+    permissions.some((p: any) => p.module === requiredModule && p.canUpdate);
+  if (!hasAccess) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   try {
     const body = await request.json();
@@ -50,14 +53,17 @@ export async function DELETE(request: Request, context: { params: Promise<{ mode
   const { model, id } = await context.params;
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const permissions = session.user.permissions || [];
-  const hasAccess =
-    session.user.role === "SUPERADMIN" ||
-    permissions.some((p: any) => p.module === "SETTINGS" && p.canDelete);
-  if (!hasAccess) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-
+  
   const modelConfig = masterDataConfig[model];
   if (!modelConfig) return NextResponse.json({ error: "Invalid model" }, { status: 400 });
+
+  const requiredModule = modelConfig.requiredModule || "SETTINGS";
+
+  const permissions = (session.user as any).permissions || [];
+  const hasAccess =
+    (session.user as any).role === "SUPERADMIN" ||
+    permissions.some((p: any) => p.module === requiredModule && p.canDelete);
+  if (!hasAccess) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   try {
     // For safety, some master data should not be hard deleted if relations exist.
