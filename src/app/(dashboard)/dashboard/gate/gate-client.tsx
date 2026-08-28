@@ -112,10 +112,24 @@ export function GateClient() {
         body: JSON.stringify({ status: newStatus }),
       });
       if (!res.ok) throw new Error();
-      toast.success("Status updated successfully");
+      toast.success("Status advanced successfully");
       fetchEntries();
     } catch (err) {
-      toast.error("Failed to update status");
+      toast.error("Failed to advance status");
+    }
+  };
+
+  const getNextStatus = (current: string, purpose: string) => {
+    switch (current) {
+      case "ARRIVED": return "DOCUMENT_VERIFICATION";
+      case "DOCUMENT_VERIFICATION": return "VERIFIED";
+      case "VERIFIED": return "PARKING";
+      case "PARKING": return "READY";
+      case "READY": return purpose === "LOADING" ? "LOADING" : "UNLOADING";
+      case "LOADING":
+      case "UNLOADING": return "COMPLETED";
+      case "COMPLETED": return "GATE_OUT";
+      default: return null;
     }
   };
 
@@ -241,7 +255,22 @@ export function GateClient() {
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      <QuickStatusSelect entry={entry} onUpdate={handleQuickStatusUpdate} />
+                      <div className="flex items-center gap-2">
+                        <StatusBadge status={entry.status} />
+                        {(() => {
+                          const next = getNextStatus(entry.status, entry.purpose);
+                          if (!next) return null;
+                          return (
+                            <button
+                              onClick={() => handleQuickStatusUpdate(entry.entryNumber, next)}
+                              className="flex items-center justify-center p-1 rounded-full text-slate-400 hover:text-white hover:bg-primary transition-all shadow-sm border border-transparent hover:border-primary"
+                              title={`Advance to ${next.replace(/_/g, " ")}`}
+                            >
+                              <ArrowRight className="h-3.5 w-3.5" />
+                            </button>
+                          );
+                        })()}
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-slate-600">{entry.transporter || "—"}</td>
                     <td className="px-4 py-3 text-right">
@@ -392,51 +421,5 @@ function StatusBadge({ status }: { status: string }) {
     <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ${className}`}>
       {status.replace(/_/g, " ")}
     </span>
-  );
-}
-
-function QuickStatusSelect({ entry, onUpdate }: { entry: any, onUpdate: (id: string, status: string) => void }) {
-  const [updating, setUpdating] = useState(false);
-
-  const handleChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const newStatus = e.target.value;
-    setUpdating(true);
-    await onUpdate(entry.entryNumber, newStatus);
-    setUpdating(false);
-  };
-
-  const styles: Record<string, string> = {
-    ARRIVED: "bg-blue-100 text-blue-800 border-blue-200",
-    DOCUMENT_VERIFICATION: "bg-purple-100 text-purple-800 border-purple-200",
-    VERIFIED: "bg-emerald-100 text-emerald-800 border-emerald-200",
-    PARKING: "bg-amber-100 text-amber-800 border-amber-200",
-    READY: "bg-teal-100 text-teal-800 border-teal-200",
-    LOADING: "bg-indigo-100 text-indigo-800 border-indigo-200",
-    UNLOADING: "bg-indigo-100 text-indigo-800 border-indigo-200",
-    COMPLETED: "bg-emerald-100 text-emerald-800 border-emerald-200",
-    GATE_OUT: "bg-slate-100 text-slate-800 border-slate-200",
-    ON_HOLD: "bg-red-100 text-red-800 border-red-200",
-    REJECTED: "bg-red-100 text-red-800 border-red-200",
-    CANCELLED: "bg-slate-100 text-slate-800 border-slate-200",
-  };
-  
-  const className = styles[entry.status] || "bg-slate-100 text-slate-800 border-slate-200";
-
-  return (
-    <div className="relative inline-block w-full max-w-[140px]">
-      <select 
-        value={entry.status}
-        onChange={handleChange}
-        disabled={updating}
-        className={`appearance-none outline-none cursor-pointer inline-flex items-center w-full pl-2.5 pr-7 py-1 rounded-full text-[11px] font-bold tracking-wide border transition-all hover:opacity-80 disabled:opacity-50 ${className}`}
-      >
-        {Object.values(GateEntryStatus).map(s => (
-          <option key={s} value={s} className="bg-white text-slate-800 font-medium">
-            {s.replace(/_/g, " ")}
-          </option>
-        ))}
-      </select>
-      <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3 w-3 pointer-events-none opacity-60" />
-    </div>
   );
 }
