@@ -49,6 +49,7 @@ const settingsItems = [
   { title: "Users", url: "/dashboard/settings/users" },
   { title: "Roles", url: "/dashboard/settings/roles" },
   { title: "System Logs", url: "/dashboard/settings/logs" },
+  { title: "API Documentation", url: "/dashboard/api-docs" },
 ];
 
 const dataCentreItems = [
