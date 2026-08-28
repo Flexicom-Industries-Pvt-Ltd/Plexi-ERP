@@ -162,6 +162,7 @@ model Driver {
   updatedAt     DateTime    @updatedAt
 }
 
+
 model SubCategory {
   id          String   @id @default(cuid())
   categoryId  String
