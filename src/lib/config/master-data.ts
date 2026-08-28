@@ -15,6 +15,7 @@ export interface ModelConfig {
   title: string;
   description: string;
   fields: FieldConfig[];
+  requiredModule?: string;
 }
 
 export const masterDataConfig: Record<string, ModelConfig> = {
@@ -135,6 +136,7 @@ export const masterDataConfig: Record<string, ModelConfig> = {
     modelName: "driver",
     title: "Drivers",
     description: "Manage registered transport drivers and their contact details.",
+    requiredModule: "DATA_CENTRE",
     fields: [
       { key: "name", label: "Name", type: "text", required: true },
       { key: "phone", label: "Contact Number", type: "text", required: true },
