@@ -11,15 +11,10 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  // Check read permission
-  const user = await db.user.findUnique({
-    where: { id: session.user.id },
-    include: { role: { include: { permissions: true } } },
-  });
-
+  const permissions = (session.user as any).permissions || [];
   const hasAccess =
-    user?.role?.name === "SUPERADMIN" ||
-    user?.role?.permissions.some((p) => p.module === "SECURITY_GATE" && p.canRead);
+    (session.user as any).role === "SUPERADMIN" ||
+    permissions.some((p: any) => p.module === "SECURITY_GATE" && p.canRead);
 
   if (!hasAccess) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
@@ -49,15 +44,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  // Check update permission
-  const user = await db.user.findUnique({
-    where: { id: session.user.id },
-    include: { role: { include: { permissions: true } } },
-  });
-
+  const permissions = (session.user as any).permissions || [];
   const hasAccess =
-    user?.role?.name === "SUPERADMIN" ||
-    user?.role?.permissions.some((p) => p.module === "SECURITY_GATE" && p.canUpdate);
+    (session.user as any).role === "SUPERADMIN" ||
+    permissions.some((p: any) => p.module === "SECURITY_GATE" && p.canUpdate);
 
   if (!hasAccess) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
@@ -88,14 +78,14 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       after: updated,
     });
 
-    await logEvent({
+    logEvent({
       userId: session.user.id,
       module: "SECURITY_GATE",
       severity: "INFO",
       action: `Updated Gate Entry Status to ${updated.status}`,
       payload: { entryId: updated.id, status: updated.status },
       meta: { entryNumber: updated.entryNumber },
-    });
+    }).catch(console.error);
 
     return NextResponse.json(updated);
   } catch (error) {
@@ -109,15 +99,10 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  // Check delete permission
-  const user = await db.user.findUnique({
-    where: { id: session.user.id },
-    include: { role: { include: { permissions: true } } },
-  });
-
+  const permissions = (session.user as any).permissions || [];
   const hasAccess =
-    user?.role?.name === "SUPERADMIN" ||
-    user?.role?.permissions.some((p) => p.module === "SECURITY_GATE" && p.canDelete);
+    (session.user as any).role === "SUPERADMIN" ||
+    permissions.some((p: any) => p.module === "SECURITY_GATE" && p.canDelete);
 
   if (!hasAccess) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
@@ -134,14 +119,14 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       where: { entryNumber: id },
     });
 
-    await logEvent({
+    logEvent({
       userId: session.user.id,
       module: "SECURITY_GATE",
       severity: "WARN",
       action: "Deleted Gate Entry",
       payload: { deletedEntryId: existing.id, entryNumber: existing.entryNumber },
       meta: { entryNumber: existing.entryNumber },
-    });
+    }).catch(console.error);
 
     return NextResponse.json({ success: true });
   } catch (error) {
