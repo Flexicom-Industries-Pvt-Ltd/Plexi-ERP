@@ -90,6 +90,15 @@ export async function POST(request: NextRequest) {
     }
     const entryNumber = `${datePrefix}-${sequence.toString().padStart(3, "0")}`;
 
+    // Upsert Driver to Data Centre if contact is provided
+    if (data.driverContact) {
+      await db.driver.upsert({
+        where: { phone: data.driverContact },
+        update: { name: data.driverName },
+        create: { phone: data.driverContact, name: data.driverName },
+      });
+    }
+
     const newEntry = await db.gateEntry.create({
       data: {
         entryNumber,
