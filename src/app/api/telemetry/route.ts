@@ -43,7 +43,7 @@ export async function GET() {
 
     // Map bigints to numbers for JSON serialization
     const timeline = timelineRaw.map((row) => ({
-      time: row.hour.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      time: row.hour.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' }),
       date: row.hour.toISOString(),
       requests: Number(row.totalRequests),
       avgLatency: row.avgDuration ? Math.round(row.avgDuration) : 0,
