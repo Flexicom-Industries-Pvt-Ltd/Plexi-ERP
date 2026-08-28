@@ -39,6 +39,8 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 
+import { TelemetryTab } from "./telemetry-tab";
+
 // ──────────────────────────────────────────────
 // Types
 // ──────────────────────────────────────────────
@@ -156,6 +158,9 @@ export function LogsClient() {
   const [loading, setLoading] = useState(true);
   const [selectedLog, setSelectedLog] = useState<LogEntry | null>(null);
   const [relatedLogs, setRelatedLogs] = useState<LogEntry[]>([]);
+
+  // Top-level tab switcher
+  const [activeMainTab, setActiveMainTab] = useState<"logs" | "telemetry">("logs");
 
   // Filters
   const [search, setSearch] = useState("");
@@ -292,15 +297,43 @@ export function LogsClient() {
   // ── Open detail panel ──
   const openDetail = async (log: LogEntry) => {
     setSelectedLog(log);
-    // Fetch related logs by correlation prefix (same action chain)
-    // We'll search for logs from the same userId within ±5 seconds
     setRelatedLogs([]);
   };
 
   return (
     <div className="space-y-4">
-      {/* ── Stats Bar ── */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+      {/* ── Main Tab Switcher ── */}
+      <div className="flex gap-2 p-1 bg-slate-100 rounded-lg w-max mb-6">
+        <button
+          onClick={() => setActiveMainTab("logs")}
+          className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+            activeMainTab === "logs"
+              ? "bg-white text-slate-800 shadow-sm"
+              : "text-slate-500 hover:text-slate-700"
+          }`}
+        >
+          <Activity className="h-4 w-4" />
+          Live Logs Table
+        </button>
+        <button
+          onClick={() => setActiveMainTab("telemetry")}
+          className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+            activeMainTab === "telemetry"
+              ? "bg-white text-slate-800 shadow-sm"
+              : "text-slate-500 hover:text-slate-700"
+          }`}
+        >
+          <Activity className="h-4 w-4" />
+          System Telemetry
+        </button>
+      </div>
+
+      {activeMainTab === "telemetry" ? (
+        <TelemetryTab />
+      ) : (
+        <>
+          {/* ── Stats Bar ── */}
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         <StatCard
           label="Total Entries"
           value={stats.total.toLocaleString()}
@@ -640,6 +673,9 @@ export function LogsClient() {
       {/* ── Detail Panel (Slide-out overlay) ── */}
       {selectedLog && (
         <LogDetailPanel log={selectedLog} onClose={() => setSelectedLog(null)} />
+      )}
+      {/* ── End of Logs Tab ── */}
+        </>
       )}
     </div>
   );
