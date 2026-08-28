@@ -10,15 +10,10 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Check SETTINGS or SUPERADMIN access
-  const user = await db.user.findUnique({
-    where: { id: session.user.id },
-    include: { role: { include: { permissions: true } } },
-  });
-
+  const permissions = (session.user as any).permissions || [];
   const hasAccess =
-    user?.role?.name === "SUPERADMIN" ||
-    user?.role?.permissions.some((p) => p.module === "SETTINGS" && p.canRead);
+    (session.user as any).role === "SUPERADMIN" ||
+    permissions.some((p: any) => p.module === "SETTINGS" && p.canRead);
 
   if (!hasAccess) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
