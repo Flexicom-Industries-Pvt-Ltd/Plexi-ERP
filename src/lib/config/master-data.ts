@@ -130,5 +130,16 @@ export const masterDataConfig: Record<string, ModelConfig> = {
       { key: "description", label: "Description", type: "text" },
       { key: "isSystem", label: "System Level", type: "boolean", required: true },
     ],
+  },
+  driver: {
+    modelName: "driver",
+    title: "Drivers",
+    description: "Manage registered transport drivers and their contact details.",
+    fields: [
+      { key: "name", label: "Name", type: "text", required: true },
+      { key: "phone", label: "Contact Number", type: "text", required: true },
+      { key: "licenseNumber", label: "License Number", type: "text" },
+      { key: "isActive", label: "Active", type: "boolean", required: true },
+    ],
   }
 };
