@@ -37,14 +37,14 @@ export async function PATCH(request: Request) {
       data: { password: hashedNewPassword },
     });
 
-    await logEvent({
+    logEvent({
       userId: session.user.id,
       module: "USERS",
       severity: "WARN",
       action: "Updated Security Credentials",
       payload: { action: "PASSWORD_CHANGED" },
       meta: { recordId: session.user.id },
-    });
+    }).catch(console.error);
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
