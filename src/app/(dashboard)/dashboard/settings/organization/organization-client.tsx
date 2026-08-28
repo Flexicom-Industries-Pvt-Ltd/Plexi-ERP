@@ -25,7 +25,7 @@ const iconMap: Record<string, any> = {
 };
 
 export function OrganizationClient() {
-  const models = Object.values(masterDataConfig);
+  const models = Object.values(masterDataConfig).filter(m => m.modelName !== "driver");
   const [activeModel, setActiveModel] = useState<ModelConfig>(models[0]);
 
   return (

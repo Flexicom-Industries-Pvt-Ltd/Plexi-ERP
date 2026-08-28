@@ -14,6 +14,7 @@ import {
   CheckCircle,
   Truck,
   ChevronDown,
+  Database,
 } from "lucide-react";
 
 import {
@@ -50,6 +51,10 @@ const settingsItems = [
   { title: "System Logs", url: "/dashboard/settings/logs" },
 ];
 
+const dataCentreItems = [
+  { title: "Drivers", url: "/dashboard/data-centre/driver" },
+];
+
 type AppSidebarProps = {
   user: any;
   allowedModules: Record<string, boolean>;
@@ -59,10 +64,12 @@ export function AppSidebar({ user, allowedModules, ...props }: AppSidebarProps) 
   const pathname = usePathname();
   const router = useRouter();
   const [settingsOpen, setSettingsOpen] = useState(pathname.startsWith("/dashboard/settings"));
+  const [dataCentreOpen, setDataCentreOpen] = useState(pathname.startsWith("/dashboard/data-centre"));
 
   // Super Admin bypass
   const isSuperAdmin = user?.role?.name === "Super Admin";
   const hasSettingsAccess = isSuperAdmin || allowedModules["SETTINGS"];
+  const hasDataCentreAccess = isSuperAdmin || allowedModules["DATA_CENTRE"];
 
   const visibleNavItems = navItems.filter(item => 
     !item.module || isSuperAdmin || allowedModules[item.module]
@@ -96,6 +103,32 @@ export function AppSidebar({ user, allowedModules, ...props }: AppSidebarProps) 
             </SidebarMenuItem>
           ))}
           
+          {hasDataCentreAccess && (
+            <Collapsible open={dataCentreOpen} onOpenChange={setDataCentreOpen} className="group/collapsible">
+              <SidebarMenuItem>
+                <CollapsibleTrigger render={<SidebarMenuButton tooltip="Data Centre" />}>
+                    <Database className="h-4 w-4" />
+                    <span>Data Centre</span>
+                    <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180" />
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <SidebarMenuSub>
+                    {dataCentreItems.map((subItem) => (
+                      <SidebarMenuSubItem key={subItem.url}>
+                        <SidebarMenuSubButton
+                          render={<Link href={subItem.url} />}
+                          isActive={pathname === subItem.url}
+                        >
+                          <span>{subItem.title}</span>
+                        </SidebarMenuSubButton>
+                      </SidebarMenuSubItem>
+                    ))}
+                  </SidebarMenuSub>
+                </CollapsibleContent>
+              </SidebarMenuItem>
+            </Collapsible>
+          )}
+
           {hasSettingsAccess && (
             <Collapsible open={settingsOpen} onOpenChange={setSettingsOpen} className="group/collapsible">
               <SidebarMenuItem>

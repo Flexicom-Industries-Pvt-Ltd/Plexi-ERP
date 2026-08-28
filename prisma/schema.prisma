@@ -18,6 +18,7 @@ enum Module {
   PRODUCTION
   QUALITY_CONTROL
   DISPATCH
+  DATA_CENTRE
 }
 
 model Role {
@@ -146,6 +147,16 @@ model Category {
   isActive      Boolean       @default(true)
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
+}
+
+model Driver {
+  id            String      @id @default(cuid())
+  name          String
+  phone         String      @unique
+  licenseNumber String?
+  isActive      Boolean     @default(true)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
 }
 
 model SubCategory {
