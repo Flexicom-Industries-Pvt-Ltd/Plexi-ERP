@@ -379,6 +379,7 @@ model GateEntry {
   truckNumber      String
   driverName       String
   driverContact    String?
+  driverLicenseNumber String?
   transporter      String?
   supplierCustomer String?
   purpose          GatePurpose
