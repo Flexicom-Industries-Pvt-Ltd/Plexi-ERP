@@ -8,15 +8,10 @@ export async function PATCH(request: Request, context: { params: Promise<{ model
   const { model, id } = await context.params;
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  const user = await db.user.findUnique({
-    where: { id: session.user.id },
-    include: { role: { include: { permissions: true } } },
-  });
-
-  const hasAccess = user?.role?.name === "SUPERADMIN" || user?.role?.permissions.some(
-    (p) => p.module === "SETTINGS" && p.canUpdate
-  );
+  const permissions = session.user.permissions || [];
+  const hasAccess =
+    session.user.role === "SUPERADMIN" ||
+    permissions.some((p: any) => p.module === "SETTINGS" && p.canUpdate);
   if (!hasAccess) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const modelConfig = masterDataConfig[model];
@@ -36,14 +31,14 @@ export async function PATCH(request: Request, context: { params: Promise<{ model
       data: body,
     });
 
-    await logEvent({
+    logEvent({
       userId: session.user.id,
       module: "SETTINGS",
       severity: "WARN",
       action: `Updated ${modelConfig.title} Record`,
       payload: { old: oldRecord, new: updatedRecord },
       meta: { model: modelConfig.modelName, recordId: updatedRecord.id },
-    });
+    }).catch(console.error);
 
     return NextResponse.json(updatedRecord);
   } catch (error: any) {
@@ -55,15 +50,10 @@ export async function DELETE(request: Request, context: { params: Promise<{ mode
   const { model, id } = await context.params;
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  const user = await db.user.findUnique({
-    where: { id: session.user.id },
-    include: { role: { include: { permissions: true } } },
-  });
-
-  const hasAccess = user?.role?.name === "SUPERADMIN" || user?.role?.permissions.some(
-    (p) => p.module === "SETTINGS" && p.canDelete
-  );
+  const permissions = session.user.permissions || [];
+  const hasAccess =
+    session.user.role === "SUPERADMIN" ||
+    permissions.some((p: any) => p.module === "SETTINGS" && p.canDelete);
   if (!hasAccess) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const modelConfig = masterDataConfig[model];
@@ -76,14 +66,14 @@ export async function DELETE(request: Request, context: { params: Promise<{ mode
       where: { id: id },
     });
 
-    await logEvent({
+    logEvent({
       userId: session.user.id,
       module: "SETTINGS",
       severity: "ERROR",
       action: `Deleted ${modelConfig.title} Record`,
       payload: deletedRecord,
       meta: { model: modelConfig.modelName, recordId: deletedRecord.id },
-    });
+    }).catch(console.error);
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
