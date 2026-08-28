@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Truck, User, Phone, Briefcase, FileText, Package, PlusCircle, ArrowLeft } from "lucide-react";
+import { Truck, User, Phone, Briefcase, FileText, Package, PlusCircle, ArrowLeft, Search, X } from "lucide-react";
 import Link from "next/link";
 import { GatePurpose } from "@/generated/prisma";
 
@@ -29,6 +29,60 @@ export function NewGateClient() {
     expectedMaterial: "",
     expectedQuantity: "",
   });
+
+  const [driverSearchTerm, setDriverSearchTerm] = useState("");
+  const [suggestedDrivers, setSuggestedDrivers] = useState<any[]>([]);
+  const [showDriverSuggestions, setShowDriverSuggestions] = useState(false);
+  const [isDriverLocked, setIsDriverLocked] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const fetchDrivers = async () => {
+      if (driverSearchTerm.length < 2) {
+        setSuggestedDrivers([]);
+        return;
+      }
+      try {
+        const res = await fetch(`/api/drivers/search?q=${encodeURIComponent(driverSearchTerm)}`);
+        if (res.ok) {
+          const data = await res.json();
+          setSuggestedDrivers(data);
+        }
+      } catch (err) {
+        console.error("Failed to fetch drivers", err);
+      }
+    };
+    
+    const timeout = setTimeout(fetchDrivers, 300);
+    return () => clearTimeout(timeout);
+  }, [driverSearchTerm]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowDriverSuggestions(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleSelectDriver = (driver: any) => {
+    setFormData({
+      ...formData,
+      driverName: driver.name,
+      driverContact: driver.phone,
+    });
+    setDriverSearchTerm(driver.phone);
+    setIsDriverLocked(true);
+    setShowDriverSuggestions(false);
+  };
+
+  const handleClearDriver = () => {
+    setFormData({ ...formData, driverName: "", driverContact: "" });
+    setDriverSearchTerm("");
+    setIsDriverLocked(false);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -110,6 +164,52 @@ export function NewGateClient() {
               <User className="h-4 w-4" /> Driver Info
             </h3>
             
+            <div className="space-y-1 relative" ref={dropdownRef}>
+              <label className="text-sm font-medium text-slate-700">Driver Contact *</label>
+              <div className="relative">
+                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <input
+                  type="tel"
+                  placeholder="e.g. 9876543210"
+                  value={driverSearchTerm}
+                  onChange={(e) => {
+                    setDriverSearchTerm(e.target.value);
+                    setFormData({ ...formData, driverContact: e.target.value });
+                    setShowDriverSuggestions(true);
+                  }}
+                  onFocus={() => setShowDriverSuggestions(true)}
+                  disabled={isDriverLocked}
+                  className="w-full pl-10 pr-10 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all disabled:bg-slate-50 disabled:text-slate-500"
+                  required
+                />
+                {isDriverLocked && (
+                  <button 
+                    type="button" 
+                    onClick={handleClearDriver}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-red-500"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+              
+              {showDriverSuggestions && suggestedDrivers.length > 0 && !isDriverLocked && (
+                <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                  {suggestedDrivers.map((driver) => (
+                    <button
+                      key={driver.id}
+                      type="button"
+                      onClick={() => handleSelectDriver(driver)}
+                      className="w-full text-left px-4 py-2 hover:bg-slate-50 flex flex-col transition-colors border-b border-slate-100 last:border-0"
+                    >
+                      <span className="font-medium text-slate-900">{driver.phone}</span>
+                      <span className="text-sm text-slate-500">{driver.name}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <div className="space-y-1">
               <label className="text-sm font-medium text-slate-700">Driver Name *</label>
               <input
@@ -117,23 +217,10 @@ export function NewGateClient() {
                 placeholder="Full Name"
                 value={formData.driverName}
                 onChange={(e) => setFormData({ ...formData, driverName: e.target.value })}
-                className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                disabled={isDriverLocked}
+                className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all disabled:bg-slate-50 disabled:text-slate-500"
                 required
               />
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-sm font-medium text-slate-700">Driver Contact</label>
-              <div className="relative">
-                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <input
-                  type="tel"
-                  placeholder="Phone Number"
-                  value={formData.driverContact}
-                  onChange={(e) => setFormData({ ...formData, driverContact: e.target.value })}
-                  className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-                />
-              </div>
             </div>
           </div>
 
