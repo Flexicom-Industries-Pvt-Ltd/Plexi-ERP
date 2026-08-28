@@ -28,14 +28,14 @@ export async function PATCH(request: Request) {
       },
     });
 
-    await logEvent({
+    logEvent({
       userId: session.user.id,
       module: "USERS",
       severity: "INFO",
       action: "Updated Personal Profile",
       payload: { old: oldUser, new: updatedUser },
       meta: { recordId: session.user.id },
-    });
+    }).catch(console.error);
 
     return NextResponse.json({ success: true, user: { name: updatedUser.name, phone: updatedUser.phone } });
   } catch (error: any) {

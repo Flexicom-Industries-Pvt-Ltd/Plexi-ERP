@@ -9,14 +9,10 @@ export async function GET(request: Request, context: { params: Promise<{ model: 
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const user = await db.user.findUnique({
-    where: { id: session.user.id },
-    include: { role: { include: { permissions: true } } },
-  });
-
-  const hasAccess = user?.role?.name === "SUPERADMIN" || user?.role?.permissions.some(
-    (p) => p.module === "SETTINGS" && p.canRead
-  );
+  const permissions = (session.user as any).permissions || [];
+  const hasAccess =
+    (session.user as any).role === "SUPERADMIN" ||
+    permissions.some((p: any) => p.module === "SETTINGS" && p.canRead);
   if (!hasAccess) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const modelConfig = masterDataConfig[model];
@@ -38,14 +34,10 @@ export async function POST(request: Request, context: { params: Promise<{ model:
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const user = await db.user.findUnique({
-    where: { id: session.user.id },
-    include: { role: { include: { permissions: true } } },
-  });
-
-  const hasAccess = user?.role?.name === "SUPERADMIN" || user?.role?.permissions.some(
-    (p) => p.module === "SETTINGS" && p.canCreate
-  );
+  const permissions = (session.user as any).permissions || [];
+  const hasAccess =
+    (session.user as any).role === "SUPERADMIN" ||
+    permissions.some((p: any) => p.module === "SETTINGS" && p.canCreate);
   if (!hasAccess) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const modelConfig = masterDataConfig[model];
@@ -58,14 +50,14 @@ export async function POST(request: Request, context: { params: Promise<{ model:
       data: body,
     });
 
-    await logEvent({
+    logEvent({
       userId: session.user.id,
       module: "SETTINGS",
       severity: "INFO",
       action: `Created ${modelConfig.title} Record`,
       payload: body,
       meta: { model: modelConfig.modelName, recordId: newRecord.id },
-    });
+    }).catch(console.error);
 
     return NextResponse.json(newRecord);
   } catch (error: any) {

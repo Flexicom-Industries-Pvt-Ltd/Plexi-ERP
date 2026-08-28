@@ -11,15 +11,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Check SECURITY_GATE read permission
-  const user = await db.user.findUnique({
-    where: { id: session.user.id },
-    include: { role: { include: { permissions: true } } },
-  });
-
+  const permissions = session.user.permissions || [];
   const hasAccess =
-    user?.role?.name === "SUPERADMIN" ||
-    user?.role?.permissions.some((p) => p.module === "SECURITY_GATE" && p.canRead);
+    session.user.role === "SUPERADMIN" ||
+    permissions.some((p: any) => p.module === "SECURITY_GATE" && p.canRead);
 
   if (!hasAccess) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -56,15 +51,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Check SECURITY_GATE create permission
-  const user = await db.user.findUnique({
-    where: { id: session.user.id },
-    include: { role: { include: { permissions: true } } },
-  });
-
+  const permissions = session.user.permissions || [];
   const hasAccess =
-    user?.role?.name === "SUPERADMIN" ||
-    user?.role?.permissions.some((p) => p.module === "SECURITY_GATE" && p.canCreate);
+    session.user.role === "SUPERADMIN" ||
+    permissions.some((p: any) => p.module === "SECURITY_GATE" && p.canCreate);
 
   if (!hasAccess) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -105,14 +95,14 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    await logEvent({
+    logEvent({
       userId: session.user.id,
       module: "SECURITY_GATE",
       severity: "INFO",
       action: "Created Gate Entry",
       payload: newEntry,
       meta: { entryId: newEntry.id, entryNumber: newEntry.entryNumber },
-    });
+    }).catch(console.error);
 
     return NextResponse.json(newEntry, { status: 201 });
   } catch (error) {
