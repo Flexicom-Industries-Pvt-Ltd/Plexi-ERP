@@ -6,7 +6,6 @@ import { z } from "zod";
 import { registry } from "@/lib/openapi";
 
 export const dynamic = "force-dynamic";
-
 // 1. Define Zod Schema for input
 const CreateInventoryItemSchema = z.object({
   code: z.string().min(1, "Item code is required"),
@@ -60,6 +59,7 @@ registry.registerPath({
     403: { description: "Forbidden" },
   },
 });
+
 
 
 export async function GET(request: NextRequest) {
