@@ -14,6 +14,7 @@ export function NewGateClient() {
     truckNumber: string;
     driverName: string;
     driverContact: string;
+    driverLicenseNumber: string;
     transporter: string;
     supplierCustomer: string;
     purpose: GatePurpose;
@@ -23,6 +24,7 @@ export function NewGateClient() {
     truckNumber: "",
     driverName: "",
     driverContact: "",
+    driverLicenseNumber: "",
     transporter: "",
     supplierCustomer: "",
     purpose: GatePurpose.LOADING,
@@ -72,6 +74,7 @@ export function NewGateClient() {
       ...formData,
       driverName: driver.name,
       driverContact: driver.phone,
+      driverLicenseNumber: driver.licenseNumber || "",
     });
     setDriverSearchTerm(driver.phone);
     setIsDriverLocked(true);
@@ -79,7 +82,7 @@ export function NewGateClient() {
   };
 
   const handleClearDriver = () => {
-    setFormData({ ...formData, driverName: "", driverContact: "" });
+    setFormData({ ...formData, driverName: "", driverContact: "", driverLicenseNumber: "" });
     setDriverSearchTerm("");
     setIsDriverLocked(false);
   };
@@ -221,6 +224,21 @@ export function NewGateClient() {
                 className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all disabled:bg-slate-50 disabled:text-slate-500"
                 required
               />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-slate-700">Driver License Number</label>
+              <div className="relative">
+                <FileText className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="e.g. DL-14-2020-0012345"
+                  value={formData.driverLicenseNumber}
+                  onChange={(e) => setFormData({ ...formData, driverLicenseNumber: e.target.value.toUpperCase() })}
+                  disabled={isDriverLocked && !!formData.driverLicenseNumber}
+                  className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all disabled:bg-slate-50 disabled:text-slate-500"
+                />
+              </div>
             </div>
           </div>
 

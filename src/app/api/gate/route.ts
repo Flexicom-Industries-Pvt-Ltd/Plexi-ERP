@@ -84,8 +84,15 @@ export async function POST(request: NextRequest) {
     if (data.driverContact) {
       await db.driver.upsert({
         where: { phone: data.driverContact },
-        update: { name: data.driverName },
-        create: { phone: data.driverContact, name: data.driverName },
+        update: { 
+          name: data.driverName,
+          ...(data.driverLicenseNumber ? { licenseNumber: data.driverLicenseNumber } : {})
+        },
+        create: { 
+          phone: data.driverContact, 
+          name: data.driverName,
+          licenseNumber: data.driverLicenseNumber || null
+        },
       });
     }
 
@@ -95,6 +102,7 @@ export async function POST(request: NextRequest) {
         truckNumber: data.truckNumber,
         driverName: data.driverName,
         driverContact: data.driverContact,
+        driverLicenseNumber: data.driverLicenseNumber,
         transporter: data.transporter,
         supplierCustomer: data.supplierCustomer,
         purpose: data.purpose,
