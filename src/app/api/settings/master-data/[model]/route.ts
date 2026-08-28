@@ -9,14 +9,17 @@ export async function GET(request: Request, context: { params: Promise<{ model: 
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  const modelConfig = masterDataConfig[model];
+  if (!modelConfig) return NextResponse.json({ error: "Invalid model" }, { status: 400 });
+
+  const requiredModule = modelConfig.requiredModule || "SETTINGS";
+
   const permissions = (session.user as any).permissions || [];
   const hasAccess =
     (session.user as any).role === "SUPERADMIN" ||
-    permissions.some((p: any) => p.module === "SETTINGS" && p.canRead);
+    permissions.some((p: any) => p.module === requiredModule && p.canRead);
   if (!hasAccess) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  const modelConfig = masterDataConfig[model];
-  if (!modelConfig) return NextResponse.json({ error: "Invalid model" }, { status: 400 });
 
   try {
     // Dynamically access Prisma model
@@ -34,14 +37,18 @@ export async function POST(request: Request, context: { params: Promise<{ model:
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  const modelConfig = masterDataConfig[model];
+  if (!modelConfig) return NextResponse.json({ error: "Invalid model" }, { status: 400 });
+
+  const requiredModule = modelConfig.requiredModule || "SETTINGS";
+
   const permissions = (session.user as any).permissions || [];
   const hasAccess =
     (session.user as any).role === "SUPERADMIN" ||
-    permissions.some((p: any) => p.module === "SETTINGS" && p.canCreate);
+    permissions.some((p: any) => p.module === requiredModule && p.canCreate);
   if (!hasAccess) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  const modelConfig = masterDataConfig[model];
-  if (!modelConfig) return NextResponse.json({ error: "Invalid model" }, { status: 400 });
+
 
   try {
     const body = await request.json();
