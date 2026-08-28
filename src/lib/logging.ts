@@ -118,6 +118,12 @@ export interface LogEventParams {
   httpMethod?: string | null;
   url?: string | null;
   statusCode?: number | null;
+  diffs?: {
+    entity: string;
+    entityId: string;
+    before: any;
+    after: any;
+  }[];
 }
 
 export async function logEvent(params: LogEventParams): Promise<string> {
@@ -175,6 +181,11 @@ export async function logEvent(params: LogEventParams): Promise<string> {
         deviceType: ua.deviceType,
         browser: ua.browser,
         os: ua.os,
+        ...(params.diffs && params.diffs.length > 0 ? {
+          diffs: {
+            create: params.diffs
+          }
+        } : {})
       },
     });
 
@@ -203,7 +214,8 @@ export async function logDiff(params: {
   url?: string | null;
   statusCode?: number | null;
 }): Promise<string> {
-  const correlationId = await logEvent({
+  // Use a single nested write via logEvent
+  return logEvent({
     userId: params.userId,
     module: params.module ?? 'DATA_CHANGE',
     severity: 'INFO',
@@ -214,27 +226,13 @@ export async function logDiff(params: {
     httpMethod: params.httpMethod,
     url: params.url,
     statusCode: params.statusCode,
+    diffs: [{
+      entity: params.entity,
+      entityId: params.entityId,
+      before: params.before,
+      after: params.after
+    }]
   });
-
-  // Link diff record to the created LogEntry
-  try {
-    const logEntry = await prisma.logEntry.findUnique({ where: { correlationId } });
-    if (logEntry) {
-      await prisma.logDiff.create({
-        data: {
-          logEntryId: logEntry.id,
-          entity: params.entity,
-          entityId: params.entityId,
-          before: params.before,
-          after: params.after,
-        },
-      });
-    }
-  } catch (err) {
-    console.error('[LogService] Failed to write diff:', err);
-  }
-
-  return correlationId;
 }
 
 // ──────────────────────────────────────────────

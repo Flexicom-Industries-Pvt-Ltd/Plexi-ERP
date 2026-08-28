@@ -10,15 +10,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  // Check update permission
-  const user = await db.user.findUnique({
-    where: { id: session.user.id },
-    include: { role: { include: { permissions: true } } },
-  });
-
+  const permissions = (session.user as any).permissions || [];
   const hasAccess =
-    user?.role?.name === "SUPERADMIN" ||
-    user?.role?.permissions.some((p) => p.module === "SECURITY_GATE" && p.canUpdate);
+    (session.user as any).role === "SUPERADMIN" ||
+    permissions.some((p: any) => p.module === "SECURITY_GATE" && p.canUpdate);
 
   if (!hasAccess) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
@@ -46,14 +41,14 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       },
     });
 
-    await logEvent({
+    logEvent({
       userId: session.user.id,
       module: "SECURITY_GATE",
       severity: "INFO",
       action: `Updated Gate Document Status to ${updatedDoc.status}`,
       payload: updatedDoc,
       meta: { entryId: id, documentId: updatedDoc.id },
-    });
+    }).catch(console.error);
 
     return NextResponse.json(updatedDoc);
   } catch (error) {
