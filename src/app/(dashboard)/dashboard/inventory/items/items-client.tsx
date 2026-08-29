@@ -219,8 +219,89 @@ export function InventoryItemsClient({
         )}
       </div>
 
+      {/* ── Desktop Table & Mobile Cards ── */}
       <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
+        
+        {/* Mobile View (Cards) */}
+        <div className="block md:hidden divide-y divide-slate-100">
+          {loading ? (
+            <div className="p-8 text-center text-slate-500 animate-pulse flex flex-col items-center">
+              <Package className="h-8 w-8 text-slate-300 mb-2" />
+              <p>Loading items...</p>
+            </div>
+          ) : items.length === 0 ? (
+            <div className="p-12 text-center text-slate-500">
+              No inventory items found.
+            </div>
+          ) : (
+            items.map((item) => {
+              const isLowStock = item.currentStock <= item.minimumStock && item.minimumStock > 0;
+              return (
+                <div key={item.id} className="p-4 flex flex-col gap-3 active:bg-slate-50">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <div className="font-bold text-slate-800 text-base">{item.code}</div>
+                      <div className="text-xs font-medium text-slate-500 mt-0.5">{item.name}</div>
+                    </div>
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+                      {item.itemType.replace(/_/g, " ")}
+                    </span>
+                  </div>
+                  
+                  <div className="flex justify-between items-end">
+                    <div className="text-xs text-slate-500">
+                      <div>{item.category?.name || "Uncategorized"}</div>
+                      <div className="mt-1">{item.location?.name || "No Location"}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className={`font-bold text-lg ${isLowStock ? "text-red-600" : "text-slate-800"}`}>
+                        {item.currentStock} <span className="text-sm font-medium text-slate-500">{item.uom?.abbreviation}</span>
+                      </div>
+                      {isLowStock && (
+                        <div className="text-[10px] text-red-500 font-medium flex items-center justify-end gap-1 mt-0.5">
+                          <AlertTriangle className="h-3 w-3" /> Low Stock
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-2 mt-2 pt-2 border-t border-slate-100">
+                    {canUpdate && (
+                      <button
+                        onClick={() => handleOpenModal("ADJUST", item)}
+                        className="p-2 text-slate-400 hover:text-amber-600 rounded-md hover:bg-amber-50 transition-colors"
+                        title="Manual Adjust Stock"
+                      >
+                        <Activity className="h-4 w-4" />
+                      </button>
+                    )}
+                    {canUpdate && (
+                      <button
+                        onClick={() => handleOpenModal("EDIT", item)}
+                        className="p-2 text-slate-400 hover:text-primary rounded-md hover:bg-primary/10 transition-colors"
+                        title="Edit"
+                      >
+                        <Edit2 className="h-4 w-4" />
+                      </button>
+                    )}
+                    {canDelete && (
+                      <button
+                        onClick={() => handleDelete(item.id, item.name)}
+                        className="p-2 text-slate-400 hover:text-red-600 rounded-md hover:bg-red-50 transition-colors"
+                        title="Delete"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Desktop View (Table) */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-sm text-left">
             <thead className="bg-slate-50 border-b border-slate-200 text-slate-500">
               <tr>
