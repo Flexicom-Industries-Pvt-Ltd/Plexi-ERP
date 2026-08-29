@@ -101,6 +101,24 @@
   html {
     @apply font-sans;
   }
+
+  /* PWA & Mobile Touch Improvements */
+  @media (max-width: 768px) {
+    input[type="text"], 
+    input[type="tel"], 
+    input[type="number"], 
+    input[type="email"], 
+    input[type="password"], 
+    select, 
+    button {
+      min-height: 44px; /* Apple iOS standard tap target */
+    }
+    
+    /* Prevent text size adjustment on orientation change */
+    html {
+      -webkit-text-size-adjust: 100%;
+    }
+  }
 }
 
 @layer utilities {

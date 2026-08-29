@@ -207,9 +207,54 @@ export function GateClient() {
         </div>
       </div>
 
-      {/* ── Table ── */}
+      {/* ── Table (Desktop) & Cards (Mobile) ── */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
+        {/* Mobile View (Cards) */}
+        <div className="block md:hidden divide-y divide-slate-100">
+          {loading && entries.length === 0 ? (
+            <div className="p-8 text-center text-slate-500">Loading...</div>
+          ) : entries.length === 0 ? (
+            <div className="p-16 text-center flex flex-col items-center gap-3 text-slate-400">
+              <Truck className="h-12 w-12 stroke-1" />
+              <div>
+                <p className="font-medium text-slate-600">No gate entries found</p>
+                <p className="text-sm">Create a new entry for arriving trucks.</p>
+              </div>
+            </div>
+          ) : (
+            entries.map((entry) => (
+              <div key={entry.id} className="p-4 flex flex-col gap-3 active:bg-slate-50">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <span className="font-bold text-slate-800 text-base">{entry.truckNumber}</span>
+                    <div className="text-xs text-primary font-medium mt-0.5">{entry.entryNumber}</div>
+                  </div>
+                  <StatusBadge status={entry.status} />
+                </div>
+                
+                <div className="flex justify-between text-xs text-slate-500">
+                  <div className="flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    {new Date(entry.arrivalTime).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
+                  </div>
+                  <div>{entry.purpose}</div>
+                </div>
+
+                <div className="flex justify-end gap-2 mt-1">
+                  <Link
+                    href={`/dashboard/gate/${entry.id}`}
+                    className="p-2 text-primary hover:bg-primary/10 rounded-md transition-colors"
+                  >
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Desktop View (Table) */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-100 bg-slate-50/80">
