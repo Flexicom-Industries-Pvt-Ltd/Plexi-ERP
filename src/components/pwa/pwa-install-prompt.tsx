@@ -7,22 +7,38 @@ import { X, Download } from "lucide-react";
 export function PwaInstallPrompt() {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isVisible, setIsVisible] = useState(false);
+  const [isIos, setIsIos] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [isStandalone, setIsStandalone] = useState(false);
 
   useEffect(() => {
-    // Detect mobile using simple window width or userAgent
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth <= 768 || /Mobi|Android/i.test(navigator.userAgent));
+    // Detect if already installed (standalone mode)
+    const checkStandalone = () => {
+      const isStan = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone;
+      setIsStandalone(isStan);
     };
+    checkStandalone();
+
+    const checkMobile = () => {
+      const ua = window.navigator.userAgent;
+      const mobile = window.innerWidth <= 768 || /Mobi|Android/i.test(ua);
+      const ios = /iPad|iPhone|iPod/.test(ua) && !(window as any).MSStream;
+      setIsMobile(mobile);
+      setIsIos(ios);
+      
+      // If iOS and mobile and not standalone, show the prompt manually 
+      // (since iOS doesn't fire beforeinstallprompt)
+      if (ios && mobile && !isStandalone) {
+        setIsVisible(true);
+      }
+    };
+    
     checkMobile();
     window.addEventListener("resize", checkMobile);
 
     const handleBeforeInstallPrompt = (e: any) => {
-      // Prevent Chrome 67 and earlier from automatically showing the prompt
       e.preventDefault();
-      // Stash the event so it can be triggered later.
       setDeferredPrompt(e);
-      // Only show if mobile
       if (window.innerWidth <= 768 || /Mobi|Android/i.test(navigator.userAgent)) {
         setIsVisible(true);
       }
@@ -34,20 +50,24 @@ export function PwaInstallPrompt() {
       window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
       window.removeEventListener("resize", checkMobile);
     };
-  }, []);
+  }, [isStandalone]);
 
   const handleInstallClick = async () => {
-    if (!deferredPrompt) return;
-    // Show the install prompt
+    if (isIos) {
+      alert("To install on iOS: Tap the Share button at the bottom of Safari and select 'Add to Home Screen'.");
+      return;
+    }
+    
+    if (!deferredPrompt) {
+      alert("App can only be installed over HTTPS or localhost, or it's already installed.");
+      return;
+    }
+    
     deferredPrompt.prompt();
-    // Wait for the user to respond to the prompt
     const { outcome } = await deferredPrompt.userChoice;
     if (outcome === "accepted") {
       console.log("User accepted the install prompt");
-    } else {
-      console.log("User dismissed the install prompt");
     }
-    // We've used the prompt, and can't use it again, throw it away
     setDeferredPrompt(null);
     setIsVisible(false);
   };
@@ -56,12 +76,12 @@ export function PwaInstallPrompt() {
     setIsVisible(false);
   };
 
-  if (!isVisible || !isMobile) {
+  if (!isVisible || !isMobile || isStandalone) {
     return null;
   }
 
   return (
-    <div className="fixed bottom-4 left-4 right-4 z-[9999] bg-slate-900 text-white rounded-xl shadow-2xl p-4 flex items-center justify-between animate-in slide-in-from-bottom-5">
+    <div className="fixed bottom-4 left-4 right-4 z-[9999] bg-slate-900 text-white rounded-xl shadow-2xl p-4 flex flex-col md:flex-row gap-4 items-center justify-between animate-in slide-in-from-bottom-5">
       <div className="flex items-center space-x-3">
         <div className="bg-slate-800 p-2 rounded-lg">
           <Download className="h-6 w-6 text-blue-400" />
