@@ -24,6 +24,9 @@ export const metadata: Metadata = {
   formatDetection: {
     telephone: false,
   },
+};
+
+export const viewport = {
   themeColor: "#0f172a",
 };
 import { Toaster } from "@/components/ui/sonner";
