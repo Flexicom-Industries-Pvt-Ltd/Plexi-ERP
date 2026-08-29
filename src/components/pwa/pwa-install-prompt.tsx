@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { X, Download } from "lucide-react";
+import Image from "next/image";
 
 export function PwaInstallPrompt() {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
@@ -83,8 +84,8 @@ export function PwaInstallPrompt() {
   return (
     <div className="fixed bottom-4 left-4 right-4 z-[9999] bg-slate-900 text-white rounded-xl shadow-2xl p-4 flex flex-col md:flex-row gap-4 items-center justify-between animate-in slide-in-from-bottom-5">
       <div className="flex items-center space-x-3">
-        <div className="bg-slate-800 p-2 rounded-lg">
-          <Download className="h-6 w-6 text-blue-400" />
+        <div className="bg-slate-100 p-1 rounded-lg shrink-0 flex items-center justify-center overflow-hidden h-12 w-12 relative">
+          <Image src="/logo.png" alt="Plexi ERP Logo" fill className="object-contain p-1" />
         </div>
         <div>
           <h4 className="font-semibold text-sm">Install Plexi ERP</h4>
