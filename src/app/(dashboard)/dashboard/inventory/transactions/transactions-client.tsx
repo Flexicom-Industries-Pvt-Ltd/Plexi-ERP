@@ -135,7 +135,7 @@ export function TransactionsClient() {
                       </td>
                       <td className="px-4 py-3">
                         {tx.referenceType === "GATE_ENTRY" ? (
-                          <Link href={`/dashboard/gate/${tx.referenceId}`} className="inline-flex items-center gap-1 text-primary hover:underline font-medium text-xs">
+                          <Link href={`/dashboard/gate/${tx.gateEntryNumber ?? tx.referenceId}`} className="inline-flex items-center gap-1 text-primary hover:underline font-medium text-xs">
                             <FileText className="h-3.5 w-3.5" /> {tx.remarks || "Gate Entry"}
                           </Link>
                         ) : (
