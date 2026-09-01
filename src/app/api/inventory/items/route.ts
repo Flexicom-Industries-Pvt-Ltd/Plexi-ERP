@@ -80,9 +80,12 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const type = searchParams.get("type");
   const search = searchParams.get("search");
+  const materialType = searchParams.get("materialType");
+  const includeMovement = searchParams.get("includeMovement") === "true";
 
-  const where: any = {};
+  const where: Record<string, unknown> = {};
   if (type) where.itemType = type;
+  if (materialType) where.stock = { materialType };
   if (search) {
     where.OR = [
       { name: { contains: search, mode: "insensitive" } },
@@ -99,9 +102,46 @@ export async function GET(request: NextRequest) {
         subCategory: true,
         uom: true,
         location: true,
+        stock: true,
       },
     });
-    return NextResponse.json(items);
+
+    if (!includeMovement) {
+      return NextResponse.json(items);
+    }
+
+    const itemIds = items.map((i) => i.id);
+    const movements = itemIds.length
+      ? await db.inventoryTransaction.groupBy({
+          by: ["itemId", "type"],
+          where: { itemId: { in: itemIds } },
+          _sum: { quantity: true },
+        })
+      : [];
+
+    const movementMap = new Map<string, { received: number; consumed: number }>();
+    for (const row of movements) {
+      const current = movementMap.get(row.itemId) || { received: 0, consumed: 0 };
+      const qty = row._sum.quantity ?? 0;
+      if (row.type === "IN") current.received += qty;
+      if (row.type === "OUT") current.consumed += qty;
+      movementMap.set(row.itemId, current);
+    }
+
+    const enriched = items.map((item) => {
+      const movement = movementMap.get(item.id) || { received: 0, consumed: 0 };
+      return {
+        ...item,
+        movementSummary: {
+          available: item.currentStock,
+          reserved: item.reservedStock,
+          received: movement.received,
+          consumed: movement.consumed,
+        },
+      };
+    });
+
+    return NextResponse.json(enriched);
   } catch (error) {
     console.error("Error fetching inventory items:", error);
     return NextResponse.json({ error: "Failed to fetch inventory items" }, { status: 500 });

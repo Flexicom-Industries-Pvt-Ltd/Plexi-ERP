@@ -57,6 +57,7 @@ const dataCentreItems = [
   { title: "Stocks", url: "/dashboard/data-centre/stock" },
   { title: "Units", url: "/dashboard/data-centre/units" },
   { title: "Item Categories", url: "/dashboard/data-centre/categories" },
+  { title: "Sub Categories", url: "/dashboard/data-centre/sub-categories" },
 ];
 
 type AppSidebarProps = {

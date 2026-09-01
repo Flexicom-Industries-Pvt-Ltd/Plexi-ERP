@@ -137,6 +137,19 @@ export const masterDataConfig: Record<string, ModelConfig> = {
       { key: "isActive", label: "Active", type: "boolean", required: true },
     ],
   },
+  subCategory: {
+    modelName: "subCategory",
+    title: "Sub Categories",
+    description: "Manage sub-categories under item categories.",
+    requiredModule: "DATA_CENTRE",
+    readModules: ["DATA_CENTRE", "INVENTORY"],
+    fields: [
+      { key: "categoryId", label: "Category", type: "select", required: true, relationEndpoint: "category" },
+      { key: "name", label: "Name", type: "text", required: true },
+      { key: "description", label: "Description", type: "text" },
+      { key: "isActive", label: "Active", type: "boolean", required: true },
+    ],
+  },
   configParameter: {
     modelName: "configParameter",
     title: "System Parameters",

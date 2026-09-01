@@ -53,11 +53,12 @@ export function InventoryItemsClient({
       const url = new URL("/api/inventory/items", window.location.origin);
       if (search) url.searchParams.set("search", search);
       if (typeFilter) url.searchParams.set("type", typeFilter);
+      url.searchParams.set("includeMovement", "true");
 
       const [resItems, resCat, resSub, resUom, resLoc] = await Promise.all([
         fetch(url).then(r => r.json()),
         fetch("/api/settings/master-data/category").then(r => r.json()),
-        fetch("/api/settings/master-data/subcategory").then(r => r.json()),
+        fetch("/api/settings/master-data/subCategory").then(r => r.json()),
         fetch("/api/settings/master-data/unitOfMeasurement").then(r => r.json()),
         fetch("/api/settings/master-data/location").then(r => r.json()),
       ]);
@@ -307,7 +308,9 @@ export function InventoryItemsClient({
               <tr>
                 <th className="px-4 py-3 font-medium">Code & Name</th>
                 <th className="px-4 py-3 font-medium">Type & Category</th>
-                <th className="px-4 py-3 font-medium text-right">Current Stock</th>
+                <th className="px-4 py-3 font-medium text-right">Available</th>
+                <th className="px-4 py-3 font-medium text-right">Reserved</th>
+                <th className="px-4 py-3 font-medium text-right">Consumed</th>
                 <th className="px-4 py-3 font-medium">Location</th>
                 <th className="px-4 py-3 font-medium text-right">Actions</th>
               </tr>
@@ -315,7 +318,7 @@ export function InventoryItemsClient({
             <tbody className="divide-y divide-slate-100">
               {loading ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-12 text-center text-slate-500">
+                  <td colSpan={7} className="px-4 py-12 text-center text-slate-500">
                     <div className="animate-pulse flex flex-col items-center">
                       <Package className="h-8 w-8 text-slate-300 mb-2" />
                       <p>Loading items...</p>
@@ -324,7 +327,7 @@ export function InventoryItemsClient({
                 </tr>
               ) : items.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-12 text-center text-slate-500">
+                  <td colSpan={7} className="px-4 py-12 text-center text-slate-500">
                     No inventory items found.
                   </td>
                 </tr>
@@ -347,13 +350,19 @@ export function InventoryItemsClient({
                       </td>
                       <td className="px-4 py-3 text-right">
                         <div className={`font-bold text-base ${isLowStock ? "text-red-600" : "text-slate-800"}`}>
-                          {item.currentStock} <span className="text-sm font-medium text-slate-500">{item.uom?.abbreviation}</span>
+                          {item.movementSummary?.available ?? item.currentStock} <span className="text-sm font-medium text-slate-500">{item.uom?.abbreviation}</span>
                         </div>
                         {isLowStock && (
                           <div className="text-[10px] text-red-500 font-medium flex items-center justify-end gap-1 mt-0.5">
                             <AlertTriangle className="h-3 w-3" /> Low Stock (Min: {item.minimumStock})
                           </div>
                         )}
+                      </td>
+                      <td className="px-4 py-3 text-right text-amber-600 font-medium">
+                        {item.movementSummary?.reserved ?? item.reservedStock ?? 0}
+                      </td>
+                      <td className="px-4 py-3 text-right text-slate-600 font-medium">
+                        {item.movementSummary?.consumed ?? 0}
                       </td>
                       <td className="px-4 py-3 text-slate-600">
                         {item.location?.name || "—"}
