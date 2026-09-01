@@ -33,7 +33,11 @@ export async function GET(request: NextRequest) {
       },
       orderBy: { arrivalTime: "desc" },
       include: {
-        stockDetails: true,
+        stockDetails: {
+          include: {
+            stock: { include: { uom: true } },
+          },
+        },
       },
     });
     
