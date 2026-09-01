@@ -54,6 +54,7 @@ const settingsItems = [
 
 const dataCentreItems = [
   { title: "Drivers", url: "/dashboard/data-centre/driver" },
+  { title: "Stocks", url: "/dashboard/data-centre/stock" },
 ];
 
 type AppSidebarProps = {

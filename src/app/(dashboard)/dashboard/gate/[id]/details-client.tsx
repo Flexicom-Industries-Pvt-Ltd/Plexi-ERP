@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import {
@@ -19,6 +19,8 @@ import {
   RefreshCw,
   AlertTriangle,
   ChevronDown,
+  Search,
+  X,
 } from "lucide-react";
 import { GateEntryStatus } from "@/generated/prisma";
 
@@ -29,6 +31,32 @@ const LIFECYCLE_STEPS = [
   { id: "LOADING", label: "Loading/Unloading" },
   { id: "GATE_OUT", label: "Gate Out" },
 ];
+
+const MATERIAL_TYPE_OPTIONS = [
+  { label: "Raw materials", value: "RAW_MATERIALS" },
+  { label: "Bobbins", value: "BOBBINS" },
+  { label: "PP rolls", value: "PP_ROLLS" },
+  { label: "LPP rolls", value: "LPP_ROLLS" },
+  { label: "Laminated rolls", value: "LAMINATED_ROLLS" },
+  { label: "Printed rolls", value: "PRINTED_ROLLS" },
+  { label: "Cut material", value: "CUT_MATERIAL" },
+  { label: "Work-in-progress", value: "WORK_IN_PROGRESS" },
+  { label: "Finished bags", value: "FINISHED_BAGS" },
+  { label: "Bales", value: "BALES" },
+  { label: "Scrap", value: "SCRAP" },
+  { label: "RP granules", value: "RP_GRANULES" },
+  { label: "External materials", value: "EXTERNAL_MATERIALS" },
+];
+
+const EMPTY_STOCK_FORM = {
+  stockId: "",
+  materialName: "",
+  materialType: "RAW_MATERIALS",
+  quantity: "",
+  unit: "kg",
+  batchLot: "",
+  expectedQuantity: "",
+};
 
 export function GateDetailsClient({ entryId }: { entryId: string }) {
   const [entry, setEntry] = useState<any>(null);
@@ -43,8 +71,13 @@ export function GateDetailsClient({ entryId }: { entryId: string }) {
   const [submitting, setSubmitting] = useState(false);
 
   // Forms state
-  const [stockForm, setStockForm] = useState({ materialName: "", materialType: "", quantity: "", unit: "kg", batchLot: "", expectedQuantity: "" });
+  const [stockForm, setStockForm] = useState({ ...EMPTY_STOCK_FORM });
   const [docForm, setDocForm] = useState({ documentType: "", remarks: "" });
+  const [stockSearchTerm, setStockSearchTerm] = useState("");
+  const [suggestedStocks, setSuggestedStocks] = useState<any[]>([]);
+  const [showStockSuggestions, setShowStockSuggestions] = useState(false);
+  const [isStockLocked, setIsStockLocked] = useState(false);
+  const stockDropdownRef = useRef<HTMLDivElement>(null);
 
   const fetchEntry = useCallback(async () => {
     try {
@@ -62,6 +95,35 @@ export function GateDetailsClient({ entryId }: { entryId: string }) {
   useEffect(() => {
     fetchEntry();
   }, [fetchEntry]);
+
+  useEffect(() => {
+    const fetchStocks = async () => {
+      if (isStockLocked || stockSearchTerm.length < 2) {
+        setSuggestedStocks([]);
+        return;
+      }
+      try {
+        const res = await fetch(`/api/stocks/search?q=${encodeURIComponent(stockSearchTerm)}`);
+        if (res.ok) {
+          setSuggestedStocks(await res.json());
+        }
+      } catch (err) {
+        console.error("Failed to search stocks", err);
+      }
+    };
+    const timeout = setTimeout(fetchStocks, 300);
+    return () => clearTimeout(timeout);
+  }, [stockSearchTerm, isStockLocked]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (stockDropdownRef.current && !stockDropdownRef.current.contains(event.target as Node)) {
+        setShowStockSuggestions(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const updateStatus = async (newStatus: string) => {
     if (newStatus === entry.status) return;
@@ -96,22 +158,51 @@ export function GateDetailsClient({ entryId }: { entryId: string }) {
     }
   };
 
+  const handleSelectCatalogStock = (stock: any) => {
+    setStockForm({
+      ...stockForm,
+      stockId: stock.id,
+      materialName: stock.name,
+      materialType: stock.materialType,
+      unit: stock.uom?.abbreviation || stockForm.unit,
+    });
+    setStockSearchTerm(stock.name);
+    setIsStockLocked(true);
+    setShowStockSuggestions(false);
+  };
+
+  const handleClearCatalogStock = () => {
+    setStockForm({ ...stockForm, stockId: "", materialName: "" });
+    setStockSearchTerm("");
+    setIsStockLocked(false);
+  };
+
   const handleAddStock = async (e: React.FormEvent) => {
     e.preventDefault();
+    const materialName = stockForm.materialName || stockSearchTerm;
+    if (!materialName) {
+      toast.error("Material name is required");
+      return;
+    }
     setSubmitting(true);
     try {
       const res = await fetch(`/api/gate/${entryId}/stock`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(stockForm),
+        body: JSON.stringify({ ...stockForm, materialName }),
       });
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Failed to add stock detail");
+      }
       await fetchEntry();
       setShowStockModal(false);
-      setStockForm({ materialName: "", materialType: "", quantity: "", unit: "kg", batchLot: "", expectedQuantity: "" });
+      setStockForm({ ...EMPTY_STOCK_FORM });
+      setStockSearchTerm("");
+      setIsStockLocked(false);
       toast.success("Stock detail added");
-    } catch (err) {
-      toast.error("Failed to add stock detail");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to add stock detail");
     } finally {
       setSubmitting(false);
     }
@@ -410,9 +501,62 @@ export function GateDetailsClient({ entryId }: { entryId: string }) {
               </button>
             </div>
             <form onSubmit={handleAddStock} className="p-6 space-y-4">
-              <div>
+              <div ref={stockDropdownRef} className="relative">
                 <label className="block text-xs font-medium text-slate-700 mb-1">Material Name *</label>
-                <input required type="text" value={stockForm.materialName} onChange={e => setStockForm({...stockForm, materialName: e.target.value})} className="w-full px-3 py-2 border rounded-md text-sm" placeholder="e.g. PP Granules" />
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <input
+                    required
+                    type="text"
+                    value={isStockLocked ? stockForm.materialName : stockSearchTerm}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setStockSearchTerm(value);
+                      setStockForm({ ...stockForm, stockId: "", materialName: value });
+                      setIsStockLocked(false);
+                      setShowStockSuggestions(true);
+                    }}
+                    onFocus={() => stockSearchTerm.length >= 2 && setShowStockSuggestions(true)}
+                    className="w-full pl-9 pr-9 py-2 border rounded-md text-sm"
+                    placeholder="Search catalog or type a new name"
+                    disabled={isStockLocked}
+                  />
+                  {isStockLocked && (
+                    <button type="button" onClick={handleClearCatalogStock} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+                {showStockSuggestions && suggestedStocks.length > 0 && !isStockLocked && (
+                  <ul className="absolute z-10 mt-1 w-full bg-white border border-slate-200 rounded-md shadow-sm max-h-48 overflow-y-auto text-sm">
+                    {suggestedStocks.map((stock) => (
+                      <li key={stock.id}>
+                        <button
+                          type="button"
+                          className="w-full text-left px-3 py-2 hover:bg-slate-50"
+                          onClick={() => handleSelectCatalogStock(stock)}
+                        >
+                          <span className="font-medium text-slate-800">{stock.name}</span>
+                          <span className="ml-2 text-xs text-slate-500">{stock.code} · {stock.uom?.abbreviation}</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">Material Type *</label>
+                <select
+                  required
+                  value={stockForm.materialType}
+                  onChange={(e) => setStockForm({ ...stockForm, materialType: e.target.value })}
+                  disabled={isStockLocked}
+                  className="w-full px-3 py-2 border rounded-md text-sm disabled:bg-slate-50"
+                >
+                  {MATERIAL_TYPE_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -421,7 +565,12 @@ export function GateDetailsClient({ entryId }: { entryId: string }) {
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-700 mb-1">Unit *</label>
-                  <select value={stockForm.unit} onChange={e => setStockForm({...stockForm, unit: e.target.value})} className="w-full px-3 py-2 border rounded-md text-sm">
+                  <select
+                    value={stockForm.unit}
+                    onChange={e => setStockForm({...stockForm, unit: e.target.value})}
+                    disabled={isStockLocked}
+                    className="w-full px-3 py-2 border rounded-md text-sm disabled:bg-slate-50"
+                  >
                     <option value="kg">kg</option>
                     <option value="tons">tons</option>
                     <option value="pcs">pcs</option>
