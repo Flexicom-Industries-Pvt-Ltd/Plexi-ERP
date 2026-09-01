@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { logEvent, logDiff } from "@/lib/logging";
 import { GateEntryStatus } from "@/generated/prisma";
 import { findGateEntryByIdOrNumber } from "@/lib/gate/resolve-gate-entry";
+import { validateGateOut } from "@/lib/gate/validate-gate-out";
 
 export const dynamic = "force-dynamic";
 
@@ -60,10 +61,13 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-    const updatedData: any = { ...data, updatedBy: session.user.id };
+    const updatedData: Record<string, unknown> = { ...data, updatedBy: session.user.id };
 
-    // If changing status to GATE_OUT, set exitTime
-    if (data.status === "GATE_OUT" && existing.status !== "GATE_OUT") {
+    if (data.status === GateEntryStatus.GATE_OUT && existing.status !== GateEntryStatus.GATE_OUT) {
+      const validation = await validateGateOut(existing.id);
+      if (!validation.ok) {
+        return NextResponse.json({ error: validation.error }, { status: 400 });
+      }
       updatedData.exitTime = new Date();
     }
 
