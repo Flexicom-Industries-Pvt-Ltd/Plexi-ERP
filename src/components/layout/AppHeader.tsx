@@ -4,6 +4,7 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { usePathname } from "next/navigation";
 import React from "react";
+import { useBreadcrumbLabel } from "@/components/layout/breadcrumb-context";
 
 const SEGMENT_LABELS: Record<string, string> = {
   dashboard: "Dashboard",
@@ -25,6 +26,7 @@ function formatSegment(segment: string, parent?: string) {
 
 export function AppHeader() {
   const pathname = usePathname();
+  const breadcrumb = useBreadcrumbLabel();
   
   // Basic breadcrumb generation based on path
   const paths = pathname.split("/").filter(Boolean);
@@ -40,7 +42,10 @@ export function AppHeader() {
             const href = "/" + paths.slice(0, index + 1).join("/");
             const isLast = index === paths.length - 1;
             const parent = index > 0 ? paths[index - 1] : undefined;
-            const title = formatSegment(path, parent);
+            const title =
+              isLast && breadcrumb?.pageLabel
+                ? breadcrumb.pageLabel
+                : formatSegment(path, parent);
             
             return (
               <React.Fragment key={path}>
