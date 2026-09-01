@@ -6,10 +6,13 @@ import { useBreadcrumbLabel } from "./breadcrumb-context";
 export function GateBreadcrumb({ entryNumber }: { entryNumber: string }) {
   const ctx = useBreadcrumbLabel();
 
+  if (ctx && ctx.pageLabel !== entryNumber) {
+    ctx.setPageLabel(entryNumber);
+  }
+
   useLayoutEffect(() => {
-    ctx?.setPageLabel(entryNumber);
     return () => ctx?.setPageLabel(null);
-  }, [ctx, entryNumber]);
+  }, [ctx]);
 
   return null;
 }
