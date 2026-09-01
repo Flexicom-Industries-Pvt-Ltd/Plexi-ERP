@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { logEvent } from "@/lib/logging";
+import { findGateEntryByIdOrNumber } from "@/lib/gate/resolve-gate-entry";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +20,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   try {
     const data = await request.json();
-    const entry = await db.gateEntry.findUnique({ where: { entryNumber: id } });
+    const entry = await findGateEntryByIdOrNumber(id);
 
     if (!entry) return NextResponse.json({ error: "Gate Entry not found" }, { status: 404 });
 
