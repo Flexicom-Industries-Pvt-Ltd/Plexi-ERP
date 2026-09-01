@@ -118,7 +118,6 @@ export const masterDataConfig: Record<string, ModelConfig> = {
       ]},
       { key: "isActive", label: "Active", type: "boolean", required: true },
     ],
-    readModules: ["SETTINGS", "DATA_CENTRE"],
   },
   category: {
     modelName: "category",
