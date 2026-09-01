@@ -2,20 +2,28 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
-import { Package, AlertTriangle, ArrowRight, ArrowDownRight, ArrowUpRight, Activity, Clock } from "lucide-react";
+import { Package, AlertTriangle, ArrowRight, ArrowDownRight, ArrowUpRight, Activity, Clock, MapPin, Layers } from "lucide-react";
 import Link from "next/link";
 import { format } from "date-fns";
 
 export function InventoryDashboardClient() {
   const [data, setData] = useState<any>(null);
+  const [locationStock, setLocationStock] = useState<any[]>([]);
+  const [batches, setBatches] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/inventory/dashboard");
-      if (!res.ok) throw new Error("Failed to load dashboard");
-      setData(await res.json());
+      const [dashRes, locRes, batchRes] = await Promise.all([
+        fetch("/api/inventory/dashboard"),
+        fetch("/api/inventory/by-location"),
+        fetch("/api/inventory/batches"),
+      ]);
+      if (!dashRes.ok) throw new Error("Failed to load dashboard");
+      setData(await dashRes.json());
+      if (locRes.ok) setLocationStock(await locRes.json());
+      if (batchRes.ok) setBatches(await batchRes.json());
     } catch (err) {
       toast.error("Failed to load dashboard data");
     } finally {
@@ -40,6 +48,14 @@ export function InventoryDashboardClient() {
 
   return (
     <div className="space-y-6">
+      <div className="flex flex-wrap gap-3">
+        <Link href="/dashboard/inventory/items" className="text-sm font-medium px-3 py-1.5 rounded-lg bg-white border border-slate-200 hover:border-primary/30 text-slate-700">All Items</Link>
+        <Link href="/dashboard/inventory/bobbins" className="text-sm font-medium px-3 py-1.5 rounded-lg bg-white border border-slate-200 hover:border-primary/30 text-slate-700">Bobbin Stock</Link>
+        <Link href="/dashboard/inventory/rolls" className="text-sm font-medium px-3 py-1.5 rounded-lg bg-white border border-slate-200 hover:border-primary/30 text-slate-700">Roll Stock</Link>
+        <Link href="/dashboard/inventory/transactions" className="text-sm font-medium px-3 py-1.5 rounded-lg bg-white border border-slate-200 hover:border-primary/30 text-slate-700">Ledger</Link>
+        <Link href="/dashboard/inventory/gate-receipts" className="text-sm font-medium px-3 py-1.5 rounded-lg bg-white border border-slate-200 hover:border-primary/30 text-slate-700">Gate Receipts</Link>
+      </div>
+
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
@@ -187,6 +203,77 @@ export function InventoryDashboardClient() {
                       </tr>
                     );
                   })}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="px-6 py-4 border-b border-slate-100">
+            <h2 className="font-bold text-slate-800 flex items-center gap-2">
+              <MapPin className="h-5 w-5 text-emerald-500" /> Stock by Location
+            </h2>
+          </div>
+          <div className="p-0 max-h-[360px] overflow-y-auto">
+            {locationStock.length === 0 ? (
+              <div className="p-8 text-center text-slate-500 text-sm">No location data.</div>
+            ) : (
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 text-xs uppercase sticky top-0">
+                  <tr>
+                    <th className="px-4 py-3 text-left">Location</th>
+                    <th className="px-4 py-3 text-right">Items</th>
+                    <th className="px-4 py-3 text-right">Total Qty</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {locationStock.map((group) => (
+                    <tr key={group.locationId || "unassigned"} className="hover:bg-slate-50">
+                      <td className="px-4 py-3">
+                        <div className="font-semibold text-slate-800">{group.locationName}</div>
+                        <div className="text-xs text-slate-500">{group.locationCode}</div>
+                      </td>
+                      <td className="px-4 py-3 text-right text-slate-600">{group.itemCount}</td>
+                      <td className="px-4 py-3 text-right font-bold text-slate-800">{group.totalStock.toFixed(2)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="px-6 py-4 border-b border-slate-100">
+            <h2 className="font-bold text-slate-800 flex items-center gap-2">
+              <Layers className="h-5 w-5 text-violet-500" /> Active Batches / Lots
+            </h2>
+          </div>
+          <div className="p-0 max-h-[360px] overflow-y-auto">
+            {batches.length === 0 ? (
+              <div className="p-8 text-center text-slate-500 text-sm">No batch records yet. Batches are created when gate receipts are committed.</div>
+            ) : (
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 text-xs uppercase sticky top-0">
+                  <tr>
+                    <th className="px-4 py-3 text-left">Batch / Lot</th>
+                    <th className="px-4 py-3 text-left">Item</th>
+                    <th className="px-4 py-3 text-right">Qty</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {batches.slice(0, 20).map((batch) => (
+                    <tr key={batch.id} className="hover:bg-slate-50">
+                      <td className="px-4 py-3 font-medium text-slate-800">{batch.batchLot}</td>
+                      <td className="px-4 py-3 text-slate-600">{batch.item?.code}</td>
+                      <td className="px-4 py-3 text-right font-bold text-emerald-600">
+                        {batch.quantity} {batch.item?.uom?.abbreviation}
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             )}
