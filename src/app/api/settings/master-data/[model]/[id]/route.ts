@@ -22,8 +22,9 @@ export async function PATCH(request: Request, context: { params: Promise<{ model
 
   try {
     const body = await request.json();
-    
-    // Fetch old record for diffing
+    const allowed = new Set(modelConfig.fields.map((f) => f.key));
+    const data = Object.fromEntries(Object.entries(body).filter(([key]) => allowed.has(key)));
+
     const oldRecord = await (db as any)[modelConfig.modelName].findUnique({
       where: { id: id }
     });
@@ -31,12 +32,12 @@ export async function PATCH(request: Request, context: { params: Promise<{ model
 
     const updatedRecord = await (db as any)[modelConfig.modelName].update({
       where: { id: id },
-      data: body,
+      data,
     });
 
     logEvent({
       userId: session.user.id,
-      module: "SETTINGS",
+      module: requiredModule,
       severity: "WARN",
       action: `Updated ${modelConfig.title} Record`,
       payload: { old: oldRecord, new: updatedRecord },
@@ -74,7 +75,7 @@ export async function DELETE(request: Request, context: { params: Promise<{ mode
 
     logEvent({
       userId: session.user.id,
-      module: "SETTINGS",
+      module: requiredModule,
       severity: "ERROR",
       action: `Deleted ${modelConfig.title} Record`,
       payload: deletedRecord,
