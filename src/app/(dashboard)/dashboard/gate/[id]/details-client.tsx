@@ -139,13 +139,51 @@ export function GateDetailsClient({ entryId }: { entryId: string }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: newStatus }),
       });
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Failed to update status");
+      }
       await fetchEntry();
       toast.success("Status updated");
-    } catch (err) {
-      toast.error("Failed to update status");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Failed to update status");
     } finally {
       setUpdating(false);
+    }
+  };
+
+  const saveParkingDetails = async () => {
+    setUpdating(true);
+    try {
+      const res = await fetch(`/api/gate/${entryId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          parkingLocation: entry.parkingLocation || null,
+          waitingReason: entry.waitingReason || null,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to save parking details");
+      toast.success("Parking details saved");
+    } catch {
+      toast.error("Failed to save parking details");
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const updateDocumentStatus = async (docId: string, status: string) => {
+    try {
+      const res = await fetch(`/api/gate/${entryId}/documents/${docId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+      if (!res.ok) throw new Error();
+      await fetchEntry();
+      toast.success(`Document ${status.toLowerCase()}`);
+    } catch {
+      toast.error("Failed to update document");
     }
   };
 
@@ -396,6 +434,45 @@ export function GateDetailsClient({ entryId }: { entryId: string }) {
                   <DetailRow icon={<User />} label="Logged By" value={entry.user?.name || entry.createdBy || "System"} />
                 </div>
               </div>
+
+              {["PARKING", "READY", "ON_HOLD", "LOADING", "UNLOADING", "COMPLETED"].includes(entry.status) && (
+                <div className="md:col-span-2 space-y-4">
+                  <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Parking & Waiting</h3>
+                  <div className="bg-slate-50 rounded-xl p-4 space-y-4 border border-slate-100">
+                    <div>
+                      <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Parking Location</label>
+                      <input
+                        type="text"
+                        value={entry.parkingLocation || ""}
+                        onChange={(e) => setEntry({ ...entry, parkingLocation: e.target.value })}
+                        placeholder="e.g. Bay A-3, Waiting Zone 2"
+                        className="mt-1 w-full px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white"
+                        disabled={entry.status === "GATE_OUT"}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Waiting Reason</label>
+                      <textarea
+                        value={entry.waitingReason || ""}
+                        onChange={(e) => setEntry({ ...entry, waitingReason: e.target.value })}
+                        placeholder="Reason for waiting or hold..."
+                        rows={2}
+                        className="mt-1 w-full px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white resize-none"
+                        disabled={entry.status === "GATE_OUT"}
+                      />
+                    </div>
+                    {entry.status !== "GATE_OUT" && (
+                      <button
+                        onClick={saveParkingDetails}
+                        disabled={updating}
+                        className="px-4 py-2 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary/90 disabled:opacity-50"
+                      >
+                        Save Parking Details
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -477,8 +554,36 @@ export function GateDetailsClient({ entryId }: { entryId: string }) {
                            </span>
                          </div>
                          <p className="text-xs text-slate-500 truncate mb-2">{doc.remarks || "No remarks"}</p>
-                         {doc.fileUrl && (
+                         {doc.verifier && (
+                           <p className="text-[10px] text-slate-400 mb-2">
+                             {doc.status === "VERIFIED" ? "Verified" : "Reviewed"} by {doc.verifier.name}
+                             {doc.verifiedAt ? ` • ${new Date(doc.verifiedAt).toLocaleString()}` : ""}
+                           </p>
+                         )}
+                         {doc.fileUrl && doc.fileUrl !== "local-check" && (
                            <a href={doc.fileUrl} target="_blank" rel="noreferrer" className="text-xs text-primary hover:underline">View File</a>
+                         )}
+                         {doc.status !== "VERIFIED" && doc.status !== "REJECTED" && entry.status !== "GATE_OUT" && (
+                           <div className="flex gap-2 mt-2">
+                             <button
+                               onClick={() => updateDocumentStatus(doc.id, "VERIFIED")}
+                               className="text-xs px-2.5 py-1 bg-emerald-100 text-emerald-700 rounded-md font-medium hover:bg-emerald-200"
+                             >
+                               Verify
+                             </button>
+                             <button
+                               onClick={() => updateDocumentStatus(doc.id, "REJECTED")}
+                               className="text-xs px-2.5 py-1 bg-red-100 text-red-700 rounded-md font-medium hover:bg-red-200"
+                             >
+                               Reject
+                             </button>
+                             <button
+                               onClick={() => updateDocumentStatus(doc.id, "UNDER_VERIFICATION")}
+                               className="text-xs px-2.5 py-1 bg-amber-100 text-amber-700 rounded-md font-medium hover:bg-amber-200"
+                             >
+                               Mark Reviewing
+                             </button>
+                           </div>
                          )}
                        </div>
                     </div>
