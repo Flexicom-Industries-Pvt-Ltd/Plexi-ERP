@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
   ArrowLeft,
@@ -60,7 +59,6 @@ const EMPTY_STOCK_FORM = {
 };
 
 export function GateDetailsClient({ entryId }: { entryId: string }) {
-  const router = useRouter();
   const [entry, setEntry] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
@@ -87,15 +85,12 @@ export function GateDetailsClient({ entryId }: { entryId: string }) {
       if (!res.ok) throw new Error("Not found");
       const data = await res.json();
       setEntry(data);
-      if (data.entryNumber && data.entryNumber !== entryId) {
-        router.replace(`/dashboard/gate/${data.entryNumber}`);
-      }
     } catch (err) {
       toast.error("Failed to fetch entry details");
     } finally {
       setLoading(false);
     }
-  }, [entryId, router]);
+  }, [entryId]);
 
   useEffect(() => {
     fetchEntry();
