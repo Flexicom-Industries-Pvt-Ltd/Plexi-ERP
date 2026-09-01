@@ -1,5 +1,6 @@
 import React from "react";
 import { SidebarProvider } from "@/components/ui/sidebar";
+import { BreadcrumbProvider } from "@/components/layout/breadcrumb-context";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { AppHeader } from "@/components/layout/AppHeader";
 import { auth } from "@/auth";
@@ -31,15 +32,17 @@ export default async function DashboardLayout({
 
   return (
     <SidebarProvider>
-      <AppSidebar user={user} allowedModules={allowedModules} />
-      <div className="flex flex-1 flex-col overflow-hidden bg-background">
-        <AppHeader />
-        <main className="flex-1 overflow-y-auto p-4 md:p-6 bg-secondary/30">
-          <div className="mx-auto max-w-7xl h-full">
-            {children}
-          </div>
-        </main>
-      </div>
+      <BreadcrumbProvider>
+        <AppSidebar user={user} allowedModules={allowedModules} />
+        <div className="flex flex-1 flex-col overflow-hidden bg-background">
+          <AppHeader />
+          <main className="flex-1 overflow-y-auto p-4 md:p-6 bg-secondary/30">
+            <div className="mx-auto max-w-7xl h-full">
+              {children}
+            </div>
+          </main>
+        </div>
+      </BreadcrumbProvider>
     </SidebarProvider>
   );
 }
