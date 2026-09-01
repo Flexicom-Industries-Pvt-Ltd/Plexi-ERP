@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { logEvent, logDiff } from "@/lib/logging";
 import { GateEntryStatus } from "@/generated/prisma";
+import { findGateEntryByIdOrNumber } from "@/lib/gate/resolve-gate-entry";
 
 export const dynamic = "force-dynamic";
 
@@ -19,8 +20,11 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   if (!hasAccess) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   try {
-    const entry = await db.gateEntry.findUnique({
-      where: { entryNumber: id },
+    const entry = await findGateEntryByIdOrNumber(id);
+    if (!entry) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+    const fullEntry = await db.gateEntry.findUnique({
+      where: { id: entry.id },
       include: {
         stockDetails: true,
         documents: {
@@ -29,10 +33,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         user: { select: { name: true, email: true } },
       },
     });
+    if (!fullEntry) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-    if (!entry) return NextResponse.json({ error: "Not found" }, { status: 404 });
-
-    return NextResponse.json(entry);
+    return NextResponse.json(fullEntry);
   } catch (error) {
     console.error("Error fetching gate entry details:", error);
     return NextResponse.json({ error: "Failed to fetch gate entry" }, { status: 500 });
@@ -53,7 +56,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
   try {
     const data = await request.json();
-    const existing = await db.gateEntry.findUnique({ where: { entryNumber: id } });
+    const existing = await findGateEntryByIdOrNumber(id);
 
     if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
@@ -65,7 +68,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     }
 
     const updated = await db.gateEntry.update({
-      where: { entryNumber: id },
+      where: { id: existing.id },
       data: updatedData,
     });
 
@@ -107,7 +110,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
   if (!hasAccess) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   try {
-    const existing = await db.gateEntry.findUnique({ where: { entryNumber: id } });
+    const existing = await findGateEntryByIdOrNumber(id);
     if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
     // Prevent deleting COMPLETED or GATE_OUT entries if they are tied to inventory
@@ -116,7 +119,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     }
 
     await db.gateEntry.delete({
-      where: { entryNumber: id },
+      where: { id: existing.id },
     });
 
     logEvent({

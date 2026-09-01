@@ -242,7 +242,7 @@ export function GateClient() {
 
                 <div className="flex justify-end gap-2 mt-1">
                   <Link
-                    href={`/dashboard/gate/${entry.id}`}
+                    href={`/dashboard/gate/${entry.entryNumber}`}
                     className="p-2 text-primary hover:bg-primary/10 rounded-md transition-colors"
                   >
                     <ArrowRight className="h-4 w-4" />
