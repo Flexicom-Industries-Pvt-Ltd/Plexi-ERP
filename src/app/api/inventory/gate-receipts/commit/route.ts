@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { logEvent } from "@/lib/logging";
 import { TransactionType } from "@/generated/prisma";
+import { resolveInventoryItemFromStock } from "@/lib/inventory/resolve-stock-item";
 
 export const dynamic = "force-dynamic";
 
@@ -23,10 +24,16 @@ export async function POST(request: NextRequest) {
 
   try {
     const { gateEntryId, commits } = await request.json();
-    // commits is an array: { stockDetailId: string, itemId: string, actualQuantity: number }
+    // commits: { stockDetailId, stockId, actualQuantity }
 
     if (!gateEntryId || !Array.isArray(commits) || commits.length === 0) {
       return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
+    }
+
+    for (const commit of commits) {
+      if (!commit.stockDetailId || !commit.stockId || commit.actualQuantity == null) {
+        return NextResponse.json({ error: "Each line requires stockDetailId, stockId, and actualQuantity" }, { status: 400 });
+      }
     }
 
     const gateEntry = await db.gateEntry.findUnique({ where: { id: gateEntryId } });
@@ -39,17 +46,17 @@ export async function POST(request: NextRequest) {
 
     await db.$transaction(async (tx) => {
       for (const commit of commits) {
-        const { stockDetailId, itemId, actualQuantity } = commit;
+        const { stockDetailId, stockId, actualQuantity } = commit;
 
         // 1. Update TruckStockDetail
         const stockDetail = await tx.truckStockDetail.update({
           where: { id: stockDetailId },
-          data: { actualQuantity },
+          data: { actualQuantity, stockId },
         });
 
-        // 2. Update InventoryItem
-        const item = await tx.inventoryItem.findUnique({ where: { id: itemId } });
-        if (!item) throw new Error(`Inventory item ${itemId} not found`);
+        // 2. Resolve catalog stock to inventory item (find or create)
+        const item = await resolveInventoryItemFromStock(stockId, tx);
+        const itemId = item.id;
 
         const newStock = transactionType === "IN" 
           ? item.currentStock + actualQuantity 
