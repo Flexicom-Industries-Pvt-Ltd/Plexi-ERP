@@ -129,6 +129,22 @@ model Shift {
   updatedAt DateTime @updatedAt
 }
 
+enum StockMaterialType {
+  RAW_MATERIALS
+  BOBBINS
+  PP_ROLLS
+  LPP_ROLLS
+  LAMINATED_ROLLS
+  PRINTED_ROLLS
+  CUT_MATERIAL
+  WORK_IN_PROGRESS
+  FINISHED_BAGS
+  BALES
+  SCRAP
+  RP_GRANULES
+  EXTERNAL_MATERIALS
+}
+
 model UnitOfMeasurement {
   id           String   @id @default(cuid())
   name         String   @unique
@@ -138,6 +154,7 @@ model UnitOfMeasurement {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   inventoryItems InventoryItem[]
+  stocks         Stock[]
 }
 
 model Category {
@@ -160,6 +177,24 @@ model Driver {
   isActive      Boolean     @default(true)
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
+}
+
+model Stock {
+  id            String             @id @default(cuid())
+  code          String             @unique
+  name          String             @unique
+  materialType  StockMaterialType
+  uomId         String
+  description   String?
+  isActive      Boolean            @default(true)
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  uom           UnitOfMeasurement  @relation(fields: [uomId], references: [id])
+  truckLines    TruckStockDetail[]
+
+  @@index([materialType])
+  @@index([uomId])
 }
 
 
@@ -424,6 +459,7 @@ model GateEntry {
 model TruckStockDetail {
   id               String    @id @default(cuid())
   gateEntryId      String
+  stockId          String?
   materialName     String
   materialType     String?
   quantity         Float
@@ -437,6 +473,9 @@ model TruckStockDetail {
   updatedAt        DateTime  @updatedAt
 
   gateEntry        GateEntry @relation(fields: [gateEntryId], references: [id], onDelete: Cascade)
+  stock            Stock?    @relation(fields: [stockId], references: [id], onDelete: SetNull)
+
+  @@index([stockId])
 }
 
 model GateDocument {
