@@ -16,6 +16,8 @@ export interface ModelConfig {
   description: string;
   fields: FieldConfig[];
   requiredModule?: string;
+  /** Modules whose canRead may list this model (defaults to requiredModule or SETTINGS). */
+  readModules?: string[];
 }
 
 export const masterDataConfig: Record<string, ModelConfig> = {
@@ -104,6 +106,7 @@ export const masterDataConfig: Record<string, ModelConfig> = {
       ]},
       { key: "isActive", label: "Active", type: "boolean", required: true },
     ],
+    readModules: ["SETTINGS", "DATA_CENTRE"],
   },
   category: {
     modelName: "category",
@@ -141,6 +144,34 @@ export const masterDataConfig: Record<string, ModelConfig> = {
       { key: "name", label: "Name", type: "text", required: true },
       { key: "phone", label: "Contact Number", type: "text", required: true },
       { key: "licenseNumber", label: "License Number", type: "text" },
+      { key: "isActive", label: "Active", type: "boolean", required: true },
+    ],
+  },
+  stock: {
+    modelName: "stock",
+    title: "Stocks",
+    description: "Reusable material catalog for gate stock lines (name, type, unit).",
+    requiredModule: "DATA_CENTRE",
+    fields: [
+      { key: "code", label: "Code", type: "text", required: true },
+      { key: "name", label: "Material / Stock Name", type: "text", required: true },
+      { key: "materialType", label: "Material Type", type: "select", required: true, options: [
+        { label: "Raw materials", value: "RAW_MATERIALS" },
+        { label: "Bobbins", value: "BOBBINS" },
+        { label: "PP rolls", value: "PP_ROLLS" },
+        { label: "LPP rolls", value: "LPP_ROLLS" },
+        { label: "Laminated rolls", value: "LAMINATED_ROLLS" },
+        { label: "Printed rolls", value: "PRINTED_ROLLS" },
+        { label: "Cut material", value: "CUT_MATERIAL" },
+        { label: "Work-in-progress", value: "WORK_IN_PROGRESS" },
+        { label: "Finished bags", value: "FINISHED_BAGS" },
+        { label: "Bales", value: "BALES" },
+        { label: "Scrap", value: "SCRAP" },
+        { label: "RP granules", value: "RP_GRANULES" },
+        { label: "External materials", value: "EXTERNAL_MATERIALS" },
+      ]},
+      { key: "uomId", label: "Unit", type: "select", required: true, relationEndpoint: "unitOfMeasurement" },
+      { key: "description", label: "Description", type: "text" },
       { key: "isActive", label: "Active", type: "boolean", required: true },
     ],
   }

@@ -150,11 +150,10 @@ export function DynamicMasterTable({ modelConfig }: Props) {
                             {record[field.key] ? "Active" : "Inactive"}
                           </span>
                         ) : field.type === "select" ? (
-                          // Ideally we'd map relation values back to labels, but for the generic table view, 
-                          // showing the raw ID is sometimes unavoidable unless we enrich the API response.
-                          // We'll show it truncated if it looks like an ID.
-                          <span className="truncate max-w-[150px] inline-block" title={record[field.key]}>
-                            {record[field.key]}
+                          <span className="truncate max-w-[150px] inline-block" title={String(record[field.key] ?? "")}>
+                            {field.key === "uomId" && record.uom
+                              ? (record.uom.abbreviation || record.uom.name)
+                              : field.options?.find((o) => o.value === record[field.key])?.label || record[field.key]}
                           </span>
                         ) : (
                           record[field.key]
