@@ -25,6 +25,15 @@ import { GateEntryStatus, GatePurpose } from "@/generated/prisma";
 export function GateClient() {
   const [entries, setEntries] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({
+    inside: 0,
+    waiting: 0,
+    loading: 0,
+    unloading: 0,
+    verificationPending: 0,
+    onHold: 0,
+    gateOutToday: 0,
+  });
   
   // Filters
   const [search, setSearch] = useState("");
@@ -45,10 +54,16 @@ export function GateClient() {
       if (statusFilter) params.set("status", statusFilter);
       if (purposeFilter) params.set("purpose", purposeFilter);
 
-      const res = await fetch(`/api/gate?${params.toString()}`);
+      const [res, statsRes] = await Promise.all([
+        fetch(`/api/gate?${params.toString()}`),
+        fetch("/api/gate/stats"),
+      ]);
       if (!res.ok) throw new Error("Failed to fetch gate entries");
       const data = await res.json();
       setEntries(data);
+      if (statsRes.ok) {
+        setStats(await statsRes.json());
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -111,11 +126,14 @@ export function GateClient() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: newStatus }),
       });
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Failed to advance status");
+      }
       toast.success("Status advanced successfully");
       fetchEntries();
-    } catch (err) {
-      toast.error("Failed to advance status");
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Failed to advance status");
     }
   };
 
@@ -137,19 +155,17 @@ export function GateClient() {
     fetchEntries();
   }, [fetchEntries]);
 
-  // Derived stats
-  const activeTrucks = entries.filter(e => e.status !== "GATE_OUT" && e.status !== "CANCELLED" && e.status !== "REJECTED").length;
-  const waitingTrucks = entries.filter(e => e.status === "PARKING" || e.status === "READY").length;
-  const inProgressTrucks = entries.filter(e => e.status === "LOADING" || e.status === "UNLOADING").length;
-
   return (
     <div className="space-y-6">
       {/* ── Stats Bar ── */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard label="Active Inside" value={activeTrucks.toString()} icon={<Truck className="h-5 w-5" />} color="blue" />
-        <StatCard label="Waiting / Parked" value={waitingTrucks.toString()} icon={<Clock className="h-5 w-5" />} color="orange" />
-        <StatCard label="Loading / Unloading" value={inProgressTrucks.toString()} icon={<RefreshCw className="h-5 w-5" />} color="purple" />
-        <StatCard label="Total Today" value={entries.length.toString()} icon={<ShieldCheck className="h-5 w-5" />} color="green" />
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+        <StatCard label="Inside Factory" value={stats.inside.toString()} icon={<Truck className="h-5 w-5" />} color="blue" />
+        <StatCard label="Waiting / Parked" value={stats.waiting.toString()} icon={<Clock className="h-5 w-5" />} color="orange" />
+        <StatCard label="Loading" value={stats.loading.toString()} icon={<RefreshCw className="h-5 w-5" />} color="purple" />
+        <StatCard label="Unloading" value={stats.unloading.toString()} icon={<RefreshCw className="h-5 w-5" />} color="indigo" />
+        <StatCard label="Doc Verification" value={stats.verificationPending.toString()} icon={<AlertTriangle className="h-5 w-5" />} color="amber" />
+        <StatCard label="On Hold" value={stats.onHold.toString()} icon={<XCircle className="h-5 w-5" />} color="red" />
+        <StatCard label="Gate Out Today" value={stats.gateOutToday.toString()} icon={<ShieldCheck className="h-5 w-5" />} color="green" />
       </div>
 
       {/* ── Toolbar ── */}
@@ -432,6 +448,9 @@ function StatCard({ label, value, icon, color }: { label: string; value: string;
     green: "from-emerald-50 to-emerald-100/50 border-emerald-200 text-emerald-700",
     purple: "from-violet-50 to-violet-100/50 border-violet-200 text-violet-700",
     orange: "from-amber-50 to-amber-100/50 border-amber-200 text-amber-700",
+    amber: "from-yellow-50 to-yellow-100/50 border-yellow-200 text-yellow-700",
+    red: "from-red-50 to-red-100/50 border-red-200 text-red-700",
+    indigo: "from-indigo-50 to-indigo-100/50 border-indigo-200 text-indigo-700",
   };
   return (
     <div className={`flex items-center gap-4 p-5 rounded-2xl border bg-gradient-to-br ${colors[color]} transition-all shadow-sm`}>
