@@ -5,28 +5,42 @@ import { toast } from "sonner";
 import { Truck, PackageCheck, AlertCircle, ArrowRight, Check } from "lucide-react";
 import { format } from "date-fns";
 
+type StockOption = {
+  id: string;
+  code: string;
+  name: string;
+  uom?: { abbreviation?: string };
+};
+
 export function GateReceiptsClient({ canCreate }: { canCreate: boolean }) {
   const [entries, setEntries] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [inventoryItems, setInventoryItems] = useState<any[]>([]);
+  const [stocks, setStocks] = useState<StockOption[]>([]);
 
-  // We will track the commitment form state per GateEntry
   const [activeEntryId, setActiveEntryId] = useState<string | null>(null);
-  const [commitForm, setCommitForm] = useState<any>({});
+  const [commitForm, setCommitForm] = useState<Record<string, { stockId: string; actualQuantity: string | number }>>({});
   const [submitting, setSubmitting] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const [resEntries, resItems] = await Promise.all([
-        fetch("/api/inventory/gate-receipts").then(r => r.json()),
-        fetch("/api/inventory/items").then(r => r.json()),
+      const [resEntries, resStocks] = await Promise.all([
+        fetch("/api/inventory/gate-receipts"),
+        fetch("/api/stocks"),
       ]);
 
-      setEntries(Array.isArray(resEntries) ? resEntries : []);
-      setInventoryItems(Array.isArray(resItems) ? resItems : []);
-    } catch (err) {
-      toast.error("Failed to load gate receipts");
+      if (!resEntries.ok) throw new Error("Failed to load gate receipts");
+      if (!resStocks.ok) throw new Error("Failed to load stock catalog");
+
+      const [entriesData, stocksData] = await Promise.all([
+        resEntries.json(),
+        resStocks.json(),
+      ]);
+
+      setEntries(Array.isArray(entriesData) ? entriesData : []);
+      setStocks(Array.isArray(stocksData) ? stocksData : []);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to load gate receipts");
     } finally {
       setLoading(false);
     }
@@ -38,29 +52,37 @@ export function GateReceiptsClient({ canCreate }: { canCreate: boolean }) {
 
   const handleOpenCommit = (entry: any) => {
     setActiveEntryId(entry.id);
-    const initialForm: any = {};
+    const initialForm: Record<string, { stockId: string; actualQuantity: string | number }> = {};
+
     entry.stockDetails.forEach((sd: any) => {
       if (sd.actualQuantity === null) {
-        // Try to match inventory item by name as default
-        const match = inventoryItems.find(i => i.name.toLowerCase() === sd.materialName.toLowerCase());
+        const matchByStockId = sd.stockId
+          ? stocks.find((s) => s.id === sd.stockId)
+          : undefined;
+        const matchByName = stocks.find(
+          (s) => s.name.toLowerCase() === sd.materialName.toLowerCase()
+        );
+        const match = matchByStockId ?? matchByName;
+
         initialForm[sd.id] = {
-          itemId: match ? match.id : "",
-          actualQuantity: sd.expectedQuantity || 0,
+          stockId: match?.id ?? "",
+          actualQuantity: sd.expectedQuantity ?? 0,
         };
       }
     });
+
     setCommitForm(initialForm);
   };
 
   const handleCommitSubmit = async (entryId: string) => {
-    const commits = Object.keys(commitForm).map(stockDetailId => ({
+    const commits = Object.keys(commitForm).map((stockDetailId) => ({
       stockDetailId,
-      itemId: commitForm[stockDetailId].itemId,
+      stockId: commitForm[stockDetailId].stockId,
       actualQuantity: Number(commitForm[stockDetailId].actualQuantity),
     }));
 
-    if (commits.some(c => !c.itemId)) {
-      return toast.error("Please select an Inventory Item for all materials.");
+    if (commits.some((c) => !c.stockId)) {
+      return toast.error("Please select a stock item for all materials.");
     }
 
     setSubmitting(true);
@@ -117,7 +139,6 @@ export function GateReceiptsClient({ canCreate }: { canCreate: boolean }) {
 
         return (
           <div key={entry.id} className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden transition-all">
-            {/* Header */}
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
               <div className="flex items-center gap-4">
                 <div className="h-10 w-10 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center">
@@ -140,13 +161,12 @@ export function GateReceiptsClient({ canCreate }: { canCreate: boolean }) {
               </div>
             </div>
 
-            {/* Body */}
             <div className="p-6">
               <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-700">
                 <AlertCircle className="h-4 w-4 text-amber-500" />
                 Pending Verification
               </div>
-              
+
               <div className="border border-slate-200 rounded-lg overflow-hidden">
                 <table className="w-full text-sm text-left">
                   <thead className="bg-slate-50 border-b border-slate-200 text-slate-500">
@@ -156,7 +176,7 @@ export function GateReceiptsClient({ canCreate }: { canCreate: boolean }) {
                       {isCommitting && (
                         <>
                           <th className="px-4 py-3 font-medium text-right w-40">Actual Qty Received</th>
-                          <th className="px-4 py-3 font-medium w-64">Map to Inventory Item</th>
+                          <th className="px-4 py-3 font-medium w-64">Map to Stock Item</th>
                         </>
                       )}
                     </tr>
@@ -169,7 +189,8 @@ export function GateReceiptsClient({ canCreate }: { canCreate: boolean }) {
                           <div className="text-xs text-slate-500">Batch: {sd.batchLot || "N/A"}</div>
                         </td>
                         <td className="px-4 py-3 text-right font-medium">
-                          {sd.expectedQuantity} <span className="text-slate-400 text-xs">{sd.unit}</span>
+                          {sd.expectedQuantity}{" "}
+                          <span className="text-slate-400 text-xs">{sd.unit || sd.stock?.uom?.abbreviation}</span>
                         </td>
                         {isCommitting && (
                           <>
@@ -180,26 +201,37 @@ export function GateReceiptsClient({ canCreate }: { canCreate: boolean }) {
                                 step="0.01"
                                 className="w-24 px-2 py-1 text-right border border-slate-300 rounded focus:ring-primary focus:border-primary text-sm"
                                 value={commitForm[sd.id]?.actualQuantity ?? ""}
-                                onChange={(e) => setCommitForm({
-                                  ...commitForm,
-                                  [sd.id]: { ...commitForm[sd.id], actualQuantity: e.target.value }
-                                })}
+                                onChange={(e) =>
+                                  setCommitForm({
+                                    ...commitForm,
+                                    [sd.id]: { ...commitForm[sd.id], actualQuantity: e.target.value },
+                                  })
+                                }
                               />
                             </td>
                             <td className="px-4 py-3">
                               <select
                                 className="w-full px-2 py-1.5 border border-slate-300 rounded focus:ring-primary focus:border-primary text-sm bg-white"
-                                value={commitForm[sd.id]?.itemId ?? ""}
-                                onChange={(e) => setCommitForm({
-                                  ...commitForm,
-                                  [sd.id]: { ...commitForm[sd.id], itemId: e.target.value }
-                                })}
+                                value={commitForm[sd.id]?.stockId ?? ""}
+                                onChange={(e) =>
+                                  setCommitForm({
+                                    ...commitForm,
+                                    [sd.id]: { ...commitForm[sd.id], stockId: e.target.value },
+                                  })
+                                }
                               >
-                                <option value="">Select Item...</option>
-                                {inventoryItems.map(item => (
-                                  <option key={item.id} value={item.id}>{item.code} - {item.name}</option>
+                                <option value="">Select stock item...</option>
+                                {stocks.map((stock) => (
+                                  <option key={stock.id} value={stock.id}>
+                                    {stock.code} - {stock.name}
+                                  </option>
                                 ))}
                               </select>
+                              {stocks.length === 0 && (
+                                <p className="text-xs text-amber-600 mt-1">
+                                  No stocks in catalog. Add items under Data Centre → Stocks.
+                                </p>
+                              )}
                             </td>
                           </>
                         )}
@@ -209,7 +241,6 @@ export function GateReceiptsClient({ canCreate }: { canCreate: boolean }) {
                 </table>
               </div>
 
-              {/* Action Bar */}
               <div className="mt-6 flex justify-end">
                 {isCommitting ? (
                   <div className="flex gap-3">
