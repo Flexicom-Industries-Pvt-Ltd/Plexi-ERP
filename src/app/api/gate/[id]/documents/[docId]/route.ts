@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { logEvent } from "@/lib/logging";
+import { gateEntryMatchesRouteParam } from "@/lib/gate/resolve-gate-entry";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +25,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       include: { gateEntry: true }
     });
 
-    if (!doc || doc.gateEntry.entryNumber !== id) {
+    if (!doc || !gateEntryMatchesRouteParam(doc.gateEntry, id)) {
       return NextResponse.json({ error: "Document not found" }, { status: 404 });
     }
 
