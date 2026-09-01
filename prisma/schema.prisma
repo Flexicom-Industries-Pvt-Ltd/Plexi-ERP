@@ -307,6 +307,7 @@ model Location {
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
   inventoryItems InventoryItem[]
+  inventoryBatches InventoryBatch[]
 }
 
 model Machine {
@@ -513,6 +514,7 @@ model InventoryItem {
   stockId         String?  @unique
   
   currentStock    Float    @default(0)
+  reservedStock   Float    @default(0)
   minimumStock    Float    @default(0)
   
   isActive        Boolean  @default(true)
@@ -525,6 +527,7 @@ model InventoryItem {
   location        Location?    @relation(fields: [locationId], references: [id])
   stock           Stock?       @relation(fields: [stockId], references: [id], onDelete: SetNull)
   transactions    InventoryTransaction[]
+  batches         InventoryBatch[]
 
   @@index([itemType])
   @@index([categoryId])
@@ -543,6 +546,7 @@ model InventoryTransaction {
   itemId          String
   type            TransactionType
   quantity        Float
+  batchLot        String?
   referenceType   String?  // e.g. "GATE_ENTRY", "MANUAL"
   referenceId     String?  // e.g. GateEntry.id
   remarks         String?
@@ -556,5 +560,26 @@ model InventoryTransaction {
   @@index([itemId])
   @@index([type])
   @@index([referenceId])
+  @@index([batchLot])
   @@index([createdAt])
+}
+
+model InventoryBatch {
+  id          String   @id @default(cuid())
+  itemId      String
+  batchLot    String
+  quantity    Float    @default(0)
+  locationId  String?
+  gateEntryId String?
+  receivedAt  DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  item     InventoryItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  location Location?     @relation(fields: [locationId], references: [id], onDelete: SetNull)
+
+  @@unique([itemId, batchLot])
+  @@index([itemId])
+  @@index([batchLot])
+  @@index([locationId])
 }
