@@ -1,4 +1,4 @@
 #!/bin/sh
-# Strip Cursor co-author trailers injected by IDE/cloud agents.
+# Strip Cursor / AI co-author trailers injected by IDE or cloud agents.
 tmp=$(mktemp)
-sed '/^Co-authored-by: Cursor <cursoragent@cursor.com>$/d' "$1" > "$tmp" && mv "$tmp" "$1"
+sed -E '/^[Cc]o-authored-by:.*[Cc]ursor/d; /^[Cc]o-authored-by:.*cursoragent@cursor\.com/d' "$1" > "$tmp" && mv "$tmp" "$1"
