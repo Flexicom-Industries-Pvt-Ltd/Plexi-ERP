@@ -58,7 +58,7 @@ export function InventoryItemsClient({
         fetch(url).then(r => r.json()),
         fetch("/api/settings/master-data/category").then(r => r.json()),
         fetch("/api/settings/master-data/subcategory").then(r => r.json()),
-        fetch("/api/settings/master-data/unitofmeasurement").then(r => r.json()),
+        fetch("/api/settings/master-data/unitOfMeasurement").then(r => r.json()),
         fetch("/api/settings/master-data/location").then(r => r.json()),
       ]);
 
