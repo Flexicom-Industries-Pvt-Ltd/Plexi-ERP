@@ -1,0 +1,4 @@
+#!/bin/sh
+# Strip Cursor co-author trailers injected by IDE/cloud agents.
+tmp=$(mktemp)
+sed '/^Co-authored-by: Cursor <cursoragent@cursor.com>$/d' "$1" > "$tmp" && mv "$tmp" "$1"
