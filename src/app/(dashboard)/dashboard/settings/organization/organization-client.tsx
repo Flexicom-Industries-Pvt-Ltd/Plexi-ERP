@@ -1,15 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { masterDataConfig, ModelConfig } from "@/lib/config/master-data";
+import { masterDataConfig, ModelConfig, ORGANIZATION_MODEL_NAMES } from "@/lib/config/master-data";
 import { DynamicMasterTable } from "@/components/settings/DynamicMasterTable";
 import { 
   Building2, 
   MapPin, 
   Settings2, 
   Clock, 
-  Scale, 
-  Tags,
   LayoutDashboard
 } from "lucide-react";
 
@@ -19,13 +17,13 @@ const iconMap: Record<string, any> = {
   location: MapPin,
   machine: Settings2,
   shift: Clock,
-  unitOfMeasurement: Scale,
-  category: Tags,
   configParameter: Settings2,
 };
 
 export function OrganizationClient() {
-  const models = Object.values(masterDataConfig).filter(m => m.modelName !== "driver");
+  const models = Object.values(masterDataConfig).filter((m) =>
+    ORGANIZATION_MODEL_NAMES.has(m.modelName)
+  );
   const [activeModel, setActiveModel] = useState<ModelConfig>(models[0]);
 
   return (
