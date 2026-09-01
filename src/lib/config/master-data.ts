@@ -20,6 +20,16 @@ export interface ModelConfig {
   readModules?: string[];
 }
 
+/** Models shown under Settings → General Settings (org/factory only). */
+export const ORGANIZATION_MODEL_NAMES = new Set([
+  "department",
+  "section",
+  "location",
+  "machine",
+  "shift",
+  "configParameter",
+]);
+
 export const masterDataConfig: Record<string, ModelConfig> = {
   department: {
     modelName: "department",
@@ -93,8 +103,10 @@ export const masterDataConfig: Record<string, ModelConfig> = {
   },
   unitOfMeasurement: {
     modelName: "unitOfMeasurement",
-    title: "Units of Measurement (UOM)",
-    description: "Manage measurement units for inventory.",
+    title: "Units",
+    description: "Manage measurement units for materials and inventory.",
+    requiredModule: "DATA_CENTRE",
+    readModules: ["DATA_CENTRE", "INVENTORY"],
     fields: [
       { key: "name", label: "Name", type: "text", required: true },
       { key: "abbreviation", label: "Abbreviation", type: "text", required: true },
@@ -112,6 +124,8 @@ export const masterDataConfig: Record<string, ModelConfig> = {
     modelName: "category",
     title: "Item Categories",
     description: "Manage high-level material and product categories.",
+    requiredModule: "DATA_CENTRE",
+    readModules: ["DATA_CENTRE", "INVENTORY"],
     fields: [
       { key: "name", label: "Name", type: "text", required: true },
       { key: "itemType", label: "Item Type", type: "select", required: true, options: [
