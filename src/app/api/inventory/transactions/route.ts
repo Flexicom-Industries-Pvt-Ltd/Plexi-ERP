@@ -31,19 +31,47 @@ export async function GET(request: NextRequest) {
     const transactions = await db.inventoryTransaction.findMany({
       where,
       orderBy: { createdAt: "desc" },
-      take: 100, // Limit to 100 recent transactions to prevent huge payloads
+      take: 100,
       include: {
         item: {
           include: {
             uom: true,
             category: true,
-          }
+          },
         },
         user: { select: { name: true, employeeId: true } },
       },
     });
 
-    return NextResponse.json(transactions);
+    const gateEntryIds = [
+      ...new Set(
+        transactions
+          .filter((tx) => tx.referenceType === "GATE_ENTRY" && tx.referenceId)
+          .map((tx) => tx.referenceId as string),
+      ),
+    ];
+
+    const gateEntries =
+      gateEntryIds.length > 0
+        ? await db.gateEntry.findMany({
+            where: { id: { in: gateEntryIds } },
+            select: { id: true, entryNumber: true },
+          })
+        : [];
+
+    const gateEntryNumbers = Object.fromEntries(
+      gateEntries.map((entry) => [entry.id, entry.entryNumber]),
+    );
+
+    const enriched = transactions.map((tx) => ({
+      ...tx,
+      gateEntryNumber:
+        tx.referenceType === "GATE_ENTRY" && tx.referenceId
+          ? gateEntryNumbers[tx.referenceId] ?? null
+          : null,
+    }));
+
+    return NextResponse.json(enriched);
   } catch (error) {
     console.error("Error fetching inventory transactions:", error);
     return NextResponse.json({ error: "Failed to fetch inventory transactions" }, { status: 500 });
