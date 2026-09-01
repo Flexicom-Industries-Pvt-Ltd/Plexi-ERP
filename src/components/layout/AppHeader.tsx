@@ -5,6 +5,24 @@ import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbP
 import { usePathname } from "next/navigation";
 import React from "react";
 
+const SEGMENT_LABELS: Record<string, string> = {
+  dashboard: "Dashboard",
+  gate: "Gate",
+  inventory: "Inventory",
+  production: "Production",
+  quality: "Quality Control",
+  dispatch: "Dispatch",
+  settings: "Settings",
+  "data-centre": "Data Centre",
+};
+
+function formatSegment(segment: string, parent?: string) {
+  if (SEGMENT_LABELS[segment]) return SEGMENT_LABELS[segment];
+  if (parent === "gate" && /^GE-\d/.test(segment)) return segment;
+  if (parent === "gate") return "Entry";
+  return segment.charAt(0).toUpperCase() + segment.slice(1).replace(/-/g, " ");
+}
+
 export function AppHeader() {
   const pathname = usePathname();
   
@@ -21,7 +39,8 @@ export function AppHeader() {
           {paths.map((path, index) => {
             const href = "/" + paths.slice(0, index + 1).join("/");
             const isLast = index === paths.length - 1;
-            const title = path.charAt(0).toUpperCase() + path.slice(1);
+            const parent = index > 0 ? paths[index - 1] : undefined;
+            const title = formatSegment(path, parent);
             
             return (
               <React.Fragment key={path}>
