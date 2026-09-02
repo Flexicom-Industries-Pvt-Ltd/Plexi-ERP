@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
@@ -61,6 +61,22 @@ const dataCentreItems = [
   { title: "Production Characteristics", url: "/dashboard/data-centre/production-characteristics" },
 ];
 
+const productionItems = [
+  { title: "Overview", url: "/dashboard/production" },
+  { title: "Shift Plans", url: "/dashboard/production/plans" },
+  { title: "Shift Handover", url: "/dashboard/production/handovers" },
+  { title: "Bobbin Production", url: "/dashboard/production/bobbin" },
+  { title: "Loom Production", url: "/dashboard/production/loom" },
+  { title: "Phase Characteristics", url: "/dashboard/data-centre/production-characteristics" },
+];
+
+function isProductionSubActive(pathname: string, url: string) {
+  if (url === "/dashboard/production") {
+    return pathname === url;
+  }
+  return pathname === url || pathname.startsWith(`${url}/`);
+}
+
 type AppSidebarProps = {
   user: any;
   allowedModules: Record<string, boolean>;
@@ -71,14 +87,19 @@ export function AppSidebar({ user, allowedModules, ...props }: AppSidebarProps) 
   const router = useRouter();
   const [settingsOpen, setSettingsOpen] = useState(pathname.startsWith("/dashboard/settings"));
   const [dataCentreOpen, setDataCentreOpen] = useState(pathname.startsWith("/dashboard/data-centre"));
+  const [productionOpen, setProductionOpen] = useState(
+    pathname.startsWith("/dashboard/production") ||
+      pathname.startsWith("/dashboard/data-centre/production-characteristics"),
+  );
 
   // Super Admin bypass
   const isSuperAdmin = user?.role?.name === "Super Admin";
   const hasSettingsAccess = isSuperAdmin || allowedModules["SETTINGS"];
   const hasDataCentreAccess = isSuperAdmin || allowedModules["DATA_CENTRE"];
+  const hasProductionAccess = isSuperAdmin || allowedModules["PRODUCTION"];
 
-  const visibleNavItems = navItems.filter(item => 
-    !item.module || isSuperAdmin || allowedModules[item.module]
+  const visibleNavItems = navItems.filter(
+    (item) => item.title !== "Production" && (!item.module || isSuperAdmin || allowedModules[item.module]),
   );
 
   return (
@@ -97,16 +118,53 @@ export function AppSidebar({ user, allowedModules, ...props }: AppSidebarProps) 
       <SidebarContent className="px-2 py-4">
         <SidebarMenu>
           {visibleNavItems.map((item) => (
-            <SidebarMenuItem key={item.url}>
-              <SidebarMenuButton
-                render={<Link href={item.url} />}
-                isActive={pathname === item.url || pathname.startsWith(item.url + "/")}
-                tooltip={item.title}
-              >
-                <item.icon className="h-4 w-4" />
-                <span>{item.title}</span>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
+            <Fragment key={item.url}>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  render={<Link href={item.url} />}
+                  isActive={pathname === item.url || pathname.startsWith(item.url + "/")}
+                  tooltip={item.title}
+                >
+                  <item.icon className="h-4 w-4" />
+                  <span>{item.title}</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              {item.title === "Inventory" && hasProductionAccess && (
+                <Collapsible open={productionOpen} onOpenChange={setProductionOpen} className="group/collapsible">
+                  <SidebarMenuItem>
+                    <CollapsibleTrigger
+                      render={
+                        <SidebarMenuButton
+                          tooltip="Production"
+                          isActive={
+                            pathname.startsWith("/dashboard/production") ||
+                            pathname.startsWith("/dashboard/data-centre/production-characteristics")
+                          }
+                        />
+                      }
+                    >
+                      <Factory className="h-4 w-4" />
+                      <span>Production</span>
+                      <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180" />
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <SidebarMenuSub>
+                        {productionItems.map((subItem) => (
+                          <SidebarMenuSubItem key={subItem.url}>
+                            <SidebarMenuSubButton
+                              render={<Link href={subItem.url} />}
+                              isActive={isProductionSubActive(pathname, subItem.url)}
+                            >
+                              <span>{subItem.title}</span>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        ))}
+                      </SidebarMenuSub>
+                    </CollapsibleContent>
+                  </SidebarMenuItem>
+                </Collapsible>
+              )}
+            </Fragment>
           ))}
           
           {hasDataCentreAccess && (
