@@ -2,9 +2,17 @@
  * Seed default production characteristic definitions for LPP roll production.
  * Run: npx tsx scripts/seed-production-characteristics.ts
  */
-import { PrismaClient } from "@prisma/client";
+import "dotenv/config";
+import { neonConfig } from "@neondatabase/serverless";
+import { PrismaNeon } from "@prisma/adapter-neon";
+import ws from "ws";
+import { PrismaClient } from "../src/generated/prisma";
 
-const prisma = new PrismaClient();
+neonConfig.webSocketConstructor = ws;
+
+const prisma = new PrismaClient({
+  adapter: new PrismaNeon({ connectionString: process.env.DATABASE_URL! }),
+});
 
 const LPP_ROLL_DEFAULTS = [
   {
