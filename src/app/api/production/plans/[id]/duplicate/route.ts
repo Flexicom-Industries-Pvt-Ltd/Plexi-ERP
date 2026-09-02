@@ -1,24 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { logEvent } from "@/lib/logging";
-import { registry } from "@/lib/openapi";
+
 import { requireProductionApiPermission } from "@/lib/production/permissions";
 import { generatePlanNumber } from "@/lib/production/plan-number";
 import { planInclude } from "@/lib/production/plan-include";
 
 export const dynamic = "force-dynamic";
-
-registry.registerPath({
-  method: "post",
-  path: "/api/production/plans/{id}/duplicate",
-  summary: "Duplicate a production plan as a new draft",
-  tags: ["Production"],
-  security: [{ cookieAuth: [] }],
-  responses: {
-    201: { description: "Duplicated plan created" },
-    404: { description: "Not found" },
-  },
-});
 
 export async function POST(
   _request: NextRequest,

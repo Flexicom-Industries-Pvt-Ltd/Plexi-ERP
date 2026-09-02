@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { logEvent } from "@/lib/logging";
-import { registry } from "@/lib/openapi";
+
 import { bobbinRunInclude } from "@/lib/production/bobbin-run-include";
 import { requireProductionApiPermission } from "@/lib/production/permissions";
 
@@ -15,24 +15,6 @@ const CreateBobbinRunSchema = z.object({
   outputItemId: z.string().optional(),
   inputQty: z.number().min(0).default(0),
   startedAt: z.string().datetime().optional(),
-});
-
-registry.registerPath({
-  method: "get",
-  path: "/api/production/bobbin/runs",
-  summary: "List bobbin production runs",
-  tags: ["Production"],
-  security: [{ cookieAuth: [] }],
-  responses: { 200: { description: "List of bobbin runs" } },
-});
-
-registry.registerPath({
-  method: "post",
-  path: "/api/production/bobbin/runs",
-  summary: "Start a bobbin production run",
-  tags: ["Production"],
-  security: [{ cookieAuth: [] }],
-  responses: { 201: { description: "Bobbin run created" } },
 });
 
 export async function GET(request: NextRequest) {

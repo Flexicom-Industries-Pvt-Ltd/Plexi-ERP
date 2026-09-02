@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { logEvent, logDiff } from "@/lib/logging";
-import { registry } from "@/lib/openapi";
+
 import { requireProductionApiPermission } from "@/lib/production/permissions";
 
 export const dynamic = "force-dynamic";
@@ -22,24 +22,6 @@ const runInclude = {
   },
   recordedBy: { select: { id: true, name: true, email: true } },
 };
-
-registry.registerPath({
-  method: "get",
-  path: "/api/production/runs",
-  summary: "List production runs",
-  tags: ["Production"],
-  security: [{ cookieAuth: [] }],
-  responses: { 200: { description: "List of runs" } },
-});
-
-registry.registerPath({
-  method: "post",
-  path: "/api/production/runs",
-  summary: "Start a production run",
-  tags: ["Production"],
-  security: [{ cookieAuth: [] }],
-  responses: { 201: { description: "Run created" } },
-});
 
 export async function GET(request: NextRequest) {
   const authResult = await requireProductionApiPermission("canRead");

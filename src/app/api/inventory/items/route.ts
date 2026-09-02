@@ -3,10 +3,10 @@ import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { logEvent } from "@/lib/logging";
 import { z } from "zod";
-import { registry } from "@/lib/openapi";
+
 
 export const dynamic = "force-dynamic";
-// 1. Define Zod Schema for input
+// Define Zod Schema for input
 const CreateInventoryItemSchema = z.object({
   code: z.string().min(1, "Item code is required"),
   name: z.string().min(1, "Item name is required"),
@@ -19,48 +19,7 @@ const CreateInventoryItemSchema = z.object({
   currentStock: z.number().default(0),
   minimumStock: z.number().default(0),
   isActive: z.boolean().default(true),
-}).openapi("CreateInventoryItemInput");
-
-// 2. Define Output Schema
-const InventoryItemResponseSchema = z.object({
-  id: z.string(),
-  code: z.string(),
-  name: z.string(),
-}).openapi("InventoryItemResponse");
-
-// 3. Register the Route
-registry.registerPath({
-  method: "post",
-  path: "/api/inventory/items",
-  summary: "Create Inventory Item",
-  description: "Creates a new master data inventory item.",
-  tags: ["Inventory"],
-  security: [{ cookieAuth: [] }],
-  request: {
-    body: {
-      content: {
-        "application/json": {
-          schema: CreateInventoryItemSchema,
-        },
-      },
-    },
-  },
-  responses: {
-    201: {
-      description: "Inventory item created successfully",
-      content: {
-        "application/json": {
-          schema: InventoryItemResponseSchema,
-        },
-      },
-    },
-    400: { description: "Validation error or code exists" },
-    401: { description: "Unauthorized" },
-    403: { description: "Forbidden" },
-  },
 });
-
-
 
 export async function GET(request: NextRequest) {
   const session = await auth();

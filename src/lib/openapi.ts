@@ -4,6 +4,7 @@ import {
 } from "@asteasolutions/zod-to-openapi";
 import { extendZodWithOpenApi } from "@asteasolutions/zod-to-openapi";
 import { z } from "zod";
+import { loadAllRouteRegistrations } from "./openapi/routes/index";
 
 extendZodWithOpenApi(z);
 
@@ -23,14 +24,17 @@ const cookieAuth = registry.registerComponent("securitySchemes", "cookieAuth", {
 });
 
 export function generateOpenApiSpec() {
+  loadAllRouteRegistrations();
+
   const generator = new OpenApiGeneratorV3(registry.definitions);
-  
+
   return generator.generateDocument({
     openapi: "3.0.0",
     info: {
       version: "1.0.0",
       title: "Flexicom ERP API",
-      description: "Internal APIs for the Flexicom ERP ecosystem.",
+      description:
+        "Complete API reference for Flexicom ERP — Gate, Inventory, Production, Data Centre, Settings, Profile, and Audit modules.",
     },
     servers: [
       {
