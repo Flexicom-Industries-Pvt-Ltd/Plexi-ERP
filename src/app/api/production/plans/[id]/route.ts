@@ -1,52 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { logDiff, logEvent } from "@/lib/logging";
-import { registry } from "@/lib/openapi";
+
 import { requireProductionApiPermission } from "@/lib/production/permissions";
 import { planInclude } from "@/lib/production/plan-include";
 import { UpdatePlanSchema, buildLineCreateData } from "@/lib/production/plan-schemas";
 import { validatePlanForApproval } from "@/lib/production/validate-plan";
 
 export const dynamic = "force-dynamic";
-
-registry.registerPath({
-  method: "get",
-  path: "/api/production/plans/{id}",
-  summary: "Get production plan by ID or plan number",
-  tags: ["Production"],
-  security: [{ cookieAuth: [] }],
-  responses: {
-    200: { description: "Production plan details" },
-    404: { description: "Not found" },
-  },
-});
-
-registry.registerPath({
-  method: "put",
-  path: "/api/production/plans/{id}",
-  summary: "Update production plan (draft only)",
-  tags: ["Production"],
-  security: [{ cookieAuth: [] }],
-  responses: {
-    200: { description: "Plan updated" },
-    400: { description: "Validation error" },
-    404: { description: "Not found" },
-    409: { description: "Plan is not editable" },
-  },
-});
-
-registry.registerPath({
-  method: "delete",
-  path: "/api/production/plans/{id}",
-  summary: "Delete draft production plan",
-  tags: ["Production"],
-  security: [{ cookieAuth: [] }],
-  responses: {
-    200: { description: "Plan deleted" },
-    404: { description: "Not found" },
-    409: { description: "Only draft plans can be deleted" },
-  },
-});
 
 async function resolvePlan(idOrNumber: string) {
   return db.productionPlan.findFirst({

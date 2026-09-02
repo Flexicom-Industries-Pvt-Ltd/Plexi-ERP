@@ -3,7 +3,7 @@ import { z } from "zod";
 import { Prisma } from "@/generated/prisma";
 import { db } from "@/lib/db";
 import { logEvent } from "@/lib/logging";
-import { registry } from "@/lib/openapi";
+
 import { postLoomInventoryMovements } from "@/lib/production/loom-inventory";
 import { loomRunInclude } from "@/lib/production/loom-run-include";
 import { requireProductionApiPermission } from "@/lib/production/permissions";
@@ -34,24 +34,6 @@ const CompleteLoomRunSchema = z.object({
   bobbinItemId: z.string().nullable().optional(),
   characteristics: z.record(z.string(), z.unknown()).optional(),
   endedAt: z.string().datetime().optional(),
-});
-
-registry.registerPath({
-  method: "get",
-  path: "/api/production/loom/runs/{id}",
-  summary: "Get loom production run by ID",
-  tags: ["Production"],
-  security: [{ cookieAuth: [] }],
-  responses: { 200: { description: "Loom run details" }, 404: { description: "Not found" } },
-});
-
-registry.registerPath({
-  method: "patch",
-  path: "/api/production/loom/runs/{id}",
-  summary: "Update or complete a loom production run",
-  tags: ["Production"],
-  security: [{ cookieAuth: [] }],
-  responses: { 200: { description: "Loom run updated" }, 404: { description: "Not found" } },
 });
 
 export async function GET(
