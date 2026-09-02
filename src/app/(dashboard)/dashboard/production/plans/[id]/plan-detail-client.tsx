@@ -4,15 +4,20 @@ import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import Link from "next/link";
-import { ArrowLeft, CheckCircle, XCircle, Loader2 } from "lucide-react";
+import { ArrowLeft, CheckCircle, XCircle, Loader2, Play } from "lucide-react";
 import { phaseLabel, statusLabel } from "@/lib/production/phases";
+import { achievementPercent } from "@/lib/production/achievement";
 import { PlanFormModal, formToPayload, planToFormDefaults } from "@/components/production/PlanFormModal";
+import { PlannedVsActualSummary } from "@/components/production/PlannedVsActualSummary";
+import { CompleteRunModal } from "@/components/production/CompleteRunModal";
 
 export function PlanDetailClient({ planNumber }: { planNumber: string }) {
   const [plan, setPlan] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [completingRun, setCompletingRun] = useState<any>(null);
+  const [startingLineId, setStartingLineId] = useState<string | null>(null);
 
   const fetchPlan = async () => {
     setLoading(true);
@@ -68,6 +73,27 @@ export function PlanDetailClient({ planNumber }: { planNumber: string }) {
     fetchPlan();
   };
 
+  const startRun = async (lineId: string, targetQty: number) => {
+    setStartingLineId(lineId);
+    try {
+      const res = await fetch("/api/production/runs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ planLineId: lineId, targetQty }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Failed to start run");
+      }
+      toast.success("Production run started");
+      fetchPlan();
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setStartingLineId(null);
+    }
+  };
+
   if (loading) {
     return <div className="py-20 flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-slate-400" /></div>;
   }
@@ -83,6 +109,8 @@ export function PlanDetailClient({ planNumber }: { planNumber: string }) {
     COMPLETED: "bg-emerald-100 text-emerald-700",
     CANCELLED: "bg-red-100 text-red-600",
   };
+
+  const canRun = ["APPROVED", "IN_PROGRESS"].includes(plan.status);
 
   return (
     <div className="space-y-6">
@@ -135,54 +163,109 @@ export function PlanDetailClient({ planNumber }: { planNumber: string }) {
         </div>
       )}
 
+      {plan.lines?.length > 0 && (
+        <PlannedVsActualSummary lines={plan.lines} />
+      )}
+
       <div className="space-y-4">
-        {plan.lines?.map((line: any, index: number) => (
-          <div key={line.id} className="bg-white rounded-xl border border-slate-200 p-5">
-            <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
-              <h3 className="font-semibold text-slate-800">
-                Line {index + 1}: {phaseLabel(line.phase)}
-              </h3>
-              <span className="text-sm text-slate-500">Target: {line.targetQty} · Priority: {line.priority}</span>
-            </div>
+        {plan.lines?.map((line: any, index: number) => {
+          const activeRun = line.runs?.find((r: any) => !r.endedAt);
+          const completedRuns = line.runs?.filter((r: any) => r.endedAt) ?? [];
+          const lineAccepted = completedRuns.reduce((s: number, r: any) => s + (r.acceptedQty ?? 0), 0);
+          const lineAchievement = achievementPercent(lineAccepted, line.targetQty);
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-4">
-              <div>
-                <p className="text-xs text-slate-500">Machine</p>
-                <p className="font-medium">{line.machine?.name ?? "—"}</p>
-              </div>
-              <div>
-                <p className="text-xs text-slate-500">Product</p>
-                <p className="font-medium">{line.inventoryItem ? `${line.inventoryItem.code} — ${line.inventoryItem.name}` : "—"}</p>
-              </div>
-              <div>
-                <p className="text-xs text-slate-500">Operators</p>
-                <p className="font-medium">
-                  {line.operators?.length
-                    ? line.operators.map((o: any) => o.user?.name || o.user?.email).join(", ")
-                    : line.operator?.name ?? "—"}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-slate-500">Instructions</p>
-                <p className="font-medium">{line.instructions || "—"}</p>
-              </div>
-            </div>
-
-            {line.characteristics?.length > 0 && (
-              <div className="border-t border-slate-100 pt-4">
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Characteristics</p>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                  {line.characteristics.map((c: any) => (
-                    <div key={c.id} className="bg-slate-50 rounded-lg px-3 py-2">
-                      <p className="text-xs text-slate-500">{c.definition?.label ?? c.definitionId}</p>
-                      <p className="text-sm font-medium text-slate-800">{c.value}</p>
-                    </div>
-                  ))}
+          return (
+            <div key={line.id} className="bg-white rounded-xl border border-slate-200 p-5">
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+                <h3 className="font-semibold text-slate-800">
+                  Line {index + 1}: {phaseLabel(line.phase)}
+                </h3>
+                <div className="flex items-center gap-3 text-sm">
+                  <span className="text-slate-500">Target: {line.targetQty}</span>
+                  <span className="text-slate-500">Accepted: {lineAccepted}</span>
+                  <span className={`font-medium ${lineAchievement >= 100 ? "text-emerald-600" : "text-amber-600"}`}>
+                    {lineAchievement}% achievement
+                  </span>
+                  {canRun && !activeRun && (
+                    <button
+                      onClick={() => startRun(line.id, line.targetQty)}
+                      disabled={startingLineId === line.id}
+                      className="inline-flex items-center gap-1 px-3 py-1 bg-primary text-white rounded-lg text-xs font-medium disabled:opacity-50"
+                    >
+                      {startingLineId === line.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Play className="h-3 w-3" />}
+                      Start Run
+                    </button>
+                  )}
+                  {activeRun && (
+                    <button
+                      onClick={() => setCompletingRun(activeRun)}
+                      className="px-3 py-1 bg-emerald-600 text-white rounded-lg text-xs font-medium"
+                    >
+                      Complete Run
+                    </button>
+                  )}
                 </div>
               </div>
-            )}
-          </div>
-        ))}
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-4">
+                <div>
+                  <p className="text-xs text-slate-500">Machine</p>
+                  <p className="font-medium">{line.machine?.name ?? "—"}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500">Product</p>
+                  <p className="font-medium">{line.inventoryItem ? `${line.inventoryItem.code} — ${line.inventoryItem.name}` : "—"}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500">Operators</p>
+                  <p className="font-medium">
+                    {line.operators?.length
+                      ? line.operators.map((o: any) => o.user?.name || o.user?.email).join(", ")
+                      : line.operator?.name ?? "—"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500">Instructions</p>
+                  <p className="font-medium">{line.instructions || "—"}</p>
+                </div>
+              </div>
+
+              {line.characteristics?.length > 0 && (
+                <div className="border-t border-slate-100 pt-4 mb-4">
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Characteristics</p>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    {line.characteristics.map((c: any) => (
+                      <div key={c.id} className="bg-slate-50 rounded-lg px-3 py-2">
+                        <p className="text-xs text-slate-500">{c.definition?.label ?? c.definitionId}</p>
+                        <p className="text-sm font-medium text-slate-800">{c.value}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {line.runs?.length > 0 && (
+                <div className="border-t border-slate-100 pt-4">
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Production Runs</p>
+                  <div className="space-y-2">
+                    {line.runs.map((run: any) => (
+                      <div key={run.id} className="flex flex-wrap items-center justify-between gap-2 text-sm bg-slate-50 rounded-lg px-3 py-2">
+                        <span className="text-slate-600">
+                          {format(new Date(run.startedAt), "dd MMM HH:mm")}
+                          {run.endedAt ? ` → ${format(new Date(run.endedAt), "HH:mm")}` : " · In progress"}
+                        </span>
+                        <span className="text-slate-700">
+                          Target {run.targetQty} · Actual {run.actualQty} · Accepted {run.acceptedQty}
+                          {run.endedAt && ` · ${achievementPercent(run.acceptedQty, run.targetQty)}%`}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       <PlanFormModal
@@ -193,6 +276,15 @@ export function PlanDetailClient({ planNumber }: { planNumber: string }) {
         onClose={() => setEditing(false)}
         onSubmit={handleEdit}
       />
+
+      {completingRun && (
+        <CompleteRunModal
+          run={completingRun}
+          open={!!completingRun}
+          onClose={() => setCompletingRun(null)}
+          onCompleted={fetchPlan}
+        />
+      )}
     </div>
   );
 }
