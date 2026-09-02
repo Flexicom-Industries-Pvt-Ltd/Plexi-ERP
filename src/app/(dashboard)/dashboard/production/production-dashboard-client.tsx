@@ -52,24 +52,7 @@ export function ProductionDashboardClient() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div className="flex flex-wrap gap-3">
-          <Link href="/dashboard/production/plans" className="text-sm font-medium px-3 py-1.5 rounded-lg bg-white border border-slate-200 hover:border-primary/30 text-slate-700">
-            Shift Plans
-          </Link>
-          <Link href="/dashboard/production/handovers" className="text-sm font-medium px-3 py-1.5 rounded-lg bg-white border border-slate-200 hover:border-primary/30 text-slate-700">
-            Shift Handover
-          </Link>
-          <Link href="/dashboard/production/bobbin" className="text-sm font-medium px-3 py-1.5 rounded-lg bg-white border border-slate-200 hover:border-primary/30 text-slate-700">
-            Bobbin Production
-          </Link>
-          <Link href="/dashboard/production/loom" className="text-sm font-medium px-3 py-1.5 rounded-lg bg-white border border-slate-200 hover:border-primary/30 text-slate-700">
-            Loom Production
-          </Link>
-          <Link href="/dashboard/data-centre/production-characteristics" className="text-sm font-medium px-3 py-1.5 rounded-lg bg-white border border-slate-200 hover:border-primary/30 text-slate-700">
-            Phase Characteristics
-          </Link>
-        </div>
+      <div className="flex flex-wrap items-end justify-end gap-4">
         <div>
           <label className="block text-xs font-medium text-slate-500 mb-1">Dashboard Date</label>
           <input
