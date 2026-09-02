@@ -1,4 +1,5 @@
 import { reg } from "../helpers";
+import { ChangePasswordBody, SuccessSchema, UpdateProfileBody } from "../schemas";
 
 const TAG = ["Profile"];
 
@@ -8,14 +9,16 @@ export function registerProfileRoutes() {
     path: "/api/profile",
     summary: "Update user profile",
     tags: TAG,
-    description: "Update name and phone for the authenticated user.",
+    body: UpdateProfileBody,
+    response: SuccessSchema,
   });
   reg({
     method: "patch",
     path: "/api/profile/password",
     summary: "Change password",
     tags: TAG,
-    description: "Requires current password and new password.",
+    body: ChangePasswordBody,
+    response: SuccessSchema,
     responses: { 400: { description: "Invalid current password" } },
   });
 }

@@ -1,22 +1,18 @@
+import type { ZodType } from "zod";
 import { registry } from "@/lib/openapi";
+import { ErrorSchema } from "./schemas";
 
 type HttpMethod = "get" | "post" | "put" | "patch" | "delete";
 
 const SEC = [{ cookieAuth: [] }];
 
-const STD = {
-  400: { description: "Bad request" },
-  401: { description: "Unauthorized" },
-  403: { description: "Forbidden" },
-  404: { description: "Not found" },
-  500: { description: "Internal server error" },
+const ERROR_RESPONSES = {
+  400: { description: "Bad request", content: { "application/json": { schema: ErrorSchema } } },
+  401: { description: "Unauthorized", content: { "application/json": { schema: ErrorSchema } } },
+  403: { description: "Forbidden", content: { "application/json": { schema: ErrorSchema } } },
+  404: { description: "Not found", content: { "application/json": { schema: ErrorSchema } } },
+  500: { description: "Internal server error", content: { "application/json": { schema: ErrorSchema } } },
 };
-
-function defaultSuccess(method: HttpMethod): Record<number, { description: string }> {
-  if (method === "post") return { 201: { description: "Created" } };
-  if (method === "delete") return { 200: { description: "Deleted" } };
-  return { 200: { description: "Success" } };
-}
 
 export function reg(opts: {
   method: HttpMethod;
@@ -24,10 +20,39 @@ export function reg(opts: {
   summary: string;
   tags: string[];
   description?: string;
-  responses?: Record<number, { description: string }>;
+  query?: ZodType;
+  params?: ZodType;
+  body?: ZodType;
+  response?: ZodType;
+  responses?: Record<number, { description: string; schema?: ZodType }>;
   security?: boolean;
 }) {
-  const success = defaultSuccess(opts.method);
+  const extra: Record<string, { description: string; content?: { "application/json": { schema: ZodType } } }> = {};
+  if (opts.responses) {
+    for (const [code, r] of Object.entries(opts.responses)) {
+      extra[code] = {
+        description: r.description,
+        ...(r.schema ? { content: { "application/json": { schema: r.schema } } } : {}),
+      };
+    }
+  }
+
+  const request: Record<string, unknown> = {};
+  if (opts.query) request.query = opts.query;
+  if (opts.params) request.params = opts.params;
+  if (opts.body) request.body = { content: { "application/json": { schema: opts.body } } };
+
+  const responses: Record<string, { description: string; content?: { "application/json": { schema: ZodType } } }> = {
+    ...ERROR_RESPONSES,
+    ...extra,
+  };
+
+  const successCode = opts.method === "post" ? "201" : "200";
+  responses[successCode] = {
+    description: opts.method === "post" ? "Created" : opts.method === "delete" ? "Deleted" : "Success",
+    ...(opts.response ? { content: { "application/json": { schema: opts.response } } } : {}),
+  };
+
   registry.registerPath({
     method: opts.method,
     path: opts.path,
@@ -35,10 +60,7 @@ export function reg(opts: {
     description: opts.description,
     tags: opts.tags,
     security: opts.security === false ? [] : SEC,
-    responses: {
-      ...success,
-      ...STD,
-      ...(opts.responses ?? {}),
-    },
+    ...(Object.keys(request).length ? { request } : {}),
+    responses,
   });
 }
