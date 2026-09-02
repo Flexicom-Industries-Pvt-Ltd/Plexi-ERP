@@ -1,4 +1,16 @@
 import { reg } from "../helpers";
+import {
+  CreateInventoryItemBody,
+  GateReceiptCommitBody,
+  IdPathParam,
+  InventoryBatchesQuery,
+  InventoryItemSchema,
+  InventoryListQuery,
+  InventoryTransactionsQuery,
+  StockAdjustBody,
+  SuccessSchema,
+  UpdateInventoryItemBody,
+} from "../schemas";
 
 const TAG = ["Inventory"];
 
@@ -8,32 +20,42 @@ export function registerInventoryRoutes() {
     path: "/api/inventory/items",
     summary: "List inventory items",
     tags: TAG,
-    description: "Search and filter catalog items by type, category, location, and active status.",
+    description: "Search and filter catalog items. Set includeMovement=true to attach recent transaction counts.",
+    query: InventoryListQuery,
+    response: InventoryItemSchema.array(),
   });
   reg({
     method: "post",
     path: "/api/inventory/items",
     summary: "Create inventory item",
     tags: TAG,
-    description: "Creates a new master data inventory item.",
+    body: CreateInventoryItemBody,
+    response: InventoryItemSchema,
   });
   reg({
     method: "get",
     path: "/api/inventory/items/{id}",
     summary: "Get inventory item",
     tags: TAG,
+    params: IdPathParam,
+    response: InventoryItemSchema,
   });
   reg({
     method: "patch",
     path: "/api/inventory/items/{id}",
     summary: "Update inventory item",
     tags: TAG,
+    params: IdPathParam,
+    body: UpdateInventoryItemBody,
+    response: InventoryItemSchema,
   });
   reg({
     method: "delete",
     path: "/api/inventory/items/{id}",
     summary: "Deactivate inventory item",
     tags: TAG,
+    params: IdPathParam,
+    response: SuccessSchema,
   });
   reg({
     method: "get",
@@ -47,7 +69,7 @@ export function registerInventoryRoutes() {
     path: "/api/inventory/batches",
     summary: "List inventory batches",
     tags: TAG,
-    description: "Filter by itemId and locationId.",
+    query: InventoryBatchesQuery,
   });
   reg({
     method: "get",
@@ -60,14 +82,16 @@ export function registerInventoryRoutes() {
     path: "/api/inventory/transactions",
     summary: "List inventory transactions",
     tags: TAG,
-    description: "Filter by itemId, type, date range, and pagination.",
+    query: InventoryTransactionsQuery,
   });
   reg({
     method: "post",
     path: "/api/inventory/transactions/adjust",
     summary: "Manual stock adjustment",
     tags: TAG,
-    description: "Post an inventory adjustment transaction with reason.",
+    description: "Posts an ADJUSTMENT transaction and updates current stock.",
+    body: StockAdjustBody,
+    response: SuccessSchema,
   });
   reg({
     method: "get",
@@ -81,6 +105,7 @@ export function registerInventoryRoutes() {
     path: "/api/inventory/gate-receipts/commit",
     summary: "Commit gate receipt to inventory",
     tags: TAG,
-    description: "Posts gate stock into inventory ledger.",
+    body: GateReceiptCommitBody,
+    response: SuccessSchema,
   });
 }
