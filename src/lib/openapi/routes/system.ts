@@ -1,4 +1,5 @@
 import { reg } from "../helpers";
+import { HealthSchema } from "../schemas";
 
 const AUTH = ["Authentication"];
 const SYSTEM = ["System"];
@@ -26,6 +27,7 @@ export function registerSystemRoutes() {
     summary: "Health check",
     tags: SYSTEM,
     description: "Database connectivity and service status.",
+    response: HealthSchema,
     security: false,
   });
   reg({
@@ -40,7 +42,7 @@ export function registerSystemRoutes() {
     path: "/api/cron/prune-logs",
     summary: "Prune old log entries",
     tags: SYSTEM,
-    description: "Cron job endpoint to delete aged log entries. Requires CRON_SECRET header.",
+    description: "Cron job endpoint. Requires CRON_SECRET authorization header.",
     security: false,
   });
 }
