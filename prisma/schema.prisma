@@ -539,6 +539,8 @@ model InventoryItem {
   transactions    InventoryTransaction[]
   batches         InventoryBatch[]
   productionPlanLines ProductionPlanLine[]
+  bobbinRunsAsRawMaterial BobbinProductionRun[] @relation("BobbinRunRawMaterial")
+  bobbinRunsAsOutput      BobbinProductionRun[] @relation("BobbinRunOutput")
 
   @@index([itemType])
   @@index([categoryId])
@@ -742,10 +744,32 @@ model ProductionRun {
 
   planLine   ProductionPlanLine @relation(fields: [planLineId], references: [id], onDelete: Cascade)
   recordedBy User?              @relation("ProductionRunRecorder", fields: [recordedById], references: [id], onDelete: SetNull)
+  bobbinRun  BobbinProductionRun?
 
   @@index([planLineId])
   @@index([startedAt])
   @@index([endedAt])
+}
+
+model BobbinProductionRun {
+  id                    String   @id @default(cuid())
+  productionRunId       String   @unique
+  rawMaterialItemId     String
+  outputItemId          String?
+  inputQty              Float    @default(0)
+  outputQty             Float    @default(0)
+  bobbinCharacteristics Json?
+  inventoryPosted       Boolean  @default(false)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  productionRun     ProductionRun  @relation(fields: [productionRunId], references: [id], onDelete: Cascade)
+  rawMaterialItem   InventoryItem  @relation("BobbinRunRawMaterial", fields: [rawMaterialItemId], references: [id], onDelete: Restrict)
+  outputItem        InventoryItem? @relation("BobbinRunOutput", fields: [outputItemId], references: [id], onDelete: SetNull)
+
+  @@index([productionRunId])
+  @@index([rawMaterialItemId])
+  @@index([outputItemId])
 }
 
 model ShiftHandover {

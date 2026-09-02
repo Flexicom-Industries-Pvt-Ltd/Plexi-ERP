@@ -60,6 +60,9 @@ export function ProductionDashboardClient() {
           <Link href="/dashboard/production/handovers" className="text-sm font-medium px-3 py-1.5 rounded-lg bg-white border border-slate-200 hover:border-primary/30 text-slate-700">
             Shift Handover
           </Link>
+          <Link href="/dashboard/production/bobbin" className="text-sm font-medium px-3 py-1.5 rounded-lg bg-white border border-slate-200 hover:border-primary/30 text-slate-700">
+            Bobbin Production
+          </Link>
           <Link href="/dashboard/data-centre/production-characteristics" className="text-sm font-medium px-3 py-1.5 rounded-lg bg-white border border-slate-200 hover:border-primary/30 text-slate-700">
             Phase Characteristics
           </Link>
