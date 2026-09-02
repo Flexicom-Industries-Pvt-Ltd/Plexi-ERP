@@ -72,6 +72,8 @@ model User {
   productionPlanLineAssignments ProductionPlanLineOperator[]
   productionRunsRecorded       ProductionRun[]              @relation("ProductionRunRecorder")
   shiftHandovers               ShiftHandover[]              @relation("ShiftHandoverAuthor")
+  loomAssignments              LoomAssignment[]
+  loomRunsOperated             LoomProductionRun[]          @relation("LoomRunOperator")
   createdAt         DateTime       @default(now())
   updatedAt     DateTime    @updatedAt
 }
@@ -136,6 +138,7 @@ model Shift {
 
   productionPlans ProductionPlan[]
   handovers       ShiftHandover[]
+  loomAssignments LoomAssignment[]
 }
 
 enum StockMaterialType {
@@ -333,6 +336,8 @@ model Machine {
 
   section Section @relation(fields: [sectionId], references: [id], onDelete: Restrict)
   productionPlanLines ProductionPlanLine[]
+  loomAssignmentMachines LoomAssignmentMachine[]
+  loomRuns               LoomProductionRun[]     @relation("LoomRunMachine")
 
   @@index([sectionId])
 }
@@ -541,6 +546,8 @@ model InventoryItem {
   productionPlanLines ProductionPlanLine[]
   bobbinRunsAsRawMaterial BobbinProductionRun[] @relation("BobbinRunRawMaterial")
   bobbinRunsAsOutput      BobbinProductionRun[] @relation("BobbinRunOutput")
+  loomRunsAsBobbin        LoomProductionRun[]   @relation("LoomRunBobbin")
+  loomRunsAsRoll          LoomProductionRun[]   @relation("LoomRunRoll")
 
   @@index([itemType])
   @@index([categoryId])
@@ -745,6 +752,7 @@ model ProductionRun {
   planLine   ProductionPlanLine @relation(fields: [planLineId], references: [id], onDelete: Cascade)
   recordedBy User?              @relation("ProductionRunRecorder", fields: [recordedById], references: [id], onDelete: SetNull)
   bobbinRun  BobbinProductionRun?
+  loomRun    LoomProductionRun?
 
   @@index([planLineId])
   @@index([startedAt])
@@ -770,6 +778,71 @@ model BobbinProductionRun {
   @@index([productionRunId])
   @@index([rawMaterialItemId])
   @@index([outputItemId])
+}
+
+enum RollType {
+  PP
+  LPP
+}
+
+model LoomAssignment {
+  id             String   @id @default(cuid())
+  shiftId        String
+  operatorId     String
+  assignmentDate DateTime @default(now())
+  createdById    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  shift     Shift                   @relation(fields: [shiftId], references: [id], onDelete: Restrict)
+  operator  User                    @relation(fields: [operatorId], references: [id], onDelete: Restrict)
+  machines  LoomAssignmentMachine[]
+
+  @@index([shiftId])
+  @@index([operatorId])
+  @@index([assignmentDate])
+}
+
+model LoomAssignmentMachine {
+  id           String @id @default(cuid())
+  assignmentId String
+  machineId    String
+
+  assignment LoomAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  machine    Machine        @relation(fields: [machineId], references: [id], onDelete: Restrict)
+
+  @@unique([assignmentId, machineId])
+  @@unique([machineId, assignmentId])
+  @@index([assignmentId])
+  @@index([machineId])
+}
+
+model LoomProductionRun {
+  id              String    @id @default(cuid())
+  productionRunId String    @unique
+  loomMachineId   String
+  operatorId      String
+  bobbinItemId    String?
+  bobbinIssueQty  Float     @default(0)
+  rollOutputQty   Float     @default(0)
+  rollType        RollType?
+  rollItemId      String?
+  characteristics Json?
+  inventoryPosted Boolean   @default(false)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  productionRun ProductionRun  @relation(fields: [productionRunId], references: [id], onDelete: Cascade)
+  loomMachine   Machine        @relation("LoomRunMachine", fields: [loomMachineId], references: [id], onDelete: Restrict)
+  operator      User           @relation("LoomRunOperator", fields: [operatorId], references: [id], onDelete: Restrict)
+  bobbinItem    InventoryItem? @relation("LoomRunBobbin", fields: [bobbinItemId], references: [id], onDelete: SetNull)
+  rollItem      InventoryItem? @relation("LoomRunRoll", fields: [rollItemId], references: [id], onDelete: SetNull)
+
+  @@index([productionRunId])
+  @@index([loomMachineId])
+  @@index([operatorId])
+  @@index([bobbinItemId])
+  @@index([rollItemId])
 }
 
 model ShiftHandover {
