@@ -70,6 +70,8 @@ model User {
   productionPlansApproved  ProductionPlan[]     @relation("ProductionPlanApprover")
   productionPlanLines        ProductionPlanLine[] @relation("ProductionPlanLineOperator")
   productionPlanLineAssignments ProductionPlanLineOperator[]
+  productionRunsRecorded       ProductionRun[]              @relation("ProductionRunRecorder")
+  shiftHandovers               ShiftHandover[]              @relation("ShiftHandoverAuthor")
   createdAt         DateTime       @default(now())
   updatedAt     DateTime    @updatedAt
 }
@@ -133,6 +135,7 @@ model Shift {
   updatedAt DateTime @updatedAt
 
   productionPlans ProductionPlan[]
+  handovers       ShiftHandover[]
 }
 
 enum StockMaterialType {
@@ -667,6 +670,7 @@ model ProductionPlanLine {
   inventoryItem   InventoryItem?                  @relation(fields: [inventoryItemId], references: [id], onDelete: SetNull)
   operators       ProductionPlanLineOperator[]
   characteristics ProductionCharacteristicValue[]
+  runs            ProductionRun[]
 
   @@index([planId])
   @@index([phase])
@@ -718,4 +722,50 @@ model ProductionCharacteristicValue {
 
   @@unique([planLineId, definitionId])
   @@index([planLineId])
+}
+
+model ProductionRun {
+  id              String    @id @default(cuid())
+  planLineId      String
+  startedAt       DateTime  @default(now())
+  endedAt         DateTime?
+  targetQty       Float
+  actualQty       Float     @default(0)
+  acceptedQty     Float     @default(0)
+  rejectedQty     Float     @default(0)
+  reworkQty       Float     @default(0)
+  scrapQty        Float     @default(0)
+  downtimeMinutes Int       @default(0)
+  recordedById    String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  planLine   ProductionPlanLine @relation(fields: [planLineId], references: [id], onDelete: Cascade)
+  recordedBy User?              @relation("ProductionRunRecorder", fields: [recordedById], references: [id], onDelete: SetNull)
+
+  @@index([planLineId])
+  @@index([startedAt])
+  @@index([endedAt])
+}
+
+model ShiftHandover {
+  id             String   @id @default(cuid())
+  shiftId        String
+  handoverDate   DateTime @default(now())
+  completedQty   Float    @default(0)
+  pendingQty     Float    @default(0)
+  wipNotes       String?
+  machineStatus  String?
+  qualityIssues  String?
+  scrapNotes     String?
+  remarks        String?
+  handedOverById String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  shift        Shift @relation(fields: [shiftId], references: [id], onDelete: Restrict)
+  handedOverBy User  @relation("ShiftHandoverAuthor", fields: [handedOverById], references: [id], onDelete: Restrict)
+
+  @@index([shiftId])
+  @@index([handoverDate])
 }
