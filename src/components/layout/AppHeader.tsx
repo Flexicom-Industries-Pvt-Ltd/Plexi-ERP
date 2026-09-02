@@ -27,15 +27,14 @@ function formatSegment(segment: string, parent?: string) {
 export function AppHeader() {
   const pathname = usePathname();
   const breadcrumb = useBreadcrumbLabel();
-  
-  // Basic breadcrumb generation based on path
+
   const paths = pathname.split("/").filter(Boolean);
-  
+
   return (
     <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-2 border-b border-border/50 bg-white/70 px-4 backdrop-blur-xl shadow-sm">
       <SidebarTrigger className="-ml-1" />
       <div className="mr-2 h-4 w-px bg-border" />
-      
+
       <Breadcrumb>
         <BreadcrumbList>
           {paths.map((path, index) => {
@@ -46,7 +45,7 @@ export function AppHeader() {
               isLast && breadcrumb?.pageLabel
                 ? breadcrumb.pageLabel
                 : formatSegment(path, parent);
-            
+
             return (
               <React.Fragment key={path}>
                 <BreadcrumbItem>

@@ -604,10 +604,6 @@ model InventoryBatch {
   @@index([locationId])
 }
 
-// ==========================================
-// Phase 4: Production Planning
-// ==========================================
-
 enum ProductionPhase {
   BOBBIN
   LOOM
