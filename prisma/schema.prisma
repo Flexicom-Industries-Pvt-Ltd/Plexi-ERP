@@ -69,6 +69,7 @@ model User {
   productionPlansCreated   ProductionPlan[]     @relation("ProductionPlanCreator")
   productionPlansApproved  ProductionPlan[]     @relation("ProductionPlanApprover")
   productionPlanLines        ProductionPlanLine[] @relation("ProductionPlanLineOperator")
+  productionPlanLineAssignments ProductionPlanLineOperator[]
   createdAt         DateTime       @default(now())
   updatedAt     DateTime    @updatedAt
 }
@@ -534,6 +535,7 @@ model InventoryItem {
   stock           Stock?       @relation(fields: [stockId], references: [id], onDelete: SetNull)
   transactions    InventoryTransaction[]
   batches         InventoryBatch[]
+  productionPlanLines ProductionPlanLine[]
 
   @@index([itemType])
   @@index([categoryId])
@@ -646,26 +648,44 @@ model ProductionPlan {
 }
 
 model ProductionPlanLine {
-  id           String          @id @default(cuid())
-  planId       String
-  phase        ProductionPhase
-  machineId    String?
-  operatorId   String?
-  targetQty    Float           @default(0)
-  priority     Int             @default(0)
-  instructions String?
-  sortOrder    Int             @default(0)
-  createdAt    DateTime        @default(now())
-  updatedAt    DateTime        @updatedAt
+  id              String          @id @default(cuid())
+  planId          String
+  phase           ProductionPhase
+  machineId       String?
+  operatorId      String?
+  inventoryItemId String?
+  targetQty       Float           @default(0)
+  priority        Int             @default(0)
+  instructions    String?
+  sortOrder       Int             @default(0)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
 
   plan            ProductionPlan                  @relation(fields: [planId], references: [id], onDelete: Cascade)
   machine         Machine?                        @relation(fields: [machineId], references: [id], onDelete: SetNull)
   operator        User?                           @relation("ProductionPlanLineOperator", fields: [operatorId], references: [id], onDelete: SetNull)
+  inventoryItem   InventoryItem?                  @relation(fields: [inventoryItemId], references: [id], onDelete: SetNull)
+  operators       ProductionPlanLineOperator[]
   characteristics ProductionCharacteristicValue[]
 
   @@index([planId])
   @@index([phase])
   @@index([machineId])
+  @@index([inventoryItemId])
+}
+
+model ProductionPlanLineOperator {
+  id         String   @id @default(cuid())
+  planLineId String
+  userId     String
+  createdAt  DateTime @default(now())
+
+  planLine ProductionPlanLine @relation(fields: [planLineId], references: [id], onDelete: Cascade)
+  user     User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([planLineId, userId])
+  @@index([planLineId])
+  @@index([userId])
 }
 
 model ProductionCharacteristicDefinition {

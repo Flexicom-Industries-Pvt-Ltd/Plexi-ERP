@@ -1,39 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
 import { db } from "@/lib/db";
-import { logEvent, logDiff } from "@/lib/logging";
+import { logEvent } from "@/lib/logging";
 import { registry } from "@/lib/openapi";
 import { requireProductionApiPermission } from "@/lib/production/permissions";
 import { generatePlanNumber } from "@/lib/production/plan-number";
+import { planInclude } from "@/lib/production/plan-include";
+import { CreatePlanSchema, buildLineCreateData } from "@/lib/production/plan-schemas";
+import { z } from "zod";
 
 export const dynamic = "force-dynamic";
-
-const CharacteristicValueSchema = z.object({
-  definitionId: z.string().min(1),
-  value: z.string(),
-});
-
-const PlanLineSchema = z.object({
-  phase: z.enum([
-    "BOBBIN", "LOOM", "LAMINATION", "PRINTING", "CUTTING",
-    "CONVERTEX", "VALVOMATIC", "BCS", "MANUAL_STITCH", "BALING",
-  ]),
-  machineId: z.string().optional().nullable(),
-  operatorId: z.string().optional().nullable(),
-  targetQty: z.number().min(0).default(0),
-  priority: z.number().int().default(0),
-  instructions: z.string().optional().nullable(),
-  sortOrder: z.number().int().default(0),
-  characteristics: z.array(CharacteristicValueSchema).optional(),
-});
-
-const CreatePlanSchema = z.object({
-  shiftId: z.string().optional().nullable(),
-  planDate: z.string().datetime().optional(),
-  status: z.enum(["DRAFT", "APPROVED", "IN_PROGRESS", "COMPLETED", "CANCELLED"]).default("DRAFT"),
-  notes: z.string().optional().nullable(),
-  lines: z.array(PlanLineSchema).min(1, "At least one plan line is required"),
-}).openapi("CreateProductionPlanInput");
 
 const PlanResponseSchema = z.object({
   id: z.string(),
@@ -45,6 +20,7 @@ registry.registerPath({
   method: "get",
   path: "/api/production/plans",
   summary: "List production plans",
+  description: "Filter by status, shiftId, phase, dateFrom, dateTo",
   tags: ["Production"],
   security: [{ cookieAuth: [] }],
   responses: {
@@ -60,39 +36,21 @@ registry.registerPath({
   summary: "Create production plan",
   tags: ["Production"],
   security: [{ cookieAuth: [] }],
-  request: {
-    body: {
-      content: {
-        "application/json": { schema: CreatePlanSchema },
-      },
-    },
-  },
   responses: {
     201: {
       description: "Plan created",
       content: { "application/json": { schema: PlanResponseSchema } },
     },
     400: { description: "Validation error" },
-    401: { description: "Unauthorized" },
-    403: { description: "Forbidden" },
   },
 });
 
-const planInclude = {
-  shift: true,
-  createdBy: { select: { id: true, name: true, email: true } },
-  approvedBy: { select: { id: true, name: true, email: true } },
-  lines: {
-    orderBy: { sortOrder: "asc" as const },
-    include: {
-      machine: { select: { id: true, name: true } },
-      operator: { select: { id: true, name: true, email: true } },
-      characteristics: {
-        include: { definition: true },
-      },
-    },
-  },
-};
+async function resolvePlan(idOrNumber: string) {
+  return db.productionPlan.findFirst({
+    where: { OR: [{ id: idOrNumber }, { planNumber: idOrNumber }] },
+    include: planInclude,
+  });
+}
 
 export async function GET(request: NextRequest) {
   const authResult = await requireProductionApiPermission("canRead");
@@ -103,10 +61,25 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const status = searchParams.get("status");
   const shiftId = searchParams.get("shiftId");
+  const phase = searchParams.get("phase");
+  const dateFrom = searchParams.get("dateFrom");
+  const dateTo = searchParams.get("dateTo");
 
   const where: Record<string, unknown> = {};
   if (status) where.status = status;
   if (shiftId) where.shiftId = shiftId;
+  if (dateFrom || dateTo) {
+    where.planDate = {};
+    if (dateFrom) (where.planDate as Record<string, Date>).gte = new Date(dateFrom);
+    if (dateTo) {
+      const end = new Date(dateTo);
+      end.setHours(23, 59, 59, 999);
+      (where.planDate as Record<string, Date>).lte = end;
+    }
+  }
+  if (phase) {
+    where.lines = { some: { phase } };
+  }
 
   try {
     const plans = await db.productionPlan.findMany({
@@ -136,33 +109,18 @@ export async function POST(request: NextRequest) {
 
     const data = parsed.data;
     const planNumber = await generatePlanNumber();
+    const planDate = data.planDate ? new Date(data.planDate) : new Date();
 
     const newPlan = await db.productionPlan.create({
       data: {
         planNumber,
         shiftId: data.shiftId || null,
-        planDate: data.planDate ? new Date(data.planDate) : new Date(),
-        status: data.status,
+        planDate,
+        status: "DRAFT",
         notes: data.notes || null,
         createdById: authResult.session.user.id,
         lines: {
-          create: data.lines.map((line, index) => ({
-            phase: line.phase,
-            machineId: line.machineId || null,
-            operatorId: line.operatorId || null,
-            targetQty: line.targetQty,
-            priority: line.priority,
-            instructions: line.instructions || null,
-            sortOrder: line.sortOrder ?? index,
-            characteristics: line.characteristics?.length
-              ? {
-                  create: line.characteristics.map((c) => ({
-                    definitionId: c.definitionId,
-                    value: c.value,
-                  })),
-                }
-              : undefined,
-          })),
+          create: data.lines.map((line, index) => buildLineCreateData(line, index)),
         },
       },
       include: planInclude,
@@ -188,3 +146,5 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Failed to create production plan" }, { status: 500 });
   }
 }
+
+export { resolvePlan };
