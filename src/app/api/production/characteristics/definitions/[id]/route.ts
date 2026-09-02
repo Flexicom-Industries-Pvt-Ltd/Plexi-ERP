@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { logEvent, logDiff } from "@/lib/logging";
-import { registry } from "@/lib/openapi";
+
 import { requireProductionApiPermission } from "@/lib/production/permissions";
 
 export const dynamic = "force-dynamic";
@@ -14,31 +14,6 @@ const UpdateDefinitionSchema = z.object({
   required: z.boolean().optional(),
   sortOrder: z.number().int().optional(),
   isActive: z.boolean().optional(),
-});
-
-registry.registerPath({
-  method: "patch",
-  path: "/api/production/characteristics/definitions/{id}",
-  summary: "Update production characteristic definition",
-  tags: ["Production"],
-  security: [{ cookieAuth: [] }],
-  responses: {
-    200: { description: "Definition updated" },
-    404: { description: "Not found" },
-  },
-});
-
-registry.registerPath({
-  method: "delete",
-  path: "/api/production/characteristics/definitions/{id}",
-  summary: "Delete production characteristic definition",
-  tags: ["Production"],
-  security: [{ cookieAuth: [] }],
-  responses: {
-    200: { description: "Definition deleted" },
-    404: { description: "Not found" },
-    409: { description: "Definition in use" },
-  },
 });
 
 export async function PATCH(

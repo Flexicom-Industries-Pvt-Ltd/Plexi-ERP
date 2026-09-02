@@ -1,49 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { logEvent } from "@/lib/logging";
-import { registry } from "@/lib/openapi";
+
 import { requireProductionApiPermission } from "@/lib/production/permissions";
 import { generatePlanNumber } from "@/lib/production/plan-number";
 import { planInclude } from "@/lib/production/plan-include";
 import { CreatePlanSchema, buildLineCreateData } from "@/lib/production/plan-schemas";
-import { z } from "zod";
 
 export const dynamic = "force-dynamic";
-
-const PlanResponseSchema = z.object({
-  id: z.string(),
-  planNumber: z.string(),
-  status: z.string(),
-}).openapi("ProductionPlanResponse");
-
-registry.registerPath({
-  method: "get",
-  path: "/api/production/plans",
-  summary: "List production plans",
-  description: "Filter by status, shiftId, phase, dateFrom, dateTo",
-  tags: ["Production"],
-  security: [{ cookieAuth: [] }],
-  responses: {
-    200: { description: "List of production plans" },
-    401: { description: "Unauthorized" },
-    403: { description: "Forbidden" },
-  },
-});
-
-registry.registerPath({
-  method: "post",
-  path: "/api/production/plans",
-  summary: "Create production plan",
-  tags: ["Production"],
-  security: [{ cookieAuth: [] }],
-  responses: {
-    201: {
-      description: "Plan created",
-      content: { "application/json": { schema: PlanResponseSchema } },
-    },
-    400: { description: "Validation error" },
-  },
-});
 
 async function resolvePlan(idOrNumber: string) {
   return db.productionPlan.findFirst({

@@ -1,18 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { registry } from "@/lib/openapi";
+
 import { requireProductionApiPermission } from "@/lib/production/permissions";
 
 export const dynamic = "force-dynamic";
-
-registry.registerPath({
-  method: "get",
-  path: "/api/production/bobbin/items",
-  summary: "List inventory items for bobbin production",
-  tags: ["Production"],
-  security: [{ cookieAuth: [] }],
-  responses: { 200: { description: "Raw materials and bobbin items" } },
-});
 
 export async function GET(_request: NextRequest) {
   const authResult = await requireProductionApiPermission("canRead");

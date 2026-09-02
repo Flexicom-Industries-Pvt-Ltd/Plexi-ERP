@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { logEvent } from "@/lib/logging";
-import { registry } from "@/lib/openapi";
+
 import { requireProductionApiPermission } from "@/lib/production/permissions";
 
 export const dynamic = "force-dynamic";
@@ -23,25 +23,6 @@ const handoverInclude = {
   shift: true,
   handedOverBy: { select: { id: true, name: true, email: true } },
 };
-
-registry.registerPath({
-  method: "get",
-  path: "/api/production/handovers",
-  summary: "List shift handovers",
-  description: "Filter by shiftId, date, or latest=true for most recent handover for a shift",
-  tags: ["Production"],
-  security: [{ cookieAuth: [] }],
-  responses: { 200: { description: "List of handovers" } },
-});
-
-registry.registerPath({
-  method: "post",
-  path: "/api/production/handovers",
-  summary: "Create shift handover",
-  tags: ["Production"],
-  security: [{ cookieAuth: [] }],
-  responses: { 201: { description: "Handover created" } },
-});
 
 export async function GET(request: NextRequest) {
   const authResult = await requireProductionApiPermission("canRead");

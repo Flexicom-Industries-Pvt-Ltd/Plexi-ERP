@@ -3,7 +3,7 @@ import { z } from "zod";
 import { Prisma } from "@/generated/prisma";
 import { db } from "@/lib/db";
 import { logEvent } from "@/lib/logging";
-import { registry } from "@/lib/openapi";
+
 import { postBobbinInventoryMovements } from "@/lib/production/bobbin-inventory";
 import { bobbinRunInclude } from "@/lib/production/bobbin-run-include";
 import { requireProductionApiPermission } from "@/lib/production/permissions";
@@ -31,24 +31,6 @@ const CompleteBobbinRunSchema = z.object({
   outputItemId: z.string().nullable().optional(),
   bobbinCharacteristics: z.record(z.string(), z.unknown()).optional(),
   endedAt: z.string().datetime().optional(),
-});
-
-registry.registerPath({
-  method: "get",
-  path: "/api/production/bobbin/runs/{id}",
-  summary: "Get bobbin production run by ID",
-  tags: ["Production"],
-  security: [{ cookieAuth: [] }],
-  responses: { 200: { description: "Bobbin run details" }, 404: { description: "Not found" } },
-});
-
-registry.registerPath({
-  method: "patch",
-  path: "/api/production/bobbin/runs/{id}",
-  summary: "Update or complete a bobbin production run",
-  tags: ["Production"],
-  security: [{ cookieAuth: [] }],
-  responses: { 200: { description: "Bobbin run updated" }, 404: { description: "Not found" } },
 });
 
 export async function GET(
