@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { logEvent, logDiff } from "@/lib/logging";
-import { registry } from "@/lib/openapi";
+
 import { requireProductionApiPermission } from "@/lib/production/permissions";
 
 export const dynamic = "force-dynamic";
@@ -19,40 +19,6 @@ const CreateDefinitionSchema = z.object({
   required: z.boolean().default(false),
   sortOrder: z.number().int().default(0),
   isActive: z.boolean().default(true),
-}).openapi("CreateProductionCharacteristicDefinitionInput");
-
-registry.registerPath({
-  method: "get",
-  path: "/api/production/characteristics/definitions",
-  summary: "List production characteristic definitions",
-  tags: ["Production"],
-  security: [{ cookieAuth: [] }],
-  responses: {
-    200: { description: "List of characteristic definitions" },
-    401: { description: "Unauthorized" },
-    403: { description: "Forbidden" },
-  },
-});
-
-registry.registerPath({
-  method: "post",
-  path: "/api/production/characteristics/definitions",
-  summary: "Create production characteristic definition",
-  tags: ["Production"],
-  security: [{ cookieAuth: [] }],
-  request: {
-    body: {
-      content: {
-        "application/json": { schema: CreateDefinitionSchema },
-      },
-    },
-  },
-  responses: {
-    201: { description: "Definition created" },
-    400: { description: "Validation error" },
-    401: { description: "Unauthorized" },
-    403: { description: "Forbidden" },
-  },
 });
 
 export async function GET(request: NextRequest) {

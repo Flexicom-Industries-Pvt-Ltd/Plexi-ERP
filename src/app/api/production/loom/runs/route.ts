@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { logEvent } from "@/lib/logging";
-import { registry } from "@/lib/openapi";
+
 import { loomRunInclude } from "@/lib/production/loom-run-include";
 import { requireProductionApiPermission } from "@/lib/production/permissions";
 
@@ -17,24 +17,6 @@ const CreateLoomRunSchema = z.object({
   bobbinIssueQty: z.number().min(0).default(0),
   rollType: z.enum(["PP", "LPP"]).optional(),
   startedAt: z.string().datetime().optional(),
-});
-
-registry.registerPath({
-  method: "get",
-  path: "/api/production/loom/runs",
-  summary: "List loom production runs",
-  tags: ["Production"],
-  security: [{ cookieAuth: [] }],
-  responses: { 200: { description: "List of loom runs" } },
-});
-
-registry.registerPath({
-  method: "post",
-  path: "/api/production/loom/runs",
-  summary: "Start a loom production run",
-  tags: ["Production"],
-  security: [{ cookieAuth: [] }],
-  responses: { 201: { description: "Loom run created" } },
 });
 
 export async function GET(request: NextRequest) {

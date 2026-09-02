@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { logEvent } from "@/lib/logging";
-import { registry } from "@/lib/openapi";
+
 import { getLoomsPerOperatorLimit, validateLoomAssignmentCount } from "@/lib/production/loom-manpower";
 import { loomAssignmentInclude } from "@/lib/production/loom-run-include";
 import { requireProductionApiPermission } from "@/lib/production/permissions";
@@ -28,24 +28,6 @@ function endOfDay(date: Date) {
   d.setHours(23, 59, 59, 999);
   return d;
 }
-
-registry.registerPath({
-  method: "get",
-  path: "/api/production/loom/assignments",
-  summary: "List loom operator assignments",
-  tags: ["Production"],
-  security: [{ cookieAuth: [] }],
-  responses: { 200: { description: "List of assignments" } },
-});
-
-registry.registerPath({
-  method: "post",
-  path: "/api/production/loom/assignments",
-  summary: "Create or replace loom operator assignment",
-  tags: ["Production"],
-  security: [{ cookieAuth: [] }],
-  responses: { 201: { description: "Assignment created" } },
-});
 
 export async function GET(request: NextRequest) {
   const authResult = await requireProductionApiPermission("canRead");

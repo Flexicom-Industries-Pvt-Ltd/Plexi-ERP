@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { logEvent } from "@/lib/logging";
-import { registry } from "@/lib/openapi";
+
 import { requireProductionApiPermission } from "@/lib/production/permissions";
 
 export const dynamic = "force-dynamic";
@@ -26,24 +26,6 @@ const runInclude = {
   },
   recordedBy: { select: { id: true, name: true, email: true } },
 };
-
-registry.registerPath({
-  method: "get",
-  path: "/api/production/runs/{id}",
-  summary: "Get production run by ID",
-  tags: ["Production"],
-  security: [{ cookieAuth: [] }],
-  responses: { 200: { description: "Run details" }, 404: { description: "Not found" } },
-});
-
-registry.registerPath({
-  method: "patch",
-  path: "/api/production/runs/{id}",
-  summary: "Complete a production run with actuals",
-  tags: ["Production"],
-  security: [{ cookieAuth: [] }],
-  responses: { 200: { description: "Run completed" }, 404: { description: "Not found" } },
-});
 
 export async function GET(
   _request: NextRequest,

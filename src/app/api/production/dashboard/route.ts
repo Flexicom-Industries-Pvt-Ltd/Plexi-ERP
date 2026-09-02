@@ -1,23 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { registry } from "@/lib/openapi";
+
 import { requireProductionApiPermission } from "@/lib/production/permissions";
 import { getProductionDashboardData } from "@/lib/production/dashboard-stats";
 
 export const dynamic = "force-dynamic";
-
-registry.registerPath({
-  method: "get",
-  path: "/api/production/dashboard",
-  summary: "Production dashboard aggregates",
-  description: "Today's target, actual, achievement, phase/shift/machine breakdown, delayed plans",
-  tags: ["Production"],
-  security: [{ cookieAuth: [] }],
-  responses: {
-    200: { description: "Dashboard data" },
-    401: { description: "Unauthorized" },
-    403: { description: "Forbidden" },
-  },
-});
 
 export async function GET(request: NextRequest) {
   const authResult = await requireProductionApiPermission("canRead");
