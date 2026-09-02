@@ -16,6 +16,12 @@ export const planInclude = {
       characteristics: {
         include: { definition: true },
       },
+      runs: {
+        orderBy: { startedAt: "desc" as const },
+        include: {
+          recordedBy: { select: { id: true, name: true, email: true } },
+        },
+      },
     },
   },
 };
