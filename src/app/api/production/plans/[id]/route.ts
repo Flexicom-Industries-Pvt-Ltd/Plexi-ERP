@@ -1,23 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
 import { db } from "@/lib/db";
-import { logDiff } from "@/lib/logging";
+import { logDiff, logEvent } from "@/lib/logging";
 import { registry } from "@/lib/openapi";
 import { requireProductionApiPermission } from "@/lib/production/permissions";
+import { planInclude } from "@/lib/production/plan-include";
+import { UpdatePlanSchema, buildLineCreateData } from "@/lib/production/plan-schemas";
+import { validatePlanForApproval } from "@/lib/production/validate-plan";
 
 export const dynamic = "force-dynamic";
-
-const UpdatePlanSchema = z.object({
-  shiftId: z.string().optional().nullable(),
-  planDate: z.string().datetime().optional(),
-  status: z.enum(["DRAFT", "APPROVED", "IN_PROGRESS", "COMPLETED", "CANCELLED"]).optional(),
-  notes: z.string().optional().nullable(),
-});
 
 registry.registerPath({
   method: "get",
   path: "/api/production/plans/{id}",
-  summary: "Get production plan by ID",
+  summary: "Get production plan by ID or plan number",
   tags: ["Production"],
   security: [{ cookieAuth: [] }],
   responses: {
@@ -27,33 +22,38 @@ registry.registerPath({
 });
 
 registry.registerPath({
-  method: "patch",
+  method: "put",
   path: "/api/production/plans/{id}",
-  summary: "Update production plan",
+  summary: "Update production plan (draft only)",
   tags: ["Production"],
   security: [{ cookieAuth: [] }],
   responses: {
     200: { description: "Plan updated" },
     400: { description: "Validation error" },
     404: { description: "Not found" },
+    409: { description: "Plan is not editable" },
   },
 });
 
-const planInclude = {
-  shift: true,
-  createdBy: { select: { id: true, name: true, email: true } },
-  approvedBy: { select: { id: true, name: true, email: true } },
-  lines: {
-    orderBy: { sortOrder: "asc" as const },
-    include: {
-      machine: { select: { id: true, name: true } },
-      operator: { select: { id: true, name: true, email: true } },
-      characteristics: {
-        include: { definition: true },
-      },
-    },
+registry.registerPath({
+  method: "delete",
+  path: "/api/production/plans/{id}",
+  summary: "Delete draft production plan",
+  tags: ["Production"],
+  security: [{ cookieAuth: [] }],
+  responses: {
+    200: { description: "Plan deleted" },
+    404: { description: "Not found" },
+    409: { description: "Only draft plans can be deleted" },
   },
-};
+});
+
+async function resolvePlan(idOrNumber: string) {
+  return db.productionPlan.findFirst({
+    where: { OR: [{ id: idOrNumber }, { planNumber: idOrNumber }] },
+    include: planInclude,
+  });
+}
 
 export async function GET(
   _request: NextRequest,
@@ -65,25 +65,14 @@ export async function GET(
   }
 
   const { id } = await context.params;
-
-  try {
-    const plan = await db.productionPlan.findFirst({
-      where: { OR: [{ id }, { planNumber: id }] },
-      include: planInclude,
-    });
-
-    if (!plan) {
-      return NextResponse.json({ error: "Plan not found" }, { status: 404 });
-    }
-
-    return NextResponse.json(plan);
-  } catch (error) {
-    console.error("Error fetching production plan:", error);
-    return NextResponse.json({ error: "Failed to fetch production plan" }, { status: 500 });
+  const plan = await resolvePlan(id);
+  if (!plan) {
+    return NextResponse.json({ error: "Plan not found" }, { status: 404 });
   }
+  return NextResponse.json(plan);
 }
 
-export async function PATCH(
+export async function PUT(
   request: NextRequest,
   context: { params: Promise<{ id: string }> },
 ) {
@@ -93,17 +82,16 @@ export async function PATCH(
   }
 
   const { id } = await context.params;
+  const existing = await resolvePlan(id);
+  if (!existing) {
+    return NextResponse.json({ error: "Plan not found" }, { status: 404 });
+  }
+
+  if (existing.status !== "DRAFT") {
+    return NextResponse.json({ error: "Only draft plans can be edited" }, { status: 409 });
+  }
 
   try {
-    const existing = await db.productionPlan.findFirst({
-      where: { OR: [{ id }, { planNumber: id }] },
-      include: planInclude,
-    });
-
-    if (!existing) {
-      return NextResponse.json({ error: "Plan not found" }, { status: 404 });
-    }
-
     const body = await request.json();
     const parsed = UpdatePlanSchema.safeParse(body);
     if (!parsed.success) {
@@ -111,22 +99,31 @@ export async function PATCH(
     }
 
     const data = parsed.data;
-    const updateData: Record<string, unknown> = {};
-    if (data.shiftId !== undefined) updateData.shiftId = data.shiftId;
-    if (data.planDate) updateData.planDate = new Date(data.planDate);
-    if (data.status) {
-      updateData.status = data.status;
-      if (data.status === "APPROVED" && !existing.approvedById) {
-        updateData.approvedById = authResult.session.user.id;
-      }
-    }
-    if (data.notes !== undefined) updateData.notes = data.notes;
 
-    const updated = await db.productionPlan.update({
-      where: { id: existing.id },
-      data: updateData,
-      include: planInclude,
+    await db.$transaction(async (tx) => {
+      if (data.lines) {
+        await tx.productionPlanLine.deleteMany({ where: { planId: existing.id } });
+      }
+
+      await tx.productionPlan.update({
+        where: { id: existing.id },
+        data: {
+          ...(data.shiftId !== undefined && { shiftId: data.shiftId }),
+          ...(data.planDate && { planDate: new Date(data.planDate) }),
+          ...(data.notes !== undefined && { notes: data.notes }),
+          ...(data.lines && {
+            lines: {
+              create: data.lines.map((line, index) => buildLineCreateData(line, index)),
+            },
+          }),
+        },
+      });
     });
+
+    const updated = await resolvePlan(existing.id);
+    if (!updated) {
+      return NextResponse.json({ error: "Plan not found after update" }, { status: 500 });
+    }
 
     await logDiff({
       userId: authResult.session.user.id,
@@ -142,4 +139,117 @@ export async function PATCH(
     console.error("Error updating production plan:", error);
     return NextResponse.json({ error: "Failed to update production plan" }, { status: 500 });
   }
+}
+
+export async function DELETE(
+  _request: NextRequest,
+  context: { params: Promise<{ id: string }> },
+) {
+  const authResult = await requireProductionApiPermission("canDelete");
+  if (!authResult.ok) {
+    return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+  }
+
+  const { id } = await context.params;
+  const existing = await resolvePlan(id);
+  if (!existing) {
+    return NextResponse.json({ error: "Plan not found" }, { status: 404 });
+  }
+
+  if (existing.status !== "DRAFT") {
+    return NextResponse.json({ error: "Only draft plans can be deleted" }, { status: 409 });
+  }
+
+  await db.productionPlan.delete({ where: { id: existing.id } });
+
+  await logEvent({
+    userId: authResult.session.user.id,
+    module: "PRODUCTION",
+    severity: "INFO",
+    action: "DELETE_PLAN",
+    payload: { planId: existing.id, planNumber: existing.planNumber },
+    diffs: [{
+      entity: "ProductionPlan",
+      entityId: existing.id,
+      before: existing,
+      after: {},
+    }],
+  });
+
+  return NextResponse.json({ success: true });
+}
+
+export async function PATCH(
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> },
+) {
+  const authResult = await requireProductionApiPermission("canUpdate");
+  if (!authResult.ok) {
+    return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+  }
+
+  const { id } = await context.params;
+  const existing = await resolvePlan(id);
+  if (!existing) {
+    return NextResponse.json({ error: "Plan not found" }, { status: 404 });
+  }
+
+  const body = await request.json();
+  const action = body.action as string | undefined;
+
+  if (action === "approve") {
+    if (existing.status !== "DRAFT") {
+      return NextResponse.json({ error: "Only draft plans can be approved" }, { status: 409 });
+    }
+
+    const validation = await validatePlanForApproval(existing);
+    if (!validation.valid) {
+      return NextResponse.json({ error: "Plan cannot be approved", details: validation.errors }, { status: 400 });
+    }
+
+    const updated = await db.productionPlan.update({
+      where: { id: existing.id },
+      data: {
+        status: "APPROVED",
+        approvedById: authResult.session.user.id,
+      },
+      include: planInclude,
+    });
+
+    await logEvent({
+      userId: authResult.session.user.id,
+      module: "PRODUCTION",
+      severity: "INFO",
+      action: "APPROVE_PLAN",
+      payload: { planId: updated.id, planNumber: updated.planNumber },
+      diffs: [{ entity: "ProductionPlan", entityId: updated.id, before: existing, after: updated }],
+    });
+
+    return NextResponse.json(updated);
+  }
+
+  if (action === "cancel") {
+    if (!["DRAFT", "APPROVED"].includes(existing.status)) {
+      return NextResponse.json({ error: "Only draft or approved plans can be cancelled" }, { status: 409 });
+    }
+
+    const updated = await db.productionPlan.update({
+      where: { id: existing.id },
+      data: { status: "CANCELLED" },
+      include: planInclude,
+    });
+
+    await logEvent({
+      userId: authResult.session.user.id,
+      module: "PRODUCTION",
+      severity: "INFO",
+      action: "CANCEL_PLAN",
+      payload: { planId: updated.id, planNumber: updated.planNumber },
+      diffs: [{ entity: "ProductionPlan", entityId: updated.id, before: existing, after: updated }],
+    });
+
+    return NextResponse.json(updated);
+  }
+
+  return NextResponse.json({ error: "Unknown action. Use approve or cancel." }, { status: 400 });
 }
