@@ -8,7 +8,13 @@ git config core.hooksPath .githooks
 
 ## What it does
 
-`prepare-commit-msg` removes `Co-authored-by: Cursor <cursoragent@cursor.com>` trailers that Cursor IDE/cloud agents inject into commit messages.
+`prepare-commit-msg` removes Cursor co-author trailers (any casing), e.g. `Co-authored-by: Cursor <cursoragent@cursor.com>`.
+
+Agents must commit with:
+
+```bash
+git -c core.hooksPath=.githooks commit -m "message"
+```
 
 Also disable **Cursor Settings → Agents → Attribution** (commit + PR).
 

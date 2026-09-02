@@ -76,6 +76,7 @@ export const masterDataConfig: Record<string, ModelConfig> = {
     modelName: "machine",
     title: "Machines",
     description: "Manage production machines and equipment.",
+    readModules: ["SETTINGS", "PRODUCTION"],
     fields: [
       { key: "sectionId", label: "Section", type: "select", required: true, relationEndpoint: "section" },
       { key: "name", label: "Name", type: "text", required: true },
@@ -94,6 +95,7 @@ export const masterDataConfig: Record<string, ModelConfig> = {
     modelName: "shift",
     title: "Shifts",
     description: "Manage factory work shifts.",
+    readModules: ["SETTINGS", "PRODUCTION"],
     fields: [
       { key: "name", label: "Name", type: "text", required: true },
       { key: "startTime", label: "Start Time", type: "time", required: true },
