@@ -66,6 +66,9 @@ model User {
   gateEntries       GateEntry[]    @relation("GateEntryCreator")
   verifiedDocuments GateDocument[] @relation("DocumentVerifier")
   inventoryTransactions InventoryTransaction[]
+  productionPlansCreated   ProductionPlan[]     @relation("ProductionPlanCreator")
+  productionPlansApproved  ProductionPlan[]     @relation("ProductionPlanApprover")
+  productionPlanLines        ProductionPlanLine[] @relation("ProductionPlanLineOperator")
   createdAt         DateTime       @default(now())
   updatedAt     DateTime    @updatedAt
 }
@@ -127,6 +130,8 @@ model Shift {
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  productionPlans ProductionPlan[]
 }
 
 enum StockMaterialType {
@@ -323,6 +328,7 @@ model Machine {
   updatedAt    DateTime @updatedAt
 
   section Section @relation(fields: [sectionId], references: [id], onDelete: Restrict)
+  productionPlanLines ProductionPlanLine[]
 
   @@index([sectionId])
 }
@@ -582,4 +588,114 @@ model InventoryBatch {
   @@index([itemId])
   @@index([batchLot])
   @@index([locationId])
+}
+
+// ==========================================
+// Phase 4: Production Planning
+// ==========================================
+
+enum ProductionPhase {
+  BOBBIN
+  LOOM
+  LAMINATION
+  PRINTING
+  CUTTING
+  CONVERTEX
+  VALVOMATIC
+  BCS
+  MANUAL_STITCH
+  BALING
+}
+
+enum ProductionPlanStatus {
+  DRAFT
+  APPROVED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum ProductionCharacteristicFieldType {
+  TEXT
+  NUMBER
+  SELECT
+  BOOLEAN
+  DATE
+}
+
+model ProductionPlan {
+  id           String               @id @default(cuid())
+  planNumber   String               @unique
+  shiftId      String?
+  planDate     DateTime             @default(now())
+  status       ProductionPlanStatus @default(DRAFT)
+  notes        String?
+  createdById  String
+  approvedById String?
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+
+  shift      Shift?               @relation(fields: [shiftId], references: [id], onDelete: SetNull)
+  createdBy  User                 @relation("ProductionPlanCreator", fields: [createdById], references: [id])
+  approvedBy User?                @relation("ProductionPlanApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  lines      ProductionPlanLine[]
+
+  @@index([status])
+  @@index([planDate])
+  @@index([shiftId])
+}
+
+model ProductionPlanLine {
+  id           String          @id @default(cuid())
+  planId       String
+  phase        ProductionPhase
+  machineId    String?
+  operatorId   String?
+  targetQty    Float           @default(0)
+  priority     Int             @default(0)
+  instructions String?
+  sortOrder    Int             @default(0)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  plan            ProductionPlan                  @relation(fields: [planId], references: [id], onDelete: Cascade)
+  machine         Machine?                        @relation(fields: [machineId], references: [id], onDelete: SetNull)
+  operator        User?                           @relation("ProductionPlanLineOperator", fields: [operatorId], references: [id], onDelete: SetNull)
+  characteristics ProductionCharacteristicValue[]
+
+  @@index([planId])
+  @@index([phase])
+  @@index([machineId])
+}
+
+model ProductionCharacteristicDefinition {
+  id        String                            @id @default(cuid())
+  phase     ProductionPhase
+  key       String
+  label     String
+  fieldType ProductionCharacteristicFieldType
+  options   Json?
+  required  Boolean                           @default(false)
+  sortOrder Int                               @default(0)
+  isActive  Boolean                           @default(true)
+  createdAt DateTime                          @default(now())
+  updatedAt DateTime                          @updatedAt
+
+  values ProductionCharacteristicValue[]
+
+  @@unique([phase, key])
+  @@index([phase])
+}
+
+model ProductionCharacteristicValue {
+  id           String @id @default(cuid())
+  planLineId   String
+  definitionId String
+  value        String
+
+  planLine   ProductionPlanLine                 @relation(fields: [planLineId], references: [id], onDelete: Cascade)
+  definition ProductionCharacteristicDefinition @relation(fields: [definitionId], references: [id], onDelete: Restrict)
+
+  @@unique([planLineId, definitionId])
+  @@index([planLineId])
 }
