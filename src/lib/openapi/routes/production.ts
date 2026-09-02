@@ -1,4 +1,32 @@
 import { reg } from "../helpers";
+import {
+  ApprovePlanBody,
+  CharacteristicsQuery,
+  CompleteBobbinRunBody,
+  CompleteLoomRunBody,
+  CompleteRunBody,
+  CreateBobbinRunBody,
+  CreateCharacteristicBody,
+  CreateHandoverBody,
+  CreateLoomAssignmentBody,
+  CreateLoomRunBody,
+  CreatePlanBody,
+  CreateRunBody,
+  HandoversQuery,
+  IdPathParam,
+  InventoryItemSchema,
+  LoomAssignmentsQuery,
+  LoomMachinesQuery,
+  OperatorSchema,
+  ProductionDashboardQuery,
+  ProductionPlanSchema,
+  ProductionPlansQuery,
+  ProductionRunsQuery,
+  UpdateBobbinRunBody,
+  UpdateCharacteristicBody,
+  UpdateLoomRunBody,
+  UpdatePlanBody,
+} from "../schemas";
 
 const TAG = ["Production"];
 
@@ -8,27 +36,32 @@ export function registerProductionRoutes() {
     path: "/api/production/dashboard",
     summary: "Production dashboard KPIs",
     tags: TAG,
-    description: "Today target/actual/achievement, phase/shift/machine breakdowns, delayed plans.",
+    query: ProductionDashboardQuery,
   });
   reg({
     method: "get",
     path: "/api/production/plans",
     summary: "List production plans",
     tags: TAG,
-    description: "Filter by status, shiftId, phase, dateFrom, dateTo.",
+    query: ProductionPlansQuery,
+    response: ProductionPlanSchema.array(),
   });
   reg({
     method: "post",
     path: "/api/production/plans",
     summary: "Create production plan",
     tags: TAG,
+    body: CreatePlanBody,
+    response: ProductionPlanSchema,
   });
   reg({
     method: "get",
     path: "/api/production/plans/{id}",
     summary: "Get production plan",
     tags: TAG,
-    description: "By ID or plan number.",
+    description: "By ID or plan number. Includes lines, operators, and characteristics.",
+    params: IdPathParam,
+    response: ProductionPlanSchema,
   });
   reg({
     method: "put",
@@ -36,6 +69,9 @@ export function registerProductionRoutes() {
     summary: "Update production plan",
     tags: TAG,
     description: "Draft plans only.",
+    params: IdPathParam,
+    body: UpdatePlanBody,
+    response: ProductionPlanSchema,
     responses: { 409: { description: "Plan is not editable" } },
   });
   reg({
@@ -43,7 +79,9 @@ export function registerProductionRoutes() {
     path: "/api/production/plans/{id}",
     summary: "Approve or cancel production plan",
     tags: TAG,
-    description: "Status transitions: approve, cancel.",
+    params: IdPathParam,
+    body: ApprovePlanBody,
+    response: ProductionPlanSchema,
     responses: { 409: { description: "Invalid status transition" } },
   });
   reg({
@@ -51,6 +89,7 @@ export function registerProductionRoutes() {
     path: "/api/production/plans/{id}",
     summary: "Delete draft production plan",
     tags: TAG,
+    params: IdPathParam,
     responses: { 409: { description: "Only draft plans can be deleted" } },
   });
   reg({
@@ -58,100 +97,117 @@ export function registerProductionRoutes() {
     path: "/api/production/plans/{id}/duplicate",
     summary: "Duplicate production plan",
     tags: TAG,
+    params: IdPathParam,
+    response: ProductionPlanSchema,
   });
   reg({
     method: "get",
     path: "/api/production/runs",
     summary: "List production runs",
     tags: TAG,
-    description: "Filter by planId, status, shiftId.",
+    query: ProductionRunsQuery,
   });
   reg({
     method: "post",
     path: "/api/production/runs",
     summary: "Start production run",
     tags: TAG,
+    body: CreateRunBody,
   });
   reg({
     method: "get",
     path: "/api/production/runs/{id}",
     summary: "Get production run",
     tags: TAG,
+    params: IdPathParam,
   });
   reg({
     method: "patch",
     path: "/api/production/runs/{id}",
     summary: "Update or complete production run",
     tags: TAG,
+    params: IdPathParam,
+    body: CompleteRunBody,
   });
   reg({
     method: "get",
     path: "/api/production/operators",
     summary: "List operators for plan assignment",
     tags: TAG,
-    description: "Active users available for production plan line assignment.",
+    response: OperatorSchema.array(),
   });
   reg({
     method: "get",
     path: "/api/production/handovers",
     summary: "List shift handovers",
     tags: TAG,
-    description: "Filter by shiftId and handoverDate.",
+    query: HandoversQuery,
   });
   reg({
     method: "post",
     path: "/api/production/handovers",
     summary: "Create shift handover",
     tags: TAG,
+    body: CreateHandoverBody,
   });
   reg({
     method: "get",
     path: "/api/production/characteristics/definitions",
     summary: "List characteristic definitions",
     tags: TAG,
-    description: "Filter by phase (BOBBIN, LOOM, etc.).",
+    query: CharacteristicsQuery,
   });
   reg({
     method: "post",
     path: "/api/production/characteristics/definitions",
     summary: "Create characteristic definition",
     tags: TAG,
+    body: CreateCharacteristicBody,
   });
   reg({
     method: "patch",
     path: "/api/production/characteristics/definitions/{id}",
     summary: "Update characteristic definition",
     tags: TAG,
+    params: IdPathParam,
+    body: UpdateCharacteristicBody,
   });
   reg({
     method: "delete",
     path: "/api/production/characteristics/definitions/{id}",
     summary: "Delete characteristic definition",
     tags: TAG,
+    params: IdPathParam,
   });
   reg({
     method: "get",
     path: "/api/production/bobbin/runs",
     summary: "List bobbin production runs",
     tags: TAG,
+    query: ProductionRunsQuery,
   });
   reg({
     method: "post",
     path: "/api/production/bobbin/runs",
     summary: "Start bobbin production run",
     tags: TAG,
+    body: CreateBobbinRunBody,
   });
   reg({
     method: "get",
     path: "/api/production/bobbin/runs/{id}",
     summary: "Get bobbin production run",
     tags: TAG,
+    params: IdPathParam,
   });
   reg({
     method: "patch",
     path: "/api/production/bobbin/runs/{id}",
     summary: "Update or complete bobbin run",
     tags: TAG,
+    params: IdPathParam,
+    body: CompleteBobbinRunBody,
+    responses: { 200: { description: "Run updated or completed", schema: UpdateBobbinRunBody } },
   });
   reg({
     method: "get",
@@ -159,37 +215,44 @@ export function registerProductionRoutes() {
     summary: "Bobbin production inventory items",
     tags: TAG,
     description: "Raw materials and bobbins for bobbin production.",
+    response: InventoryItemSchema.array(),
   });
   reg({
     method: "get",
     path: "/api/production/loom/runs",
     summary: "List loom production runs",
     tags: TAG,
+    query: ProductionRunsQuery,
   });
   reg({
     method: "post",
     path: "/api/production/loom/runs",
     summary: "Start loom production run",
     tags: TAG,
+    body: CreateLoomRunBody,
   });
   reg({
     method: "get",
     path: "/api/production/loom/runs/{id}",
     summary: "Get loom production run",
     tags: TAG,
+    params: IdPathParam,
   });
   reg({
     method: "patch",
     path: "/api/production/loom/runs/{id}",
     summary: "Update or complete loom run",
     tags: TAG,
+    params: IdPathParam,
+    body: CompleteLoomRunBody,
+    responses: { 200: { description: "Run updated or completed", schema: UpdateLoomRunBody } },
   });
   reg({
     method: "get",
     path: "/api/production/loom/machines",
     summary: "Loom machine grid status",
     tags: TAG,
-    description: "Machine status and assigned operators for a given date/shift.",
+    query: LoomMachinesQuery,
   });
   reg({
     method: "get",
@@ -203,12 +266,13 @@ export function registerProductionRoutes() {
     path: "/api/production/loom/assignments",
     summary: "List loom operator assignments",
     tags: TAG,
+    query: LoomAssignmentsQuery,
   });
   reg({
     method: "post",
     path: "/api/production/loom/assignments",
     summary: "Create loom operator assignment",
     tags: TAG,
-    description: "Assign operator to looms with manpower limit validation.",
+    body: CreateLoomAssignmentBody,
   });
 }

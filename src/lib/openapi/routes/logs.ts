@@ -1,4 +1,5 @@
 import { reg } from "../helpers";
+import { LogsExportQuery, LogsQuery } from "../schemas";
 
 const TAG = ["Logs & Audit"];
 
@@ -8,15 +9,16 @@ export function registerLogsRoutes() {
     path: "/api/logs",
     summary: "Query audit logs",
     tags: TAG,
-    description:
-      "Paginated log viewer. Filters: page, limit, module, severity, action, search, from, to, httpMethod, statusCode, userId, sortBy, sortOrder.",
+    description: "Paginated log viewer with stats and filter options.",
+    query: LogsQuery,
   });
   reg({
     method: "get",
     path: "/api/logs/export",
     summary: "Export audit logs",
     tags: TAG,
-    description: "Export filtered logs as CSV. Same filter params as /api/logs.",
+    description: "Export filtered logs as CSV.",
+    query: LogsExportQuery,
   });
   reg({
     method: "get",
@@ -30,6 +32,5 @@ export function registerLogsRoutes() {
     path: "/api/telemetry",
     summary: "Client telemetry ingest status",
     tags: TAG,
-    description: "Telemetry endpoint health check.",
   });
 }

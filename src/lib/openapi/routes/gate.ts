@@ -1,4 +1,17 @@
 import { reg } from "../helpers";
+import {
+  CreateGateDocumentBody,
+  CreateGateEntryBody,
+  CreateGateStockBody,
+  GateEntrySchema,
+  GateListQuery,
+  GateStatsSchema,
+  IdPathParam,
+  DocIdPathParam,
+  SuccessSchema,
+  UpdateGateDocumentBody,
+  UpdateGateEntryBody,
+} from "../schemas";
 
 const TAG = ["Gate"];
 
@@ -8,62 +21,78 @@ export function registerGateRoutes() {
     path: "/api/gate",
     summary: "List gate entries",
     tags: TAG,
-    description: "Filter by status, purpose, truckNumber query params.",
+    description: "Returns gate entries ordered by arrival time (newest first).",
+    query: GateListQuery,
+    response: GateEntrySchema.array(),
   });
   reg({
     method: "post",
     path: "/api/gate",
     summary: "Create gate entry",
     tags: TAG,
-    description: "Registers truck arrival with driver and purpose details.",
+    description: "Registers truck arrival. Auto-generates entry number and upserts driver to Data Centre.",
+    body: CreateGateEntryBody,
+    response: GateEntrySchema,
   });
   reg({
     method: "get",
     path: "/api/gate/stats",
     summary: "Gate security KPIs",
     tags: TAG,
-    description: "Returns inside, waiting, loading, unloading, verification pending, on-hold, and gate-out-today counts.",
+    description: "Real-time counts for inside, waiting, loading, unloading, verification pending, on-hold, and gate-out today.",
+    response: GateStatsSchema,
   });
   reg({
     method: "get",
     path: "/api/gate/{id}",
     summary: "Get gate entry details",
     tags: TAG,
-    description: "Accepts entry ID or entry number. Includes stock lines and documents.",
+    description: "Accepts entry ID or entry number. Includes stock lines, documents, and creator.",
+    params: IdPathParam,
+    response: GateEntrySchema,
   });
   reg({
     method: "patch",
     path: "/api/gate/{id}",
     summary: "Update gate entry",
     tags: TAG,
-    description: "Update status, parking, timestamps, and other entry fields.",
+    description: "Update status, parking, timestamps. Gate-out validates documents and stock before exit.",
+    params: IdPathParam,
+    body: UpdateGateEntryBody,
+    response: GateEntrySchema,
   });
   reg({
     method: "delete",
     path: "/api/gate/{id}",
     summary: "Delete gate entry",
     tags: TAG,
-    description: "Only allowed for entries that have not progressed past initial states.",
+    description: "Only allowed before journey is completed or gate-out.",
+    params: IdPathParam,
+    response: SuccessSchema,
   });
   reg({
     method: "post",
     path: "/api/gate/{id}/documents",
     summary: "Upload gate document",
     tags: TAG,
-    description: "Attach a document (type, fileUrl, remarks) to a gate entry.",
+    params: IdPathParam,
+    body: CreateGateDocumentBody,
   });
   reg({
     method: "patch",
     path: "/api/gate/{id}/documents/{docId}",
     summary: "Verify or reject gate document",
     tags: TAG,
-    description: "Update document verification status.",
+    params: DocIdPathParam,
+    body: UpdateGateDocumentBody,
   });
   reg({
     method: "post",
     path: "/api/gate/{id}/stock",
     summary: "Add stock line to gate entry",
     tags: TAG,
-    description: "Add truck stock detail; auto-upserts Data Centre stock catalog when needed.",
+    description: "Adds truck stock detail and auto-upserts Data Centre stock catalog when needed.",
+    params: IdPathParam,
+    body: CreateGateStockBody,
   });
 }
