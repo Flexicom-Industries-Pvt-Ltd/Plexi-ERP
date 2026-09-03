@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { logEvent } from "@/lib/logging";
 
 import { postLoomInventoryMovements } from "@/lib/production/loom-inventory";
+import { createProductionRollFromLoomRun } from "@/lib/production/create-roll-from-loom";
 import { loomRunInclude } from "@/lib/production/loom-run-include";
 import { requireProductionApiPermission } from "@/lib/production/permissions";
 
@@ -87,6 +88,8 @@ export async function PATCH(
       }
 
       const data = parsed.data;
+      let createdRollId: string | null = null;
+
       const updated = await db.$transaction(async (tx) => {
         await tx.productionRun.update({
           where: { id: existing.productionRunId },
@@ -101,7 +104,7 @@ export async function PATCH(
           },
         });
 
-        return tx.loomProductionRun.update({
+        const loomUpdated = await tx.loomProductionRun.update({
           where: { id },
           data: {
             bobbinIssueQty: data.bobbinIssueQty,
@@ -111,6 +114,13 @@ export async function PATCH(
             bobbinItemId: data.bobbinItemId ?? existing.bobbinItemId,
             characteristics: (data.characteristics as Prisma.InputJsonValue) ?? undefined,
           },
+        });
+
+        const roll = await createProductionRollFromLoomRun(tx, loomUpdated);
+        createdRollId = roll?.id ?? null;
+
+        return tx.loomProductionRun.findUniqueOrThrow({
+          where: { id },
           include: loomRunInclude,
         });
       });
@@ -135,6 +145,7 @@ export async function PATCH(
           loomRunId: updated.id,
           acceptedQty: data.acceptedQty,
           rollOutputQty: data.rollOutputQty,
+          productionRollId: createdRollId,
           targetQty: existing.productionRun.targetQty,
           inventory: inventoryResult,
         },

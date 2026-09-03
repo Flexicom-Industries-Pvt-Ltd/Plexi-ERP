@@ -12,6 +12,7 @@ import {
   CreateLoomRunBody,
   CreatePlanBody,
   CreateRunBody,
+  CreateProductionRollBody,
   HandoversQuery,
   IdPathParam,
   InventoryItemSchema,
@@ -21,11 +22,14 @@ import {
   ProductionDashboardQuery,
   ProductionPlanSchema,
   ProductionPlansQuery,
+  ProductionRollSchema,
+  ProductionRollsQuery,
   ProductionRunsQuery,
   UpdateBobbinRunBody,
   UpdateCharacteristicBody,
   UpdateLoomRunBody,
   UpdatePlanBody,
+  UpdateProductionRollBody,
 } from "../schemas";
 
 const TAG = ["Production"];
@@ -274,5 +278,38 @@ export function registerProductionRoutes() {
     summary: "Create loom operator assignment",
     tags: TAG,
     body: CreateLoomAssignmentBody,
+  });
+  reg({
+    method: "get",
+    path: "/api/production/rolls",
+    summary: "List production rolls",
+    tags: TAG,
+    query: ProductionRollsQuery,
+    response: ProductionRollSchema.array(),
+  });
+  reg({
+    method: "post",
+    path: "/api/production/rolls",
+    summary: "Create production roll",
+    tags: TAG,
+    body: CreateProductionRollBody,
+    response: ProductionRollSchema,
+  });
+  reg({
+    method: "get",
+    path: "/api/production/rolls/{id}",
+    summary: "Get production roll detail",
+    tags: TAG,
+    params: IdPathParam,
+    response: ProductionRollSchema,
+  });
+  reg({
+    method: "patch",
+    path: "/api/production/rolls/{id}",
+    summary: "Update production roll status and attributes",
+    tags: TAG,
+    params: IdPathParam,
+    body: UpdateProductionRollBody,
+    response: ProductionRollSchema,
   });
 }
