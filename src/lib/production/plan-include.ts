@@ -36,6 +36,7 @@ export type PlanWithLines = {
   lines: {
     id: string;
     phase: string;
+    finishingRoute: string | null;
     targetQty: number;
     characteristics: { definitionId: string; value: string; definition: { required: boolean; label: string } }[];
     operators: { userId: string }[];
