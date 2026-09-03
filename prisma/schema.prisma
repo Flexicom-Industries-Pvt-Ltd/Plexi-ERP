@@ -82,6 +82,7 @@ model User {
   valvomaticRunsOperated       ValvomaticProductionRun[]    @relation("ValvomaticRunOperator")
   bcsRunsOperated              BcsProductionRun[]           @relation("BcsRunOperator")
   manualStitchRunsOperated     ManualStitchProductionRun[]  @relation("ManualStitchRunOperator")
+  balesCreated                 Bale[]                       @relation("BaleCreator")
   createdAt         DateTime       @default(now())
   updatedAt     DateTime    @updatedAt
 }
@@ -147,6 +148,7 @@ model Shift {
   productionPlans ProductionPlan[]
   handovers       ShiftHandover[]
   loomAssignments LoomAssignment[]
+  bales           Bale[]
 }
 
 enum StockMaterialType {
@@ -571,6 +573,8 @@ model InventoryItem {
   bcsRunsAsOutput         BcsProductionRun[]      @relation("BcsRunOutput")
   manualStitchRunsAsInput ManualStitchProductionRun[] @relation("ManualStitchRunInput")
   manualStitchRunsAsOutput ManualStitchProductionRun[] @relation("ManualStitchRunOutput")
+  balesAsProduct          Bale[] @relation("BaleProduct")
+  balesAsOutput           Bale[] @relation("BaleOutputItem")
 
   @@index([itemType])
   @@index([categoryId])
@@ -1079,6 +1083,35 @@ model ManualStitchProductionRun {
   @@index([operatorId])
   @@index([inputMaterialId])
   @@index([outputItemId])
+}
+
+model Bale {
+  id              String            @id @default(cuid())
+  baleNumber      String            @unique
+  productId       String
+  baleItemId      String?
+  bagsPerBale     Float
+  quantity        Float
+  productionBatch String?
+  qualityStatus   RollQualityStatus @default(PENDING_QC)
+  shiftId         String
+  characteristics Json?
+  inventoryPosted Boolean           @default(false)
+  baledAt         DateTime          @default(now())
+  createdById     String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  product   InventoryItem  @relation("BaleProduct", fields: [productId], references: [id], onDelete: Restrict)
+  baleItem  InventoryItem? @relation("BaleOutputItem", fields: [baleItemId], references: [id], onDelete: SetNull)
+  shift     Shift          @relation(fields: [shiftId], references: [id], onDelete: Restrict)
+  createdBy User?          @relation("BaleCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([productId])
+  @@index([baleItemId])
+  @@index([shiftId])
+  @@index([qualityStatus])
+  @@index([baledAt])
 }
 
 enum RollQualityStatus {

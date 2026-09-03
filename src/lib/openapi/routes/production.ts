@@ -12,6 +12,7 @@ import {
   CompleteBcsRunBody,
   CompleteManualStitchRunBody,
   CompleteRunBody,
+  CreateBaleBody,
   CreateBobbinRunBody,
   CreateCharacteristicBody,
   CreateHandoverBody,
@@ -42,6 +43,8 @@ import {
   BcsMachinesQuery,
   BcsProductionRulesBody,
   BcsRunsQuery,
+  BalesQuery,
+  BaleSchema,
   ConvertexMachinesQuery,
   ConvertexRunsQuery,
   ValvomaticInputMaterialsQuery,
@@ -65,6 +68,7 @@ import {
   UpdateValvomaticRunBody,
   UpdateBcsRunBody,
   UpdateManualStitchRunBody,
+  UpdateBaleBody,
   UpdatePlanBody,
   UpdateProductionRollBody,
 } from "../schemas";
@@ -696,6 +700,51 @@ export function registerProductionRoutes() {
     method: "get",
     path: "/api/production/manual-stitch/output-items",
     summary: "Finished bag items for manual stitch output",
+    tags: TAG,
+  });
+  reg({
+    method: "get",
+    path: "/api/production/baling",
+    summary: "List bales",
+    tags: TAG,
+    query: BalesQuery,
+    response: BaleSchema.array(),
+  });
+  reg({
+    method: "post",
+    path: "/api/production/baling",
+    summary: "Create bale from finished bags",
+    tags: TAG,
+    body: CreateBaleBody,
+    response: BaleSchema,
+  });
+  reg({
+    method: "get",
+    path: "/api/production/baling/{id}",
+    summary: "Get bale detail",
+    tags: TAG,
+    params: IdPathParam,
+    response: BaleSchema,
+  });
+  reg({
+    method: "patch",
+    path: "/api/production/baling/{id}",
+    summary: "Update bale attributes",
+    tags: TAG,
+    params: IdPathParam,
+    body: UpdateBaleBody,
+    response: BaleSchema,
+  });
+  reg({
+    method: "get",
+    path: "/api/production/baling/bag-items",
+    summary: "Finished bag items available for baling",
+    tags: TAG,
+  });
+  reg({
+    method: "get",
+    path: "/api/production/baling/bale-items",
+    summary: "Bale stock items for baling output",
     tags: TAG,
   });
   reg({
