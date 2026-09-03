@@ -3,12 +3,19 @@
 import { useState, useEffect } from "react";
 import { Loader2, X } from "lucide-react";
 import { PRODUCTION_PHASES } from "@/lib/production/phases";
+import {
+  FINISHING_ROUTES,
+  isFinishingPhase,
+  phaseForFinishingRoute,
+  finishingRouteDescription,
+} from "@/lib/production/finishing-routes";
 import { DynamicCharacteristicsForm, CharacteristicValueInput } from "@/components/production/DynamicCharacteristicsForm";
 import { OperatorMultiSelect } from "@/components/production/OperatorMultiSelect";
 import type { ProductionCharacteristicDefinition } from "@/generated/prisma";
 
 export interface PlanLineForm {
   phase: string;
+  finishingRoute: string;
   machineId: string;
   operatorIds: string[];
   inventoryItemId: string;
@@ -20,6 +27,7 @@ export interface PlanLineForm {
 
 export const emptyPlanLine = (): PlanLineForm => ({
   phase: "LOOM",
+  finishingRoute: "",
   machineId: "",
   operatorIds: [],
   inventoryItemId: "",
@@ -98,6 +106,39 @@ export function PlanFormModal({
 
   const updateLine = (index: number, patch: Partial<PlanLineForm>) => {
     setLines((prev) => prev.map((l, i) => (i === index ? { ...l, ...patch } : l)));
+  };
+
+  const applyFinishingRoute = (index: number, route: string) => {
+    const phase = phaseForFinishingRoute(route);
+    updateLine(index, { finishingRoute: route, phase, characteristics: [] });
+  };
+
+  const onPhaseChange = (index: number, phase: string) => {
+    const patch: Partial<PlanLineForm> = { phase, characteristics: [] };
+    if (isFinishingPhase(phase)) {
+      patch.finishingRoute = phase;
+    } else {
+      patch.finishingRoute = "";
+    }
+    updateLine(index, patch);
+  };
+
+  const onProductChange = async (index: number, inventoryItemId: string, productsList: any[]) => {
+    updateLine(index, { inventoryItemId });
+    if (!inventoryItemId) return;
+    const product = productsList.find((p) => p.id === inventoryItemId);
+    const categoryId = product?.categoryId || product?.category?.id;
+    if (!categoryId) return;
+    try {
+      const res = await fetch(`/api/production/finishing/defaults?categoryId=${categoryId}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.route) {
+        applyFinishingRoute(index, data.route);
+      }
+    } catch {
+      // optional default — ignore
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -196,7 +237,7 @@ export function PlanFormModal({
                       <select
                         className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
                         value={line.phase}
-                        onChange={(e) => updateLine(index, { phase: e.target.value, characteristics: [] })}
+                        onChange={(e) => onPhaseChange(index, e.target.value)}
                         required
                       >
                         {PRODUCTION_PHASES.map((p) => (
@@ -209,7 +250,7 @@ export function PlanFormModal({
                       <select
                         className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
                         value={line.inventoryItemId}
-                        onChange={(e) => updateLine(index, { inventoryItemId: e.target.value })}
+                        onChange={(e) => onProductChange(index, e.target.value, products)}
                       >
                         <option value="">None</option>
                         {products.map((p) => (
@@ -217,6 +258,24 @@ export function PlanFormModal({
                         ))}
                       </select>
                     </div>
+                    {isFinishingPhase(line.phase) && (
+                      <div className="sm:col-span-2">
+                        <label className="block text-xs font-medium text-slate-600 mb-1">Finishing Route *</label>
+                        <select
+                          className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm"
+                          value={line.finishingRoute || line.phase}
+                          onChange={(e) => applyFinishingRoute(index, e.target.value)}
+                          required
+                        >
+                          {FINISHING_ROUTES.map((r) => (
+                            <option key={r.value} value={r.value}>{r.label}</option>
+                          ))}
+                        </select>
+                        <p className="text-xs text-slate-500 mt-1">
+                          {finishingRouteDescription(line.finishingRoute || line.phase)}
+                        </p>
+                      </div>
+                    )}
                     <div>
                       <label className="block text-xs font-medium text-slate-600 mb-1">Target Qty *</label>
                       <input
@@ -307,6 +366,7 @@ export function PlanFormModal({
 function planLineToForm(line: any): PlanLineForm {
   return {
     phase: line.phase,
+    finishingRoute: line.finishingRoute || (isFinishingPhase(line.phase) ? line.phase : ""),
     machineId: line.machineId || "",
     operatorIds: line.operators?.map((o: any) => o.userId) || (line.operatorId ? [line.operatorId] : []),
     inventoryItemId: line.inventoryItemId || "",
@@ -341,6 +401,7 @@ export function formToPayload(data: {
     notes: data.notes || null,
     lines: data.lines.map((l, i) => ({
       phase: l.phase,
+      finishingRoute: l.finishingRoute || (isFinishingPhase(l.phase) ? l.phase : null),
       machineId: l.machineId || null,
       operatorIds: l.operatorIds,
       inventoryItemId: l.inventoryItemId || null,

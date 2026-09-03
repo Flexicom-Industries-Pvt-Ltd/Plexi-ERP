@@ -1,0 +1,21 @@
+import { requirePermission } from "@/lib/permissions";
+import { Module } from "@/generated/prisma";
+import { Metadata } from "next";
+import { ConvertexProductionClient } from "./convertex-production-client";
+
+export const metadata: Metadata = {
+  title: "Convertex Production | Flexicom ERP",
+  description: "Convertex execution — cut material to finished bags",
+};
+
+export const dynamic = "force-dynamic";
+
+export default async function ConvertexPage() {
+  await requirePermission(Module.PRODUCTION, "canRead");
+
+  return (
+    <div className="flex flex-col gap-6 p-6 lg:p-8 max-w-7xl mx-auto w-full">
+      <ConvertexProductionClient />
+    </div>
+  );
+}

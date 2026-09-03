@@ -284,6 +284,390 @@ export const CompleteLoomRunBody = z.object({
   characteristics: z.record(z.string(), z.unknown()).optional(),
 }).openapi("CompleteLoomRun");
 
+export const CreateLaminationRunBody = z.object({
+  planLineId: z.string().min(1),
+  laminationMachineId: z.string().min(1),
+  operatorId: z.string().min(1),
+  inputRollId: z.string().min(1),
+  targetQty: z.number().min(0),
+  inputQty: z.number().min(0).default(0),
+  startedAt: z.string().datetime().optional(),
+}).openapi("CreateLaminationRun");
+
+export const UpdateLaminationRunBody = z.object({
+  inputQty: z.number().min(0).optional(),
+  outputQty: z.number().min(0).optional(),
+  characteristics: z.record(z.string(), z.unknown()).optional(),
+}).openapi("UpdateLaminationRun");
+
+export const CompleteLaminationRunBody = z.object({
+  action: z.literal("complete"),
+  actualQty: z.number().min(0),
+  acceptedQty: z.number().min(0),
+  rejectedQty: z.number().min(0).default(0),
+  reworkQty: z.number().min(0).default(0),
+  scrapQty: z.number().min(0).default(0),
+  downtimeMinutes: z.number().int().min(0).default(0),
+  inputQty: z.number().min(0),
+  outputQty: z.number().min(0),
+  characteristics: z.record(z.string(), z.unknown()).optional(),
+  endedAt: z.string().datetime().optional(),
+}).openapi("CompleteLaminationRun");
+
+export const LaminationMachinesQuery = z.object({
+  shiftId: z.string().optional(),
+  assignmentDate: z.string().optional(),
+});
+
+export const LaminationRunsQuery = z.object({
+  planLineId: z.string().optional(),
+  planId: z.string().optional(),
+  operatorId: z.string().optional(),
+  laminationMachineId: z.string().optional(),
+  activeOnly: z.enum(["true", "false"]).optional(),
+});
+
+const InkMaterialBody = z.object({
+  itemId: z.string().optional(),
+  name: z.string().min(1),
+  qty: z.number().min(0),
+  unit: z.string().optional(),
+});
+
+export const CreatePrintingRunBody = z.object({
+  planLineId: z.string().min(1),
+  printingMachineId: z.string().min(1),
+  operatorId: z.string().min(1),
+  inputRollId: z.string().min(1),
+  helperUserIds: z.array(z.string().min(1)).default([]),
+  targetQty: z.number().min(0),
+  brand: z.string().optional().nullable(),
+  colour: z.string().optional().nullable(),
+  artworkRef: z.string().optional().nullable(),
+  inkMaterials: z.array(InkMaterialBody).optional(),
+  inputQty: z.number().min(0).default(0),
+}).openapi("CreatePrintingRun");
+
+export const UpdatePrintingRunBody = z.object({
+  inputQty: z.number().min(0).optional(),
+  outputQty: z.number().min(0).optional(),
+  brand: z.string().optional().nullable(),
+  colour: z.string().optional().nullable(),
+  artworkRef: z.string().optional().nullable(),
+  inkMaterials: z.array(InkMaterialBody).optional(),
+  characteristics: z.record(z.string(), z.unknown()).optional(),
+}).openapi("UpdatePrintingRun");
+
+export const CompletePrintingRunBody = z.object({
+  action: z.literal("complete"),
+  actualQty: z.number().min(0),
+  acceptedQty: z.number().min(0),
+  rejectedQty: z.number().min(0).default(0),
+  reworkQty: z.number().min(0).default(0),
+  scrapQty: z.number().min(0).default(0),
+  downtimeMinutes: z.number().int().min(0).default(0),
+  inputQty: z.number().min(0),
+  outputQty: z.number().min(0),
+  brand: z.string().optional().nullable(),
+  colour: z.string().optional().nullable(),
+  artworkRef: z.string().optional().nullable(),
+  inkMaterials: z.array(InkMaterialBody).optional(),
+  characteristics: z.record(z.string(), z.unknown()).optional(),
+}).openapi("CompletePrintingRun");
+
+export const PrintingMachinesQuery = z.object({
+  shiftId: z.string().optional(),
+  assignmentDate: z.string().optional(),
+});
+
+export const PrintingRunsQuery = z.object({
+  planLineId: z.string().optional(),
+  planId: z.string().optional(),
+  operatorId: z.string().optional(),
+  printingMachineId: z.string().optional(),
+  activeOnly: z.enum(["true", "false"]).optional(),
+});
+
+export const CreateCuttingRunBody = z.object({
+  planLineId: z.string().min(1),
+  cuttingMachineId: z.string().min(1),
+  operatorId: z.string().min(1),
+  inputRollId: z.string().min(1),
+  targetQty: z.number().min(0),
+  cuttingSpec: z.string().optional().nullable(),
+  inputQty: z.number().min(0).default(0),
+}).openapi("CreateCuttingRun");
+
+export const UpdateCuttingRunBody = z.object({
+  inputQty: z.number().min(0).optional(),
+  outputMaterialQty: z.number().min(0).optional(),
+  cuttingSpec: z.string().optional().nullable(),
+  outputItemId: z.string().nullable().optional(),
+  characteristics: z.record(z.string(), z.unknown()).optional(),
+}).openapi("UpdateCuttingRun");
+
+export const CompleteCuttingRunBody = z.object({
+  action: z.literal("complete"),
+  actualQty: z.number().min(0),
+  acceptedQty: z.number().min(0),
+  rejectedQty: z.number().min(0).default(0),
+  reworkQty: z.number().min(0).default(0),
+  scrapQty: z.number().min(0).default(0),
+  downtimeMinutes: z.number().int().min(0).default(0),
+  inputQty: z.number().min(0),
+  outputMaterialQty: z.number().min(0),
+  cuttingSpec: z.string().optional().nullable(),
+  outputItemId: z.string().nullable().optional(),
+  characteristics: z.record(z.string(), z.unknown()).optional(),
+}).openapi("CompleteCuttingRun");
+
+export const CuttingMachinesQuery = z.object({
+  shiftId: z.string().optional(),
+  assignmentDate: z.string().optional(),
+});
+
+export const CuttingRunsQuery = z.object({
+  planLineId: z.string().optional(),
+  planId: z.string().optional(),
+  operatorId: z.string().optional(),
+  cuttingMachineId: z.string().optional(),
+  activeOnly: z.enum(["true", "false"]).optional(),
+});
+
+export const CreateConvertexRunBody = z.object({
+  planLineId: z.string().min(1),
+  convertexMachineId: z.string().min(1),
+  operatorId: z.string().min(1),
+  inputMaterialId: z.string().min(1),
+  targetQty: z.number().min(0),
+  inputQty: z.number().min(0).default(0),
+}).openapi("CreateConvertexRun");
+
+export const UpdateConvertexRunBody = z.object({
+  inputQty: z.number().min(0).optional(),
+  outputBagQty: z.number().min(0).optional(),
+  outputItemId: z.string().nullable().optional(),
+  characteristics: z.record(z.string(), z.unknown()).optional(),
+}).openapi("UpdateConvertexRun");
+
+export const CompleteConvertexRunBody = z.object({
+  action: z.literal("complete"),
+  actualQty: z.number().min(0),
+  acceptedQty: z.number().min(0),
+  rejectedQty: z.number().min(0).default(0),
+  reworkQty: z.number().min(0).default(0),
+  scrapQty: z.number().min(0).default(0),
+  downtimeMinutes: z.number().int().min(0).default(0),
+  inputQty: z.number().min(0),
+  outputBagQty: z.number().min(0),
+  outputItemId: z.string().nullable().optional(),
+  characteristics: z.record(z.string(), z.unknown()).optional(),
+}).openapi("CompleteConvertexRun");
+
+export const ConvertexMachinesQuery = z.object({
+  shiftId: z.string().optional(),
+});
+
+export const ConvertexRunsQuery = z.object({
+  planLineId: z.string().optional(),
+  planId: z.string().optional(),
+  operatorId: z.string().optional(),
+  convertexMachineId: z.string().optional(),
+  activeOnly: z.enum(["true", "false"]).optional(),
+});
+
+export const ValvomaticInputsBody = z.object({
+  inputRollId: z.string().nullable().optional(),
+  rollQty: z.number().min(0).default(0),
+  yarnItemId: z.string().nullable().optional(),
+  yarnQty: z.number().min(0).default(0),
+  ppItemId: z.string().nullable().optional(),
+  ppQty: z.number().min(0).default(0),
+  lppItemId: z.string().nullable().optional(),
+  lppQty: z.number().min(0).default(0),
+}).openapi("ValvomaticInputs");
+
+export const CreateValvomaticRunBody = z.object({
+  planLineId: z.string().min(1),
+  valvomaticMachineId: z.string().min(1),
+  operatorId: z.string().min(1),
+  targetQty: z.number().min(0),
+  inputs: ValvomaticInputsBody,
+}).openapi("CreateValvomaticRun");
+
+export const UpdateValvomaticRunBody = z.object({
+  inputs: ValvomaticInputsBody.optional(),
+  outputBagQty: z.number().min(0).optional(),
+  outputItemId: z.string().nullable().optional(),
+  characteristics: z.record(z.string(), z.unknown()).optional(),
+}).openapi("UpdateValvomaticRun");
+
+export const CompleteValvomaticRunBody = z.object({
+  action: z.literal("complete"),
+  actualQty: z.number().min(0),
+  acceptedQty: z.number().min(0),
+  rejectedQty: z.number().min(0).default(0),
+  reworkQty: z.number().min(0).default(0),
+  scrapQty: z.number().min(0).default(0),
+  downtimeMinutes: z.number().int().min(0).default(0),
+  inputs: ValvomaticInputsBody,
+  outputBagQty: z.number().min(0),
+  outputItemId: z.string().nullable().optional(),
+  characteristics: z.record(z.string(), z.unknown()).optional(),
+}).openapi("CompleteValvomaticRun");
+
+export const ValvomaticMachinesQuery = z.object({
+  shiftId: z.string().optional(),
+});
+
+export const ValvomaticRunsQuery = z.object({
+  planLineId: z.string().optional(),
+  planId: z.string().optional(),
+  operatorId: z.string().optional(),
+  valvomaticMachineId: z.string().optional(),
+  activeOnly: z.enum(["true", "false"]).optional(),
+});
+
+export const ValvomaticInputMaterialsQuery = z.object({
+  type: z.enum(["yarn", "pp", "lpp"]).optional(),
+});
+
+export const BcsProductionRulesBody = z.object({
+  minTeamMembers: z.number().int().min(0).default(0),
+  maxTeamMembers: z.number().int().min(0).default(6),
+  requireRollInput: z.boolean().default(false),
+  requireYarnInput: z.boolean().default(false),
+}).openapi("BcsProductionRules");
+
+export const ManpowerRulesBody = z.object({
+  loomsPerOperator: z.number().int().min(1).max(20),
+  printingHelpersPerOperator: z.number().int().min(0).max(10),
+}).openapi("ManpowerRules");
+
+export const CreateBcsRunBody = z.object({
+  planLineId: z.string().min(1),
+  bcsMachineId: z.string().min(1),
+  operatorId: z.string().min(1),
+  teamMemberIds: z.array(z.string().min(1)).default([]),
+  targetQty: z.number().min(0),
+  inputs: ValvomaticInputsBody,
+}).openapi("CreateBcsRun");
+
+export const UpdateBcsRunBody = z.object({
+  teamMemberIds: z.array(z.string().min(1)).optional(),
+  inputs: ValvomaticInputsBody.optional(),
+  outputBagQty: z.number().min(0).optional(),
+  outputItemId: z.string().nullable().optional(),
+  characteristics: z.record(z.string(), z.unknown()).optional(),
+}).openapi("UpdateBcsRun");
+
+export const CompleteBcsRunBody = z.object({
+  action: z.literal("complete"),
+  actualQty: z.number().min(0),
+  acceptedQty: z.number().min(0),
+  rejectedQty: z.number().min(0).default(0),
+  reworkQty: z.number().min(0).default(0),
+  scrapQty: z.number().min(0).default(0),
+  downtimeMinutes: z.number().int().min(0).default(0),
+  teamMemberIds: z.array(z.string().min(1)).default([]),
+  inputs: ValvomaticInputsBody,
+  outputBagQty: z.number().min(0),
+  outputItemId: z.string().nullable().optional(),
+  characteristics: z.record(z.string(), z.unknown()).optional(),
+}).openapi("CompleteBcsRun");
+
+export const BcsMachinesQuery = z.object({
+  shiftId: z.string().optional(),
+});
+
+export const BcsRunsQuery = z.object({
+  planLineId: z.string().optional(),
+  planId: z.string().optional(),
+  operatorId: z.string().optional(),
+  bcsMachineId: z.string().optional(),
+  activeOnly: z.enum(["true", "false"]).optional(),
+});
+
+export const BcsInputMaterialsQuery = z.object({
+  type: z.enum(["yarn", "pp", "lpp"]).optional(),
+});
+
+export const CreateManualStitchRunBody = z.object({
+  planLineId: z.string().min(1),
+  operatorId: z.string().min(1),
+  workerIds: z.array(z.string().min(1)).min(1),
+  targetQty: z.number().min(0),
+  inputMaterialId: z.string().min(1),
+  inputQty: z.number().min(0).default(0),
+}).openapi("CreateManualStitchRun");
+
+export const UpdateManualStitchRunBody = z.object({
+  workerIds: z.array(z.string().min(1)).optional(),
+  inputQty: z.number().min(0).optional(),
+  outputBagQty: z.number().min(0).optional(),
+  outputItemId: z.string().nullable().optional(),
+  characteristics: z.record(z.string(), z.unknown()).optional(),
+}).openapi("UpdateManualStitchRun");
+
+export const CompleteManualStitchRunBody = z.object({
+  action: z.literal("complete"),
+  actualQty: z.number().min(0),
+  acceptedQty: z.number().min(0),
+  rejectedQty: z.number().min(0).default(0),
+  reworkQty: z.number().min(0).default(0),
+  scrapQty: z.number().min(0).default(0),
+  downtimeMinutes: z.number().int().min(0).default(0),
+  workerIds: z.array(z.string().min(1)).min(1),
+  inputQty: z.number().min(0),
+  outputBagQty: z.number().min(0),
+  outputItemId: z.string().nullable().optional(),
+  characteristics: z.record(z.string(), z.unknown()).optional(),
+}).openapi("CompleteManualStitchRun");
+
+export const ManualStitchRunsQuery = z.object({
+  planLineId: z.string().optional(),
+  planId: z.string().optional(),
+  operatorId: z.string().optional(),
+  activeOnly: z.enum(["true", "false"]).optional(),
+});
+
+export const BalesQuery = z.object({
+  shiftId: z.string().optional(),
+  productId: z.string().optional(),
+  qualityStatus: z.enum(["PENDING_QC", "PASSED", "FAILED", "REWORK", "ON_HOLD"]).optional(),
+  search: z.string().optional(),
+  dateFrom: z.string().optional(),
+  dateTo: z.string().optional(),
+});
+
+export const CreateBaleBody = z.object({
+  productId: z.string().min(1),
+  baleItemId: z.string().nullable().optional(),
+  bagsPerBale: z.number().min(1),
+  quantity: z.number().min(1),
+  productionBatch: z.string().nullable().optional(),
+  qualityStatus: z.enum(["PENDING_QC", "PASSED", "FAILED", "REWORK", "ON_HOLD"]).default("PENDING_QC"),
+  shiftId: z.string().min(1),
+  characteristics: z.record(z.string(), z.unknown()).optional(),
+  baledAt: z.string().datetime().optional(),
+}).openapi("CreateBale");
+
+export const UpdateBaleBody = z.object({
+  productionBatch: z.string().nullable().optional(),
+  qualityStatus: z.enum(["PENDING_QC", "PASSED", "FAILED", "REWORK", "ON_HOLD"]).optional(),
+  characteristics: z.record(z.string(), z.unknown()).optional(),
+  baleItemId: z.string().nullable().optional(),
+}).openapi("UpdateBale");
+
+export const BaleSchema = z.object({
+  id: z.string(),
+  baleNumber: z.string(),
+  bagsPerBale: z.number(),
+  quantity: z.number(),
+  qualityStatus: z.string(),
+  productionBatch: z.string().nullable().optional(),
+}).openapi("Bale");
+
 export const LoomMachinesQuery = z.object({
   date: z.string().optional(),
   shiftId: z.string().optional(),
@@ -306,6 +690,66 @@ export const CreateLoomAssignmentBody = z.object({
 export const ProductionDashboardQuery = z.object({
   date: z.string().optional(),
 });
+
+export const ProductionReportsQuery = z.object({
+  dateFrom: z.string().optional(),
+  dateTo: z.string().optional(),
+  dateRange: z.string().optional().describe("Comma-separated from,to dates"),
+  shift: z.string().optional(),
+  shiftId: z.string().optional(),
+  phase: z.string().optional(),
+  machine: z.string().optional(),
+  machineId: z.string().optional(),
+  operator: z.string().optional(),
+  operatorId: z.string().optional(),
+  format: z.enum(["json", "csv"]).optional(),
+});
+
+export const ProductionRollsQuery = z.object({
+  rollType: z.enum(["PP", "LPP"]).optional(),
+  qualityStatus: z.enum(["PENDING_QC", "PASSED", "FAILED", "REWORK", "ON_HOLD"]).optional(),
+  sourcePhase: z.enum(["LOOM", "LAMINATION", "PRINTING"]).optional(),
+  search: z.string().optional(),
+  dateFrom: z.string().optional(),
+  dateTo: z.string().optional(),
+  locationId: z.string().optional(),
+});
+
+export const CreateProductionRollBody = z.object({
+  rollType: z.enum(["PP", "LPP"]),
+  weight: z.number().min(0).optional(),
+  length: z.number().min(0).optional(),
+  batchLot: z.string().optional().nullable(),
+  locationId: z.string().optional().nullable(),
+  inventoryItemId: z.string().optional().nullable(),
+  characteristics: z.record(z.string(), z.unknown()).optional(),
+  qualityStatus: z.enum(["PENDING_QC", "PASSED", "FAILED", "REWORK", "ON_HOLD"]).default("PENDING_QC"),
+  sourcePhase: z.enum(["LOOM", "LAMINATION", "PRINTING"]).default("LOOM"),
+  productionRunId: z.string().optional().nullable(),
+  loomProductionRunId: z.string().optional().nullable(),
+  remarks: z.string().optional().nullable(),
+}).openapi("CreateProductionRoll");
+
+export const UpdateProductionRollBody = z.object({
+  weight: z.number().min(0).optional(),
+  length: z.number().min(0).optional(),
+  batchLot: z.string().optional().nullable(),
+  locationId: z.string().optional().nullable(),
+  inventoryItemId: z.string().optional().nullable(),
+  characteristics: z.record(z.string(), z.unknown()).optional(),
+  qualityStatus: z.enum(["PENDING_QC", "PASSED", "FAILED", "REWORK", "ON_HOLD"]).optional(),
+  remarks: z.string().optional().nullable(),
+}).openapi("UpdateProductionRoll");
+
+export const ProductionRollSchema = z.object({
+  id: z.string(),
+  rollNumber: z.string(),
+  rollType: z.enum(["PP", "LPP"]),
+  qualityStatus: z.string(),
+  weight: z.number().nullable().optional(),
+  length: z.number().nullable().optional(),
+  batchLot: z.string().nullable().optional(),
+}).openapi("ProductionRoll");
 
 // ─── Data Centre & Settings ───────────────────────────────────────────────────
 

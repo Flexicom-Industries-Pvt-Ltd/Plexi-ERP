@@ -9,8 +9,10 @@ These instructions represent the end-to-end knowledge and rules for this project
 - `Co-authored-by: Cursor <cursoragent@cursor.com>`
 - `Co-authored-by: Cursor` (any email)
 - Any other AI/agent co-author trailer
+- `Made with [Cursor](https://cursor.com)` or any Cursor branding footer in PR descriptions
+- Any `cursor.com` attribution link in PR bodies
 
-Commits must list **only the human author**. Cursor may inject co-author lines automatically — you must prevent and remove them.
+Commits must list **only the human author**. PR bodies must contain **only** Summary, Changes, Test plan, and issue references — no AI tool branding. Cursor may inject co-author lines or PR footers automatically — you must prevent and remove them.
 
 **Before every commit:**
 
@@ -62,6 +64,8 @@ Whenever you implement a feature or fix a bug, you must follow this exact sequen
    - Prefer `gh pr merge --squash` for merges.
 3. **Push Feature Branch**: `git push -u origin <branch-name>`
 4. **Create PR**: Use the GitHub CLI to create the PR: `gh pr create --base dev --head <branch-name> --title "..." --body "..."`
+   - **Never** include `Made with [Cursor]` or any Cursor attribution in the body (see §0).
+   - If Cursor injects a footer after `gh pr create`, immediately run `gh pr edit <id> --body "..."` with a clean body.
 5. **Merge PR**: Use the GitHub CLI to squash and merge: `gh pr merge <PR-ID> --squash --delete-branch`
    - **Do not wait** for GitHub Actions build checks or Vercel deployment checks before merging. Create the PR, then squash-merge immediately once the change is ready.
 6. **Sync Local**: Switch back to `dev` and pull the latest squashed commit: `git checkout dev && git pull origin dev`
@@ -107,7 +111,7 @@ Always respect the dependency chain:
 6. **Phase 6 (Commercial)**: Finished Goods, Dispatch.
 
 ## Agent Behavior Checklist
-- **Never** include `Co-authored-by: Cursor` (or any AI co-author) in commits or PRs — see §0.
+- **Never** include `Co-authored-by: Cursor`, `Made with [Cursor]`, or any AI branding in commits or PRs — see §0.
 - Before implementing any new feature, confirm it aligns with the RBAC and Central CRM model.
 - Always implement deep logging for any new business action or endpoint.
 - Strictly adhere to the branch naming and commit conventions during development.

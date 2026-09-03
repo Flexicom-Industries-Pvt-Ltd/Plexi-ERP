@@ -74,6 +74,15 @@ model User {
   shiftHandovers               ShiftHandover[]              @relation("ShiftHandoverAuthor")
   loomAssignments              LoomAssignment[]
   loomRunsOperated             LoomProductionRun[]          @relation("LoomRunOperator")
+  laminationRunsOperated       LaminationProductionRun[]    @relation("LaminationRunOperator")
+  printingRunsOperated         PrintingProductionRun[]      @relation("PrintingRunOperator")
+  printingRunHelperAssignments PrintingProductionRunHelper[]
+  cuttingRunsOperated          CuttingProductionRun[]       @relation("CuttingRunOperator")
+  convertexRunsOperated        ConvertexProductionRun[]     @relation("ConvertexRunOperator")
+  valvomaticRunsOperated       ValvomaticProductionRun[]    @relation("ValvomaticRunOperator")
+  bcsRunsOperated              BcsProductionRun[]           @relation("BcsRunOperator")
+  manualStitchRunsOperated     ManualStitchProductionRun[]  @relation("ManualStitchRunOperator")
+  balesCreated                 Bale[]                       @relation("BaleCreator")
   createdAt         DateTime       @default(now())
   updatedAt     DateTime    @updatedAt
 }
@@ -139,6 +148,7 @@ model Shift {
   productionPlans ProductionPlan[]
   handovers       ShiftHandover[]
   loomAssignments LoomAssignment[]
+  bales           Bale[]
 }
 
 enum StockMaterialType {
@@ -320,6 +330,7 @@ model Location {
   updatedAt   DateTime     @updatedAt
   inventoryItems InventoryItem[]
   inventoryBatches InventoryBatch[]
+  productionRolls  ProductionRoll[]
 }
 
 model Machine {
@@ -338,6 +349,12 @@ model Machine {
   productionPlanLines ProductionPlanLine[]
   loomAssignmentMachines LoomAssignmentMachine[]
   loomRuns               LoomProductionRun[]     @relation("LoomRunMachine")
+  laminationRuns         LaminationProductionRun[] @relation("LaminationRunMachine")
+  printingRuns           PrintingProductionRun[]   @relation("PrintingRunMachine")
+  cuttingRuns            CuttingProductionRun[]    @relation("CuttingRunMachine")
+  convertexRuns          ConvertexProductionRun[]  @relation("ConvertexRunMachine")
+  valvomaticRuns         ValvomaticProductionRun[] @relation("ValvomaticRunMachine")
+  bcsRuns                BcsProductionRun[]        @relation("BcsRunMachine")
 
   @@index([sectionId])
 }
@@ -548,6 +565,16 @@ model InventoryItem {
   bobbinRunsAsOutput      BobbinProductionRun[] @relation("BobbinRunOutput")
   loomRunsAsBobbin        LoomProductionRun[]   @relation("LoomRunBobbin")
   loomRunsAsRoll          LoomProductionRun[]   @relation("LoomRunRoll")
+  productionRolls         ProductionRoll[]
+  cuttingRunsAsOutput     CuttingProductionRun[] @relation("CuttingRunOutput")
+  convertexRunsAsInput    ConvertexProductionRun[] @relation("ConvertexRunInput")
+  convertexRunsAsOutput   ConvertexProductionRun[] @relation("ConvertexRunOutput")
+  valvomaticRunsAsOutput  ValvomaticProductionRun[] @relation("ValvomaticRunOutput")
+  bcsRunsAsOutput         BcsProductionRun[]      @relation("BcsRunOutput")
+  manualStitchRunsAsInput ManualStitchProductionRun[] @relation("ManualStitchRunInput")
+  manualStitchRunsAsOutput ManualStitchProductionRun[] @relation("ManualStitchRunOutput")
+  balesAsProduct          Bale[] @relation("BaleProduct")
+  balesAsOutput           Bale[] @relation("BaleOutputItem")
 
   @@index([itemType])
   @@index([categoryId])
@@ -579,6 +606,7 @@ model InventoryTransaction {
 
   @@index([itemId])
   @@index([type])
+  @@index([referenceType])
   @@index([referenceId])
   @@index([batchLot])
   @@index([createdAt])
@@ -615,6 +643,13 @@ enum ProductionPhase {
   BCS
   MANUAL_STITCH
   BALING
+}
+
+enum FinishingRoute {
+  CONVERTEX
+  VALVOMATIC
+  BCS
+  MANUAL_STITCH
 }
 
 enum ProductionPlanStatus {
@@ -659,6 +694,7 @@ model ProductionPlanLine {
   id              String          @id @default(cuid())
   planId          String
   phase           ProductionPhase
+  finishingRoute  FinishingRoute?
   machineId       String?
   operatorId      String?
   inventoryItemId String?
@@ -679,6 +715,7 @@ model ProductionPlanLine {
 
   @@index([planId])
   @@index([phase])
+  @@index([finishingRoute])
   @@index([machineId])
   @@index([inventoryItemId])
 }
@@ -749,6 +786,14 @@ model ProductionRun {
   recordedBy User?              @relation("ProductionRunRecorder", fields: [recordedById], references: [id], onDelete: SetNull)
   bobbinRun  BobbinProductionRun?
   loomRun    LoomProductionRun?
+  laminationRun LaminationProductionRun?
+  printingRun   PrintingProductionRun?
+  cuttingRun    CuttingProductionRun?
+  convertexRun  ConvertexProductionRun?
+  valvomaticRun ValvomaticProductionRun?
+  bcsRun        BcsProductionRun?
+  manualStitchRun ManualStitchProductionRun?
+  productionRolls ProductionRoll[]
 
   @@index([planLineId])
   @@index([startedAt])
@@ -833,12 +878,294 @@ model LoomProductionRun {
   operator      User           @relation("LoomRunOperator", fields: [operatorId], references: [id], onDelete: Restrict)
   bobbinItem    InventoryItem? @relation("LoomRunBobbin", fields: [bobbinItemId], references: [id], onDelete: SetNull)
   rollItem      InventoryItem? @relation("LoomRunRoll", fields: [rollItemId], references: [id], onDelete: SetNull)
+  productionRoll ProductionRoll?
 
   @@index([productionRunId])
   @@index([loomMachineId])
   @@index([operatorId])
   @@index([bobbinItemId])
   @@index([rollItemId])
+}
+
+model LaminationProductionRun {
+  id                  String   @id @default(cuid())
+  productionRunId     String   @unique
+  laminationMachineId String
+  operatorId          String
+  inputRollId         String
+  inputQty            Float    @default(0)
+  outputQty           Float    @default(0)
+  characteristics     Json?
+  inventoryPosted     Boolean  @default(false)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  productionRun     ProductionRun   @relation(fields: [productionRunId], references: [id], onDelete: Cascade)
+  laminationMachine Machine         @relation("LaminationRunMachine", fields: [laminationMachineId], references: [id], onDelete: Restrict)
+  operator          User            @relation("LaminationRunOperator", fields: [operatorId], references: [id], onDelete: Restrict)
+  inputRoll         ProductionRoll  @relation("LaminationInputRoll", fields: [inputRollId], references: [id], onDelete: Restrict)
+  productionRoll    ProductionRoll?
+
+  @@index([productionRunId])
+  @@index([laminationMachineId])
+  @@index([operatorId])
+  @@index([inputRollId])
+}
+
+model PrintingProductionRun {
+  id                String   @id @default(cuid())
+  productionRunId   String   @unique
+  printingMachineId String
+  operatorId        String
+  inputRollId       String
+  brand             String?
+  colour            String?
+  artworkRef        String?
+  inkMaterials      Json?
+  inputQty          Float    @default(0)
+  outputQty         Float    @default(0)
+  characteristics   Json?
+  inventoryPosted   Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  productionRun   ProductionRun                 @relation(fields: [productionRunId], references: [id], onDelete: Cascade)
+  printingMachine Machine                       @relation("PrintingRunMachine", fields: [printingMachineId], references: [id], onDelete: Restrict)
+  operator        User                          @relation("PrintingRunOperator", fields: [operatorId], references: [id], onDelete: Restrict)
+  inputRoll       ProductionRoll                @relation("PrintingInputRoll", fields: [inputRollId], references: [id], onDelete: Restrict)
+  productionRoll  ProductionRoll?
+  helpers         PrintingProductionRunHelper[]
+
+  @@index([productionRunId])
+  @@index([printingMachineId])
+  @@index([operatorId])
+  @@index([inputRollId])
+}
+
+model PrintingProductionRunHelper {
+  id            String   @id @default(cuid())
+  printingRunId String
+  userId        String
+  createdAt     DateTime @default(now())
+
+  printingRun PrintingProductionRun @relation(fields: [printingRunId], references: [id], onDelete: Cascade)
+  user        User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([printingRunId, userId])
+  @@index([printingRunId])
+  @@index([userId])
+}
+
+model CuttingProductionRun {
+  id                String   @id @default(cuid())
+  productionRunId   String   @unique
+  cuttingMachineId  String
+  operatorId        String
+  inputRollId       String
+  cuttingSpec       String?
+  inputQty          Float    @default(0)
+  outputMaterialQty Float    @default(0)
+  outputItemId      String?
+  characteristics   Json?
+  inventoryPosted   Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  productionRun  ProductionRun  @relation(fields: [productionRunId], references: [id], onDelete: Cascade)
+  cuttingMachine Machine        @relation("CuttingRunMachine", fields: [cuttingMachineId], references: [id], onDelete: Restrict)
+  operator       User           @relation("CuttingRunOperator", fields: [operatorId], references: [id], onDelete: Restrict)
+  inputRoll      ProductionRoll @relation("CuttingInputRoll", fields: [inputRollId], references: [id], onDelete: Restrict)
+  outputItem     InventoryItem? @relation("CuttingRunOutput", fields: [outputItemId], references: [id], onDelete: SetNull)
+
+  @@index([productionRunId])
+  @@index([cuttingMachineId])
+  @@index([operatorId])
+  @@index([inputRollId])
+  @@index([outputItemId])
+}
+
+model ConvertexProductionRun {
+  id                 String   @id @default(cuid())
+  productionRunId    String   @unique
+  convertexMachineId String
+  operatorId         String
+  inputMaterialId    String
+  inputQty           Float    @default(0)
+  outputBagQty       Float    @default(0)
+  outputItemId       String?
+  characteristics    Json?
+  inventoryPosted    Boolean  @default(false)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  productionRun    ProductionRun @relation(fields: [productionRunId], references: [id], onDelete: Cascade)
+  convertexMachine Machine       @relation("ConvertexRunMachine", fields: [convertexMachineId], references: [id], onDelete: Restrict)
+  operator         User          @relation("ConvertexRunOperator", fields: [operatorId], references: [id], onDelete: Restrict)
+  inputMaterial    InventoryItem @relation("ConvertexRunInput", fields: [inputMaterialId], references: [id], onDelete: Restrict)
+  outputItem       InventoryItem? @relation("ConvertexRunOutput", fields: [outputItemId], references: [id], onDelete: SetNull)
+
+  @@index([productionRunId])
+  @@index([convertexMachineId])
+  @@index([operatorId])
+  @@index([inputMaterialId])
+  @@index([outputItemId])
+}
+
+model ValvomaticProductionRun {
+  id                  String   @id @default(cuid())
+  productionRunId     String   @unique
+  valvomaticMachineId String
+  operatorId          String
+  inputs              Json
+  outputBagQty        Float    @default(0)
+  outputItemId        String?
+  characteristics     Json?
+  inventoryPosted     Boolean  @default(false)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  productionRun     ProductionRun  @relation(fields: [productionRunId], references: [id], onDelete: Cascade)
+  valvomaticMachine Machine        @relation("ValvomaticRunMachine", fields: [valvomaticMachineId], references: [id], onDelete: Restrict)
+  operator          User           @relation("ValvomaticRunOperator", fields: [operatorId], references: [id], onDelete: Restrict)
+  outputItem        InventoryItem? @relation("ValvomaticRunOutput", fields: [outputItemId], references: [id], onDelete: SetNull)
+
+  @@index([productionRunId])
+  @@index([valvomaticMachineId])
+  @@index([operatorId])
+  @@index([outputItemId])
+}
+
+model BcsProductionRun {
+  id                String   @id @default(cuid())
+  productionRunId   String   @unique
+  bcsMachineId      String
+  operatorId        String
+  teamMemberIds     Json     @default("[]")
+  inputs            Json
+  outputBagQty      Float    @default(0)
+  outputItemId      String?
+  characteristics   Json?
+  bcsRulesSnapshot  Json?
+  inventoryPosted   Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  productionRun ProductionRun  @relation(fields: [productionRunId], references: [id], onDelete: Cascade)
+  bcsMachine    Machine        @relation("BcsRunMachine", fields: [bcsMachineId], references: [id], onDelete: Restrict)
+  operator      User           @relation("BcsRunOperator", fields: [operatorId], references: [id], onDelete: Restrict)
+  outputItem    InventoryItem? @relation("BcsRunOutput", fields: [outputItemId], references: [id], onDelete: SetNull)
+
+  @@index([productionRunId])
+  @@index([bcsMachineId])
+  @@index([operatorId])
+  @@index([outputItemId])
+}
+
+model ManualStitchProductionRun {
+  id              String   @id @default(cuid())
+  productionRunId String   @unique
+  operatorId      String
+  workerIds       Json     @default("[]")
+  inputMaterialId String
+  inputQty        Float    @default(0)
+  outputBagQty    Float    @default(0)
+  outputItemId    String?
+  characteristics Json?
+  inventoryPosted Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  productionRun ProductionRun  @relation(fields: [productionRunId], references: [id], onDelete: Cascade)
+  operator      User           @relation("ManualStitchRunOperator", fields: [operatorId], references: [id], onDelete: Restrict)
+  inputMaterial InventoryItem  @relation("ManualStitchRunInput", fields: [inputMaterialId], references: [id], onDelete: Restrict)
+  outputItem    InventoryItem? @relation("ManualStitchRunOutput", fields: [outputItemId], references: [id], onDelete: SetNull)
+
+  @@index([productionRunId])
+  @@index([operatorId])
+  @@index([inputMaterialId])
+  @@index([outputItemId])
+}
+
+model Bale {
+  id              String            @id @default(cuid())
+  baleNumber      String            @unique
+  productId       String
+  baleItemId      String?
+  bagsPerBale     Float
+  quantity        Float
+  productionBatch String?
+  qualityStatus   RollQualityStatus @default(PENDING_QC)
+  shiftId         String
+  characteristics Json?
+  inventoryPosted Boolean           @default(false)
+  baledAt         DateTime          @default(now())
+  createdById     String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  product   InventoryItem  @relation("BaleProduct", fields: [productId], references: [id], onDelete: Restrict)
+  baleItem  InventoryItem? @relation("BaleOutputItem", fields: [baleItemId], references: [id], onDelete: SetNull)
+  shift     Shift          @relation(fields: [shiftId], references: [id], onDelete: Restrict)
+  createdBy User?          @relation("BaleCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([productId])
+  @@index([baleItemId])
+  @@index([shiftId])
+  @@index([qualityStatus])
+  @@index([baledAt])
+}
+
+enum RollQualityStatus {
+  PENDING_QC
+  PASSED
+  FAILED
+  REWORK
+  ON_HOLD
+}
+
+enum ProductionRollSourcePhase {
+  LOOM
+  LAMINATION
+  PRINTING
+}
+
+model ProductionRoll {
+  id                  String                    @id @default(cuid())
+  rollNumber          String                    @unique
+  rollType            RollType
+  characteristics     Json?
+  weight              Float?
+  length              Float?
+  batchLot            String?
+  locationId          String?
+  qualityStatus       RollQualityStatus         @default(PENDING_QC)
+  inventoryItemId     String?
+  sourcePhase         ProductionRollSourcePhase @default(LOOM)
+  loomProductionRunId       String?                   @unique
+  laminationProductionRunId String?                   @unique
+  printingProductionRunId   String?                   @unique
+  productionRunId           String?
+  consumedAt                  DateTime?
+  remarks                     String?
+  createdAt                   DateTime                  @default(now())
+  updatedAt                   DateTime                  @updatedAt
+
+  location                Location?                @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  inventoryItem           InventoryItem?           @relation(fields: [inventoryItemId], references: [id], onDelete: SetNull)
+  loomProductionRun       LoomProductionRun?       @relation(fields: [loomProductionRunId], references: [id], onDelete: SetNull)
+  laminationProductionRun LaminationProductionRun? @relation(fields: [laminationProductionRunId], references: [id], onDelete: SetNull)
+  printingProductionRun   PrintingProductionRun?   @relation(fields: [printingProductionRunId], references: [id], onDelete: SetNull)
+  productionRun           ProductionRun?           @relation(fields: [productionRunId], references: [id], onDelete: SetNull)
+  laminationRunsAsInput   LaminationProductionRun[] @relation("LaminationInputRoll")
+  printingRunsAsInput     PrintingProductionRun[]   @relation("PrintingInputRoll")
+  cuttingRunsAsInput      CuttingProductionRun[]    @relation("CuttingInputRoll")
+
+  @@index([rollType])
+  @@index([qualityStatus])
+  @@index([locationId])
+  @@index([inventoryItemId])
+  @@index([productionRunId])
+  @@index([createdAt])
 }
 
 model ShiftHandover {
