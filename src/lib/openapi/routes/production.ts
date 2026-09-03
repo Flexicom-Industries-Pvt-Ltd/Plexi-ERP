@@ -4,12 +4,14 @@ import {
   CharacteristicsQuery,
   CompleteBobbinRunBody,
   CompleteLoomRunBody,
+  CompleteLaminationRunBody,
   CompleteRunBody,
   CreateBobbinRunBody,
   CreateCharacteristicBody,
   CreateHandoverBody,
   CreateLoomAssignmentBody,
   CreateLoomRunBody,
+  CreateLaminationRunBody,
   CreatePlanBody,
   CreateRunBody,
   CreateProductionRollBody,
@@ -18,6 +20,8 @@ import {
   InventoryItemSchema,
   LoomAssignmentsQuery,
   LoomMachinesQuery,
+  LaminationMachinesQuery,
+  LaminationRunsQuery,
   OperatorSchema,
   ProductionDashboardQuery,
   ProductionPlanSchema,
@@ -28,6 +32,7 @@ import {
   UpdateBobbinRunBody,
   UpdateCharacteristicBody,
   UpdateLoomRunBody,
+  UpdateLaminationRunBody,
   UpdatePlanBody,
   UpdateProductionRollBody,
 } from "../schemas";
@@ -278,6 +283,50 @@ export function registerProductionRoutes() {
     summary: "Create loom operator assignment",
     tags: TAG,
     body: CreateLoomAssignmentBody,
+  });
+  reg({
+    method: "get",
+    path: "/api/production/lamination/runs",
+    summary: "List lamination production runs",
+    tags: TAG,
+    query: LaminationRunsQuery,
+  });
+  reg({
+    method: "post",
+    path: "/api/production/lamination/runs",
+    summary: "Start lamination production run",
+    tags: TAG,
+    body: CreateLaminationRunBody,
+  });
+  reg({
+    method: "get",
+    path: "/api/production/lamination/runs/{id}",
+    summary: "Get lamination production run",
+    tags: TAG,
+    params: IdPathParam,
+  });
+  reg({
+    method: "patch",
+    path: "/api/production/lamination/runs/{id}",
+    summary: "Update or complete lamination run",
+    tags: TAG,
+    params: IdPathParam,
+    body: CompleteLaminationRunBody,
+    responses: { 200: { description: "Run updated or completed", schema: UpdateLaminationRunBody } },
+  });
+  reg({
+    method: "get",
+    path: "/api/production/lamination/machines",
+    summary: "Lamination machine grid status",
+    tags: TAG,
+    query: LaminationMachinesQuery,
+  });
+  reg({
+    method: "get",
+    path: "/api/production/lamination/input-rolls",
+    summary: "Available loom rolls for lamination input",
+    tags: TAG,
+    description: "Unconsumed loom-output rolls eligible for lamination.",
   });
   reg({
     method: "get",
