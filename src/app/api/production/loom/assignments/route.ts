@@ -3,9 +3,9 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { logEvent } from "@/lib/logging";
 
-import { getLoomsPerOperatorLimit, validateLoomAssignmentCount } from "@/lib/production/loom-manpower";
+import { getManpowerRules, validateManpowerAssignment } from "@/lib/production/manpower-rules";
 import { loomAssignmentInclude } from "@/lib/production/loom-run-include";
-import { requireProductionApiPermission } from "@/lib/production/permissions";
+import { canOverrideProductionRules, requireProductionApiPermission } from "@/lib/production/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -76,19 +76,27 @@ export async function POST(request: NextRequest) {
 
     const data = parsed.data;
     const day = startOfDay(data.assignmentDate);
-    const limit = await getLoomsPerOperatorLimit();
-    const validation = validateLoomAssignmentCount(data.machineIds, limit);
+    const validation = await validateManpowerAssignment("LOOM", data.operatorId, {
+      machineIds: data.machineIds,
+    });
 
     if (!validation.valid && !data.forceOverride) {
       return NextResponse.json(
         {
-          error: "Loom assignment exceeds operator limit",
+          error: validation.error ?? "Loom assignment exceeds operator limit",
           warnings: validation.warnings,
           limit: validation.limit,
           assignedCount: validation.assignedCount,
           canOverride: true,
         },
         { status: 422 },
+      );
+    }
+
+    if (data.forceOverride && !canOverrideProductionRules(authResult.session.user)) {
+      return NextResponse.json(
+        { error: "Supervisor permission (Production update) required to override manpower rules" },
+        { status: 403 },
       );
     }
 

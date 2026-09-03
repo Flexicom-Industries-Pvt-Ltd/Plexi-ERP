@@ -83,6 +83,7 @@ const dataCentreItems = [
   { title: "Item Categories", url: "/dashboard/data-centre/categories" },
   { title: "Sub Categories", url: "/dashboard/data-centre/sub-categories" },
   { title: "Production Characteristics", url: "/dashboard/data-centre/production-characteristics" },
+  { title: "Manpower Rules", url: "/dashboard/data-centre/manpower-rules" },
 ];
 
 function isProductionSubActive(pathname: string, url: string) {

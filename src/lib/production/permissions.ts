@@ -19,3 +19,13 @@ export async function requireProductionApiPermission(action: ProductionAction) {
 
   return { ok: true as const, session };
 }
+
+export function canOverrideProductionRules(session: {
+  role?: string;
+  permissions?: { module: string; canUpdate?: boolean }[];
+}) {
+  if (session.role === "SUPERADMIN") return true;
+  return (session.permissions ?? []).some(
+    (p) => p.module === "PRODUCTION" && p.canUpdate,
+  );
+}
