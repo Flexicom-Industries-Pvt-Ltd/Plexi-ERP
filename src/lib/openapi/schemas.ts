@@ -307,6 +307,52 @@ export const ProductionDashboardQuery = z.object({
   date: z.string().optional(),
 });
 
+export const ProductionRollsQuery = z.object({
+  rollType: z.enum(["PP", "LPP"]).optional(),
+  qualityStatus: z.enum(["PENDING_QC", "PASSED", "FAILED", "REWORK", "ON_HOLD"]).optional(),
+  sourcePhase: z.enum(["LOOM", "LAMINATION", "PRINTING"]).optional(),
+  search: z.string().optional(),
+  dateFrom: z.string().optional(),
+  dateTo: z.string().optional(),
+  locationId: z.string().optional(),
+});
+
+export const CreateProductionRollBody = z.object({
+  rollType: z.enum(["PP", "LPP"]),
+  weight: z.number().min(0).optional(),
+  length: z.number().min(0).optional(),
+  batchLot: z.string().optional().nullable(),
+  locationId: z.string().optional().nullable(),
+  inventoryItemId: z.string().optional().nullable(),
+  characteristics: z.record(z.string(), z.unknown()).optional(),
+  qualityStatus: z.enum(["PENDING_QC", "PASSED", "FAILED", "REWORK", "ON_HOLD"]).default("PENDING_QC"),
+  sourcePhase: z.enum(["LOOM", "LAMINATION", "PRINTING"]).default("LOOM"),
+  productionRunId: z.string().optional().nullable(),
+  loomProductionRunId: z.string().optional().nullable(),
+  remarks: z.string().optional().nullable(),
+}).openapi("CreateProductionRoll");
+
+export const UpdateProductionRollBody = z.object({
+  weight: z.number().min(0).optional(),
+  length: z.number().min(0).optional(),
+  batchLot: z.string().optional().nullable(),
+  locationId: z.string().optional().nullable(),
+  inventoryItemId: z.string().optional().nullable(),
+  characteristics: z.record(z.string(), z.unknown()).optional(),
+  qualityStatus: z.enum(["PENDING_QC", "PASSED", "FAILED", "REWORK", "ON_HOLD"]).optional(),
+  remarks: z.string().optional().nullable(),
+}).openapi("UpdateProductionRoll");
+
+export const ProductionRollSchema = z.object({
+  id: z.string(),
+  rollNumber: z.string(),
+  rollType: z.enum(["PP", "LPP"]),
+  qualityStatus: z.string(),
+  weight: z.number().nullable().optional(),
+  length: z.number().nullable().optional(),
+  batchLot: z.string().nullable().optional(),
+}).openapi("ProductionRoll");
+
 // ─── Data Centre & Settings ───────────────────────────────────────────────────
 
 export const StockSearchQuery = z.object({

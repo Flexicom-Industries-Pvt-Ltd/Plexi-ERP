@@ -67,6 +67,7 @@ const productionItems = [
   { title: "Shift Handover", url: "/dashboard/production/handovers" },
   { title: "Bobbin Production", url: "/dashboard/production/bobbin" },
   { title: "Loom Production", url: "/dashboard/production/loom" },
+  { title: "Roll Stock", url: "/dashboard/production/rolls" },
   { title: "Phase Characteristics", url: "/dashboard/data-centre/production-characteristics" },
 ];
 

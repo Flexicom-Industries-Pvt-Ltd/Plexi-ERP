@@ -320,6 +320,7 @@ model Location {
   updatedAt   DateTime     @updatedAt
   inventoryItems InventoryItem[]
   inventoryBatches InventoryBatch[]
+  productionRolls  ProductionRoll[]
 }
 
 model Machine {
@@ -548,6 +549,7 @@ model InventoryItem {
   bobbinRunsAsOutput      BobbinProductionRun[] @relation("BobbinRunOutput")
   loomRunsAsBobbin        LoomProductionRun[]   @relation("LoomRunBobbin")
   loomRunsAsRoll          LoomProductionRun[]   @relation("LoomRunRoll")
+  productionRolls         ProductionRoll[]
 
   @@index([itemType])
   @@index([categoryId])
@@ -749,6 +751,7 @@ model ProductionRun {
   recordedBy User?              @relation("ProductionRunRecorder", fields: [recordedById], references: [id], onDelete: SetNull)
   bobbinRun  BobbinProductionRun?
   loomRun    LoomProductionRun?
+  productionRolls ProductionRoll[]
 
   @@index([planLineId])
   @@index([startedAt])
@@ -833,12 +836,58 @@ model LoomProductionRun {
   operator      User           @relation("LoomRunOperator", fields: [operatorId], references: [id], onDelete: Restrict)
   bobbinItem    InventoryItem? @relation("LoomRunBobbin", fields: [bobbinItemId], references: [id], onDelete: SetNull)
   rollItem      InventoryItem? @relation("LoomRunRoll", fields: [rollItemId], references: [id], onDelete: SetNull)
+  productionRoll ProductionRoll?
 
   @@index([productionRunId])
   @@index([loomMachineId])
   @@index([operatorId])
   @@index([bobbinItemId])
   @@index([rollItemId])
+}
+
+enum RollQualityStatus {
+  PENDING_QC
+  PASSED
+  FAILED
+  REWORK
+  ON_HOLD
+}
+
+enum ProductionRollSourcePhase {
+  LOOM
+  LAMINATION
+  PRINTING
+}
+
+model ProductionRoll {
+  id                  String                    @id @default(cuid())
+  rollNumber          String                    @unique
+  rollType            RollType
+  characteristics     Json?
+  weight              Float?
+  length              Float?
+  batchLot            String?
+  locationId          String?
+  qualityStatus       RollQualityStatus         @default(PENDING_QC)
+  inventoryItemId     String?
+  sourcePhase         ProductionRollSourcePhase @default(LOOM)
+  loomProductionRunId String?                   @unique
+  productionRunId     String?
+  remarks             String?
+  createdAt           DateTime                  @default(now())
+  updatedAt           DateTime                  @updatedAt
+
+  location          Location?          @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  inventoryItem     InventoryItem?     @relation(fields: [inventoryItemId], references: [id], onDelete: SetNull)
+  loomProductionRun LoomProductionRun? @relation(fields: [loomProductionRunId], references: [id], onDelete: SetNull)
+  productionRun     ProductionRun?     @relation(fields: [productionRunId], references: [id], onDelete: SetNull)
+
+  @@index([rollType])
+  @@index([qualityStatus])
+  @@index([locationId])
+  @@index([inventoryItemId])
+  @@index([productionRunId])
+  @@index([createdAt])
 }
 
 model ShiftHandover {
