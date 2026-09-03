@@ -434,6 +434,48 @@ export const CuttingRunsQuery = z.object({
   activeOnly: z.enum(["true", "false"]).optional(),
 });
 
+export const CreateConvertexRunBody = z.object({
+  planLineId: z.string().min(1),
+  convertexMachineId: z.string().min(1),
+  operatorId: z.string().min(1),
+  inputMaterialId: z.string().min(1),
+  targetQty: z.number().min(0),
+  inputQty: z.number().min(0).default(0),
+}).openapi("CreateConvertexRun");
+
+export const UpdateConvertexRunBody = z.object({
+  inputQty: z.number().min(0).optional(),
+  outputBagQty: z.number().min(0).optional(),
+  outputItemId: z.string().nullable().optional(),
+  characteristics: z.record(z.string(), z.unknown()).optional(),
+}).openapi("UpdateConvertexRun");
+
+export const CompleteConvertexRunBody = z.object({
+  action: z.literal("complete"),
+  actualQty: z.number().min(0),
+  acceptedQty: z.number().min(0),
+  rejectedQty: z.number().min(0).default(0),
+  reworkQty: z.number().min(0).default(0),
+  scrapQty: z.number().min(0).default(0),
+  downtimeMinutes: z.number().int().min(0).default(0),
+  inputQty: z.number().min(0),
+  outputBagQty: z.number().min(0),
+  outputItemId: z.string().nullable().optional(),
+  characteristics: z.record(z.string(), z.unknown()).optional(),
+}).openapi("CompleteConvertexRun");
+
+export const ConvertexMachinesQuery = z.object({
+  shiftId: z.string().optional(),
+});
+
+export const ConvertexRunsQuery = z.object({
+  planLineId: z.string().optional(),
+  planId: z.string().optional(),
+  operatorId: z.string().optional(),
+  convertexMachineId: z.string().optional(),
+  activeOnly: z.enum(["true", "false"]).optional(),
+});
+
 export const LoomMachinesQuery = z.object({
   date: z.string().optional(),
   shiftId: z.string().optional(),

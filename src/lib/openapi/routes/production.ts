@@ -7,6 +7,7 @@ import {
   CompleteLaminationRunBody,
   CompletePrintingRunBody,
   CompleteCuttingRunBody,
+  CompleteConvertexRunBody,
   CompleteRunBody,
   CreateBobbinRunBody,
   CreateCharacteristicBody,
@@ -16,6 +17,7 @@ import {
   CreateLaminationRunBody,
   CreatePrintingRunBody,
   CreateCuttingRunBody,
+  CreateConvertexRunBody,
   CreatePlanBody,
   CreateRunBody,
   CreateProductionRollBody,
@@ -30,6 +32,8 @@ import {
   PrintingRunsQuery,
   CuttingMachinesQuery,
   CuttingRunsQuery,
+  ConvertexMachinesQuery,
+  ConvertexRunsQuery,
   OperatorSchema,
   ProductionDashboardQuery,
   ProductionPlanSchema,
@@ -43,6 +47,7 @@ import {
   UpdateLaminationRunBody,
   UpdatePrintingRunBody,
   UpdateCuttingRunBody,
+  UpdateConvertexRunBody,
   UpdatePlanBody,
   UpdateProductionRollBody,
 } from "../schemas";
@@ -457,6 +462,55 @@ export function registerProductionRoutes() {
     method: "put",
     path: "/api/production/finishing/defaults",
     summary: "Update finishing route defaults by category",
+    tags: TAG,
+  });
+  reg({
+    method: "get",
+    path: "/api/production/convertex/runs",
+    summary: "List convertex production runs",
+    tags: TAG,
+    query: ConvertexRunsQuery,
+  });
+  reg({
+    method: "post",
+    path: "/api/production/convertex/runs",
+    summary: "Start convertex production run",
+    tags: TAG,
+    body: CreateConvertexRunBody,
+  });
+  reg({
+    method: "get",
+    path: "/api/production/convertex/runs/{id}",
+    summary: "Get convertex production run",
+    tags: TAG,
+    params: IdPathParam,
+  });
+  reg({
+    method: "patch",
+    path: "/api/production/convertex/runs/{id}",
+    summary: "Update or complete convertex run",
+    tags: TAG,
+    params: IdPathParam,
+    body: CompleteConvertexRunBody,
+    responses: { 200: { description: "Run updated or completed", schema: UpdateConvertexRunBody } },
+  });
+  reg({
+    method: "get",
+    path: "/api/production/convertex/machines",
+    summary: "Convertex machine grid status",
+    tags: TAG,
+    query: ConvertexMachinesQuery,
+  });
+  reg({
+    method: "get",
+    path: "/api/production/convertex/input-materials",
+    summary: "Cut material items for convertex input",
+    tags: TAG,
+  });
+  reg({
+    method: "get",
+    path: "/api/production/convertex/output-items",
+    summary: "Finished bag items for convertex output",
     tags: TAG,
   });
   reg({

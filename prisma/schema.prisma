@@ -78,6 +78,7 @@ model User {
   printingRunsOperated         PrintingProductionRun[]      @relation("PrintingRunOperator")
   printingRunHelperAssignments PrintingProductionRunHelper[]
   cuttingRunsOperated          CuttingProductionRun[]       @relation("CuttingRunOperator")
+  convertexRunsOperated        ConvertexProductionRun[]     @relation("ConvertexRunOperator")
   createdAt         DateTime       @default(now())
   updatedAt     DateTime    @updatedAt
 }
@@ -346,6 +347,7 @@ model Machine {
   laminationRuns         LaminationProductionRun[] @relation("LaminationRunMachine")
   printingRuns           PrintingProductionRun[]   @relation("PrintingRunMachine")
   cuttingRuns            CuttingProductionRun[]    @relation("CuttingRunMachine")
+  convertexRuns          ConvertexProductionRun[]  @relation("ConvertexRunMachine")
 
   @@index([sectionId])
 }
@@ -558,6 +560,8 @@ model InventoryItem {
   loomRunsAsRoll          LoomProductionRun[]   @relation("LoomRunRoll")
   productionRolls         ProductionRoll[]
   cuttingRunsAsOutput     CuttingProductionRun[] @relation("CuttingRunOutput")
+  convertexRunsAsInput    ConvertexProductionRun[] @relation("ConvertexRunInput")
+  convertexRunsAsOutput   ConvertexProductionRun[] @relation("ConvertexRunOutput")
 
   @@index([itemType])
   @@index([categoryId])
@@ -771,6 +775,7 @@ model ProductionRun {
   laminationRun LaminationProductionRun?
   printingRun   PrintingProductionRun?
   cuttingRun    CuttingProductionRun?
+  convertexRun  ConvertexProductionRun?
   productionRolls ProductionRoll[]
 
   @@index([planLineId])
@@ -959,6 +964,33 @@ model CuttingProductionRun {
   @@index([cuttingMachineId])
   @@index([operatorId])
   @@index([inputRollId])
+  @@index([outputItemId])
+}
+
+model ConvertexProductionRun {
+  id                 String   @id @default(cuid())
+  productionRunId    String   @unique
+  convertexMachineId String
+  operatorId         String
+  inputMaterialId    String
+  inputQty           Float    @default(0)
+  outputBagQty       Float    @default(0)
+  outputItemId       String?
+  characteristics    Json?
+  inventoryPosted    Boolean  @default(false)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  productionRun    ProductionRun @relation(fields: [productionRunId], references: [id], onDelete: Cascade)
+  convertexMachine Machine       @relation("ConvertexRunMachine", fields: [convertexMachineId], references: [id], onDelete: Restrict)
+  operator         User          @relation("ConvertexRunOperator", fields: [operatorId], references: [id], onDelete: Restrict)
+  inputMaterial    InventoryItem @relation("ConvertexRunInput", fields: [inputMaterialId], references: [id], onDelete: Restrict)
+  outputItem       InventoryItem? @relation("ConvertexRunOutput", fields: [outputItemId], references: [id], onDelete: SetNull)
+
+  @@index([productionRunId])
+  @@index([convertexMachineId])
+  @@index([operatorId])
+  @@index([inputMaterialId])
   @@index([outputItemId])
 }
 
