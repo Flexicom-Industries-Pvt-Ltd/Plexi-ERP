@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { logEvent } from "@/lib/logging";
 
 import { postBcsInventoryMovements } from "@/lib/production/bcs-inventory";
+import { createProductionCorrelationId } from "@/lib/production/inventory-tx";
 import { bcsRunInclude } from "@/lib/production/bcs-run-include";
 import { validateValvomaticInputs, ValvomaticInputsSchema } from "@/lib/production/valvomatic-inputs";
 import { requireProductionApiPermission } from "@/lib/production/permissions";
@@ -98,6 +99,8 @@ export async function PATCH(
       }
 
       const uniqueTeam = [...new Set(parsed.data.teamMemberIds)];
+      const correlationId = createProductionCorrelationId(existing.productionRunId);
+      let inventoryResult;
 
       const updated = await db.$transaction(async (tx) => {
         await tx.productionRun.update({
@@ -113,7 +116,7 @@ export async function PATCH(
           },
         });
 
-        return tx.bcsProductionRun.update({
+        const bcsUpdated = await tx.bcsProductionRun.update({
           where: { id },
           data: {
             teamMemberIds: uniqueTeam as Prisma.InputJsonValue,
@@ -121,20 +124,28 @@ export async function PATCH(
             outputBagQty: parsed.data.outputBagQty,
             outputItemId: parsed.data.outputItemId ?? existing.outputItemId,
             characteristics: (parsed.data.characteristics as Prisma.InputJsonValue) ?? undefined,
+            inventoryPosted: true,
           },
+        });
+
+        inventoryResult = await postBcsInventoryMovements({
+          tx,
+          userId: authResult.session.user.id,
+          bcsRunId: bcsUpdated.id,
+          productionRunId: bcsUpdated.productionRunId,
+          inputs: parsed.data.inputs,
+          teamMemberIds: uniqueTeam,
+          outputItemId: bcsUpdated.outputItemId,
+          outputBagQty: bcsUpdated.outputBagQty,
+          scrapQty: parsed.data.scrapQty,
+          alreadyPosted: existing.inventoryPosted,
+          correlationId,
+        });
+
+        return tx.bcsProductionRun.findUniqueOrThrow({
+          where: { id },
           include: bcsRunInclude,
         });
-      });
-
-      const inventoryResult = await postBcsInventoryMovements({
-        userId: authResult.session.user.id,
-        bcsRunId: updated.id,
-        productionRunId: updated.productionRunId,
-        inputs: parsed.data.inputs,
-        teamMemberIds: uniqueTeam,
-        outputItemId: updated.outputItemId,
-        outputBagQty: updated.outputBagQty,
-        scrapQty: parsed.data.scrapQty,
       });
 
       await logEvent({
@@ -148,6 +159,7 @@ export async function PATCH(
           outputBagQty: parsed.data.outputBagQty,
           teamMemberIds: uniqueTeam,
           inputs: parsed.data.inputs,
+          correlationId,
           inventory: inventoryResult,
         },
         diffs: [{ entity: "BcsProductionRun", entityId: id, before: existing, after: updated }],

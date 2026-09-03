@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { logEvent } from "@/lib/logging";
 
 import { postLoomInventoryMovements } from "@/lib/production/loom-inventory";
+import { createProductionCorrelationId } from "@/lib/production/inventory-tx";
 import { createProductionRollFromLoomRun } from "@/lib/production/create-roll-from-loom";
 import { loomRunInclude } from "@/lib/production/loom-run-include";
 import { requireProductionApiPermission } from "@/lib/production/permissions";
@@ -89,6 +90,8 @@ export async function PATCH(
 
       const data = parsed.data;
       let createdRollId: string | null = null;
+      const correlationId = createProductionCorrelationId(existing.productionRunId);
+      let inventoryResult;
 
       const updated = await db.$transaction(async (tx) => {
         await tx.productionRun.update({
@@ -113,27 +116,32 @@ export async function PATCH(
             rollItemId: data.rollItemId ?? existing.rollItemId,
             bobbinItemId: data.bobbinItemId ?? existing.bobbinItemId,
             characteristics: (data.characteristics as Prisma.InputJsonValue) ?? undefined,
+            inventoryPosted: true,
           },
         });
 
         const roll = await createProductionRollFromLoomRun(tx, loomUpdated);
         createdRollId = roll?.id ?? null;
 
+        inventoryResult = await postLoomInventoryMovements({
+          tx,
+          userId: authResult.session.user.id,
+          loomRunId: loomUpdated.id,
+          productionRunId: loomUpdated.productionRunId,
+          bobbinItemId: loomUpdated.bobbinItemId,
+          bobbinIssueQty: loomUpdated.bobbinIssueQty,
+          rollItemId: loomUpdated.rollItemId,
+          rollOutputQty: loomUpdated.rollOutputQty,
+          outputRoll: roll,
+          scrapQty: data.scrapQty,
+          alreadyPosted: existing.inventoryPosted,
+          correlationId,
+        });
+
         return tx.loomProductionRun.findUniqueOrThrow({
           where: { id },
           include: loomRunInclude,
         });
-      });
-
-      const inventoryResult = await postLoomInventoryMovements({
-        userId: authResult.session.user.id,
-        loomRunId: updated.id,
-        productionRunId: updated.productionRunId,
-        bobbinItemId: updated.bobbinItemId,
-        bobbinIssueQty: updated.bobbinIssueQty,
-        rollItemId: updated.rollItemId,
-        rollOutputQty: updated.rollOutputQty,
-        scrapQty: data.scrapQty,
       });
 
       await logEvent({
@@ -147,6 +155,7 @@ export async function PATCH(
           rollOutputQty: data.rollOutputQty,
           productionRollId: createdRollId,
           targetQty: existing.productionRun.targetQty,
+          correlationId,
           inventory: inventoryResult,
         },
         diffs: [{ entity: "LoomProductionRun", entityId: id, before: existing, after: updated }],

@@ -1,41 +1,64 @@
-import { logEvent } from "@/lib/logging";
+import { Prisma } from "@/generated/prisma";
+import {
+  createProductionCorrelationId,
+  itemInMovement,
+  itemOutMovement,
+  postProductionInventoryMovements,
+  PRODUCTION_RUN_REFERENCE,
+  resolveRollOutMovement,
+  type ProductionInventoryMovement,
+  type ProductionInventoryResult,
+} from "@/lib/production/inventory-tx";
 import type { ValvomaticInputs } from "@/lib/production/valvomatic-inputs";
 
+async function valvomaticInputMovements(
+  tx: Prisma.TransactionClient,
+  inputs: ValvomaticInputs,
+): Promise<ProductionInventoryMovement[]> {
+  const movements: ProductionInventoryMovement[] = [];
+
+  if (inputs.inputRollId && inputs.rollQty > 0) {
+    const rollOut = await resolveRollOutMovement(tx, inputs.inputRollId, inputs.rollQty, "Valvomatic roll");
+    if (rollOut) movements.push(rollOut);
+  }
+  const yarnOut = itemOutMovement(inputs.yarnItemId, inputs.yarnQty, null, "Yarn consumed");
+  const ppOut = itemOutMovement(inputs.ppItemId, inputs.ppQty, null, "PP consumed");
+  const lppOut = itemOutMovement(inputs.lppItemId, inputs.lppQty, null, "LPP consumed");
+  return [...movements, yarnOut, ppOut, lppOut].filter(Boolean) as ProductionInventoryMovement[];
+}
+
 type ValvomaticInventoryParams = {
+  tx: Prisma.TransactionClient;
   userId: string;
   valvomaticRunId: string;
   productionRunId: string;
   inputs: ValvomaticInputs;
   outputItemId?: string | null;
   outputBagQty: number;
+  productionBatch?: string | null;
   scrapQty: number;
+  alreadyPosted?: boolean;
+  correlationId?: string;
 };
 
-/**
- * P36 integration stub — records intent to consume multi-material inputs and receive finished bags.
- */
-export async function postValvomaticInventoryMovements(params: ValvomaticInventoryParams) {
-  await logEvent({
-    userId: params.userId,
-    module: "PRODUCTION",
-    severity: "INFO",
-    action: "VALVOMATIC_INVENTORY_STUB",
-    payload: {
-      note: "P36 integration pending — multi-material OUT and FINISHED_BAGS IN not posted yet",
-      intendedMovements: {
-        inputs: params.inputs,
-        finishedBagsIn: params.outputItemId
-          ? { itemId: params.outputItemId, qty: params.outputBagQty, materialType: "FINISHED_BAGS" }
-          : null,
-        scrapQty: params.scrapQty,
-      },
-      valvomaticRunId: params.valvomaticRunId,
-      productionRunId: params.productionRunId,
-    },
-  });
+export async function postValvomaticInventoryMovements(
+  params: ValvomaticInventoryParams,
+): Promise<ProductionInventoryResult> {
+  const correlationId = params.correlationId ?? createProductionCorrelationId(params.productionRunId);
 
-  return {
-    posted: false,
-    message: "Inventory posting deferred to P36 integration",
-  };
+  const movements = [
+    ...(await valvomaticInputMovements(params.tx, params.inputs)),
+    itemInMovement(params.outputItemId, params.outputBagQty, params.productionBatch, "Finished bags output"),
+  ].filter(Boolean) as ProductionInventoryMovement[];
+
+  return postProductionInventoryMovements({
+    tx: params.tx,
+    userId: params.userId,
+    referenceType: PRODUCTION_RUN_REFERENCE,
+    referenceId: params.productionRunId,
+    phase: "VALVOMATIC",
+    correlationId,
+    movements,
+    skipIfAlreadyPosted: params.alreadyPosted,
+  });
 }

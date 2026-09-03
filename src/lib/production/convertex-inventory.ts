@@ -1,6 +1,16 @@
-import { logEvent } from "@/lib/logging";
+import { Prisma } from "@/generated/prisma";
+import {
+  createProductionCorrelationId,
+  itemInMovement,
+  itemOutMovement,
+  postProductionInventoryMovements,
+  PRODUCTION_RUN_REFERENCE,
+  type ProductionInventoryMovement,
+  type ProductionInventoryResult,
+} from "@/lib/production/inventory-tx";
 
 type ConvertexInventoryParams = {
+  tx: Prisma.TransactionClient;
   userId: string;
   convertexRunId: string;
   productionRunId: string;
@@ -8,34 +18,30 @@ type ConvertexInventoryParams = {
   inputQty: number;
   outputItemId?: string | null;
   outputBagQty: number;
+  productionBatch?: string | null;
   scrapQty: number;
+  alreadyPosted?: boolean;
+  correlationId?: string;
 };
 
-/**
- * P36 integration stub — records intent to consume cut material and receive finished bags.
- */
-export async function postConvertexInventoryMovements(params: ConvertexInventoryParams) {
-  await logEvent({
-    userId: params.userId,
-    module: "PRODUCTION",
-    severity: "INFO",
-    action: "CONVERTEX_INVENTORY_STUB",
-    payload: {
-      note: "P36 integration pending — CUT_MATERIAL OUT and FINISHED_BAGS IN not posted yet",
-      intendedMovements: {
-        cutMaterialOut: { itemId: params.inputMaterialId, qty: params.inputQty },
-        finishedBagsIn: params.outputItemId
-          ? { itemId: params.outputItemId, qty: params.outputBagQty, materialType: "FINISHED_BAGS" }
-          : null,
-        scrapQty: params.scrapQty,
-      },
-      convertexRunId: params.convertexRunId,
-      productionRunId: params.productionRunId,
-    },
-  });
+export async function postConvertexInventoryMovements(
+  params: ConvertexInventoryParams,
+): Promise<ProductionInventoryResult> {
+  const correlationId = params.correlationId ?? createProductionCorrelationId(params.productionRunId);
 
-  return {
-    posted: false,
-    message: "Inventory posting deferred to P36 integration",
-  };
+  const movements = [
+    itemOutMovement(params.inputMaterialId, params.inputQty, null, "Cut material consumed"),
+    itemInMovement(params.outputItemId, params.outputBagQty, params.productionBatch, "Finished bags output"),
+  ].filter(Boolean) as ProductionInventoryMovement[];
+
+  return postProductionInventoryMovements({
+    tx: params.tx,
+    userId: params.userId,
+    referenceType: PRODUCTION_RUN_REFERENCE,
+    referenceId: params.productionRunId,
+    phase: "CONVERTEX",
+    correlationId,
+    movements,
+    skipIfAlreadyPosted: params.alreadyPosted,
+  });
 }

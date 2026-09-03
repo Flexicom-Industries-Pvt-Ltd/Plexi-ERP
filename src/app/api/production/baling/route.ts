@@ -6,6 +6,7 @@ import { logEvent } from "@/lib/logging";
 import { baleInclude } from "@/lib/production/bale-include";
 import { generateBaleNumber } from "@/lib/production/bale-number";
 import { postBalingInventoryMovements } from "@/lib/production/baling-inventory";
+import { createBaleCorrelationId } from "@/lib/production/inventory-tx";
 import { requireProductionApiPermission } from "@/lib/production/permissions";
 
 export const dynamic = "force-dynamic";
@@ -168,25 +169,29 @@ export async function POST(request: NextRequest) {
             characteristics: data.characteristics as Prisma.InputJsonValue | undefined,
             baledAt: data.baledAt ? new Date(data.baledAt) : new Date(),
             createdById: authResult.session.user.id,
+            inventoryPosted: true,
           },
           include: baleInclude,
         });
-        created.push(bale);
+
+        const inventory = await postBalingInventoryMovements({
+          tx,
+          userId: authResult.session.user.id,
+          baleId: bale.id,
+          baleNumber: bale.baleNumber,
+          productId: data.productId,
+          bagQty: bale.quantity,
+          baleItemId: data.baleItemId,
+          productionBatch: data.productionBatch,
+          correlationId: createBaleCorrelationId(bale.id),
+        });
+
+        created.push({ ...bale, inventory });
       }
       return created;
     });
 
     for (const bale of bales) {
-      await postBalingInventoryMovements({
-        userId: authResult.session.user.id,
-        baleId: bale.id,
-        baleNumber: bale.baleNumber,
-        productId: data.productId,
-        bagQty: bale.quantity,
-        baleItemId: data.baleItemId,
-        baleQty: 1,
-      });
-
       await logEvent({
         userId: authResult.session.user.id,
         module: "PRODUCTION",
@@ -199,6 +204,8 @@ export async function POST(request: NextRequest) {
           quantity: bale.quantity,
           bagsPerBale: data.bagsPerBale,
           shiftId: data.shiftId,
+          correlationId: bale.inventory?.correlationId,
+          inventory: bale.inventory,
         },
         diffs: [{ entity: "Bale", entityId: bale.id, before: {}, after: bale }],
       });

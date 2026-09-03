@@ -1,6 +1,16 @@
-import { logEvent } from "@/lib/logging";
+import { Prisma } from "@/generated/prisma";
+import {
+  createProductionCorrelationId,
+  itemInMovement,
+  itemOutMovement,
+  postProductionInventoryMovements,
+  PRODUCTION_RUN_REFERENCE,
+  type ProductionInventoryMovement,
+  type ProductionInventoryResult,
+} from "@/lib/production/inventory-tx";
 
 type ManualStitchInventoryParams = {
+  tx: Prisma.TransactionClient;
   userId: string;
   manualStitchRunId: string;
   productionRunId: string;
@@ -9,35 +19,30 @@ type ManualStitchInventoryParams = {
   workerIds: string[];
   outputItemId?: string | null;
   outputBagQty: number;
+  productionBatch?: string | null;
   scrapQty: number;
+  alreadyPosted?: boolean;
+  correlationId?: string;
 };
 
-/**
- * P36 integration stub — records intent to consume cut material and receive finished bags.
- */
-export async function postManualStitchInventoryMovements(params: ManualStitchInventoryParams) {
-  await logEvent({
-    userId: params.userId,
-    module: "PRODUCTION",
-    severity: "INFO",
-    action: "MANUAL_STITCH_INVENTORY_STUB",
-    payload: {
-      note: "P36 integration pending — CUT_MATERIAL OUT and FINISHED_BAGS IN not posted yet",
-      intendedMovements: {
-        cutMaterialOut: { itemId: params.inputMaterialId, qty: params.inputQty },
-        finishedBagsIn: params.outputItemId
-          ? { itemId: params.outputItemId, qty: params.outputBagQty, materialType: "FINISHED_BAGS" }
-          : null,
-        workerIds: params.workerIds,
-        scrapQty: params.scrapQty,
-      },
-      manualStitchRunId: params.manualStitchRunId,
-      productionRunId: params.productionRunId,
-    },
-  });
+export async function postManualStitchInventoryMovements(
+  params: ManualStitchInventoryParams,
+): Promise<ProductionInventoryResult> {
+  const correlationId = params.correlationId ?? createProductionCorrelationId(params.productionRunId);
 
-  return {
-    posted: false,
-    message: "Inventory posting deferred to P36 integration",
-  };
+  const movements = [
+    itemOutMovement(params.inputMaterialId, params.inputQty, null, "Cut material consumed"),
+    itemInMovement(params.outputItemId, params.outputBagQty, params.productionBatch, "Finished bags output"),
+  ].filter(Boolean) as ProductionInventoryMovement[];
+
+  return postProductionInventoryMovements({
+    tx: params.tx,
+    userId: params.userId,
+    referenceType: PRODUCTION_RUN_REFERENCE,
+    referenceId: params.productionRunId,
+    phase: "MANUAL_STITCH",
+    correlationId,
+    movements,
+    skipIfAlreadyPosted: params.alreadyPosted,
+  });
 }

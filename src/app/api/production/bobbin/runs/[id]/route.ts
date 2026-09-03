@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { logEvent } from "@/lib/logging";
 
 import { postBobbinInventoryMovements } from "@/lib/production/bobbin-inventory";
+import { createProductionCorrelationId } from "@/lib/production/inventory-tx";
 import { bobbinRunInclude } from "@/lib/production/bobbin-run-include";
 import { requireProductionApiPermission } from "@/lib/production/permissions";
 
@@ -84,6 +85,9 @@ export async function PATCH(
       }
 
       const data = parsed.data;
+      const correlationId = createProductionCorrelationId(existing.productionRunId);
+      let inventoryResult;
+
       const updated = await db.$transaction(async (tx) => {
         await tx.productionRun.update({
           where: { id: existing.productionRunId },
@@ -98,27 +102,35 @@ export async function PATCH(
           },
         });
 
-        return tx.bobbinProductionRun.update({
+        const runUpdated = await tx.bobbinProductionRun.update({
           where: { id },
           data: {
             inputQty: data.inputQty,
             outputQty: data.outputQty,
             outputItemId: data.outputItemId ?? existing.outputItemId,
             bobbinCharacteristics: (data.bobbinCharacteristics as Prisma.InputJsonValue) ?? undefined,
+            inventoryPosted: true,
           },
+        });
+
+        inventoryResult = await postBobbinInventoryMovements({
+          tx,
+          userId: authResult.session.user.id,
+          bobbinRunId: runUpdated.id,
+          productionRunId: runUpdated.productionRunId,
+          rawMaterialItemId: runUpdated.rawMaterialItemId,
+          outputItemId: runUpdated.outputItemId,
+          inputQty: runUpdated.inputQty,
+          outputQty: runUpdated.outputQty,
+          scrapQty: data.scrapQty,
+          alreadyPosted: existing.inventoryPosted,
+          correlationId,
+        });
+
+        return tx.bobbinProductionRun.findUniqueOrThrow({
+          where: { id },
           include: bobbinRunInclude,
         });
-      });
-
-      const inventoryResult = await postBobbinInventoryMovements({
-        userId: authResult.session.user.id,
-        bobbinRunId: updated.id,
-        productionRunId: updated.productionRunId,
-        rawMaterialItemId: updated.rawMaterialItemId,
-        outputItemId: updated.outputItemId,
-        inputQty: updated.inputQty,
-        outputQty: updated.outputQty,
-        scrapQty: data.scrapQty,
       });
 
       await logEvent({
@@ -130,6 +142,7 @@ export async function PATCH(
           bobbinRunId: updated.id,
           acceptedQty: data.acceptedQty,
           targetQty: existing.productionRun.targetQty,
+          correlationId,
           inventory: inventoryResult,
         },
         diffs: [{ entity: "BobbinProductionRun", entityId: id, before: existing, after: updated }],

@@ -1,41 +1,52 @@
-import { logEvent } from "@/lib/logging";
+import { Prisma } from "@/generated/prisma";
+import {
+  createProductionCorrelationId,
+  postProductionInventoryMovements,
+  PRODUCTION_RUN_REFERENCE,
+  resolveRollOutMovement,
+  rollInMovement,
+  type ProductionInventoryResult,
+} from "@/lib/production/inventory-tx";
 
 type LaminationInventoryParams = {
+  tx: Prisma.TransactionClient;
   userId: string;
   laminationRunId: string;
   productionRunId: string;
   inputRollId: string;
   inputQty: number;
-  outputRollId?: string | null;
+  outputRoll?: {
+    inventoryItemId: string | null;
+    batchLot: string | null;
+    rollNumber: string;
+    weight?: number | null;
+  } | null;
   outputQty: number;
   scrapQty: number;
+  alreadyPosted?: boolean;
+  correlationId?: string;
 };
 
-/**
- * P36 integration stub — records intent to consume input roll and receive laminated roll.
- */
-export async function postLaminationInventoryMovements(params: LaminationInventoryParams) {
-  await logEvent({
-    userId: params.userId,
-    module: "PRODUCTION",
-    severity: "INFO",
-    action: "LAMINATION_INVENTORY_STUB",
-    payload: {
-      note: "P36 integration pending — input roll OUT and laminated roll IN not posted yet",
-      intendedMovements: {
-        inputRollOut: { rollId: params.inputRollId, qty: params.inputQty },
-        laminatedRollIn: params.outputRollId
-          ? { rollId: params.outputRollId, qty: params.outputQty }
-          : null,
-        scrapQty: params.scrapQty,
-      },
-      laminationRunId: params.laminationRunId,
-      productionRunId: params.productionRunId,
-    },
-  });
+export async function postLaminationInventoryMovements(
+  params: LaminationInventoryParams,
+): Promise<ProductionInventoryResult> {
+  const correlationId = params.correlationId ?? createProductionCorrelationId(params.productionRunId);
 
-  return {
-    posted: false,
-    message: "Inventory posting deferred to P36 integration",
-  };
+  const rollOut = await resolveRollOutMovement(params.tx, params.inputRollId, params.inputQty);
+  const rollIn = params.outputRoll
+    ? rollInMovement(params.outputRoll, params.outputQty || params.outputRoll.weight || 0)
+    : null;
+
+  const movements = [rollOut, rollIn].filter(Boolean) as NonNullable<typeof rollOut>[];
+
+  return postProductionInventoryMovements({
+    tx: params.tx,
+    userId: params.userId,
+    referenceType: PRODUCTION_RUN_REFERENCE,
+    referenceId: params.productionRunId,
+    phase: "LAMINATION",
+    correlationId,
+    movements,
+    skipIfAlreadyPosted: params.alreadyPosted,
+  });
 }

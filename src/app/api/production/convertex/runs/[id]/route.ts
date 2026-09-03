@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { logEvent } from "@/lib/logging";
 
 import { postConvertexInventoryMovements } from "@/lib/production/convertex-inventory";
+import { createProductionCorrelationId } from "@/lib/production/inventory-tx";
 import { convertexRunInclude } from "@/lib/production/convertex-run-include";
 import { requireProductionApiPermission } from "@/lib/production/permissions";
 
@@ -97,6 +98,9 @@ export async function PATCH(
         }
       }
 
+      const correlationId = createProductionCorrelationId(existing.productionRunId);
+      let inventoryResult;
+
       const updated = await db.$transaction(async (tx) => {
         await tx.productionRun.update({
           where: { id: existing.productionRunId },
@@ -111,27 +115,35 @@ export async function PATCH(
           },
         });
 
-        return tx.convertexProductionRun.update({
+        const convertexUpdated = await tx.convertexProductionRun.update({
           where: { id },
           data: {
             inputQty: data.inputQty,
             outputBagQty: data.outputBagQty,
             outputItemId: data.outputItemId ?? existing.outputItemId,
             characteristics: (data.characteristics as Prisma.InputJsonValue) ?? undefined,
+            inventoryPosted: true,
           },
+        });
+
+        inventoryResult = await postConvertexInventoryMovements({
+          tx,
+          userId: authResult.session.user.id,
+          convertexRunId: convertexUpdated.id,
+          productionRunId: convertexUpdated.productionRunId,
+          inputMaterialId: convertexUpdated.inputMaterialId,
+          inputQty: convertexUpdated.inputQty,
+          outputItemId: convertexUpdated.outputItemId,
+          outputBagQty: convertexUpdated.outputBagQty,
+          scrapQty: data.scrapQty,
+          alreadyPosted: existing.inventoryPosted,
+          correlationId,
+        });
+
+        return tx.convertexProductionRun.findUniqueOrThrow({
+          where: { id },
           include: convertexRunInclude,
         });
-      });
-
-      const inventoryResult = await postConvertexInventoryMovements({
-        userId: authResult.session.user.id,
-        convertexRunId: updated.id,
-        productionRunId: updated.productionRunId,
-        inputMaterialId: updated.inputMaterialId,
-        inputQty: updated.inputQty,
-        outputItemId: updated.outputItemId,
-        outputBagQty: updated.outputBagQty,
-        scrapQty: data.scrapQty,
       });
 
       await logEvent({
@@ -146,6 +158,7 @@ export async function PATCH(
           outputItemId: updated.outputItemId,
           inputMaterialId: updated.inputMaterialId,
           targetQty: existing.productionRun.targetQty,
+          correlationId,
           inventory: inventoryResult,
         },
         diffs: [{ entity: "ConvertexProductionRun", entityId: id, before: existing, after: updated }],
