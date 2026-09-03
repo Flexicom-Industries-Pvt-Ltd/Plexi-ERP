@@ -441,6 +441,26 @@ export function registerProductionRoutes() {
   });
   reg({
     method: "get",
+    path: "/api/production/finishing/active-routes",
+    summary: "Active finishing routes for today",
+    tags: TAG,
+    description: "Finishing routes from approved/in-progress plans — drives production nav visibility.",
+  });
+  reg({
+    method: "get",
+    path: "/api/production/finishing/defaults",
+    summary: "Finishing route defaults by category",
+    tags: TAG,
+    description: "Config key FINISHING_ROUTE_DEFAULTS. Optional ?categoryId= for lookup.",
+  });
+  reg({
+    method: "put",
+    path: "/api/production/finishing/defaults",
+    summary: "Update finishing route defaults by category",
+    tags: TAG,
+  });
+  reg({
+    method: "get",
     path: "/api/production/rolls",
     summary: "List production rolls",
     tags: TAG,

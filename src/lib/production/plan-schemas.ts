@@ -1,5 +1,7 @@
 import { z } from "zod";
 import { extendZodWithOpenApi } from "@asteasolutions/zod-to-openapi";
+import { FinishingRouteEnum } from "./finishing-route-schemas";
+import { isFinishingPhase, finishingRouteForPhase } from "./finishing-routes";
 
 extendZodWithOpenApi(z);
 
@@ -19,6 +21,7 @@ export const CharacteristicValueSchema = z.object({
 
 export const PlanLineSchema = z.object({
   phase: ProductionPhaseEnum,
+  finishingRoute: FinishingRouteEnum.optional().nullable(),
   machineId: z.string().optional().nullable(),
   operatorId: z.string().optional().nullable(),
   operatorIds: z.array(z.string()).optional(),
@@ -56,6 +59,7 @@ export function buildLineCreateData(line: PlanLineInput, index: number) {
 
   return {
     phase: line.phase,
+    finishingRoute: line.finishingRoute ?? finishingRouteForPhase(line.phase) ?? null,
     machineId: line.machineId || null,
     operatorId: operatorIds[0] || line.operatorId || null,
     inventoryItemId: line.inventoryItemId || null,

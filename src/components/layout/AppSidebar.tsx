@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useState } from "react";
+import { Fragment, useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
@@ -34,6 +34,29 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
+import { FINISHING_ROUTES } from "@/lib/production/finishing-routes";
+
+const baseProductionItems = [
+  { title: "Overview", url: "/dashboard/production" },
+  { title: "Shift Plans", url: "/dashboard/production/plans" },
+  { title: "Shift Handover", url: "/dashboard/production/handovers" },
+  { title: "Bobbin Production", url: "/dashboard/production/bobbin" },
+  { title: "Loom Production", url: "/dashboard/production/loom" },
+  { title: "Lamination", url: "/dashboard/production/lamination" },
+  { title: "Printing", url: "/dashboard/production/printing" },
+  { title: "Cutting", url: "/dashboard/production/cutting" },
+];
+
+const finishingNavItems = FINISHING_ROUTES.map((r) => ({
+  title: r.label,
+  url: r.path,
+  finishingRoute: r.value,
+}));
+
+const tailProductionItems = [
+  { title: "Roll Stock", url: "/dashboard/production/rolls" },
+  { title: "Phase Characteristics", url: "/dashboard/data-centre/production-characteristics" },
+];
 
 const navItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, module: null },
@@ -59,19 +82,6 @@ const dataCentreItems = [
   { title: "Item Categories", url: "/dashboard/data-centre/categories" },
   { title: "Sub Categories", url: "/dashboard/data-centre/sub-categories" },
   { title: "Production Characteristics", url: "/dashboard/data-centre/production-characteristics" },
-];
-
-const productionItems = [
-  { title: "Overview", url: "/dashboard/production" },
-  { title: "Shift Plans", url: "/dashboard/production/plans" },
-  { title: "Shift Handover", url: "/dashboard/production/handovers" },
-  { title: "Bobbin Production", url: "/dashboard/production/bobbin" },
-  { title: "Loom Production", url: "/dashboard/production/loom" },
-  { title: "Lamination", url: "/dashboard/production/lamination" },
-  { title: "Printing", url: "/dashboard/production/printing" },
-  { title: "Cutting", url: "/dashboard/production/cutting" },
-  { title: "Roll Stock", url: "/dashboard/production/rolls" },
-  { title: "Phase Characteristics", url: "/dashboard/data-centre/production-characteristics" },
 ];
 
 function isProductionSubActive(pathname: string, url: string) {
@@ -101,6 +111,24 @@ export function AppSidebar({ user, allowedModules, ...props }: AppSidebarProps) 
   const hasSettingsAccess = isSuperAdmin || allowedModules["SETTINGS"];
   const hasDataCentreAccess = isSuperAdmin || allowedModules["DATA_CENTRE"];
   const hasProductionAccess = isSuperAdmin || allowedModules["PRODUCTION"];
+
+  const [activeFinishingRoutes, setActiveFinishingRoutes] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!hasProductionAccess) return;
+    fetch("/api/production/finishing/active-routes")
+      .then((r) => (r.ok ? r.json() : { routes: [] }))
+      .then((data) => setActiveFinishingRoutes(data.routes ?? []))
+      .catch(() => setActiveFinishingRoutes([]));
+  }, [hasProductionAccess]);
+
+  const productionItems = useMemo(() => {
+    const visibleFinishing = finishingNavItems.filter((item) =>
+      activeFinishingRoutes.includes(item.finishingRoute) ||
+      pathname.startsWith(item.url),
+    );
+    return [...baseProductionItems, ...visibleFinishing, ...tailProductionItems];
+  }, [activeFinishingRoutes, pathname]);
 
   const visibleNavItems = navItems.filter(
     (item) => item.title !== "Production" && (!item.module || isSuperAdmin || allowedModules[item.module]),

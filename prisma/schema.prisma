@@ -627,6 +627,13 @@ enum ProductionPhase {
   BALING
 }
 
+enum FinishingRoute {
+  CONVERTEX
+  VALVOMATIC
+  BCS
+  MANUAL_STITCH
+}
+
 enum ProductionPlanStatus {
   DRAFT
   APPROVED
@@ -669,6 +676,7 @@ model ProductionPlanLine {
   id              String          @id @default(cuid())
   planId          String
   phase           ProductionPhase
+  finishingRoute  FinishingRoute?
   machineId       String?
   operatorId      String?
   inventoryItemId String?
@@ -689,6 +697,7 @@ model ProductionPlanLine {
 
   @@index([planId])
   @@index([phase])
+  @@index([finishingRoute])
   @@index([machineId])
   @@index([inventoryItemId])
 }
