@@ -79,6 +79,7 @@ model User {
   printingRunHelperAssignments PrintingProductionRunHelper[]
   cuttingRunsOperated          CuttingProductionRun[]       @relation("CuttingRunOperator")
   convertexRunsOperated        ConvertexProductionRun[]     @relation("ConvertexRunOperator")
+  valvomaticRunsOperated       ValvomaticProductionRun[]    @relation("ValvomaticRunOperator")
   createdAt         DateTime       @default(now())
   updatedAt     DateTime    @updatedAt
 }
@@ -348,6 +349,7 @@ model Machine {
   printingRuns           PrintingProductionRun[]   @relation("PrintingRunMachine")
   cuttingRuns            CuttingProductionRun[]    @relation("CuttingRunMachine")
   convertexRuns          ConvertexProductionRun[]  @relation("ConvertexRunMachine")
+  valvomaticRuns         ValvomaticProductionRun[] @relation("ValvomaticRunMachine")
 
   @@index([sectionId])
 }
@@ -562,6 +564,7 @@ model InventoryItem {
   cuttingRunsAsOutput     CuttingProductionRun[] @relation("CuttingRunOutput")
   convertexRunsAsInput    ConvertexProductionRun[] @relation("ConvertexRunInput")
   convertexRunsAsOutput   ConvertexProductionRun[] @relation("ConvertexRunOutput")
+  valvomaticRunsAsOutput  ValvomaticProductionRun[] @relation("ValvomaticRunOutput")
 
   @@index([itemType])
   @@index([categoryId])
@@ -776,6 +779,7 @@ model ProductionRun {
   printingRun   PrintingProductionRun?
   cuttingRun    CuttingProductionRun?
   convertexRun  ConvertexProductionRun?
+  valvomaticRun ValvomaticProductionRun?
   productionRolls ProductionRoll[]
 
   @@index([planLineId])
@@ -991,6 +995,30 @@ model ConvertexProductionRun {
   @@index([convertexMachineId])
   @@index([operatorId])
   @@index([inputMaterialId])
+  @@index([outputItemId])
+}
+
+model ValvomaticProductionRun {
+  id                  String   @id @default(cuid())
+  productionRunId     String   @unique
+  valvomaticMachineId String
+  operatorId          String
+  inputs              Json
+  outputBagQty        Float    @default(0)
+  outputItemId        String?
+  characteristics     Json?
+  inventoryPosted     Boolean  @default(false)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  productionRun     ProductionRun  @relation(fields: [productionRunId], references: [id], onDelete: Cascade)
+  valvomaticMachine Machine        @relation("ValvomaticRunMachine", fields: [valvomaticMachineId], references: [id], onDelete: Restrict)
+  operator          User           @relation("ValvomaticRunOperator", fields: [operatorId], references: [id], onDelete: Restrict)
+  outputItem        InventoryItem? @relation("ValvomaticRunOutput", fields: [outputItemId], references: [id], onDelete: SetNull)
+
+  @@index([productionRunId])
+  @@index([valvomaticMachineId])
+  @@index([operatorId])
   @@index([outputItemId])
 }
 

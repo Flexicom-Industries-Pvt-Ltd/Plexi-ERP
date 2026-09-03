@@ -476,6 +476,62 @@ export const ConvertexRunsQuery = z.object({
   activeOnly: z.enum(["true", "false"]).optional(),
 });
 
+export const ValvomaticInputsBody = z.object({
+  inputRollId: z.string().nullable().optional(),
+  rollQty: z.number().min(0).default(0),
+  yarnItemId: z.string().nullable().optional(),
+  yarnQty: z.number().min(0).default(0),
+  ppItemId: z.string().nullable().optional(),
+  ppQty: z.number().min(0).default(0),
+  lppItemId: z.string().nullable().optional(),
+  lppQty: z.number().min(0).default(0),
+}).openapi("ValvomaticInputs");
+
+export const CreateValvomaticRunBody = z.object({
+  planLineId: z.string().min(1),
+  valvomaticMachineId: z.string().min(1),
+  operatorId: z.string().min(1),
+  targetQty: z.number().min(0),
+  inputs: ValvomaticInputsBody,
+}).openapi("CreateValvomaticRun");
+
+export const UpdateValvomaticRunBody = z.object({
+  inputs: ValvomaticInputsBody.optional(),
+  outputBagQty: z.number().min(0).optional(),
+  outputItemId: z.string().nullable().optional(),
+  characteristics: z.record(z.string(), z.unknown()).optional(),
+}).openapi("UpdateValvomaticRun");
+
+export const CompleteValvomaticRunBody = z.object({
+  action: z.literal("complete"),
+  actualQty: z.number().min(0),
+  acceptedQty: z.number().min(0),
+  rejectedQty: z.number().min(0).default(0),
+  reworkQty: z.number().min(0).default(0),
+  scrapQty: z.number().min(0).default(0),
+  downtimeMinutes: z.number().int().min(0).default(0),
+  inputs: ValvomaticInputsBody,
+  outputBagQty: z.number().min(0),
+  outputItemId: z.string().nullable().optional(),
+  characteristics: z.record(z.string(), z.unknown()).optional(),
+}).openapi("CompleteValvomaticRun");
+
+export const ValvomaticMachinesQuery = z.object({
+  shiftId: z.string().optional(),
+});
+
+export const ValvomaticRunsQuery = z.object({
+  planLineId: z.string().optional(),
+  planId: z.string().optional(),
+  operatorId: z.string().optional(),
+  valvomaticMachineId: z.string().optional(),
+  activeOnly: z.enum(["true", "false"]).optional(),
+});
+
+export const ValvomaticInputMaterialsQuery = z.object({
+  type: z.enum(["yarn", "pp", "lpp"]).optional(),
+});
+
 export const LoomMachinesQuery = z.object({
   date: z.string().optional(),
   shiftId: z.string().optional(),

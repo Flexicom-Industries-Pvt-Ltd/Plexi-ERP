@@ -8,6 +8,7 @@ import {
   CompletePrintingRunBody,
   CompleteCuttingRunBody,
   CompleteConvertexRunBody,
+  CompleteValvomaticRunBody,
   CompleteRunBody,
   CreateBobbinRunBody,
   CreateCharacteristicBody,
@@ -18,6 +19,7 @@ import {
   CreatePrintingRunBody,
   CreateCuttingRunBody,
   CreateConvertexRunBody,
+  CreateValvomaticRunBody,
   CreatePlanBody,
   CreateRunBody,
   CreateProductionRollBody,
@@ -34,6 +36,9 @@ import {
   CuttingRunsQuery,
   ConvertexMachinesQuery,
   ConvertexRunsQuery,
+  ValvomaticInputMaterialsQuery,
+  ValvomaticMachinesQuery,
+  ValvomaticRunsQuery,
   OperatorSchema,
   ProductionDashboardQuery,
   ProductionPlanSchema,
@@ -48,6 +53,7 @@ import {
   UpdatePrintingRunBody,
   UpdateCuttingRunBody,
   UpdateConvertexRunBody,
+  UpdateValvomaticRunBody,
   UpdatePlanBody,
   UpdateProductionRollBody,
 } from "../schemas";
@@ -511,6 +517,62 @@ export function registerProductionRoutes() {
     method: "get",
     path: "/api/production/convertex/output-items",
     summary: "Finished bag items for convertex output",
+    tags: TAG,
+  });
+  reg({
+    method: "get",
+    path: "/api/production/valvomatic/runs",
+    summary: "List valvomatic production runs",
+    tags: TAG,
+    query: ValvomaticRunsQuery,
+  });
+  reg({
+    method: "post",
+    path: "/api/production/valvomatic/runs",
+    summary: "Start valvomatic production run",
+    tags: TAG,
+    body: CreateValvomaticRunBody,
+  });
+  reg({
+    method: "get",
+    path: "/api/production/valvomatic/runs/{id}",
+    summary: "Get valvomatic production run",
+    tags: TAG,
+    params: IdPathParam,
+  });
+  reg({
+    method: "patch",
+    path: "/api/production/valvomatic/runs/{id}",
+    summary: "Update or complete valvomatic run",
+    tags: TAG,
+    params: IdPathParam,
+    body: CompleteValvomaticRunBody,
+    responses: { 200: { description: "Run updated or completed", schema: UpdateValvomaticRunBody } },
+  });
+  reg({
+    method: "get",
+    path: "/api/production/valvomatic/machines",
+    summary: "Valvomatic machine grid status",
+    tags: TAG,
+    query: ValvomaticMachinesQuery,
+  });
+  reg({
+    method: "get",
+    path: "/api/production/valvomatic/input-rolls",
+    summary: "Production rolls for valvomatic input",
+    tags: TAG,
+  });
+  reg({
+    method: "get",
+    path: "/api/production/valvomatic/input-materials",
+    summary: "Yarn, PP, and LPP inventory items for valvomatic",
+    tags: TAG,
+    query: ValvomaticInputMaterialsQuery,
+  });
+  reg({
+    method: "get",
+    path: "/api/production/valvomatic/output-items",
+    summary: "Finished bag items for valvomatic output",
     tags: TAG,
   });
   reg({
