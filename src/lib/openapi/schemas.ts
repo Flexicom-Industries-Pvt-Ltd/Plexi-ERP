@@ -587,6 +587,45 @@ export const BcsInputMaterialsQuery = z.object({
   type: z.enum(["yarn", "pp", "lpp"]).optional(),
 });
 
+export const CreateManualStitchRunBody = z.object({
+  planLineId: z.string().min(1),
+  operatorId: z.string().min(1),
+  workerIds: z.array(z.string().min(1)).min(1),
+  targetQty: z.number().min(0),
+  inputMaterialId: z.string().min(1),
+  inputQty: z.number().min(0).default(0),
+}).openapi("CreateManualStitchRun");
+
+export const UpdateManualStitchRunBody = z.object({
+  workerIds: z.array(z.string().min(1)).optional(),
+  inputQty: z.number().min(0).optional(),
+  outputBagQty: z.number().min(0).optional(),
+  outputItemId: z.string().nullable().optional(),
+  characteristics: z.record(z.string(), z.unknown()).optional(),
+}).openapi("UpdateManualStitchRun");
+
+export const CompleteManualStitchRunBody = z.object({
+  action: z.literal("complete"),
+  actualQty: z.number().min(0),
+  acceptedQty: z.number().min(0),
+  rejectedQty: z.number().min(0).default(0),
+  reworkQty: z.number().min(0).default(0),
+  scrapQty: z.number().min(0).default(0),
+  downtimeMinutes: z.number().int().min(0).default(0),
+  workerIds: z.array(z.string().min(1)).min(1),
+  inputQty: z.number().min(0),
+  outputBagQty: z.number().min(0),
+  outputItemId: z.string().nullable().optional(),
+  characteristics: z.record(z.string(), z.unknown()).optional(),
+}).openapi("CompleteManualStitchRun");
+
+export const ManualStitchRunsQuery = z.object({
+  planLineId: z.string().optional(),
+  planId: z.string().optional(),
+  operatorId: z.string().optional(),
+  activeOnly: z.enum(["true", "false"]).optional(),
+});
+
 export const LoomMachinesQuery = z.object({
   date: z.string().optional(),
   shiftId: z.string().optional(),

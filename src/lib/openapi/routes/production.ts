@@ -10,6 +10,7 @@ import {
   CompleteConvertexRunBody,
   CompleteValvomaticRunBody,
   CompleteBcsRunBody,
+  CompleteManualStitchRunBody,
   CompleteRunBody,
   CreateBobbinRunBody,
   CreateCharacteristicBody,
@@ -22,6 +23,7 @@ import {
   CreateConvertexRunBody,
   CreateValvomaticRunBody,
   CreateBcsRunBody,
+  CreateManualStitchRunBody,
   CreatePlanBody,
   CreateRunBody,
   CreateProductionRollBody,
@@ -45,6 +47,7 @@ import {
   ValvomaticInputMaterialsQuery,
   ValvomaticMachinesQuery,
   ValvomaticRunsQuery,
+  ManualStitchRunsQuery,
   OperatorSchema,
   ProductionDashboardQuery,
   ProductionPlanSchema,
@@ -61,6 +64,7 @@ import {
   UpdateConvertexRunBody,
   UpdateValvomaticRunBody,
   UpdateBcsRunBody,
+  UpdateManualStitchRunBody,
   UpdatePlanBody,
   UpdateProductionRollBody,
 } from "../schemas";
@@ -650,6 +654,48 @@ export function registerProductionRoutes() {
     method: "get",
     path: "/api/production/bcs/output-items",
     summary: "Finished bag items for BCS output",
+    tags: TAG,
+  });
+  reg({
+    method: "get",
+    path: "/api/production/manual-stitch/runs",
+    summary: "List manual stitch production runs",
+    tags: TAG,
+    query: ManualStitchRunsQuery,
+  });
+  reg({
+    method: "post",
+    path: "/api/production/manual-stitch/runs",
+    summary: "Start manual stitch production run",
+    tags: TAG,
+    body: CreateManualStitchRunBody,
+  });
+  reg({
+    method: "get",
+    path: "/api/production/manual-stitch/runs/{id}",
+    summary: "Get manual stitch production run",
+    tags: TAG,
+    params: IdPathParam,
+  });
+  reg({
+    method: "patch",
+    path: "/api/production/manual-stitch/runs/{id}",
+    summary: "Update or complete manual stitch run",
+    tags: TAG,
+    params: IdPathParam,
+    body: CompleteManualStitchRunBody,
+    responses: { 200: { description: "Run updated or completed", schema: UpdateManualStitchRunBody } },
+  });
+  reg({
+    method: "get",
+    path: "/api/production/manual-stitch/input-materials",
+    summary: "Cut material items for manual stitch input",
+    tags: TAG,
+  });
+  reg({
+    method: "get",
+    path: "/api/production/manual-stitch/output-items",
+    summary: "Finished bag items for manual stitch output",
     tags: TAG,
   });
   reg({
