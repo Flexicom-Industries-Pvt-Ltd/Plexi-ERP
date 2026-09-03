@@ -6,6 +6,7 @@ import { format } from "date-fns";
 import Link from "next/link";
 import { ArrowLeft, CheckCircle, XCircle, Loader2, Play } from "lucide-react";
 import { phaseLabel, statusLabel } from "@/lib/production/phases";
+import { finishingRouteLabel, isFinishingPhase } from "@/lib/production/finishing-routes";
 import { achievementPercent } from "@/lib/production/achievement";
 import { PlanFormModal, formToPayload, planToFormDefaults } from "@/components/production/PlanFormModal";
 import { PlannedVsActualSummary } from "@/components/production/PlannedVsActualSummary";
@@ -179,6 +180,9 @@ export function PlanDetailClient({ planNumber }: { planNumber: string }) {
               <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
                 <h3 className="font-semibold text-slate-800">
                   Line {index + 1}: {phaseLabel(line.phase)}
+                  {line.finishingRoute && isFinishingPhase(line.phase) && (
+                    <span className="text-slate-500 font-normal"> · {finishingRouteLabel(line.finishingRoute)}</span>
+                  )}
                 </h3>
                 <div className="flex items-center gap-3 text-sm">
                   <span className="text-slate-500">Target: {line.targetQty}</span>
