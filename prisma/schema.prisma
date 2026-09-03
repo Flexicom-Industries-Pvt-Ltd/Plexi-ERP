@@ -80,6 +80,7 @@ model User {
   cuttingRunsOperated          CuttingProductionRun[]       @relation("CuttingRunOperator")
   convertexRunsOperated        ConvertexProductionRun[]     @relation("ConvertexRunOperator")
   valvomaticRunsOperated       ValvomaticProductionRun[]    @relation("ValvomaticRunOperator")
+  bcsRunsOperated              BcsProductionRun[]           @relation("BcsRunOperator")
   createdAt         DateTime       @default(now())
   updatedAt     DateTime    @updatedAt
 }
@@ -350,6 +351,7 @@ model Machine {
   cuttingRuns            CuttingProductionRun[]    @relation("CuttingRunMachine")
   convertexRuns          ConvertexProductionRun[]  @relation("ConvertexRunMachine")
   valvomaticRuns         ValvomaticProductionRun[] @relation("ValvomaticRunMachine")
+  bcsRuns                BcsProductionRun[]        @relation("BcsRunMachine")
 
   @@index([sectionId])
 }
@@ -565,6 +567,7 @@ model InventoryItem {
   convertexRunsAsInput    ConvertexProductionRun[] @relation("ConvertexRunInput")
   convertexRunsAsOutput   ConvertexProductionRun[] @relation("ConvertexRunOutput")
   valvomaticRunsAsOutput  ValvomaticProductionRun[] @relation("ValvomaticRunOutput")
+  bcsRunsAsOutput         BcsProductionRun[]      @relation("BcsRunOutput")
 
   @@index([itemType])
   @@index([categoryId])
@@ -780,6 +783,7 @@ model ProductionRun {
   cuttingRun    CuttingProductionRun?
   convertexRun  ConvertexProductionRun?
   valvomaticRun ValvomaticProductionRun?
+  bcsRun        BcsProductionRun?
   productionRolls ProductionRoll[]
 
   @@index([planLineId])
@@ -1018,6 +1022,32 @@ model ValvomaticProductionRun {
 
   @@index([productionRunId])
   @@index([valvomaticMachineId])
+  @@index([operatorId])
+  @@index([outputItemId])
+}
+
+model BcsProductionRun {
+  id                String   @id @default(cuid())
+  productionRunId   String   @unique
+  bcsMachineId      String
+  operatorId        String
+  teamMemberIds     Json     @default("[]")
+  inputs            Json
+  outputBagQty      Float    @default(0)
+  outputItemId      String?
+  characteristics   Json?
+  bcsRulesSnapshot  Json?
+  inventoryPosted   Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  productionRun ProductionRun  @relation(fields: [productionRunId], references: [id], onDelete: Cascade)
+  bcsMachine    Machine        @relation("BcsRunMachine", fields: [bcsMachineId], references: [id], onDelete: Restrict)
+  operator      User           @relation("BcsRunOperator", fields: [operatorId], references: [id], onDelete: Restrict)
+  outputItem    InventoryItem? @relation("BcsRunOutput", fields: [outputItemId], references: [id], onDelete: SetNull)
+
+  @@index([productionRunId])
+  @@index([bcsMachineId])
   @@index([operatorId])
   @@index([outputItemId])
 }

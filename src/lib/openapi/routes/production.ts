@@ -9,6 +9,7 @@ import {
   CompleteCuttingRunBody,
   CompleteConvertexRunBody,
   CompleteValvomaticRunBody,
+  CompleteBcsRunBody,
   CompleteRunBody,
   CreateBobbinRunBody,
   CreateCharacteristicBody,
@@ -20,6 +21,7 @@ import {
   CreateCuttingRunBody,
   CreateConvertexRunBody,
   CreateValvomaticRunBody,
+  CreateBcsRunBody,
   CreatePlanBody,
   CreateRunBody,
   CreateProductionRollBody,
@@ -34,6 +36,10 @@ import {
   PrintingRunsQuery,
   CuttingMachinesQuery,
   CuttingRunsQuery,
+  BcsInputMaterialsQuery,
+  BcsMachinesQuery,
+  BcsProductionRulesBody,
+  BcsRunsQuery,
   ConvertexMachinesQuery,
   ConvertexRunsQuery,
   ValvomaticInputMaterialsQuery,
@@ -54,6 +60,7 @@ import {
   UpdateCuttingRunBody,
   UpdateConvertexRunBody,
   UpdateValvomaticRunBody,
+  UpdateBcsRunBody,
   UpdatePlanBody,
   UpdateProductionRollBody,
 } from "../schemas";
@@ -573,6 +580,76 @@ export function registerProductionRoutes() {
     method: "get",
     path: "/api/production/valvomatic/output-items",
     summary: "Finished bag items for valvomatic output",
+    tags: TAG,
+  });
+  reg({
+    method: "get",
+    path: "/api/production/bcs/rules",
+    summary: "Get BCS production rules",
+    tags: TAG,
+    response: BcsProductionRulesBody,
+  });
+  reg({
+    method: "put",
+    path: "/api/production/bcs/rules",
+    summary: "Update BCS production rules",
+    tags: TAG,
+    body: BcsProductionRulesBody,
+  });
+  reg({
+    method: "get",
+    path: "/api/production/bcs/runs",
+    summary: "List BCS production runs",
+    tags: TAG,
+    query: BcsRunsQuery,
+  });
+  reg({
+    method: "post",
+    path: "/api/production/bcs/runs",
+    summary: "Start BCS production run",
+    tags: TAG,
+    body: CreateBcsRunBody,
+  });
+  reg({
+    method: "get",
+    path: "/api/production/bcs/runs/{id}",
+    summary: "Get BCS production run",
+    tags: TAG,
+    params: IdPathParam,
+  });
+  reg({
+    method: "patch",
+    path: "/api/production/bcs/runs/{id}",
+    summary: "Update or complete BCS run",
+    tags: TAG,
+    params: IdPathParam,
+    body: CompleteBcsRunBody,
+    responses: { 200: { description: "Run updated or completed", schema: UpdateBcsRunBody } },
+  });
+  reg({
+    method: "get",
+    path: "/api/production/bcs/machines",
+    summary: "BCS machine grid status",
+    tags: TAG,
+    query: BcsMachinesQuery,
+  });
+  reg({
+    method: "get",
+    path: "/api/production/bcs/input-rolls",
+    summary: "Production rolls for BCS input",
+    tags: TAG,
+  });
+  reg({
+    method: "get",
+    path: "/api/production/bcs/input-materials",
+    summary: "Yarn, PP, and LPP inventory items for BCS",
+    tags: TAG,
+    query: BcsInputMaterialsQuery,
+  });
+  reg({
+    method: "get",
+    path: "/api/production/bcs/output-items",
+    summary: "Finished bag items for BCS output",
     tags: TAG,
   });
   reg({
