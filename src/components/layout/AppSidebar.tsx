@@ -55,6 +55,7 @@ const finishingNavItems = FINISHING_ROUTES.map((r) => ({
 
 const tailProductionItems = [
   { title: "Baling", url: "/dashboard/production/baling" },
+  { title: "Reports", url: "/dashboard/production/reports" },
   { title: "Roll Stock", url: "/dashboard/production/rolls" },
   { title: "Phase Characteristics", url: "/dashboard/data-centre/production-characteristics" },
 ];
