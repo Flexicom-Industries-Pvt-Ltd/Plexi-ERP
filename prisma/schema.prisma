@@ -81,6 +81,7 @@ model User {
   convertexRunsOperated        ConvertexProductionRun[]     @relation("ConvertexRunOperator")
   valvomaticRunsOperated       ValvomaticProductionRun[]    @relation("ValvomaticRunOperator")
   bcsRunsOperated              BcsProductionRun[]           @relation("BcsRunOperator")
+  manualStitchRunsOperated     ManualStitchProductionRun[]  @relation("ManualStitchRunOperator")
   createdAt         DateTime       @default(now())
   updatedAt     DateTime    @updatedAt
 }
@@ -568,6 +569,8 @@ model InventoryItem {
   convertexRunsAsOutput   ConvertexProductionRun[] @relation("ConvertexRunOutput")
   valvomaticRunsAsOutput  ValvomaticProductionRun[] @relation("ValvomaticRunOutput")
   bcsRunsAsOutput         BcsProductionRun[]      @relation("BcsRunOutput")
+  manualStitchRunsAsInput ManualStitchProductionRun[] @relation("ManualStitchRunInput")
+  manualStitchRunsAsOutput ManualStitchProductionRun[] @relation("ManualStitchRunOutput")
 
   @@index([itemType])
   @@index([categoryId])
@@ -784,6 +787,7 @@ model ProductionRun {
   convertexRun  ConvertexProductionRun?
   valvomaticRun ValvomaticProductionRun?
   bcsRun        BcsProductionRun?
+  manualStitchRun ManualStitchProductionRun?
   productionRolls ProductionRoll[]
 
   @@index([planLineId])
@@ -1049,6 +1053,31 @@ model BcsProductionRun {
   @@index([productionRunId])
   @@index([bcsMachineId])
   @@index([operatorId])
+  @@index([outputItemId])
+}
+
+model ManualStitchProductionRun {
+  id              String   @id @default(cuid())
+  productionRunId String   @unique
+  operatorId      String
+  workerIds       Json     @default("[]")
+  inputMaterialId String
+  inputQty        Float    @default(0)
+  outputBagQty    Float    @default(0)
+  outputItemId    String?
+  characteristics Json?
+  inventoryPosted Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  productionRun ProductionRun  @relation(fields: [productionRunId], references: [id], onDelete: Cascade)
+  operator      User           @relation("ManualStitchRunOperator", fields: [operatorId], references: [id], onDelete: Restrict)
+  inputMaterial InventoryItem  @relation("ManualStitchRunInput", fields: [inputMaterialId], references: [id], onDelete: Restrict)
+  outputItem    InventoryItem? @relation("ManualStitchRunOutput", fields: [outputItemId], references: [id], onDelete: SetNull)
+
+  @@index([productionRunId])
+  @@index([operatorId])
+  @@index([inputMaterialId])
   @@index([outputItemId])
 }
 
