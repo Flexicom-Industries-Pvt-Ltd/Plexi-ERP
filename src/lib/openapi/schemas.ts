@@ -327,6 +327,67 @@ export const LaminationRunsQuery = z.object({
   activeOnly: z.enum(["true", "false"]).optional(),
 });
 
+const InkMaterialBody = z.object({
+  itemId: z.string().optional(),
+  name: z.string().min(1),
+  qty: z.number().min(0),
+  unit: z.string().optional(),
+});
+
+export const CreatePrintingRunBody = z.object({
+  planLineId: z.string().min(1),
+  printingMachineId: z.string().min(1),
+  operatorId: z.string().min(1),
+  inputRollId: z.string().min(1),
+  helperUserIds: z.array(z.string().min(1)).default([]),
+  targetQty: z.number().min(0),
+  brand: z.string().optional().nullable(),
+  colour: z.string().optional().nullable(),
+  artworkRef: z.string().optional().nullable(),
+  inkMaterials: z.array(InkMaterialBody).optional(),
+  inputQty: z.number().min(0).default(0),
+}).openapi("CreatePrintingRun");
+
+export const UpdatePrintingRunBody = z.object({
+  inputQty: z.number().min(0).optional(),
+  outputQty: z.number().min(0).optional(),
+  brand: z.string().optional().nullable(),
+  colour: z.string().optional().nullable(),
+  artworkRef: z.string().optional().nullable(),
+  inkMaterials: z.array(InkMaterialBody).optional(),
+  characteristics: z.record(z.string(), z.unknown()).optional(),
+}).openapi("UpdatePrintingRun");
+
+export const CompletePrintingRunBody = z.object({
+  action: z.literal("complete"),
+  actualQty: z.number().min(0),
+  acceptedQty: z.number().min(0),
+  rejectedQty: z.number().min(0).default(0),
+  reworkQty: z.number().min(0).default(0),
+  scrapQty: z.number().min(0).default(0),
+  downtimeMinutes: z.number().int().min(0).default(0),
+  inputQty: z.number().min(0),
+  outputQty: z.number().min(0),
+  brand: z.string().optional().nullable(),
+  colour: z.string().optional().nullable(),
+  artworkRef: z.string().optional().nullable(),
+  inkMaterials: z.array(InkMaterialBody).optional(),
+  characteristics: z.record(z.string(), z.unknown()).optional(),
+}).openapi("CompletePrintingRun");
+
+export const PrintingMachinesQuery = z.object({
+  shiftId: z.string().optional(),
+  assignmentDate: z.string().optional(),
+});
+
+export const PrintingRunsQuery = z.object({
+  planLineId: z.string().optional(),
+  planId: z.string().optional(),
+  operatorId: z.string().optional(),
+  printingMachineId: z.string().optional(),
+  activeOnly: z.enum(["true", "false"]).optional(),
+});
+
 export const LoomMachinesQuery = z.object({
   date: z.string().optional(),
   shiftId: z.string().optional(),

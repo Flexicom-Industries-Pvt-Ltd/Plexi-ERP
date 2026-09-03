@@ -75,6 +75,8 @@ model User {
   loomAssignments              LoomAssignment[]
   loomRunsOperated             LoomProductionRun[]          @relation("LoomRunOperator")
   laminationRunsOperated       LaminationProductionRun[]    @relation("LaminationRunOperator")
+  printingRunsOperated         PrintingProductionRun[]      @relation("PrintingRunOperator")
+  printingRunHelperAssignments PrintingProductionRunHelper[]
   createdAt         DateTime       @default(now())
   updatedAt     DateTime    @updatedAt
 }
@@ -341,6 +343,7 @@ model Machine {
   loomAssignmentMachines LoomAssignmentMachine[]
   loomRuns               LoomProductionRun[]     @relation("LoomRunMachine")
   laminationRuns         LaminationProductionRun[] @relation("LaminationRunMachine")
+  printingRuns           PrintingProductionRun[]   @relation("PrintingRunMachine")
 
   @@index([sectionId])
 }
@@ -754,6 +757,7 @@ model ProductionRun {
   bobbinRun  BobbinProductionRun?
   loomRun    LoomProductionRun?
   laminationRun LaminationProductionRun?
+  printingRun   PrintingProductionRun?
   productionRolls ProductionRoll[]
 
   @@index([planLineId])
@@ -873,6 +877,50 @@ model LaminationProductionRun {
   @@index([inputRollId])
 }
 
+model PrintingProductionRun {
+  id                String   @id @default(cuid())
+  productionRunId   String   @unique
+  printingMachineId String
+  operatorId        String
+  inputRollId       String
+  brand             String?
+  colour            String?
+  artworkRef        String?
+  inkMaterials      Json?
+  inputQty          Float    @default(0)
+  outputQty         Float    @default(0)
+  characteristics   Json?
+  inventoryPosted   Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  productionRun   ProductionRun                 @relation(fields: [productionRunId], references: [id], onDelete: Cascade)
+  printingMachine Machine                       @relation("PrintingRunMachine", fields: [printingMachineId], references: [id], onDelete: Restrict)
+  operator        User                          @relation("PrintingRunOperator", fields: [operatorId], references: [id], onDelete: Restrict)
+  inputRoll       ProductionRoll                @relation("PrintingInputRoll", fields: [inputRollId], references: [id], onDelete: Restrict)
+  productionRoll  ProductionRoll?
+  helpers         PrintingProductionRunHelper[]
+
+  @@index([productionRunId])
+  @@index([printingMachineId])
+  @@index([operatorId])
+  @@index([inputRollId])
+}
+
+model PrintingProductionRunHelper {
+  id            String   @id @default(cuid())
+  printingRunId String
+  userId        String
+  createdAt     DateTime @default(now())
+
+  printingRun PrintingProductionRun @relation(fields: [printingRunId], references: [id], onDelete: Cascade)
+  user        User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([printingRunId, userId])
+  @@index([printingRunId])
+  @@index([userId])
+}
+
 enum RollQualityStatus {
   PENDING_QC
   PASSED
@@ -901,6 +949,7 @@ model ProductionRoll {
   sourcePhase         ProductionRollSourcePhase @default(LOOM)
   loomProductionRunId       String?                   @unique
   laminationProductionRunId String?                   @unique
+  printingProductionRunId   String?                   @unique
   productionRunId           String?
   consumedAt                  DateTime?
   remarks                     String?
@@ -911,8 +960,10 @@ model ProductionRoll {
   inventoryItem           InventoryItem?           @relation(fields: [inventoryItemId], references: [id], onDelete: SetNull)
   loomProductionRun       LoomProductionRun?       @relation(fields: [loomProductionRunId], references: [id], onDelete: SetNull)
   laminationProductionRun LaminationProductionRun? @relation(fields: [laminationProductionRunId], references: [id], onDelete: SetNull)
+  printingProductionRun   PrintingProductionRun?   @relation(fields: [printingProductionRunId], references: [id], onDelete: SetNull)
   productionRun           ProductionRun?           @relation(fields: [productionRunId], references: [id], onDelete: SetNull)
   laminationRunsAsInput   LaminationProductionRun[] @relation("LaminationInputRoll")
+  printingRunsAsInput     PrintingProductionRun[]   @relation("PrintingInputRoll")
 
   @@index([rollType])
   @@index([qualityStatus])

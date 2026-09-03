@@ -22,6 +22,18 @@ export const productionRollInclude = {
       inputRoll: { select: { id: true, rollNumber: true, rollType: true } },
     },
   },
+  printingProductionRun: {
+    include: {
+      printingMachine: { select: { id: true, name: true, serialNumber: true } },
+      operator: { select: { id: true, name: true, email: true } },
+      inputRoll: { select: { id: true, rollNumber: true, rollType: true } },
+      helpers: {
+        include: {
+          user: { select: { id: true, name: true, email: true } },
+        },
+      },
+    },
+  },
   productionRun: {
     include: {
       planLine: {
