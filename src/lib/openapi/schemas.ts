@@ -691,6 +691,20 @@ export const ProductionDashboardQuery = z.object({
   date: z.string().optional(),
 });
 
+export const ProductionReportsQuery = z.object({
+  dateFrom: z.string().optional(),
+  dateTo: z.string().optional(),
+  dateRange: z.string().optional().describe("Comma-separated from,to dates"),
+  shift: z.string().optional(),
+  shiftId: z.string().optional(),
+  phase: z.string().optional(),
+  machine: z.string().optional(),
+  machineId: z.string().optional(),
+  operator: z.string().optional(),
+  operatorId: z.string().optional(),
+  format: z.enum(["json", "csv"]).optional(),
+});
+
 export const ProductionRollsQuery = z.object({
   rollType: z.enum(["PP", "LPP"]).optional(),
   qualityStatus: z.enum(["PENDING_QC", "PASSED", "FAILED", "REWORK", "ON_HOLD"]).optional(),

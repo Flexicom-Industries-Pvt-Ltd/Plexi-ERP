@@ -54,6 +54,7 @@ import {
   ManualStitchRunsQuery,
   OperatorSchema,
   ProductionDashboardQuery,
+  ProductionReportsQuery,
   ProductionPlanSchema,
   ProductionPlansQuery,
   ProductionRollSchema,
@@ -90,6 +91,13 @@ export function registerProductionRoutes() {
     summary: "Production dashboard KPIs",
     tags: TAG,
     query: ProductionDashboardQuery,
+  });
+  reg({
+    method: "get",
+    path: "/api/production/reports",
+    summary: "Production reports and analytics",
+    tags: TAG,
+    query: ProductionReportsQuery,
   });
   reg({
     method: "get",
