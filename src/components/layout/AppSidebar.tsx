@@ -69,6 +69,7 @@ const productionItems = [
   { title: "Loom Production", url: "/dashboard/production/loom" },
   { title: "Lamination", url: "/dashboard/production/lamination" },
   { title: "Printing", url: "/dashboard/production/printing" },
+  { title: "Cutting", url: "/dashboard/production/cutting" },
   { title: "Roll Stock", url: "/dashboard/production/rolls" },
   { title: "Phase Characteristics", url: "/dashboard/data-centre/production-characteristics" },
 ];
