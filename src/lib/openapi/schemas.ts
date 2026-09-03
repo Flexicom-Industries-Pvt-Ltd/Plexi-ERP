@@ -388,6 +388,52 @@ export const PrintingRunsQuery = z.object({
   activeOnly: z.enum(["true", "false"]).optional(),
 });
 
+export const CreateCuttingRunBody = z.object({
+  planLineId: z.string().min(1),
+  cuttingMachineId: z.string().min(1),
+  operatorId: z.string().min(1),
+  inputRollId: z.string().min(1),
+  targetQty: z.number().min(0),
+  cuttingSpec: z.string().optional().nullable(),
+  inputQty: z.number().min(0).default(0),
+}).openapi("CreateCuttingRun");
+
+export const UpdateCuttingRunBody = z.object({
+  inputQty: z.number().min(0).optional(),
+  outputMaterialQty: z.number().min(0).optional(),
+  cuttingSpec: z.string().optional().nullable(),
+  outputItemId: z.string().nullable().optional(),
+  characteristics: z.record(z.string(), z.unknown()).optional(),
+}).openapi("UpdateCuttingRun");
+
+export const CompleteCuttingRunBody = z.object({
+  action: z.literal("complete"),
+  actualQty: z.number().min(0),
+  acceptedQty: z.number().min(0),
+  rejectedQty: z.number().min(0).default(0),
+  reworkQty: z.number().min(0).default(0),
+  scrapQty: z.number().min(0).default(0),
+  downtimeMinutes: z.number().int().min(0).default(0),
+  inputQty: z.number().min(0),
+  outputMaterialQty: z.number().min(0),
+  cuttingSpec: z.string().optional().nullable(),
+  outputItemId: z.string().nullable().optional(),
+  characteristics: z.record(z.string(), z.unknown()).optional(),
+}).openapi("CompleteCuttingRun");
+
+export const CuttingMachinesQuery = z.object({
+  shiftId: z.string().optional(),
+  assignmentDate: z.string().optional(),
+});
+
+export const CuttingRunsQuery = z.object({
+  planLineId: z.string().optional(),
+  planId: z.string().optional(),
+  operatorId: z.string().optional(),
+  cuttingMachineId: z.string().optional(),
+  activeOnly: z.enum(["true", "false"]).optional(),
+});
+
 export const LoomMachinesQuery = z.object({
   date: z.string().optional(),
   shiftId: z.string().optional(),

@@ -6,6 +6,7 @@ import {
   CompleteLoomRunBody,
   CompleteLaminationRunBody,
   CompletePrintingRunBody,
+  CompleteCuttingRunBody,
   CompleteRunBody,
   CreateBobbinRunBody,
   CreateCharacteristicBody,
@@ -14,6 +15,7 @@ import {
   CreateLoomRunBody,
   CreateLaminationRunBody,
   CreatePrintingRunBody,
+  CreateCuttingRunBody,
   CreatePlanBody,
   CreateRunBody,
   CreateProductionRollBody,
@@ -26,6 +28,8 @@ import {
   LaminationRunsQuery,
   PrintingMachinesQuery,
   PrintingRunsQuery,
+  CuttingMachinesQuery,
+  CuttingRunsQuery,
   OperatorSchema,
   ProductionDashboardQuery,
   ProductionPlanSchema,
@@ -38,6 +42,7 @@ import {
   UpdateLoomRunBody,
   UpdateLaminationRunBody,
   UpdatePrintingRunBody,
+  UpdateCuttingRunBody,
   UpdatePlanBody,
   UpdateProductionRollBody,
 } from "../schemas";
@@ -383,6 +388,56 @@ export function registerProductionRoutes() {
     summary: "Available rolls for printing input",
     tags: TAG,
     description: "Unconsumed loom or laminated rolls eligible for printing.",
+  });
+  reg({
+    method: "get",
+    path: "/api/production/cutting/runs",
+    summary: "List cutting production runs",
+    tags: TAG,
+    query: CuttingRunsQuery,
+  });
+  reg({
+    method: "post",
+    path: "/api/production/cutting/runs",
+    summary: "Start cutting production run",
+    tags: TAG,
+    body: CreateCuttingRunBody,
+  });
+  reg({
+    method: "get",
+    path: "/api/production/cutting/runs/{id}",
+    summary: "Get cutting production run",
+    tags: TAG,
+    params: IdPathParam,
+  });
+  reg({
+    method: "patch",
+    path: "/api/production/cutting/runs/{id}",
+    summary: "Update or complete cutting run",
+    tags: TAG,
+    params: IdPathParam,
+    body: CompleteCuttingRunBody,
+    responses: { 200: { description: "Run updated or completed", schema: UpdateCuttingRunBody } },
+  });
+  reg({
+    method: "get",
+    path: "/api/production/cutting/machines",
+    summary: "Cutting machine grid status",
+    tags: TAG,
+    query: CuttingMachinesQuery,
+  });
+  reg({
+    method: "get",
+    path: "/api/production/cutting/input-rolls",
+    summary: "Available printed rolls for cutting input",
+    tags: TAG,
+  });
+  reg({
+    method: "get",
+    path: "/api/production/cutting/items",
+    summary: "Cut material inventory items",
+    tags: TAG,
+    description: "CUT_MATERIAL stock items for cutting output.",
   });
   reg({
     method: "get",

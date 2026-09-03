@@ -77,6 +77,7 @@ model User {
   laminationRunsOperated       LaminationProductionRun[]    @relation("LaminationRunOperator")
   printingRunsOperated         PrintingProductionRun[]      @relation("PrintingRunOperator")
   printingRunHelperAssignments PrintingProductionRunHelper[]
+  cuttingRunsOperated          CuttingProductionRun[]       @relation("CuttingRunOperator")
   createdAt         DateTime       @default(now())
   updatedAt     DateTime    @updatedAt
 }
@@ -344,6 +345,7 @@ model Machine {
   loomRuns               LoomProductionRun[]     @relation("LoomRunMachine")
   laminationRuns         LaminationProductionRun[] @relation("LaminationRunMachine")
   printingRuns           PrintingProductionRun[]   @relation("PrintingRunMachine")
+  cuttingRuns            CuttingProductionRun[]    @relation("CuttingRunMachine")
 
   @@index([sectionId])
 }
@@ -555,6 +557,7 @@ model InventoryItem {
   loomRunsAsBobbin        LoomProductionRun[]   @relation("LoomRunBobbin")
   loomRunsAsRoll          LoomProductionRun[]   @relation("LoomRunRoll")
   productionRolls         ProductionRoll[]
+  cuttingRunsAsOutput     CuttingProductionRun[] @relation("CuttingRunOutput")
 
   @@index([itemType])
   @@index([categoryId])
@@ -758,6 +761,7 @@ model ProductionRun {
   loomRun    LoomProductionRun?
   laminationRun LaminationProductionRun?
   printingRun   PrintingProductionRun?
+  cuttingRun    CuttingProductionRun?
   productionRolls ProductionRoll[]
 
   @@index([planLineId])
@@ -921,6 +925,34 @@ model PrintingProductionRunHelper {
   @@index([userId])
 }
 
+model CuttingProductionRun {
+  id                String   @id @default(cuid())
+  productionRunId   String   @unique
+  cuttingMachineId  String
+  operatorId        String
+  inputRollId       String
+  cuttingSpec       String?
+  inputQty          Float    @default(0)
+  outputMaterialQty Float    @default(0)
+  outputItemId      String?
+  characteristics   Json?
+  inventoryPosted   Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  productionRun  ProductionRun  @relation(fields: [productionRunId], references: [id], onDelete: Cascade)
+  cuttingMachine Machine        @relation("CuttingRunMachine", fields: [cuttingMachineId], references: [id], onDelete: Restrict)
+  operator       User           @relation("CuttingRunOperator", fields: [operatorId], references: [id], onDelete: Restrict)
+  inputRoll      ProductionRoll @relation("CuttingInputRoll", fields: [inputRollId], references: [id], onDelete: Restrict)
+  outputItem     InventoryItem? @relation("CuttingRunOutput", fields: [outputItemId], references: [id], onDelete: SetNull)
+
+  @@index([productionRunId])
+  @@index([cuttingMachineId])
+  @@index([operatorId])
+  @@index([inputRollId])
+  @@index([outputItemId])
+}
+
 enum RollQualityStatus {
   PENDING_QC
   PASSED
@@ -964,6 +996,7 @@ model ProductionRoll {
   productionRun           ProductionRun?           @relation(fields: [productionRunId], references: [id], onDelete: SetNull)
   laminationRunsAsInput   LaminationProductionRun[] @relation("LaminationInputRoll")
   printingRunsAsInput     PrintingProductionRun[]   @relation("PrintingInputRoll")
+  cuttingRunsAsInput      CuttingProductionRun[]    @relation("CuttingInputRoll")
 
   @@index([rollType])
   @@index([qualityStatus])
