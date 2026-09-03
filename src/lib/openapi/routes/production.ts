@@ -5,6 +5,7 @@ import {
   CompleteBobbinRunBody,
   CompleteLoomRunBody,
   CompleteLaminationRunBody,
+  CompletePrintingRunBody,
   CompleteRunBody,
   CreateBobbinRunBody,
   CreateCharacteristicBody,
@@ -12,6 +13,7 @@ import {
   CreateLoomAssignmentBody,
   CreateLoomRunBody,
   CreateLaminationRunBody,
+  CreatePrintingRunBody,
   CreatePlanBody,
   CreateRunBody,
   CreateProductionRollBody,
@@ -22,6 +24,8 @@ import {
   LoomMachinesQuery,
   LaminationMachinesQuery,
   LaminationRunsQuery,
+  PrintingMachinesQuery,
+  PrintingRunsQuery,
   OperatorSchema,
   ProductionDashboardQuery,
   ProductionPlanSchema,
@@ -33,6 +37,7 @@ import {
   UpdateCharacteristicBody,
   UpdateLoomRunBody,
   UpdateLaminationRunBody,
+  UpdatePrintingRunBody,
   UpdatePlanBody,
   UpdateProductionRollBody,
 } from "../schemas";
@@ -327,6 +332,57 @@ export function registerProductionRoutes() {
     summary: "Available loom rolls for lamination input",
     tags: TAG,
     description: "Unconsumed loom-output rolls eligible for lamination.",
+  });
+  reg({
+    method: "get",
+    path: "/api/production/printing/config",
+    summary: "Printing manpower configuration",
+    tags: TAG,
+    description: "Returns required helper count from PRINTING_HELPERS_PER_OPERATOR (default 2).",
+  });
+  reg({
+    method: "get",
+    path: "/api/production/printing/runs",
+    summary: "List printing production runs",
+    tags: TAG,
+    query: PrintingRunsQuery,
+  });
+  reg({
+    method: "post",
+    path: "/api/production/printing/runs",
+    summary: "Start printing production run",
+    tags: TAG,
+    body: CreatePrintingRunBody,
+  });
+  reg({
+    method: "get",
+    path: "/api/production/printing/runs/{id}",
+    summary: "Get printing production run",
+    tags: TAG,
+    params: IdPathParam,
+  });
+  reg({
+    method: "patch",
+    path: "/api/production/printing/runs/{id}",
+    summary: "Update or complete printing run",
+    tags: TAG,
+    params: IdPathParam,
+    body: CompletePrintingRunBody,
+    responses: { 200: { description: "Run updated or completed", schema: UpdatePrintingRunBody } },
+  });
+  reg({
+    method: "get",
+    path: "/api/production/printing/machines",
+    summary: "Printing machine grid status",
+    tags: TAG,
+    query: PrintingMachinesQuery,
+  });
+  reg({
+    method: "get",
+    path: "/api/production/printing/input-rolls",
+    summary: "Available rolls for printing input",
+    tags: TAG,
+    description: "Unconsumed loom or laminated rolls eligible for printing.",
   });
   reg({
     method: "get",
