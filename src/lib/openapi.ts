@@ -38,8 +38,8 @@ export function generateOpenApiSpec() {
     },
     servers: [
       {
-        url: "/api",
-        description: "API Base URL",
+        url: "/",
+        description: "Application root (paths include /api prefix)",
       },
     ],
     security: [{ bearerAuth: [] }, { cookieAuth: [] }],
