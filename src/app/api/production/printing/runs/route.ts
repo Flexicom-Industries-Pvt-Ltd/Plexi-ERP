@@ -5,11 +5,8 @@ import { db } from "@/lib/db";
 import { logEvent } from "@/lib/logging";
 
 import { printingRunInclude } from "@/lib/production/printing-run-include";
-import {
-  getPrintingHelpersPerOperator,
-  validatePrintingHelperCount,
-} from "@/lib/production/printing-manpower";
-import { requireProductionApiPermission } from "@/lib/production/permissions";
+import { validateManpowerAssignment } from "@/lib/production/manpower-rules";
+import { canOverrideProductionRules, requireProductionApiPermission } from "@/lib/production/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +30,7 @@ const CreatePrintingRunSchema = z.object({
   inkMaterials: z.array(InkMaterialSchema).optional(),
   inputQty: z.number().min(0).default(0),
   startedAt: z.string().datetime().optional(),
+  forceOverride: z.boolean().default(false),
 });
 
 async function assertInputRollAvailable(inputRollId: string) {
@@ -109,14 +107,29 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Validation failed", details: parsed.error.format() }, { status: 400 });
     }
 
-    const requiredHelpers = await getPrintingHelpersPerOperator();
-    const helperValidation = validatePrintingHelperCount(
-      parsed.data.helperUserIds,
+    const manpowerValidation = await validateManpowerAssignment(
+      "PRINTING",
       parsed.data.operatorId,
-      requiredHelpers,
+      { helperUserIds: parsed.data.helperUserIds },
     );
-    if (!helperValidation.valid) {
-      return NextResponse.json({ error: helperValidation.error }, { status: 400 });
+
+    if (!manpowerValidation.valid && !parsed.data.forceOverride) {
+      return NextResponse.json(
+        {
+          error: manpowerValidation.error ?? "Printing helper assignment invalid",
+          requiredCount: manpowerValidation.requiredCount,
+          actualCount: manpowerValidation.actualCount,
+          canOverride: true,
+        },
+        { status: 422 },
+      );
+    }
+
+    if (parsed.data.forceOverride && !canOverrideProductionRules(authResult.session.user)) {
+      return NextResponse.json(
+        { error: "Supervisor permission (Production update) required to override manpower rules" },
+        { status: 403 },
+      );
     }
 
     const line = await db.productionPlanLine.findUnique({

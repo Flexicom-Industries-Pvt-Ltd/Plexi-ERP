@@ -539,6 +539,11 @@ export const BcsProductionRulesBody = z.object({
   requireYarnInput: z.boolean().default(false),
 }).openapi("BcsProductionRules");
 
+export const ManpowerRulesBody = z.object({
+  loomsPerOperator: z.number().int().min(1).max(20),
+  printingHelpersPerOperator: z.number().int().min(0).max(10),
+}).openapi("ManpowerRules");
+
 export const CreateBcsRunBody = z.object({
   planLineId: z.string().min(1),
   bcsMachineId: z.string().min(1),

@@ -42,6 +42,7 @@ import {
   BcsInputMaterialsQuery,
   BcsMachinesQuery,
   BcsProductionRulesBody,
+  ManpowerRulesBody,
   BcsRunsQuery,
   BalesQuery,
   BaleSchema,
@@ -596,6 +597,21 @@ export function registerProductionRoutes() {
     path: "/api/production/valvomatic/output-items",
     summary: "Finished bag items for valvomatic output",
     tags: TAG,
+  });
+  reg({
+    method: "get",
+    path: "/api/production/manpower-rules",
+    summary: "Get production manpower rules",
+    tags: TAG,
+    response: ManpowerRulesBody,
+  });
+  reg({
+    method: "put",
+    path: "/api/production/manpower-rules",
+    summary: "Update production manpower rules",
+    tags: TAG,
+    body: ManpowerRulesBody,
+    response: ManpowerRulesBody,
   });
   reg({
     method: "get",

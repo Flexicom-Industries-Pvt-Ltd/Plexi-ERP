@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { getPrintingHelpersPerOperator } from "@/lib/production/printing-manpower";
+import { getManpowerRules, PRINTING_KEY } from "@/lib/production/manpower-rules";
 import { requireProductionApiPermission } from "@/lib/production/permissions";
 
 export const dynamic = "force-dynamic";
@@ -11,9 +11,10 @@ export async function GET() {
     return NextResponse.json({ error: authResult.error }, { status: authResult.status });
   }
 
-  const helpersPerOperator = await getPrintingHelpersPerOperator();
+  const rules = await getManpowerRules();
   return NextResponse.json({
-    helpersPerOperator,
-    configKey: "PRINTING_HELPERS_PER_OPERATOR",
+    helpersPerOperator: rules.printingHelpersPerOperator,
+    configKey: PRINTING_KEY,
+    loomsPerOperator: rules.loomsPerOperator,
   });
 }

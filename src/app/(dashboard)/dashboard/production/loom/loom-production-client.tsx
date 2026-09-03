@@ -75,6 +75,7 @@ export function LoomProductionClient() {
   const [bobbins, setBobbins] = useState<any[]>([]);
   const [ppRolls, setPpRolls] = useState<any[]>([]);
   const [lppRolls, setLppRolls] = useState<any[]>([]);
+  const [loomsPerOperator, setLoomsPerOperator] = useState(4);
 
   const [shiftId, setShiftId] = useState("");
   const [assignOperatorId, setAssignOperatorId] = useState("");
@@ -121,6 +122,11 @@ export function LoomProductionClient() {
         setBobbins(data.bobbins || []);
         setPpRolls(data.ppRolls || []);
         setLppRolls(data.lppRolls || []);
+      });
+    fetch("/api/production/manpower-rules")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.loomsPerOperator) setLoomsPerOperator(data.loomsPerOperator);
       });
   }, []);
 
@@ -394,7 +400,7 @@ export function LoomProductionClient() {
           </h2>
           <p className="text-xs text-slate-500 flex items-start gap-1">
             <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5 text-amber-500" />
-            Default limit: 4 looms per operator (configurable via LOOMS_PER_OPERATOR).
+            Limit: {loomsPerOperator} loom(s) per operator (configurable in Data Centre → Manpower Rules).
           </p>
           <div className="space-y-3">
             <div>

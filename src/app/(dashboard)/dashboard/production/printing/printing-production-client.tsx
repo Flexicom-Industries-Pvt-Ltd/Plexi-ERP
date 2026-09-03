@@ -196,13 +196,12 @@ export function PrintingProductionClient() {
 
   const helperOptions = operators.filter((op) => op.id !== startForm.operatorId);
 
-  const handleStart = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleStart = async (forceOverride = false) => {
     if (!startForm.planLineId || !startForm.printingMachineId || !startForm.operatorId || !startForm.inputRollId) {
       toast.error("Select plan line, machine, operator, and input roll");
       return;
     }
-    if (startForm.helperUserIds.length !== requiredHelpers) {
+    if (!forceOverride && startForm.helperUserIds.length !== requiredHelpers) {
       toast.error(`Select exactly ${requiredHelpers} helper(s)`);
       return;
     }
@@ -215,11 +214,22 @@ export function PrintingProductionClient() {
         body: JSON.stringify({
           ...startForm,
           inkMaterials: inkMaterials.length ? inkMaterials : undefined,
+          forceOverride,
         }),
       });
+      const data = await res.json();
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || "Failed to start run");
+        if (data.canOverride && res.status === 422) {
+          const proceed = window.confirm(
+            `${data.error}\n\nOverride manpower rules and start run anyway? (Supervisor permission required)`,
+          );
+          if (proceed) {
+            setSaving(false);
+            return handleStart(true);
+          }
+          return;
+        }
+        throw new Error(data.error || "Failed to start run");
       }
       toast.success("Printing run started");
       setStartForm({
@@ -409,9 +419,9 @@ export function PrintingProductionClient() {
             <Play className="h-4 w-4 text-primary" /> Start Printing Run
           </h2>
           <p className="text-xs text-slate-500">
-            Requires exactly {requiredHelpers} helper(s) (config: PRINTING_HELPERS_PER_OPERATOR).
+            Requires exactly {requiredHelpers} helper(s). Configure in Data Centre → Manpower Rules.
           </p>
-          <form onSubmit={handleStart} className="space-y-3">
+          <form onSubmit={(e) => { e.preventDefault(); handleStart(); }} className="space-y-3">
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">Plan Line</label>
               <select className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm disabled:bg-slate-50" value={startForm.planLineId} onChange={(e) => onPlanLineSelect(e.target.value)} required disabled={!hasPrintingPlans}>
