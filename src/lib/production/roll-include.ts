@@ -15,6 +15,13 @@ export const productionRollInclude = {
       bobbinItem: { select: { id: true, code: true, name: true } },
     },
   },
+  laminationProductionRun: {
+    include: {
+      laminationMachine: { select: { id: true, name: true, serialNumber: true } },
+      operator: { select: { id: true, name: true, email: true } },
+      inputRoll: { select: { id: true, rollNumber: true, rollType: true } },
+    },
+  },
   productionRun: {
     include: {
       planLine: {

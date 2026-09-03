@@ -284,6 +284,49 @@ export const CompleteLoomRunBody = z.object({
   characteristics: z.record(z.string(), z.unknown()).optional(),
 }).openapi("CompleteLoomRun");
 
+export const CreateLaminationRunBody = z.object({
+  planLineId: z.string().min(1),
+  laminationMachineId: z.string().min(1),
+  operatorId: z.string().min(1),
+  inputRollId: z.string().min(1),
+  targetQty: z.number().min(0),
+  inputQty: z.number().min(0).default(0),
+  startedAt: z.string().datetime().optional(),
+}).openapi("CreateLaminationRun");
+
+export const UpdateLaminationRunBody = z.object({
+  inputQty: z.number().min(0).optional(),
+  outputQty: z.number().min(0).optional(),
+  characteristics: z.record(z.string(), z.unknown()).optional(),
+}).openapi("UpdateLaminationRun");
+
+export const CompleteLaminationRunBody = z.object({
+  action: z.literal("complete"),
+  actualQty: z.number().min(0),
+  acceptedQty: z.number().min(0),
+  rejectedQty: z.number().min(0).default(0),
+  reworkQty: z.number().min(0).default(0),
+  scrapQty: z.number().min(0).default(0),
+  downtimeMinutes: z.number().int().min(0).default(0),
+  inputQty: z.number().min(0),
+  outputQty: z.number().min(0),
+  characteristics: z.record(z.string(), z.unknown()).optional(),
+  endedAt: z.string().datetime().optional(),
+}).openapi("CompleteLaminationRun");
+
+export const LaminationMachinesQuery = z.object({
+  shiftId: z.string().optional(),
+  assignmentDate: z.string().optional(),
+});
+
+export const LaminationRunsQuery = z.object({
+  planLineId: z.string().optional(),
+  planId: z.string().optional(),
+  operatorId: z.string().optional(),
+  laminationMachineId: z.string().optional(),
+  activeOnly: z.enum(["true", "false"]).optional(),
+});
+
 export const LoomMachinesQuery = z.object({
   date: z.string().optional(),
   shiftId: z.string().optional(),
