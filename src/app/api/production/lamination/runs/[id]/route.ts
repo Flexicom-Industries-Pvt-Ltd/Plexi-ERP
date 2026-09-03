@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { logEvent } from "@/lib/logging";
 
 import { postLaminationInventoryMovements } from "@/lib/production/lamination-inventory";
+import { createProductionCorrelationId } from "@/lib/production/inventory-tx";
 import { createProductionRollFromLaminationRun } from "@/lib/production/create-roll-from-lamination";
 import { laminationRunInclude } from "@/lib/production/lamination-run-include";
 import { requireProductionApiPermission } from "@/lib/production/permissions";
@@ -97,6 +98,8 @@ export async function PATCH(
 
       const data = parsed.data;
       let createdRollId: string | null = null;
+      const correlationId = createProductionCorrelationId(existing.productionRunId);
+      let inventoryResult;
 
       const updated = await db.$transaction(async (tx) => {
         await tx.productionRun.update({
@@ -118,6 +121,7 @@ export async function PATCH(
             inputQty: data.inputQty,
             outputQty: data.outputQty,
             characteristics: (data.characteristics as Prisma.InputJsonValue) ?? undefined,
+            inventoryPosted: true,
           },
         });
 
@@ -135,21 +139,24 @@ export async function PATCH(
         });
         createdRollId = roll?.id ?? null;
 
+        inventoryResult = await postLaminationInventoryMovements({
+          tx,
+          userId: authResult.session.user.id,
+          laminationRunId: laminationUpdated.id,
+          productionRunId: laminationUpdated.productionRunId,
+          inputRollId: existing.inputRollId,
+          inputQty: laminationUpdated.inputQty,
+          outputRoll: roll,
+          outputQty: laminationUpdated.outputQty,
+          scrapQty: data.scrapQty,
+          alreadyPosted: existing.inventoryPosted,
+          correlationId,
+        });
+
         return tx.laminationProductionRun.findUniqueOrThrow({
           where: { id },
           include: laminationRunInclude,
         });
-      });
-
-      const inventoryResult = await postLaminationInventoryMovements({
-        userId: authResult.session.user.id,
-        laminationRunId: updated.id,
-        productionRunId: updated.productionRunId,
-        inputRollId: updated.inputRollId,
-        inputQty: updated.inputQty,
-        outputRollId: updated.productionRoll?.id ?? null,
-        outputQty: updated.outputQty,
-        scrapQty: data.scrapQty,
       });
 
       await logEvent({
@@ -164,6 +171,7 @@ export async function PATCH(
           outputRollId: createdRollId,
           inputRollId: updated.inputRollId,
           targetQty: existing.productionRun.targetQty,
+          correlationId,
           inventory: inventoryResult,
         },
         diffs: [{ entity: "LaminationProductionRun", entityId: id, before: existing, after: updated }],

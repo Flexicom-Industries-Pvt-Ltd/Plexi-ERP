@@ -5,6 +5,7 @@ import { format } from "date-fns";
 import Link from "next/link";
 import { toast } from "sonner";
 import { ArrowLeft, Factory, Loader2, MapPin, Package, ScrollText } from "lucide-react";
+import { ProductionInventoryMovements } from "@/components/production/ProductionInventoryMovements";
 
 const qualityOptions = [
   { value: "PENDING_QC", label: "Pending QC" },
@@ -311,6 +312,10 @@ export function RollDetailClient({ rollId }: { rollId: string }) {
           </section>
         </div>
       </div>
+
+      {roll.productionRun?.id && (
+        <ProductionInventoryMovements referenceId={roll.productionRun.id} />
+      )}
     </div>
   );
 }

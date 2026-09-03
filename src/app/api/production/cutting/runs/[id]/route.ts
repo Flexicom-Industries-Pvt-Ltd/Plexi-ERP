@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { logEvent } from "@/lib/logging";
 
 import { postCuttingInventoryMovements } from "@/lib/production/cutting-inventory";
+import { createProductionCorrelationId } from "@/lib/production/inventory-tx";
 import { cuttingRunInclude } from "@/lib/production/cutting-run-include";
 import { requireProductionApiPermission } from "@/lib/production/permissions";
 
@@ -99,6 +100,9 @@ export async function PATCH(
         }
       }
 
+      const correlationId = createProductionCorrelationId(existing.productionRunId);
+      let inventoryResult;
+
       const updated = await db.$transaction(async (tx) => {
         await tx.productionRun.update({
           where: { id: existing.productionRunId },
@@ -113,7 +117,7 @@ export async function PATCH(
           },
         });
 
-        await tx.cuttingProductionRun.update({
+        const cuttingUpdated = await tx.cuttingProductionRun.update({
           where: { id },
           data: {
             inputQty: data.inputQty,
@@ -121,6 +125,7 @@ export async function PATCH(
             cuttingSpec: data.cuttingSpec ?? existing.cuttingSpec,
             outputItemId: data.outputItemId ?? existing.outputItemId,
             characteristics: (data.characteristics as Prisma.InputJsonValue) ?? undefined,
+            inventoryPosted: true,
           },
         });
 
@@ -129,21 +134,25 @@ export async function PATCH(
           data: { consumedAt: new Date() },
         });
 
+        inventoryResult = await postCuttingInventoryMovements({
+          tx,
+          userId: authResult.session.user.id,
+          cuttingRunId: cuttingUpdated.id,
+          productionRunId: cuttingUpdated.productionRunId,
+          inputRollId: existing.inputRollId,
+          inputQty: cuttingUpdated.inputQty,
+          outputItemId: cuttingUpdated.outputItemId,
+          outputMaterialQty: cuttingUpdated.outputMaterialQty,
+          productionBatch: cuttingUpdated.cuttingSpec,
+          scrapQty: data.scrapQty,
+          alreadyPosted: existing.inventoryPosted,
+          correlationId,
+        });
+
         return tx.cuttingProductionRun.findUniqueOrThrow({
           where: { id },
           include: cuttingRunInclude,
         });
-      });
-
-      const inventoryResult = await postCuttingInventoryMovements({
-        userId: authResult.session.user.id,
-        cuttingRunId: updated.id,
-        productionRunId: updated.productionRunId,
-        inputRollId: updated.inputRollId,
-        inputQty: updated.inputQty,
-        outputItemId: updated.outputItemId,
-        outputMaterialQty: updated.outputMaterialQty,
-        scrapQty: data.scrapQty,
       });
 
       await logEvent({
@@ -159,6 +168,7 @@ export async function PATCH(
           inputRollId: updated.inputRollId,
           cuttingSpec: updated.cuttingSpec,
           targetQty: existing.productionRun.targetQty,
+          correlationId,
           inventory: inventoryResult,
         },
         diffs: [{ entity: "CuttingProductionRun", entityId: id, before: existing, after: updated }],

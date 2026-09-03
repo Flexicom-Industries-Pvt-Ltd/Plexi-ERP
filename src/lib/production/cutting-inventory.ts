@@ -1,6 +1,15 @@
-import { logEvent } from "@/lib/logging";
+import { Prisma } from "@/generated/prisma";
+import {
+  createProductionCorrelationId,
+  itemInMovement,
+  postProductionInventoryMovements,
+  PRODUCTION_RUN_REFERENCE,
+  resolveRollOutMovement,
+  type ProductionInventoryResult,
+} from "@/lib/production/inventory-tx";
 
 type CuttingInventoryParams = {
+  tx: Prisma.TransactionClient;
   userId: string;
   cuttingRunId: string;
   productionRunId: string;
@@ -8,34 +17,35 @@ type CuttingInventoryParams = {
   inputQty: number;
   outputItemId?: string | null;
   outputMaterialQty: number;
+  productionBatch?: string | null;
   scrapQty: number;
+  alreadyPosted?: boolean;
+  correlationId?: string;
 };
 
-/**
- * P36 integration stub — records intent to consume printed roll and receive cut material.
- */
-export async function postCuttingInventoryMovements(params: CuttingInventoryParams) {
-  await logEvent({
-    userId: params.userId,
-    module: "PRODUCTION",
-    severity: "INFO",
-    action: "CUTTING_INVENTORY_STUB",
-    payload: {
-      note: "P36 integration pending — printed roll OUT and CUT_MATERIAL IN not posted yet",
-      intendedMovements: {
-        printedRollOut: { rollId: params.inputRollId, qty: params.inputQty },
-        cutMaterialIn: params.outputItemId
-          ? { itemId: params.outputItemId, qty: params.outputMaterialQty, materialType: "CUT_MATERIAL" }
-          : null,
-        scrapQty: params.scrapQty,
-      },
-      cuttingRunId: params.cuttingRunId,
-      productionRunId: params.productionRunId,
-    },
-  });
+export async function postCuttingInventoryMovements(
+  params: CuttingInventoryParams,
+): Promise<ProductionInventoryResult> {
+  const correlationId = params.correlationId ?? createProductionCorrelationId(params.productionRunId);
 
-  return {
-    posted: false,
-    message: "Inventory posting deferred to P36 integration",
-  };
+  const rollOut = await resolveRollOutMovement(params.tx, params.inputRollId, params.inputQty, "Printed roll");
+  const cutMaterialIn = itemInMovement(
+    params.outputItemId,
+    params.outputMaterialQty,
+    params.productionBatch,
+    "Cut material output",
+  );
+
+  const movements = [rollOut, cutMaterialIn].filter(Boolean) as NonNullable<typeof rollOut>[];
+
+  return postProductionInventoryMovements({
+    tx: params.tx,
+    userId: params.userId,
+    referenceType: PRODUCTION_RUN_REFERENCE,
+    referenceId: params.productionRunId,
+    phase: "CUTTING",
+    correlationId,
+    movements,
+    skipIfAlreadyPosted: params.alreadyPosted,
+  });
 }

@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { logEvent } from "@/lib/logging";
 
 import { postValvomaticInventoryMovements } from "@/lib/production/valvomatic-inventory";
+import { createProductionCorrelationId } from "@/lib/production/inventory-tx";
 import {
   ValvomaticInputsSchema,
   validateValvomaticInputs,
@@ -104,6 +105,9 @@ export async function PATCH(
         }
       }
 
+      const correlationId = createProductionCorrelationId(existing.productionRunId);
+      let inventoryResult;
+
       const updated = await db.$transaction(async (tx) => {
         await tx.productionRun.update({
           where: { id: existing.productionRunId },
@@ -118,26 +122,34 @@ export async function PATCH(
           },
         });
 
-        return tx.valvomaticProductionRun.update({
+        const valvomaticUpdated = await tx.valvomaticProductionRun.update({
           where: { id },
           data: {
             inputs: parsed.data.inputs as Prisma.InputJsonValue,
             outputBagQty: parsed.data.outputBagQty,
             outputItemId: parsed.data.outputItemId ?? existing.outputItemId,
             characteristics: (parsed.data.characteristics as Prisma.InputJsonValue) ?? undefined,
+            inventoryPosted: true,
           },
+        });
+
+        inventoryResult = await postValvomaticInventoryMovements({
+          tx,
+          userId: authResult.session.user.id,
+          valvomaticRunId: valvomaticUpdated.id,
+          productionRunId: valvomaticUpdated.productionRunId,
+          inputs: parsed.data.inputs,
+          outputItemId: valvomaticUpdated.outputItemId,
+          outputBagQty: valvomaticUpdated.outputBagQty,
+          scrapQty: parsed.data.scrapQty,
+          alreadyPosted: existing.inventoryPosted,
+          correlationId,
+        });
+
+        return tx.valvomaticProductionRun.findUniqueOrThrow({
+          where: { id },
           include: valvomaticRunInclude,
         });
-      });
-
-      const inventoryResult = await postValvomaticInventoryMovements({
-        userId: authResult.session.user.id,
-        valvomaticRunId: updated.id,
-        productionRunId: updated.productionRunId,
-        inputs: parsed.data.inputs,
-        outputItemId: updated.outputItemId,
-        outputBagQty: updated.outputBagQty,
-        scrapQty: parsed.data.scrapQty,
       });
 
       await logEvent({
@@ -152,6 +164,7 @@ export async function PATCH(
           outputItemId: updated.outputItemId,
           inputs: parsed.data.inputs,
           targetQty: existing.productionRun.targetQty,
+          correlationId,
           inventory: inventoryResult,
         },
         diffs: [{ entity: "ValvomaticProductionRun", entityId: id, before: existing, after: updated }],

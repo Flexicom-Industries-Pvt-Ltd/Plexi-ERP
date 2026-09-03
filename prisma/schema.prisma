@@ -606,6 +606,7 @@ model InventoryTransaction {
 
   @@index([itemId])
   @@index([type])
+  @@index([referenceType])
   @@index([referenceId])
   @@index([batchLot])
   @@index([createdAt])

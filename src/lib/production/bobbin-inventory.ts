@@ -1,6 +1,15 @@
-import { logEvent } from "@/lib/logging";
+import { Prisma } from "@/generated/prisma";
+import {
+  createProductionCorrelationId,
+  itemInMovement,
+  itemOutMovement,
+  postProductionInventoryMovements,
+  PRODUCTION_RUN_REFERENCE,
+  type ProductionInventoryResult,
+} from "@/lib/production/inventory-tx";
 
 type BobbinInventoryParams = {
+  tx: Prisma.TransactionClient;
   userId: string;
   bobbinRunId: string;
   productionRunId: string;
@@ -9,34 +18,28 @@ type BobbinInventoryParams = {
   inputQty: number;
   outputQty: number;
   scrapQty: number;
+  alreadyPosted?: boolean;
+  correlationId?: string;
 };
 
-/**
- * P36 integration stub — records intent to post inventory movements.
- * Full production-inventory integration will replace this in P36.
- */
-export async function postBobbinInventoryMovements(params: BobbinInventoryParams) {
-  await logEvent({
-    userId: params.userId,
-    module: "PRODUCTION",
-    severity: "INFO",
-    action: "BOBBIN_INVENTORY_STUB",
-    payload: {
-      note: "P36 integration pending — raw material OUT and bobbin IN not posted yet",
-      intendedMovements: {
-        rawMaterialOut: { itemId: params.rawMaterialItemId, qty: params.inputQty },
-        bobbinIn: params.outputItemId
-          ? { itemId: params.outputItemId, qty: params.outputQty }
-          : null,
-        scrapQty: params.scrapQty,
-      },
-      bobbinRunId: params.bobbinRunId,
-      productionRunId: params.productionRunId,
-    },
-  });
+export async function postBobbinInventoryMovements(
+  params: BobbinInventoryParams,
+): Promise<ProductionInventoryResult> {
+  const correlationId = params.correlationId ?? createProductionCorrelationId(params.productionRunId);
 
-  return {
-    posted: false,
-    message: "Inventory posting deferred to P36 integration",
-  };
+  const movements = [
+    itemOutMovement(params.rawMaterialItemId, params.inputQty, null, "Raw material consumed"),
+    itemInMovement(params.outputItemId, params.outputQty, null, "Bobbin output"),
+  ].filter(Boolean) as NonNullable<ReturnType<typeof itemOutMovement>>[];
+
+  return postProductionInventoryMovements({
+    tx: params.tx,
+    userId: params.userId,
+    referenceType: PRODUCTION_RUN_REFERENCE,
+    referenceId: params.productionRunId,
+    phase: "BOBBIN",
+    correlationId,
+    movements,
+    skipIfAlreadyPosted: params.alreadyPosted,
+  });
 }

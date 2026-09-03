@@ -1,39 +1,45 @@
-import { logEvent } from "@/lib/logging";
+import { Prisma } from "@/generated/prisma";
+import {
+  BALE_REFERENCE,
+  createBaleCorrelationId,
+  itemInMovement,
+  itemOutMovement,
+  postProductionInventoryMovements,
+  type ProductionInventoryMovement,
+  type ProductionInventoryResult,
+} from "@/lib/production/inventory-tx";
 
 type BalingInventoryParams = {
+  tx: Prisma.TransactionClient;
   userId: string;
   baleId: string;
   baleNumber: string;
   productId: string;
   bagQty: number;
   baleItemId?: string | null;
-  baleQty: number;
+  productionBatch?: string | null;
+  alreadyPosted?: boolean;
+  correlationId?: string;
 };
 
-/**
- * P36 integration stub — records intent to consume finished bags and receive bales stock.
- */
-export async function postBalingInventoryMovements(params: BalingInventoryParams) {
-  await logEvent({
-    userId: params.userId,
-    module: "PRODUCTION",
-    severity: "INFO",
-    action: "BALING_INVENTORY_STUB",
-    payload: {
-      note: "P36 integration pending — FINISHED_BAGS OUT and BALES IN not posted yet",
-      intendedMovements: {
-        finishedBagsOut: { itemId: params.productId, qty: params.bagQty, materialType: "FINISHED_BAGS" },
-        balesIn: params.baleItemId
-          ? { itemId: params.baleItemId, qty: params.baleQty, materialType: "BALES" }
-          : null,
-      },
-      baleId: params.baleId,
-      baleNumber: params.baleNumber,
-    },
-  });
+export async function postBalingInventoryMovements(
+  params: BalingInventoryParams,
+): Promise<ProductionInventoryResult> {
+  const correlationId = params.correlationId ?? createBaleCorrelationId(params.baleId);
 
-  return {
-    posted: false,
-    message: "Inventory posting deferred to P36 integration",
-  };
+  const movements = [
+    itemOutMovement(params.productId, params.bagQty, params.productionBatch, "Finished bags baled"),
+    itemInMovement(params.baleItemId, 1, params.productionBatch, `Bale ${params.baleNumber}`),
+  ].filter(Boolean) as ProductionInventoryMovement[];
+
+  return postProductionInventoryMovements({
+    tx: params.tx,
+    userId: params.userId,
+    referenceType: BALE_REFERENCE,
+    referenceId: params.baleId,
+    phase: "BALING",
+    correlationId,
+    movements,
+    skipIfAlreadyPosted: params.alreadyPosted,
+  });
 }

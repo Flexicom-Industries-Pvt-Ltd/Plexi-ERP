@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { logEvent } from "@/lib/logging";
 
 import { postPrintingInventoryMovements } from "@/lib/production/printing-inventory";
+import { createProductionCorrelationId } from "@/lib/production/inventory-tx";
 import { createProductionRollFromPrintingRun } from "@/lib/production/create-roll-from-printing";
 import { printingRunInclude } from "@/lib/production/printing-run-include";
 import { requireProductionApiPermission } from "@/lib/production/permissions";
@@ -112,6 +113,8 @@ export async function PATCH(
 
       const data = parsed.data;
       let createdRollId: string | null = null;
+      const correlationId = createProductionCorrelationId(existing.productionRunId);
+      let inventoryResult;
 
       const updated = await db.$transaction(async (tx) => {
         await tx.productionRun.update({
@@ -137,6 +140,7 @@ export async function PATCH(
             artworkRef: data.artworkRef ?? existing.artworkRef,
             inkMaterials: (data.inkMaterials as Prisma.InputJsonValue) ?? existing.inkMaterials ?? undefined,
             characteristics: (data.characteristics as Prisma.InputJsonValue) ?? undefined,
+            inventoryPosted: true,
           },
         });
 
@@ -157,22 +161,25 @@ export async function PATCH(
         });
         createdRollId = roll?.id ?? null;
 
+        inventoryResult = await postPrintingInventoryMovements({
+          tx,
+          userId: authResult.session.user.id,
+          printingRunId: printingUpdated.id,
+          productionRunId: printingUpdated.productionRunId,
+          inputRollId: existing.inputRollId,
+          inputQty: printingUpdated.inputQty,
+          outputRoll: roll,
+          outputQty: printingUpdated.outputQty,
+          inkMaterials: printingUpdated.inkMaterials,
+          scrapQty: data.scrapQty,
+          alreadyPosted: existing.inventoryPosted,
+          correlationId,
+        });
+
         return tx.printingProductionRun.findUniqueOrThrow({
           where: { id },
           include: printingRunInclude,
         });
-      });
-
-      const inventoryResult = await postPrintingInventoryMovements({
-        userId: authResult.session.user.id,
-        printingRunId: updated.id,
-        productionRunId: updated.productionRunId,
-        inputRollId: updated.inputRollId,
-        inputQty: updated.inputQty,
-        outputRollId: updated.productionRoll?.id ?? null,
-        outputQty: updated.outputQty,
-        inkMaterials: updated.inkMaterials,
-        scrapQty: data.scrapQty,
       });
 
       await logEvent({
@@ -188,6 +195,7 @@ export async function PATCH(
           inputRollId: updated.inputRollId,
           inkMaterials: updated.inkMaterials,
           targetQty: existing.productionRun.targetQty,
+          correlationId,
           inventory: inventoryResult,
         },
         diffs: [{ entity: "PrintingProductionRun", entityId: id, before: existing, after: updated }],

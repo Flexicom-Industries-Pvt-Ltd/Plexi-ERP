@@ -78,6 +78,13 @@ const TAG = ["Production"];
 export function registerProductionRoutes() {
   reg({
     method: "get",
+    path: "/api/production/runs/{id}/inventory-transactions",
+    summary: "List inventory transactions linked to a production run or bale",
+    tags: TAG,
+    params: IdPathParam,
+  });
+  reg({
+    method: "get",
     path: "/api/production/dashboard",
     summary: "Production dashboard KPIs",
     tags: TAG,
