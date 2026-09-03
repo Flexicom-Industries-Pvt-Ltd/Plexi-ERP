@@ -626,6 +626,43 @@ export const ManualStitchRunsQuery = z.object({
   activeOnly: z.enum(["true", "false"]).optional(),
 });
 
+export const BalesQuery = z.object({
+  shiftId: z.string().optional(),
+  productId: z.string().optional(),
+  qualityStatus: z.enum(["PENDING_QC", "PASSED", "FAILED", "REWORK", "ON_HOLD"]).optional(),
+  search: z.string().optional(),
+  dateFrom: z.string().optional(),
+  dateTo: z.string().optional(),
+});
+
+export const CreateBaleBody = z.object({
+  productId: z.string().min(1),
+  baleItemId: z.string().nullable().optional(),
+  bagsPerBale: z.number().min(1),
+  quantity: z.number().min(1),
+  productionBatch: z.string().nullable().optional(),
+  qualityStatus: z.enum(["PENDING_QC", "PASSED", "FAILED", "REWORK", "ON_HOLD"]).default("PENDING_QC"),
+  shiftId: z.string().min(1),
+  characteristics: z.record(z.string(), z.unknown()).optional(),
+  baledAt: z.string().datetime().optional(),
+}).openapi("CreateBale");
+
+export const UpdateBaleBody = z.object({
+  productionBatch: z.string().nullable().optional(),
+  qualityStatus: z.enum(["PENDING_QC", "PASSED", "FAILED", "REWORK", "ON_HOLD"]).optional(),
+  characteristics: z.record(z.string(), z.unknown()).optional(),
+  baleItemId: z.string().nullable().optional(),
+}).openapi("UpdateBale");
+
+export const BaleSchema = z.object({
+  id: z.string(),
+  baleNumber: z.string(),
+  bagsPerBale: z.number(),
+  quantity: z.number(),
+  qualityStatus: z.string(),
+  productionBatch: z.string().nullable().optional(),
+}).openapi("Bale");
+
 export const LoomMachinesQuery = z.object({
   date: z.string().optional(),
   shiftId: z.string().optional(),
