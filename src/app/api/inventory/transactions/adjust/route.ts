@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
         before: { currentStock: item.currentStock },
         after: { currentStock: updatedItem.currentStock, transactionId: invTx.id },
       });
-    });
+    }, { maxWait: 15000, timeout: 30000 });
 
     await logEvent({
       userId: session.user.id,
