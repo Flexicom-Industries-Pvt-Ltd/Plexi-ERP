@@ -103,17 +103,18 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       const unit = catalog.uom?.abbreviation || data.unit;
       const materialType = catalog.materialType || data.materialType;
 
+      const qtyNum = parseFloat(data.quantity) || 0;
       return tx.truckStockDetail.create({
         data: {
           gateEntryId: entry.id,
           stockId: catalog.id,
           materialName: catalog.name,
           materialType,
-          quantity: parseFloat(data.quantity),
+          quantity: qtyNum,
           unit,
-          batchLot: data.batchLot,
-          supplierCustomer: data.supplierCustomer,
-          expectedQuantity: data.expectedQuantity ? parseFloat(data.expectedQuantity) : null,
+          batchLot: data.batchLot || null,
+          supplierCustomer: data.supplierCustomer || entry.supplierCustomer || null,
+          expectedQuantity: data.expectedQuantity ? parseFloat(data.expectedQuantity) : qtyNum,
           actualQuantity: data.actualQuantity ? parseFloat(data.actualQuantity) : null,
         },
       });
