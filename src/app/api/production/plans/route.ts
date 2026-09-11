@@ -4,7 +4,7 @@ import { logEvent } from "@/lib/logging";
 
 import { requireProductionApiPermission } from "@/lib/production/permissions";
 import { generatePlanNumber } from "@/lib/production/plan-number";
-import { planInclude } from "@/lib/production/plan-include";
+import { planDetailInclude, planListInclude } from "@/lib/production/plan-include";
 import { CreatePlanSchema, buildLineCreateData } from "@/lib/production/plan-schemas";
 
 export const dynamic = "force-dynamic";
@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 async function resolvePlan(idOrNumber: string) {
   return db.productionPlan.findFirst({
     where: { OR: [{ id: idOrNumber }, { planNumber: idOrNumber }] },
-    include: planInclude,
+    include: planDetailInclude,
   });
 }
 
@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
     const plans = await db.productionPlan.findMany({
       where,
       orderBy: { planDate: "desc" },
-      include: planInclude,
+      include: planListInclude,
     });
     return NextResponse.json(plans);
   } catch (error) {
@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
           create: data.lines.map((line, index) => buildLineCreateData(line, index)),
         },
       },
-      include: planInclude,
+      include: planDetailInclude,
     });
 
     await logEvent({
