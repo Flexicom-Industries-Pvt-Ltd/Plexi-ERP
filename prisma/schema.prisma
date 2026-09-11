@@ -85,6 +85,9 @@ model User {
   balesCreated                 Bale[]                       @relation("BaleCreator")
   createdAt         DateTime       @default(now())
   updatedAt     DateTime    @updatedAt
+
+  @@index([roleId, isActive])
+  @@index([departmentId])
 }
 
 model Account {
@@ -488,6 +491,7 @@ model GateEntry {
   @@index([status])
   @@index([truckNumber])
   @@index([arrivalTime])
+  @@index([status, arrivalTime])
 }
 
 model TruckStockDetail {
@@ -510,6 +514,7 @@ model TruckStockDetail {
   stock            Stock?    @relation(fields: [stockId], references: [id], onDelete: SetNull)
 
   @@index([stockId])
+  @@index([gateEntryId])
 }
 
 model GateDocument {
@@ -527,6 +532,8 @@ model GateDocument {
 
   gateEntry      GateEntry      @relation(fields: [gateEntryId], references: [id], onDelete: Cascade)
   verifier       User?          @relation("DocumentVerifier", fields: [verifiedBy], references: [id])
+
+  @@index([gateEntryId, status])
 }
 
 // ==========================================
@@ -688,6 +695,7 @@ model ProductionPlan {
   @@index([status])
   @@index([planDate])
   @@index([shiftId])
+  @@index([planDate, status])
 }
 
 model ProductionPlanLine {
@@ -798,6 +806,7 @@ model ProductionRun {
   @@index([planLineId])
   @@index([startedAt])
   @@index([endedAt])
+  @@index([planLineId, startedAt])
 }
 
 model BobbinProductionRun {

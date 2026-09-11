@@ -1,4 +1,5 @@
 import { auth } from "@/auth";
+import { isSuperAdminRole } from "@/lib/api-auth";
 
 type ProductionAction = "canRead" | "canCreate" | "canUpdate" | "canDelete";
 
@@ -10,8 +11,8 @@ export async function requireProductionApiPermission(action: ProductionAction) {
 
   const permissions = session.user.permissions || [];
   const hasAccess =
-    session.user.role === "SUPERADMIN" ||
-    permissions.some((p: { module: string; [key: string]: unknown }) => p.module === "PRODUCTION" && p[action]);
+    isSuperAdminRole(session.user.role) ||
+    permissions.some((p: { module: string; [key: string]: unknown }) => (p.module === "PRODUCTION" || p.module === "ALL") && Boolean(p[action]));
 
   if (!hasAccess) {
     return { ok: false as const, status: 403, error: "Forbidden" };
@@ -24,7 +25,7 @@ export function canOverrideProductionRules(session: {
   role?: string;
   permissions?: { module: string; canUpdate?: boolean }[];
 }) {
-  if (session.role === "SUPERADMIN") return true;
+  if (isSuperAdminRole(session.role)) return true;
   return (session.permissions ?? []).some(
     (p) => p.module === "PRODUCTION" && p.canUpdate,
   );
