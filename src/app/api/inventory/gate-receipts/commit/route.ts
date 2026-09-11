@@ -43,78 +43,92 @@ export async function POST(request: NextRequest) {
 
     const transactionType = gateEntry.purpose === "LOADING" ? TransactionType.OUT : TransactionType.IN;
     const diffs: any[] = [];
+    const itemCache = new Map<string, any>();
 
-    await db.$transaction(async (tx) => {
-      for (const commit of commits) {
-        const { stockDetailId, stockId, actualQuantity } = commit;
+    await db.$transaction(
+      async (tx) => {
+        for (const commit of commits) {
+          const { stockDetailId, stockId, actualQuantity } = commit;
 
-        // 1. Update TruckStockDetail
-        const stockDetail = await tx.truckStockDetail.update({
-          where: { id: stockDetailId },
-          data: { actualQuantity, stockId },
-        });
-
-        const batchLot = stockDetail.batchLot || `GATE-${gateEntry.entryNumber}`;
-
-        // 2. Resolve catalog stock to inventory item (find or create)
-        const item = await resolveInventoryItemFromStock(stockId, tx);
-        const itemId = item.id;
-
-        const newStock = transactionType === "IN" 
-          ? item.currentStock + actualQuantity 
-          : item.currentStock - actualQuantity;
-
-        const updatedItem = await tx.inventoryItem.update({
-          where: { id: itemId },
-          data: { currentStock: newStock },
-        });
-
-        if (transactionType === TransactionType.IN) {
-          await tx.inventoryBatch.upsert({
-            where: { itemId_batchLot: { itemId, batchLot } },
-            create: {
-              itemId,
-              batchLot,
-              quantity: actualQuantity,
-              gateEntryId,
-              locationId: item.locationId,
-            },
-            update: { quantity: { increment: actualQuantity } },
+          // 1. Update TruckStockDetail
+          const stockDetail = await tx.truckStockDetail.update({
+            where: { id: stockDetailId },
+            data: { actualQuantity, stockId },
           });
-        } else if (transactionType === TransactionType.OUT) {
-          const existingBatch = await tx.inventoryBatch.findUnique({
-            where: { itemId_batchLot: { itemId, batchLot } },
-          });
-          if (existingBatch) {
-            await tx.inventoryBatch.update({
-              where: { id: existingBatch.id },
-              data: { quantity: { decrement: actualQuantity } },
-            });
+
+          const batchLot = stockDetail.batchLot || `GATE-${gateEntry.entryNumber}`;
+
+          // 2. Resolve catalog stock to inventory item (cached in-memory)
+          let item = itemCache.get(stockId);
+          if (!item) {
+            item = await resolveInventoryItemFromStock(stockId, tx);
+            itemCache.set(stockId, item);
           }
+          const itemId = item.id;
+
+          const previousStock = item.currentStock;
+          const newStock = transactionType === "IN" 
+            ? previousStock + actualQuantity 
+            : previousStock - actualQuantity;
+
+          const updatedItem = await tx.inventoryItem.update({
+            where: { id: itemId },
+            data: { currentStock: newStock },
+          });
+          // Update cached item's currentStock for subsequent rows referencing the same item
+          item.currentStock = updatedItem.currentStock;
+
+          if (transactionType === TransactionType.IN) {
+            await tx.inventoryBatch.upsert({
+              where: { itemId_batchLot: { itemId, batchLot } },
+              create: {
+                itemId,
+                batchLot,
+                quantity: actualQuantity,
+                gateEntryId,
+                locationId: item.locationId,
+              },
+              update: { quantity: { increment: actualQuantity } },
+            });
+          } else if (transactionType === TransactionType.OUT) {
+            const existingBatch = await tx.inventoryBatch.findUnique({
+              where: { itemId_batchLot: { itemId, batchLot } },
+            });
+            if (existingBatch) {
+              await tx.inventoryBatch.update({
+                where: { id: existingBatch.id },
+                data: { quantity: { decrement: actualQuantity } },
+              });
+            }
+          }
+
+          // 3. Create InventoryTransaction
+          const invTx = await tx.inventoryTransaction.create({
+            data: {
+              itemId,
+              type: transactionType,
+              quantity: actualQuantity,
+              batchLot,
+              referenceType: "GATE_ENTRY",
+              referenceId: gateEntryId,
+              userId: session.user?.id,
+              remarks: `Gate Entry ${gateEntry.entryNumber}`,
+            },
+          });
+
+          diffs.push({
+            entity: "InventoryItem",
+            entityId: itemId,
+            before: { currentStock: previousStock },
+            after: { currentStock: updatedItem.currentStock, transactionId: invTx.id },
+          });
         }
-
-        // 3. Create InventoryTransaction
-        const invTx = await tx.inventoryTransaction.create({
-          data: {
-            itemId,
-            type: transactionType,
-            quantity: actualQuantity,
-            batchLot,
-            referenceType: "GATE_ENTRY",
-            referenceId: gateEntryId,
-            userId: session.user?.id,
-            remarks: `Gate Entry ${gateEntry.entryNumber}`,
-          },
-        });
-
-        diffs.push({
-          entity: "InventoryItem",
-          entityId: itemId,
-          before: { currentStock: item.currentStock },
-          after: { currentStock: updatedItem.currentStock, transactionId: invTx.id },
-        });
+      },
+      {
+        maxWait: 15000,
+        timeout: 30000,
       }
-    });
+    );
 
     // Log the transaction
     await logEvent({

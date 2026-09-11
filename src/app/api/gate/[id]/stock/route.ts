@@ -118,7 +118,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           actualQuantity: data.actualQuantity ? parseFloat(data.actualQuantity) : null,
         },
       });
-    });
+    }, { maxWait: 15000, timeout: 30000 });
 
     logEvent({
       userId: session.user.id,
