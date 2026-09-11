@@ -99,6 +99,8 @@ type AppSidebarProps = {
   allowedModules: Record<string, boolean>;
 };
 
+let cachedActiveRoutes: string[] | null = null;
+
 export function AppSidebar({ user, allowedModules, ...props }: AppSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
@@ -115,14 +117,23 @@ export function AppSidebar({ user, allowedModules, ...props }: AppSidebarProps) 
   const hasDataCentreAccess = isSuperAdmin || allowedModules["DATA_CENTRE"];
   const hasProductionAccess = isSuperAdmin || allowedModules["PRODUCTION"];
 
-  const [activeFinishingRoutes, setActiveFinishingRoutes] = useState<string[]>([]);
+  const [activeFinishingRoutes, setActiveFinishingRoutes] = useState<string[]>(
+    () => cachedActiveRoutes ?? [],
+  );
 
   useEffect(() => {
-    if (!hasProductionAccess) return;
+    if (!hasProductionAccess || cachedActiveRoutes !== null) return;
     fetch("/api/production/finishing/active-routes")
       .then((r) => (r.ok ? r.json() : { routes: [] }))
-      .then((data) => setActiveFinishingRoutes(data.routes ?? []))
-      .catch(() => setActiveFinishingRoutes([]));
+      .then((data) => {
+        const routes = data.routes ?? [];
+        cachedActiveRoutes = routes;
+        setActiveFinishingRoutes(routes);
+      })
+      .catch(() => {
+        cachedActiveRoutes = [];
+        setActiveFinishingRoutes([]);
+      });
   }, [hasProductionAccess]);
 
   const productionItems = useMemo(() => {

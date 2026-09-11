@@ -1,18 +1,17 @@
 "use client";
 
-import { useLayoutEffect } from "react";
+import { useEffect } from "react";
 import { useBreadcrumbLabel } from "./breadcrumb-context";
 
 export function GateBreadcrumb({ entryNumber }: { entryNumber: string }) {
   const ctx = useBreadcrumbLabel();
 
-  if (ctx && ctx.pageLabel !== entryNumber) {
-    ctx.setPageLabel(entryNumber);
-  }
-
-  useLayoutEffect(() => {
-    return () => ctx?.setPageLabel(null);
-  }, [ctx]);
+  useEffect(() => {
+    ctx?.setPageLabel(entryNumber);
+    return () => {
+      ctx?.setPageLabel(null);
+    };
+  }, [entryNumber, ctx]);
 
   return null;
 }
