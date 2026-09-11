@@ -30,28 +30,34 @@ export async function withTransaction<T>(
 
   try {
     // 2. Execute the action inside a transaction
-    const result = await db.$transaction(async (tx) => {
-      // Run the business logic
-      const actionResult = await action(tx, context);
+    const result = await db.$transaction(
+      async (tx) => {
+        // Run the business logic
+        const actionResult = await action(tx, context);
 
-      // Log the audit event within the same transaction so it succeeds/fails together
-      await tx.auditLog.create({
-        data: {
-          correlationId: context.correlationId,
-          userId: context.userId,
-          action: auditOptions.action,
-          module: auditOptions.module,
-          entityId: auditOptions.entityId,
-          oldValues: auditOptions.oldValues || null,
-          newValues: auditOptions.newValues || null,
-          ipAddress: context.ipAddress,
-          userAgent: context.userAgent,
-          durationMs: Date.now() - startTime,
-        },
-      });
+        // Log the audit event within the same transaction so it succeeds/fails together
+        await tx.auditLog.create({
+          data: {
+            correlationId: context.correlationId,
+            userId: context.userId,
+            action: auditOptions.action,
+            module: auditOptions.module,
+            entityId: auditOptions.entityId,
+            oldValues: auditOptions.oldValues || null,
+            newValues: auditOptions.newValues || null,
+            ipAddress: context.ipAddress,
+            userAgent: context.userAgent,
+            durationMs: Date.now() - startTime,
+          },
+        });
 
-      return actionResult;
-    });
+        return actionResult;
+      },
+      {
+        maxWait: 15000,
+        timeout: 30000,
+      }
+    );
 
     return result;
   } catch (error) {

@@ -217,7 +217,7 @@ export async function POST(request: NextRequest) {
         where: { id: entry.id },
         include: { stockDetails: true },
       });
-    });
+    }, { maxWait: 15000, timeout: 30000 });
 
     logEvent({
       userId: session.user.id,
