@@ -285,49 +285,130 @@ export function GateClient({
         </div>
       </div>
 
+      {/* ── Mobile Filter Chips (Horizontal Scroll) ── */}
+      <div className="flex md:hidden overflow-x-auto gap-2 pb-1 no-scrollbar -mx-4 px-4">
+        {[
+          { label: "All", value: "" },
+          { label: "Arrived", value: "ARRIVED" },
+          { label: "Verified", value: "VERIFIED" },
+          { label: "Parking", value: "PARKING" },
+          { label: "Loading", value: "LOADING" },
+          { label: "Unloading", value: "UNLOADING" },
+          { label: "Gate Out", value: "GATE_OUT" },
+        ].map((chip) => {
+          const isActive = statusFilter === chip.value;
+          return (
+            <button
+              key={chip.label}
+              onClick={() => setStatusFilter(chip.value)}
+              className={cn(
+                "shrink-0 px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all touch-manipulation",
+                isActive
+                  ? "bg-slate-900 text-white shadow-xs"
+                  : "bg-white border border-slate-200 text-slate-600 active:bg-slate-100"
+              )}
+            >
+              {chip.label}
+            </button>
+          );
+        })}
+      </div>
+
       {/* ── Table (Desktop) & Cards (Mobile) ── */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        {/* Mobile View (Cards) */}
-        <div className="block md:hidden divide-y divide-slate-100">
+        {/* Mobile View (Touch-Optimized App-Like Cards) */}
+        <div className="block md:hidden divide-y divide-slate-100 bg-slate-50/50">
           {loading && entries.length === 0 ? (
-            <div className="p-8 text-center text-slate-500">Loading...</div>
+            <div className="p-8 text-center text-slate-500 font-medium">Loading entries...</div>
           ) : entries.length === 0 ? (
-            <div className="p-16 text-center flex flex-col items-center gap-3 text-slate-400">
-              <Truck className="h-12 w-12 stroke-1" />
+            <div className="p-12 text-center flex flex-col items-center gap-3 text-slate-400">
+              <div className="h-14 w-14 rounded-full bg-slate-100 flex items-center justify-center text-slate-500">
+                <Truck className="h-7 w-7 stroke-[1.5]" />
+              </div>
               <div>
-                <p className="font-medium text-slate-600">No gate entries found</p>
-                <p className="text-sm">Create a new entry for arriving trucks.</p>
+                <p className="font-semibold text-slate-700 text-base">No gate entries found</p>
+                <p className="text-xs text-slate-500 mt-0.5">Arriving trucks will appear here in real-time.</p>
               </div>
             </div>
           ) : (
-            entries.map((entry) => (
-              <div key={entry.id} className="p-4 flex flex-col gap-3 active:bg-slate-50">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <span className="font-bold text-slate-800 text-base">{entry.truckNumber}</span>
-                    <div className="text-xs text-primary font-medium mt-0.5">{entry.entryNumber}</div>
+            entries.map((entry) => {
+              const nextStatus = getNextStatus(entry.status, entry.purpose);
+              return (
+                <div
+                  key={entry.id}
+                  className="p-4 bg-white flex flex-col gap-3 active:bg-slate-50/80 transition-colors"
+                >
+                  {/* Top: License Badge + Status */}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="space-y-1">
+                      <div className="inline-flex items-center px-2.5 py-1 rounded bg-slate-950 text-amber-300 font-mono text-sm font-black tracking-wider border border-slate-800 shadow-2xs">
+                        {entry.truckNumber}
+                      </div>
+                      <div className="text-[11px] text-slate-500 font-mono">
+                        {entry.entryNumber} • {entry.purpose}
+                      </div>
+                    </div>
+                    <StatusBadge status={entry.status} />
                   </div>
-                  <StatusBadge status={entry.status} />
-                </div>
-                
-                <div className="flex justify-between text-xs text-slate-500">
-                  <div className="flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
-                    {new Date(entry.arrivalTime).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
-                  </div>
-                  <div>{entry.purpose}</div>
-                </div>
 
-                <div className="flex justify-end gap-2 mt-1">
-                  <Link
-                    href={`/dashboard/gate/${entry.entryNumber}`}
-                    className="p-2 text-primary hover:bg-primary/10 rounded-md transition-colors"
-                  >
-                    <ArrowRight className="h-4 w-4" />
-                  </Link>
+                  {/* Metadata Grid */}
+                  <div className="grid grid-cols-2 gap-2 text-xs bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                    <div>
+                      <span className="text-slate-400 block text-[10px] uppercase font-semibold">Driver</span>
+                      <span className="font-medium text-slate-800 truncate block">
+                        {entry.driverName || "—"}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block text-[10px] uppercase font-semibold">Transporter</span>
+                      <span className="font-medium text-slate-800 truncate block">
+                        {entry.transporter || "—"}
+                      </span>
+                    </div>
+                    <div className="col-span-2 flex items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-slate-200/60">
+                      <span className="flex items-center gap-1">
+                        <Clock className="h-3 w-3 text-slate-400" />
+                        {new Date(entry.arrivalTime).toLocaleTimeString("en-IN", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                          day: "2-digit",
+                          month: "short",
+                        })}
+                      </span>
+                      {entry.driverContact && (
+                        <span className="font-mono text-slate-600">{entry.driverContact}</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 1-Tap Advance Button & Actions */}
+                  <div className="flex items-center gap-2 pt-1">
+                    {nextStatus ? (
+                      <button
+                        onClick={() => handleQuickStatusUpdate(entry.entryNumber, nextStatus)}
+                        className="flex-1 min-h-[44px] flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-primary text-white text-xs font-bold active:scale-[0.98] transition-transform shadow-xs touch-manipulation"
+                      >
+                        <span>Advance to {nextStatus.replace(/_/g, " ")}</span>
+                        <ArrowRight className="h-3.5 w-3.5 shrink-0" />
+                      </button>
+                    ) : (
+                      <div className="flex-1 min-h-[44px] flex items-center justify-center text-xs font-semibold text-emerald-700 bg-emerald-50 rounded-lg border border-emerald-200">
+                        <CheckCircle className="h-3.5 w-3.5 mr-1" />
+                        Completed / Gate Out
+                      </div>
+                    )}
+
+                    <Link
+                      href={`/dashboard/gate/${entry.entryNumber}`}
+                      className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-100 active:bg-slate-200 transition-colors shrink-0"
+                      title="View Details"
+                    >
+                      <ChevronRight className="h-5 w-5 text-slate-500" />
+                    </Link>
+                  </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
 
@@ -494,12 +575,35 @@ export function GateClient({
               Are you sure you want to delete this gate entry ({deleteEntryId})? This action cannot be undone.
             </p>
             <div className="flex gap-3">
-              <button onClick={() => setDeleteEntryId(null)} className="flex-1 px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50">Cancel</button>
-              <button onClick={handleDelete} disabled={isDeleting} className="flex-1 px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50">{isDeleting ? "Deleting..." : "Delete"}</button>
+              <button
+                type="button"
+                onClick={() => setDeleteEntryId(null)}
+                className="flex-1 px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className="flex-1 px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50"
+              >
+                {isDeleting ? "Deleting..." : "Delete"}
+              </button>
             </div>
           </div>
         </div>
       )}
+
+      {/* Mobile Floating Action Button (FAB) */}
+      <Link
+        href="/dashboard/gate/new"
+        className="fixed bottom-20 right-4 z-40 md:hidden inline-flex items-center gap-2 px-4 py-3 bg-primary text-white rounded-full shadow-lg hover:bg-primary/90 active:scale-95 transition-all text-sm font-bold touch-manipulation border border-white/20"
+        aria-label="New Gate Entry"
+      >
+        <Plus className="h-5 w-5" />
+        <span>New Truck</span>
+      </Link>
     </div>
   );
 }
