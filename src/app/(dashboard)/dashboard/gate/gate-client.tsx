@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { GateEntryStatus, GatePurpose } from "@/generated/prisma";
+import { cn } from "@/lib/utils";
 
 export function GateClient() {
   const [entries, setEntries] = useState<any[]>([]);
@@ -158,7 +159,7 @@ export function GateClient() {
   return (
     <div className="space-y-6">
       {/* ── Stats Bar ── */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-7 gap-3">
         <StatCard label="Inside Factory" value={stats.inside.toString()} icon={<Truck className="h-5 w-5" />} color="blue" />
         <StatCard label="Waiting / Parked" value={stats.waiting.toString()} icon={<Clock className="h-5 w-5" />} color="orange" />
         <StatCard label="Loading" value={stats.loading.toString()} icon={<RefreshCw className="h-5 w-5" />} color="purple" />
@@ -443,21 +444,30 @@ export function GateClient() {
 }
 
 function StatCard({ label, value, icon, color }: { label: string; value: string; icon: React.ReactNode; color: string }) {
-  const colors: Record<string, string> = {
-    blue: "from-blue-50 to-blue-100/50 border-blue-200 text-blue-700",
-    green: "from-emerald-50 to-emerald-100/50 border-emerald-200 text-emerald-700",
-    purple: "from-violet-50 to-violet-100/50 border-violet-200 text-violet-700",
-    orange: "from-amber-50 to-amber-100/50 border-amber-200 text-amber-700",
-    amber: "from-yellow-50 to-yellow-100/50 border-yellow-200 text-yellow-700",
-    red: "from-red-50 to-red-100/50 border-red-200 text-red-700",
-    indigo: "from-indigo-50 to-indigo-100/50 border-indigo-200 text-indigo-700",
+  const colorMap: Record<string, { bg: string; border: string; text: string; iconBg: string; iconText: string }> = {
+    blue: { bg: "bg-blue-50/70", border: "border-blue-200/80", text: "text-blue-900", iconBg: "bg-blue-100", iconText: "text-blue-600" },
+    orange: { bg: "bg-amber-50/70", border: "border-amber-200/80", text: "text-amber-900", iconBg: "bg-amber-100", iconText: "text-amber-600" },
+    purple: { bg: "bg-purple-50/70", border: "border-purple-200/80", text: "text-purple-900", iconBg: "bg-purple-100", iconText: "text-purple-600" },
+    indigo: { bg: "bg-indigo-50/70", border: "border-indigo-200/80", text: "text-indigo-900", iconBg: "bg-indigo-100", iconText: "text-indigo-600" },
+    amber: { bg: "bg-yellow-50/70", border: "border-yellow-200/80", text: "text-yellow-900", iconBg: "bg-yellow-100", iconText: "text-yellow-600" },
+    red: { bg: "bg-rose-50/70", border: "border-rose-200/80", text: "text-rose-900", iconBg: "bg-rose-100", iconText: "text-rose-600" },
+    green: { bg: "bg-emerald-50/70", border: "border-emerald-200/80", text: "text-emerald-900", iconBg: "bg-emerald-100", iconText: "text-emerald-600" },
   };
+
+  const scheme = colorMap[color] || colorMap.blue;
+
   return (
-    <div className={`flex items-center gap-4 p-5 rounded-2xl border bg-gradient-to-br ${colors[color]} transition-all shadow-sm`}>
-      <div className="p-3 rounded-xl bg-white shadow-sm shrink-0">{icon}</div>
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-wider opacity-70 mb-1">{label}</p>
-        <p className="text-2xl font-bold leading-none">{value}</p>
+    <div className={cn("flex items-center gap-3 p-3.5 sm:p-4 rounded-xl border shadow-xs transition-all hover:shadow-sm", scheme.bg, scheme.border)}>
+      <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-lg shadow-2xs", scheme.iconBg, scheme.iconText)}>
+        {icon}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 truncate" title={label}>
+          {label}
+        </p>
+        <p className={cn("text-2xl font-extrabold tracking-tight leading-none mt-1", scheme.text)}>
+          {value}
+        </p>
       </div>
     </div>
   );
