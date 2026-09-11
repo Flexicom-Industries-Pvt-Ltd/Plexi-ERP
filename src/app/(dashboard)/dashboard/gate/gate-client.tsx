@@ -23,10 +23,22 @@ import { toast } from "sonner";
 import { GateEntryStatus, GatePurpose } from "@/generated/prisma";
 import { cn } from "@/lib/utils";
 
-export function GateClient() {
-  const [entries, setEntries] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({
+type GateClientProps = {
+  initialEntries?: any[];
+  initialStats?: {
+    inside: number;
+    waiting: number;
+    loading: number;
+    unloading: number;
+    verificationPending: number;
+    onHold: number;
+    gateOutToday: number;
+  };
+};
+
+export function GateClient({
+  initialEntries = [],
+  initialStats = {
     inside: 0,
     waiting: 0,
     loading: 0,
@@ -34,7 +46,11 @@ export function GateClient() {
     verificationPending: 0,
     onHold: 0,
     gateOutToday: 0,
-  });
+  },
+}: GateClientProps) {
+  const [entries, setEntries] = useState<any[]>(initialEntries);
+  const [loading, setLoading] = useState(false);
+  const [stats, setStats] = useState(initialStats);
   
   // Filters
   const [search, setSearch] = useState("");
@@ -72,55 +88,100 @@ export function GateClient() {
     }
   }, [search, statusFilter, purposeFilter]);
 
+  // Only refetch when user changes search or filter controls
+  const isFirstMount = useState(true);
+  useEffect(() => {
+    if (isFirstMount[0]) {
+      isFirstMount[1](false);
+      if (!search && !statusFilter && !purposeFilter && initialEntries.length > 0) {
+        return;
+      }
+    }
+    fetchEntries();
+  }, [search, statusFilter, purposeFilter, fetchEntries]);
+
+  // Optimistic Delete
   const handleDelete = async () => {
     if (!deleteEntryId) return;
+    const targetId = deleteEntryId;
+    const prevEntries = [...entries];
+    
+    // 0ms Optimistic UI update
+    setEntries((prev) => prev.filter((e) => e.id !== targetId && e.entryNumber !== targetId));
+    setDeleteEntryId(null);
     setIsDeleting(true);
+
     try {
-      const res = await fetch(`/api/gate/${deleteEntryId}`, { method: "DELETE" });
+      const res = await fetch(`/api/gate/${targetId}`, { method: "DELETE" });
       if (!res.ok) {
         const error = await res.json();
         throw new Error(error.error || "Failed to delete");
       }
       toast.success("Gate entry deleted successfully");
-      setDeleteEntryId(null);
-      fetchEntries();
+      // Sync stats in background
+      fetch("/api/gate/stats")
+        .then((r) => (r.ok ? r.json() : null))
+        .then((s) => s && setStats(s))
+        .catch(() => {});
     } catch (err: any) {
+      setEntries(prevEntries);
       toast.error(err.message || "Failed to delete gate entry");
     } finally {
       setIsDeleting(false);
     }
   };
 
+  // Optimistic Edit
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editEntry) return;
+    const target = { ...editEntry };
+    const prevEntries = [...entries];
+
+    // 0ms Optimistic UI update
+    setEntries((prev) =>
+      prev.map((item) => (item.entryNumber === target.entryNumber ? { ...item, ...target } : item)),
+    );
+    setEditEntry(null);
     setIsEditing(true);
+
     try {
-      const res = await fetch(`/api/gate/${editEntry.entryNumber}`, {
+      const res = await fetch(`/api/gate/${target.entryNumber}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          truckNumber: editEntry.truckNumber,
-          driverName: editEntry.driverName,
-          driverContact: editEntry.driverContact,
-          transporter: editEntry.transporter,
-          supplierCustomer: editEntry.supplierCustomer,
-          purpose: editEntry.purpose,
-          status: editEntry.status,
+          truckNumber: target.truckNumber,
+          driverName: target.driverName,
+          driverContact: target.driverContact,
+          transporter: target.transporter,
+          supplierCustomer: target.supplierCustomer,
+          purpose: target.purpose,
+          status: target.status,
         }),
       });
       if (!res.ok) throw new Error();
       toast.success("Gate entry updated successfully");
-      setEditEntry(null);
-      fetchEntries();
-    } catch (err) {
+      fetch("/api/gate/stats")
+        .then((r) => (r.ok ? r.json() : null))
+        .then((s) => s && setStats(s))
+        .catch(() => {});
+    } catch {
+      setEntries(prevEntries);
       toast.error("Failed to update gate entry");
     } finally {
       setIsEditing(false);
     }
   };
 
+  // Optimistic Quick Status Advance
   const handleQuickStatusUpdate = async (entryNumber: string, newStatus: string) => {
+    const prevEntries = [...entries];
+    
+    // 0ms Optimistic UI update
+    setEntries((prev) =>
+      prev.map((item) => (item.entryNumber === entryNumber ? { ...item, status: newStatus } : item)),
+    );
+
     try {
       const res = await fetch(`/api/gate/${entryNumber}`, {
         method: "PATCH",
@@ -132,8 +193,12 @@ export function GateClient() {
         throw new Error(err.error || "Failed to advance status");
       }
       toast.success("Status advanced successfully");
-      fetchEntries();
+      fetch("/api/gate/stats")
+        .then((r) => (r.ok ? r.json() : null))
+        .then((s) => s && setStats(s))
+        .catch(() => {});
     } catch (err: unknown) {
+      setEntries(prevEntries);
       toast.error(err instanceof Error ? err.message : "Failed to advance status");
     }
   };
@@ -151,10 +216,6 @@ export function GateClient() {
       default: return null;
     }
   };
-
-  useEffect(() => {
-    fetchEntries();
-  }, [fetchEntries]);
 
   return (
     <div className="space-y-6">

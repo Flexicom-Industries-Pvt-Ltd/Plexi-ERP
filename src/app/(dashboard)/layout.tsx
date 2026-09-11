@@ -3,8 +3,7 @@ import { SidebarProvider } from "@/components/ui/sidebar";
 import { BreadcrumbProvider } from "@/components/layout/breadcrumb-context";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { AppHeader } from "@/components/layout/AppHeader";
-import { auth } from "@/auth";
-import { db } from "@/lib/db";
+import { getAuthenticatedUserWithRole } from "@/lib/permissions";
 import { redirect } from "next/navigation";
 
 export default async function DashboardLayout({
@@ -12,20 +11,14 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const session = await auth();
-  
-  if (!session?.user) {
+  const user = await getAuthenticatedUserWithRole();
+  if (!user || !user.isActive) {
     redirect("/auth/login");
   }
 
-  const user = await db.user.findUnique({
-    where: { email: session.user.email as string },
-    include: { role: { include: { permissions: true } } },
-  });
-
   const allowedModules: Record<string, boolean> = {};
-  if (user?.role?.permissions) {
-    user.role.permissions.forEach(p => {
+  if (user.role?.permissions) {
+    user.role.permissions.forEach((p) => {
       allowedModules[p.module] = p.canRead;
     });
   }
