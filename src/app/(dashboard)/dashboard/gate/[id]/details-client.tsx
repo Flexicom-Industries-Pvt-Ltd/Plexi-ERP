@@ -496,21 +496,35 @@ export function GateDetailsClient({ entryId }: { entryId: string }) {
               {entry.stockDetails?.length > 0 ? (
                 <div className="overflow-x-auto border border-slate-200 rounded-lg">
                   <table className="w-full text-sm text-left">
-                    <thead className="bg-slate-50 border-b border-slate-200 text-xs uppercase text-slate-600">
+                    <thead className="bg-slate-50 border-b border-slate-200 text-xs uppercase font-semibold text-slate-600">
                       <tr>
                         <th className="px-4 py-3">Material</th>
                         <th className="px-4 py-3">Type</th>
                         <th className="px-4 py-3">Batch/Lot</th>
-                        <th className="px-4 py-3 text-right">Quantity</th>
+                        <th className="px-4 py-3 text-right">Declared Qty</th>
+                        <th className="px-4 py-3 text-right">Inventory Status</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {entry.stockDetails.map((item: any) => (
-                        <tr key={item.id}>
-                          <td className="px-4 py-3 font-medium text-slate-800">{item.materialName}</td>
-                          <td className="px-4 py-3 text-slate-500">{item.materialType || "—"}</td>
-                          <td className="px-4 py-3 text-slate-500">{item.batchLot || "—"}</td>
-                          <td className="px-4 py-3 font-semibold text-slate-700 text-right">{item.quantity} {item.unit}</td>
+                        <tr key={item.id} className="hover:bg-slate-50/60 transition-colors">
+                          <td className="px-4 py-3 font-bold text-slate-800">{item.materialName}</td>
+                          <td className="px-4 py-3 text-slate-500 text-xs">{item.materialType ? item.materialType.replace(/_/g, " ") : "—"}</td>
+                          <td className="px-4 py-3 text-slate-500 font-mono text-xs">{item.batchLot || "—"}</td>
+                          <td className="px-4 py-3 font-semibold text-slate-800 text-right">
+                            {item.expectedQuantity ?? item.quantity} {item.unit}
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            {item.actualQuantity !== null && item.actualQuantity !== undefined ? (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                Received {item.actualQuantity} {item.unit}
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                                Pending Inward
+                              </span>
+                            )}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
