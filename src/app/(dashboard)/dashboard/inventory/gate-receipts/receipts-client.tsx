@@ -64,9 +64,11 @@ export function GateReceiptsClient({ canCreate }: { canCreate: boolean }) {
         );
         const match = matchByStockId ?? matchByName;
 
+        const expectedQty = sd.expectedQuantity ?? sd.quantity ?? 0;
+
         initialForm[sd.id] = {
           stockId: match?.id ?? "",
-          actualQuantity: sd.expectedQuantity ?? 0,
+          actualQuantity: expectedQty,
         };
       }
     });
@@ -112,7 +114,7 @@ export function GateReceiptsClient({ canCreate }: { canCreate: boolean }) {
     return (
       <div className="bg-white rounded-xl border border-slate-200 p-12 flex flex-col items-center justify-center text-slate-500 shadow-sm">
         <PackageCheck className="h-8 w-8 text-slate-300 mb-3 animate-pulse" />
-        <p>Loading pending receipts...</p>
+        <p className="text-sm font-medium">Loading pending receipts...</p>
       </div>
     );
   }
@@ -121,8 +123,8 @@ export function GateReceiptsClient({ canCreate }: { canCreate: boolean }) {
     return (
       <div className="bg-white rounded-xl border border-slate-200 p-12 flex flex-col items-center justify-center text-slate-500 shadow-sm">
         <PackageCheck className="h-10 w-10 text-slate-300 mb-3" />
-        <p className="font-medium text-slate-600">No Pending Receipts</p>
-        <p className="text-sm mt-1 text-center max-w-sm">
+        <p className="font-semibold text-slate-700">No Pending Receipts</p>
+        <p className="text-xs text-slate-500 mt-1 text-center max-w-sm">
           All unloaded trucks have been fully verified and committed to inventory.
         </p>
       </div>
@@ -141,18 +143,23 @@ export function GateReceiptsClient({ canCreate }: { canCreate: boolean }) {
           <div key={entry.id} className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden transition-all">
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
               <div className="flex items-center gap-4">
-                <div className="h-10 w-10 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center">
+                <div className="h-10 w-10 bg-primary/10 text-primary rounded-lg flex items-center justify-center font-bold">
                   <Truck className="h-5 w-5" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-slate-800">{entry.entryNumber}</h3>
-                  <p className="text-xs text-slate-500 font-medium">
-                    {entry.truckNumber} • {entry.supplierCustomer || "Unknown Supplier"}
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-bold text-slate-800">{entry.entryNumber}</h3>
+                    <span className="font-mono text-xs px-2 py-0.5 rounded bg-slate-900 text-amber-300 font-bold">
+                      {entry.truckNumber}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 font-medium mt-0.5">
+                    {entry.supplierCustomer || "Unknown Supplier"} • {entry.transporter || "Direct"}
                   </p>
                 </div>
               </div>
               <div className="text-right">
-                <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-700">
+                <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-700 border border-emerald-200">
                   {entry.status}
                 </span>
                 <p className="text-[11px] text-slate-400 mt-1">
@@ -162,81 +169,115 @@ export function GateReceiptsClient({ canCreate }: { canCreate: boolean }) {
             </div>
 
             <div className="p-6">
-              <div className="mb-4 flex items-center gap-2 text-sm font-semibold text-slate-700">
-                <AlertCircle className="h-4 w-4 text-amber-500" />
-                Pending Verification
+              <div className="mb-4 flex items-center justify-between">
+                <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-600">
+                  <AlertCircle className="h-4 w-4 text-amber-500" />
+                  Declared Consignment Items ({pendingDetails.length})
+                </div>
+                {entry.stockDetails.length > pendingDetails.length && (
+                  <span className="text-xs text-emerald-600 font-medium">
+                    {entry.stockDetails.length - pendingDetails.length} items already received
+                  </span>
+                )}
               </div>
 
               <div className="border border-slate-200 rounded-lg overflow-hidden">
                 <table className="w-full text-sm text-left">
-                  <thead className="bg-slate-50 border-b border-slate-200 text-slate-500">
+                  <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 text-xs uppercase font-semibold">
                     <tr>
-                      <th className="px-4 py-3 font-medium">Material Declared at Gate</th>
-                      <th className="px-4 py-3 font-medium text-right w-40">Expected Qty</th>
+                      <th className="px-4 py-3">Material Declared at Gate</th>
+                      <th className="px-4 py-3 text-right w-36">Expected Qty</th>
                       {isCommitting && (
                         <>
-                          <th className="px-4 py-3 font-medium text-right w-40">Actual Qty Received</th>
-                          <th className="px-4 py-3 font-medium w-64">Map to Stock Item</th>
+                          <th className="px-4 py-3 text-right w-40">Actual Received</th>
+                          <th className="px-4 py-3 text-center w-28">Variance</th>
+                          <th className="px-4 py-3 w-64">Map to Stock Catalog</th>
                         </>
                       )}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {pendingDetails.map((sd: any) => (
-                      <tr key={sd.id} className="hover:bg-slate-50">
-                        <td className="px-4 py-3">
-                          <div className="font-semibold text-slate-800">{sd.materialName}</div>
-                          <div className="text-xs text-slate-500">Batch: {sd.batchLot || "N/A"}</div>
-                        </td>
-                        <td className="px-4 py-3 text-right font-medium">
-                          {sd.expectedQuantity}{" "}
-                          <span className="text-slate-400 text-xs">{sd.unit || sd.stock?.uom?.abbreviation}</span>
-                        </td>
-                        {isCommitting && (
-                          <>
-                            <td className="px-4 py-3 text-right">
-                              <input
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                className="w-24 px-2 py-1 text-right border border-slate-300 rounded focus:ring-primary focus:border-primary text-sm"
-                                value={commitForm[sd.id]?.actualQuantity ?? ""}
-                                onChange={(e) =>
-                                  setCommitForm({
-                                    ...commitForm,
-                                    [sd.id]: { ...commitForm[sd.id], actualQuantity: e.target.value },
-                                  })
-                                }
-                              />
-                            </td>
-                            <td className="px-4 py-3">
-                              <select
-                                className="w-full px-2 py-1.5 border border-slate-300 rounded focus:ring-primary focus:border-primary text-sm bg-white"
-                                value={commitForm[sd.id]?.stockId ?? ""}
-                                onChange={(e) =>
-                                  setCommitForm({
-                                    ...commitForm,
-                                    [sd.id]: { ...commitForm[sd.id], stockId: e.target.value },
-                                  })
-                                }
-                              >
-                                <option value="">Select stock item...</option>
-                                {stocks.map((stock) => (
-                                  <option key={stock.id} value={stock.id}>
-                                    {stock.code} - {stock.name}
-                                  </option>
-                                ))}
-                              </select>
-                              {stocks.length === 0 && (
-                                <p className="text-xs text-amber-600 mt-1">
-                                  No stocks in catalog. Add items under Data Centre → Stocks.
-                                </p>
-                              )}
-                            </td>
-                          </>
-                        )}
-                      </tr>
-                    ))}
+                    {pendingDetails.map((sd: any) => {
+                      const expectedQty = sd.expectedQuantity ?? sd.quantity ?? 0;
+                      const actualQty = isCommitting && commitForm[sd.id]?.actualQuantity !== undefined
+                        ? Number(commitForm[sd.id]?.actualQuantity)
+                        : expectedQty;
+                      const variance = actualQty - expectedQty;
+                      const unitStr = sd.unit || sd.stock?.uom?.abbreviation || "kg";
+
+                      return (
+                        <tr key={sd.id} className="hover:bg-slate-50 transition-colors">
+                          <td className="px-4 py-3">
+                            <div className="font-bold text-slate-800">{sd.materialName}</div>
+                            <div className="text-xs text-slate-500 font-mono">
+                              {sd.materialType ? sd.materialType.replace(/_/g, " ") : "Consignment"}
+                              {sd.batchLot && ` • Batch: ${sd.batchLot}`}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-right font-semibold text-slate-700">
+                            {expectedQty} <span className="text-slate-400 text-xs font-normal">{unitStr}</span>
+                          </td>
+                          {isCommitting && (
+                            <>
+                              <td className="px-4 py-3 text-right">
+                                <input
+                                  type="number"
+                                  step="any"
+                                  min="0"
+                                  className="w-28 px-2.5 py-1.5 text-right border border-slate-300 rounded-md focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm font-bold bg-white"
+                                  value={commitForm[sd.id]?.actualQuantity ?? ""}
+                                  onChange={(e) =>
+                                    setCommitForm({
+                                      ...commitForm,
+                                      [sd.id]: { ...commitForm[sd.id], actualQuantity: e.target.value },
+                                    })
+                                  }
+                                />
+                              </td>
+                              <td className="px-4 py-3 text-center">
+                                {variance === 0 ? (
+                                  <span className="text-[11px] font-bold text-emerald-700 px-2 py-0.5 rounded bg-emerald-50 border border-emerald-200">
+                                    Exact
+                                  </span>
+                                ) : variance < 0 ? (
+                                  <span className="text-[11px] font-bold text-rose-700 px-2 py-0.5 rounded bg-rose-50 border border-rose-200">
+                                    {variance} {unitStr}
+                                  </span>
+                                ) : (
+                                  <span className="text-[11px] font-bold text-blue-700 px-2 py-0.5 rounded bg-blue-50 border border-blue-200">
+                                    +{variance} {unitStr}
+                                  </span>
+                                )}
+                              </td>
+                              <td className="px-4 py-3">
+                                <select
+                                  className="w-full px-2.5 py-1.5 border border-slate-300 rounded-md focus:ring-2 focus:ring-primary/20 focus:border-primary text-xs font-medium bg-white"
+                                  value={commitForm[sd.id]?.stockId ?? ""}
+                                  onChange={(e) =>
+                                    setCommitForm({
+                                      ...commitForm,
+                                      [sd.id]: { ...commitForm[sd.id], stockId: e.target.value },
+                                    })
+                                  }
+                                >
+                                  <option value="">Select catalog stock...</option>
+                                  {stocks.map((stock) => (
+                                    <option key={stock.id} value={stock.id}>
+                                      {stock.code} - {stock.name} ({stock.uom?.abbreviation || "unit"})
+                                    </option>
+                                  ))}
+                                </select>
+                                {stocks.length === 0 && (
+                                  <p className="text-[11px] text-amber-600 mt-1">
+                                    No stocks in catalog. Add items under Data Centre → Stocks.
+                                  </p>
+                                )}
+                              </td>
+                            </>
+                          )}
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -253,19 +294,19 @@ export function GateReceiptsClient({ canCreate }: { canCreate: boolean }) {
                     <button
                       onClick={() => handleCommitSubmit(entry.id)}
                       disabled={submitting}
-                      className="px-6 py-2 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary/90 shadow-sm disabled:opacity-50 transition-colors flex items-center gap-2"
+                      className="px-6 py-2 bg-primary text-white text-sm font-bold rounded-lg hover:bg-primary/90 shadow-sm disabled:opacity-50 transition-colors flex items-center gap-2"
                     >
                       <Check className="h-4 w-4" />
-                      {submitting ? "Committing..." : "Commit to Inventory"}
+                      {submitting ? "Committing to Inventory..." : "Commit to Inventory Ledger"}
                     </button>
                   </div>
                 ) : (
                   canCreate && (
                     <button
                       onClick={() => handleOpenCommit(entry)}
-                      className="px-5 py-2 bg-slate-800 text-white text-sm font-medium rounded-lg hover:bg-slate-900 shadow-sm transition-colors flex items-center gap-2"
+                      className="px-5 py-2 bg-slate-900 text-white text-sm font-bold rounded-lg hover:bg-slate-800 shadow-sm transition-colors flex items-center gap-2"
                     >
-                      Verify & Receive <ArrowRight className="h-4 w-4" />
+                      Verify & Receive Consignment <ArrowRight className="h-4 w-4" />
                     </button>
                   )
                 )}
