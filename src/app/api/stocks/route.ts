@@ -1,26 +1,16 @@
-import { NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { requireApiAuth } from "@/lib/api-auth";
+import { apiError, apiSuccess } from "@/lib/api-response";
+import { Module } from "@/generated/prisma";
 import { db } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const session = await auth();
-  if (!session?.user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const permissions = session.user.permissions || [];
-  const hasAccess =
-    session.user.role === "SUPERADMIN" ||
-    permissions.some(
-      (p: { module: string; canRead?: boolean }) =>
-        (p.module === "INVENTORY" || p.module === "DATA_CENTRE") && p.canRead
-    );
-
-  if (!hasAccess) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  const authResult = await requireApiAuth({
+    module: [Module.INVENTORY, Module.DATA_CENTRE],
+    action: "canRead",
+  });
+  if (!authResult.ok) return authResult.response;
 
   try {
     const stocks = await db.stock.findMany({
@@ -29,9 +19,9 @@ export async function GET() {
       orderBy: { name: "asc" },
     });
 
-    return NextResponse.json(stocks);
+    return apiSuccess(stocks);
   } catch (error) {
     console.error("[STOCKS_LIST_ERROR]", error);
-    return NextResponse.json({ error: "Failed to fetch stocks" }, { status: 500 });
+    return apiError("Failed to fetch stocks", 500);
   }
 }

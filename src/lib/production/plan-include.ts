@@ -1,4 +1,18 @@
-export const planInclude = {
+export const planListInclude = {
+  shift: { select: { id: true, name: true } },
+  createdBy: { select: { id: true, name: true, email: true } },
+  approvedBy: { select: { id: true, name: true, email: true } },
+  lines: {
+    orderBy: { sortOrder: "asc" as const },
+    include: {
+      machine: { select: { id: true, name: true } },
+      operator: { select: { id: true, name: true, email: true } },
+      inventoryItem: { select: { id: true, code: true, name: true } },
+    },
+  },
+};
+
+export const planDetailInclude = {
   shift: true,
   createdBy: { select: { id: true, name: true, email: true } },
   approvedBy: { select: { id: true, name: true, email: true } },
@@ -25,6 +39,8 @@ export const planInclude = {
     },
   },
 };
+
+export const planInclude = planDetailInclude;
 
 export type PlanWithLines = {
   id: string;

@@ -24,12 +24,27 @@ export async function getProductionDashboardData(date = new Date()) {
         planDate: { gte: dayStart, lte: dayEnd },
         status: { not: "CANCELLED" },
       },
-      include: {
-        shift: true,
+      select: {
+        id: true,
+        status: true,
+        shiftId: true,
+        shift: { select: { id: true, name: true } },
         lines: {
-          include: {
+          select: {
+            id: true,
+            phase: true,
+            targetQty: true,
+            machineId: true,
             machine: { select: { id: true, name: true } },
-            runs: true,
+            runs: {
+              select: {
+                id: true,
+                startedAt: true,
+                endedAt: true,
+                actualQty: true,
+                acceptedQty: true,
+              },
+            },
           },
         },
       },
@@ -39,7 +54,13 @@ export async function getProductionDashboardData(date = new Date()) {
         planDate: { lt: dayStart },
         status: { in: ["APPROVED", "IN_PROGRESS"] },
       },
-      include: { shift: true },
+      select: {
+        id: true,
+        planNumber: true,
+        planDate: true,
+        status: true,
+        shift: { select: { name: true } },
+      },
       orderBy: { planDate: "asc" },
       take: 20,
     }),
@@ -47,11 +68,17 @@ export async function getProductionDashboardData(date = new Date()) {
       where: {
         startedAt: { gte: dayStart, lte: dayEnd },
       },
-      include: {
+      select: {
+        id: true,
+        startedAt: true,
+        endedAt: true,
+        targetQty: true,
+        actualQty: true,
+        acceptedQty: true,
         planLine: {
-          include: {
+          select: {
+            machineId: true,
             machine: { select: { id: true, name: true } },
-            plan: { include: { shift: true } },
           },
         },
       },
