@@ -218,22 +218,22 @@ export function GateClient({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6 w-full max-w-full min-w-0">
       {/* ── Stats Bar ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-7 gap-3">
-        <StatCard label="Inside Factory" value={stats.inside.toString()} icon={<Truck className="h-5 w-5" />} color="blue" />
-        <StatCard label="Waiting / Parked" value={stats.waiting.toString()} icon={<Clock className="h-5 w-5" />} color="orange" />
-        <StatCard label="Loading" value={stats.loading.toString()} icon={<RefreshCw className="h-5 w-5" />} color="purple" />
-        <StatCard label="Unloading" value={stats.unloading.toString()} icon={<RefreshCw className="h-5 w-5" />} color="indigo" />
-        <StatCard label="Doc Verification" value={stats.verificationPending.toString()} icon={<AlertTriangle className="h-5 w-5" />} color="amber" />
-        <StatCard label="On Hold" value={stats.onHold.toString()} icon={<XCircle className="h-5 w-5" />} color="red" />
-        <StatCard label="Gate Out Today" value={stats.gateOutToday.toString()} icon={<ShieldCheck className="h-5 w-5" />} color="green" />
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-7 gap-2 sm:gap-3 w-full">
+        <StatCard label="Inside Factory" value={stats.inside.toString()} icon={<Truck className="h-4 w-4 sm:h-5 sm:w-5" />} color="blue" />
+        <StatCard label="Waiting / Parked" value={stats.waiting.toString()} icon={<Clock className="h-4 w-4 sm:h-5 sm:w-5" />} color="orange" />
+        <StatCard label="Loading" value={stats.loading.toString()} icon={<RefreshCw className="h-4 w-4 sm:h-5 sm:w-5" />} color="purple" />
+        <StatCard label="Unloading" value={stats.unloading.toString()} icon={<RefreshCw className="h-4 w-4 sm:h-5 sm:w-5" />} color="indigo" />
+        <StatCard label="Doc Verification" value={stats.verificationPending.toString()} icon={<AlertTriangle className="h-4 w-4 sm:h-5 sm:w-5" />} color="amber" />
+        <StatCard label="On Hold" value={stats.onHold.toString()} icon={<XCircle className="h-4 w-4 sm:h-5 sm:w-5" />} color="red" />
+        <StatCard label="Gate Out Today" value={stats.gateOutToday.toString()} icon={<ShieldCheck className="h-4 w-4 sm:h-5 sm:w-5" />} color="green" />
       </div>
 
-      {/* ── Toolbar ── */}
-      <div className="flex flex-col md:flex-row gap-4 p-4 bg-white rounded-xl border border-slate-200 shadow-sm justify-between items-center">
-        <div className="flex items-center gap-3 w-full md:w-auto">
-          <div className="relative flex-1 min-w-[240px]">
+      {/* ── Desktop Toolbar ── */}
+      <div className="hidden md:flex flex-row gap-4 p-4 bg-white rounded-xl border border-slate-200 shadow-sm justify-between items-center">
+        <div className="flex items-center gap-3">
+          <div className="relative min-w-[240px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <input
               type="text"
@@ -267,11 +267,12 @@ export function GateClient({
           </select>
         </div>
 
-        <div className="flex items-center gap-3 w-full md:w-auto">
+        <div className="flex items-center gap-3">
           <button
             onClick={fetchEntries}
             disabled={loading}
             className="inline-flex items-center justify-center p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors border border-slate-200 bg-white disabled:opacity-50"
+            title="Refresh"
           >
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
           </button>
@@ -285,16 +286,86 @@ export function GateClient({
         </div>
       </div>
 
-      {/* ── Mobile Filter Chips (Horizontal Scroll) ── */}
-      <div className="flex md:hidden overflow-x-auto gap-2 pb-1 no-scrollbar -mx-4 px-4">
+      {/* ── Mobile Toolbar Card ── */}
+      <div className="flex md:hidden flex-col gap-2.5 p-3 bg-white rounded-xl border border-slate-200 shadow-sm w-full">
+        {/* Top Row: Search + Refresh + New Entry */}
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1 min-w-0">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="Search truck..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full pl-8 pr-7 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-slate-50 transition-all"
+            />
+            {search && (
+              <button
+                onClick={() => setSearch("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+              >
+                <XCircle className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+
+          <button
+            onClick={fetchEntries}
+            disabled={loading}
+            className="p-2 text-slate-600 hover:bg-slate-100 rounded-lg border border-slate-200 bg-white disabled:opacity-50 shrink-0"
+            title="Refresh"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+          </button>
+          <Link
+            href="/dashboard/gate/new"
+            className="inline-flex items-center justify-center gap-1 px-3 py-2 text-xs font-semibold rounded-lg bg-primary text-white hover:bg-primary/90 transition-colors shadow-xs shrink-0"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            <span>New</span>
+          </Link>
+        </div>
+
+        {/* Second Row: Filters Grid */}
+        <div className="grid grid-cols-2 gap-2">
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="w-full px-2 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-slate-50 text-slate-700 truncate"
+          >
+            <option value="">All Statuses</option>
+            {Object.values(GateEntryStatus).map(s => (
+              <option key={s} value={s}>{s.replace(/_/g, " ")}</option>
+            ))}
+          </select>
+
+          <select
+            value={purposeFilter}
+            onChange={(e) => setPurposeFilter(e.target.value)}
+            className="w-full px-2 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-slate-50 text-slate-700 truncate"
+          >
+            <option value="">All Purposes</option>
+            {Object.values(GatePurpose).map(p => (
+              <option key={p} value={p}>{p}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* ── Mobile Quick Status Filter Chips (Horizontal Scroll) ── */}
+      <div className="flex md:hidden overflow-x-auto gap-1.5 pb-1 no-scrollbar w-full">
         {[
           { label: "All", value: "" },
           { label: "Arrived", value: "ARRIVED" },
+          { label: "Doc Verification", value: "DOCUMENT_VERIFICATION" },
           { label: "Verified", value: "VERIFIED" },
           { label: "Parking", value: "PARKING" },
+          { label: "Ready", value: "READY" },
           { label: "Loading", value: "LOADING" },
           { label: "Unloading", value: "UNLOADING" },
+          { label: "Completed", value: "COMPLETED" },
           { label: "Gate Out", value: "GATE_OUT" },
+          { label: "On Hold", value: "ON_HOLD" },
         ].map((chip) => {
           const isActive = statusFilter === chip.value;
           return (
@@ -302,7 +373,7 @@ export function GateClient({
               key={chip.label}
               onClick={() => setStatusFilter(chip.value)}
               className={cn(
-                "shrink-0 px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all touch-manipulation",
+                "shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-all touch-manipulation",
                 isActive
                   ? "bg-slate-900 text-white shadow-xs"
                   : "bg-white border border-slate-200 text-slate-600 active:bg-slate-100"
@@ -315,40 +386,60 @@ export function GateClient({
       </div>
 
       {/* ── Table (Desktop) & Cards (Mobile) ── */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden w-full">
         {/* Mobile View (Touch-Optimized App-Like Cards) */}
         <div className="block md:hidden divide-y divide-slate-100 bg-slate-50/50">
           {loading && entries.length === 0 ? (
-            <div className="p-8 text-center text-slate-500 font-medium">Loading entries...</div>
+            <div className="p-8 text-center text-slate-500 font-medium text-xs">Loading entries...</div>
           ) : entries.length === 0 ? (
-            <div className="p-12 text-center flex flex-col items-center gap-3 text-slate-400">
-              <div className="h-14 w-14 rounded-full bg-slate-100 flex items-center justify-center text-slate-500">
-                <Truck className="h-7 w-7 stroke-[1.5]" />
+            <div className="p-8 text-center flex flex-col items-center gap-3 text-slate-400">
+              <div className="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-500">
+                <Truck className="h-6 w-6 stroke-[1.5]" />
               </div>
               <div>
-                <p className="font-semibold text-slate-700 text-base">No gate entries found</p>
+                <p className="font-semibold text-slate-700 text-sm">No gate entries found</p>
                 <p className="text-xs text-slate-500 mt-0.5">Arriving trucks will appear here in real-time.</p>
               </div>
             </div>
           ) : (
             entries.map((entry) => {
               const nextStatus = getNextStatus(entry.status, entry.purpose);
+              const materialsSummary = entry.stockDetails && entry.stockDetails.length > 0
+                ? entry.stockDetails.map((s: any) => `${s.materialName} (${s.actualQuantity ?? s.quantity} ${s.unit || "kg"})`).join(", ")
+                : entry.expectedMaterial
+                ? `${entry.expectedMaterial}${entry.expectedQuantity ? ` (${entry.expectedQuantity})` : ""}`
+                : null;
+
               return (
                 <div
                   key={entry.id}
-                  className="p-4 bg-white flex flex-col gap-3 active:bg-slate-50/80 transition-colors"
+                  className="p-3.5 bg-white flex flex-col gap-2.5 active:bg-slate-50/80 transition-colors"
                 >
-                  {/* Top: License Badge + Status */}
+                  {/* Top: License Badge + Purpose + Status */}
                   <div className="flex items-start justify-between gap-2">
-                    <div className="space-y-1">
-                      <div className="inline-flex items-center px-2.5 py-1 rounded bg-slate-950 text-amber-300 font-mono text-sm font-black tracking-wider border border-slate-800 shadow-2xs">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <div className="inline-flex items-center px-2 py-0.5 rounded bg-slate-950 text-amber-300 font-mono text-xs font-black tracking-wider border border-slate-800 shadow-2xs">
                         {entry.truckNumber}
                       </div>
-                      <div className="text-[11px] text-slate-500 font-mono">
-                        {entry.entryNumber} • {entry.purpose}
-                      </div>
+                      <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-700">
+                        {entry.purpose}
+                      </span>
                     </div>
                     <StatusBadge status={entry.status} />
+                  </div>
+
+                  {/* Subtitle: Entry number + Arrival time */}
+                  <div className="flex items-center justify-between text-[11px] text-slate-500">
+                    <span className="font-mono text-primary font-medium">{entry.entryNumber}</span>
+                    <span className="flex items-center gap-1">
+                      <Clock className="h-3 w-3 text-slate-400" />
+                      {new Date(entry.arrivalTime).toLocaleTimeString("en-IN", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        day: "2-digit",
+                        month: "short",
+                      })}
+                    </span>
                   </div>
 
                   {/* Metadata Grid */}
@@ -365,34 +456,34 @@ export function GateClient({
                         {entry.transporter || "—"}
                       </span>
                     </div>
-                    <div className="col-span-2 flex items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-slate-200/60">
-                      <span className="flex items-center gap-1">
-                        <Clock className="h-3 w-3 text-slate-400" />
-                        {new Date(entry.arrivalTime).toLocaleTimeString("en-IN", {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                          day: "2-digit",
-                          month: "short",
-                        })}
-                      </span>
-                      {entry.driverContact && (
-                        <span className="font-mono text-slate-600">{entry.driverContact}</span>
-                      )}
-                    </div>
+                    {entry.supplierCustomer && (
+                      <div className="col-span-2">
+                        <span className="text-slate-400 block text-[10px] uppercase font-semibold">Supplier / Customer</span>
+                        <span className="font-medium text-slate-800 truncate block">
+                          {entry.supplierCustomer}
+                        </span>
+                      </div>
+                    )}
+                    {materialsSummary && (
+                      <div className="col-span-2 pt-1 border-t border-slate-200/60 text-[11px] text-slate-600 flex items-start gap-1">
+                        <span className="font-semibold text-slate-700 shrink-0">📦 Items:</span>
+                        <span className="truncate">{materialsSummary}</span>
+                      </div>
+                    )}
                   </div>
 
-                  {/* 1-Tap Advance Button & Actions */}
-                  <div className="flex items-center gap-2 pt-1">
+                  {/* Actions Row */}
+                  <div className="flex items-center gap-1.5 pt-1">
                     {nextStatus ? (
                       <button
                         onClick={() => handleQuickStatusUpdate(entry.entryNumber, nextStatus)}
-                        className="flex-1 min-h-[44px] flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-primary text-white text-xs font-bold active:scale-[0.98] transition-transform shadow-xs touch-manipulation"
+                        className="flex-1 min-h-[40px] flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-primary text-white text-xs font-bold active:scale-[0.98] transition-transform shadow-xs touch-manipulation"
                       >
                         <span>Advance to {nextStatus.replace(/_/g, " ")}</span>
                         <ArrowRight className="h-3.5 w-3.5 shrink-0" />
                       </button>
                     ) : (
-                      <div className="flex-1 min-h-[44px] flex items-center justify-center text-xs font-semibold text-emerald-700 bg-emerald-50 rounded-lg border border-emerald-200">
+                      <div className="flex-1 min-h-[40px] flex items-center justify-center text-xs font-semibold text-emerald-700 bg-emerald-50 rounded-lg border border-emerald-200">
                         <CheckCircle className="h-3.5 w-3.5 mr-1" />
                         Completed / Gate Out
                       </div>
@@ -400,11 +491,27 @@ export function GateClient({
 
                     <Link
                       href={`/dashboard/gate/${entry.entryNumber}`}
-                      className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-100 active:bg-slate-200 transition-colors shrink-0"
-                      title="View Details"
+                      className="min-h-[40px] px-3 flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-100 active:bg-slate-200 transition-colors text-xs font-semibold shrink-0"
+                      title="Manage Truck"
                     >
-                      <ChevronRight className="h-5 w-5 text-slate-500" />
+                      Manage
                     </Link>
+
+                    <button
+                      onClick={() => setEditEntry({ ...entry })}
+                      className="min-h-[40px] min-w-[36px] flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:text-primary hover:bg-primary/5 transition-colors shrink-0"
+                      title="Edit"
+                    >
+                      <Edit className="h-3.5 w-3.5" />
+                    </button>
+
+                    <button
+                      onClick={() => setDeleteEntryId(entry.entryNumber)}
+                      className="min-h-[40px] min-w-[36px] flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:text-red-600 hover:bg-red-50 transition-colors shrink-0"
+                      title="Delete"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
                   </div>
                 </div>
               );
@@ -512,15 +619,15 @@ export function GateClient({
       {/* Edit Modal */}
       {editEntry && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-              <h3 className="font-semibold text-slate-800">Edit Gate Entry</h3>
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
+            <div className="px-4 sm:px-6 py-3.5 border-b border-slate-100 flex justify-between items-center bg-slate-50 shrink-0">
+              <h3 className="font-semibold text-slate-800 text-sm sm:text-base">Edit Gate Entry</h3>
               <button onClick={() => setEditEntry(null)} className="text-slate-400 hover:text-slate-600">
                 <XCircle className="h-5 w-5" />
               </button>
             </div>
-            <form onSubmit={handleEditSubmit} className="p-6 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+            <form onSubmit={handleEditSubmit} className="p-4 sm:p-6 overflow-y-auto space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div>
                   <label className="block text-xs font-medium text-slate-700 mb-1">Truck Number *</label>
                   <input required type="text" value={editEntry.truckNumber} onChange={e => setEditEntry({...editEntry, truckNumber: e.target.value.toUpperCase()})} className="w-full px-3 py-2 border rounded-md text-sm" />
@@ -543,18 +650,18 @@ export function GateClient({
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-700 mb-1">Driver Contact</label>
-                  <input type="text" value={editEntry.driverContact} onChange={e => setEditEntry({...editEntry, driverContact: e.target.value})} className="w-full px-3 py-2 border rounded-md text-sm" />
+                  <input type="text" value={editEntry.driverContact || ""} onChange={e => setEditEntry({...editEntry, driverContact: e.target.value})} className="w-full px-3 py-2 border rounded-md text-sm" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-700 mb-1">Transporter</label>
                   <input type="text" value={editEntry.transporter || ""} onChange={e => setEditEntry({...editEntry, transporter: e.target.value})} className="w-full px-3 py-2 border rounded-md text-sm" />
                 </div>
-                <div>
+                <div className="sm:col-span-2">
                   <label className="block text-xs font-medium text-slate-700 mb-1">Supplier / Customer</label>
                   <input type="text" value={editEntry.supplierCustomer || ""} onChange={e => setEditEntry({...editEntry, supplierCustomer: e.target.value})} className="w-full px-3 py-2 border rounded-md text-sm" />
                 </div>
               </div>
-              <div className="pt-4 flex justify-end gap-2 border-t border-slate-100 mt-6">
+              <div className="pt-4 flex justify-end gap-2 border-t border-slate-100 mt-4">
                 <button type="button" onClick={() => setEditEntry(null)} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-md border border-slate-200">Cancel</button>
                 <button type="submit" disabled={isEditing} className="px-4 py-2 text-sm bg-primary text-white rounded-md hover:bg-primary/90">{isEditing ? "Saving..." : "Save Changes"}</button>
               </div>
@@ -622,15 +729,15 @@ function StatCard({ label, value, icon, color }: { label: string; value: string;
   const scheme = colorMap[color] || colorMap.blue;
 
   return (
-    <div className={cn("flex items-center gap-3 p-3.5 sm:p-4 rounded-xl border shadow-xs transition-all hover:shadow-sm", scheme.bg, scheme.border)}>
-      <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-lg shadow-2xs", scheme.iconBg, scheme.iconText)}>
+    <div className={cn("flex items-center gap-2.5 sm:gap-3 p-2.5 sm:p-4 rounded-xl border shadow-xs transition-all hover:shadow-sm min-w-0", scheme.bg, scheme.border)}>
+      <div className={cn("flex h-8 w-8 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-lg shadow-2xs", scheme.iconBg, scheme.iconText)}>
         {icon}
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 truncate" title={label}>
+        <p className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-slate-500 truncate" title={label}>
           {label}
         </p>
-        <p className={cn("text-2xl font-extrabold tracking-tight leading-none mt-1", scheme.text)}>
+        <p className={cn("text-lg sm:text-2xl font-extrabold tracking-tight leading-none mt-0.5 sm:mt-1", scheme.text)}>
           {value}
         </p>
       </div>
