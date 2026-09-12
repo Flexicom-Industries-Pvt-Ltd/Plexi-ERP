@@ -14,12 +14,12 @@ export default async function NewGatePage() {
   await requirePermission(Module.SECURITY_GATE, "canCreate");
 
   return (
-    <div className="flex flex-col gap-6 p-6 lg:p-8 max-w-4xl mx-auto w-full">
-      <div className="flex flex-col gap-2">
-        <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+    <div className="flex flex-col gap-4 sm:gap-6 p-0 sm:p-4 md:p-6 lg:p-8 max-w-4xl mx-auto w-full min-w-0">
+      <div className="flex flex-col gap-1 sm:gap-2">
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
           New Gate Entry
         </h1>
-        <p className="text-muted-foreground">
+        <p className="text-xs sm:text-sm text-muted-foreground">
           Log a newly arrived truck into the factory premises.
         </p>
       </div>
