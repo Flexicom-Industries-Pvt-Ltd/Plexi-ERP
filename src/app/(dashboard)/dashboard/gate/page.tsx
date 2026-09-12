@@ -26,12 +26,12 @@ export default async function GatePage() {
   ]);
 
   return (
-    <div className="flex flex-col gap-6 w-full">
-      <div className="flex flex-col gap-1.5">
-        <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+    <div className="flex flex-col gap-4 md:gap-6 w-full max-w-full min-w-0">
+      <div className="flex flex-col gap-1">
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
           Security & Gate Management
         </h1>
-        <p className="text-muted-foreground">
+        <p className="text-xs sm:text-sm text-muted-foreground">
           Track and manage truck lifecycle from arrival to gate-out.
         </p>
       </div>
