@@ -25,7 +25,7 @@ export default async function GateDetailsPage({ params }: { params: Promise<{ id
   }
 
   return (
-    <div className="flex flex-col gap-6 p-6 lg:p-8 max-w-7xl mx-auto w-full">
+    <div className="flex flex-col gap-4 sm:gap-6 p-0 sm:p-4 md:p-6 lg:p-8 max-w-7xl mx-auto w-full min-w-0">
       <GateBreadcrumb entryNumber={entry.entryNumber} />
       <GateDetailsClient entryId={entry.entryNumber} />
     </div>

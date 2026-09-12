@@ -18,10 +18,14 @@ import {
   Package,
   Upload,
   RefreshCw,
-  AlertTriangle,
   ChevronDown,
   Search,
   X,
+  Plus,
+  ArrowRight,
+  ShieldCheck,
+  Check,
+  AlertCircle,
 } from "lucide-react";
 import { GateEntryStatus } from "@/generated/prisma";
 
@@ -258,7 +262,6 @@ export function GateDetailsClient({ entryId }: { entryId: string }) {
       const res = await fetch(`/api/gate/${entryId}/documents`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        // Dummy fileUrl for now since we aren't using S3
         body: JSON.stringify({ ...docForm, fileUrl: "local-check" }),
       });
       if (!res.ok) throw new Error();
@@ -273,14 +276,30 @@ export function GateDetailsClient({ entryId }: { entryId: string }) {
     }
   };
 
-  if (loading) return <div className="text-center py-12 text-slate-500">Loading details...</div>;
-  if (!entry) return <div className="text-center py-12 text-red-500">Entry not found</div>;
+  if (loading) return <div className="text-center py-12 text-slate-500 font-medium">Loading details...</div>;
+  if (!entry) return <div className="text-center py-12 text-red-500 font-medium">Entry not found</div>;
 
   const nextStatus = entry ? getNextStatus(entry.status, entry.purpose) : null;
 
+  // Calculate lifecycle progress
+  const currentStepIndex = LIFECYCLE_STEPS.findIndex(s => 
+    s.id === entry.status || 
+    (s.id === "LOADING" && entry.status === "UNLOADING") ||
+    (s.id === "DOCUMENT_VERIFICATION" && entry.status === "VERIFIED") ||
+    (s.id === "PARKING" && entry.status === "READY") ||
+    (s.id === "LOADING" && entry.status === "COMPLETED")
+  );
+  const activeStepIdx = entry.status === "GATE_OUT" ? 4 : (currentStepIndex >= 0 ? currentStepIndex : 0);
+  const activeStepLabel = entry.status === "GATE_OUT" 
+    ? "Gate Out" 
+    : (LIFECYCLE_STEPS[activeStepIdx]?.label || entry.status.replace("_", " "));
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 sm:space-y-6">
+      {/* ========================================================================= */}
+      {/* DESKTOP HEADER (Preserved 100% for desktop screens md and above)          */}
+      {/* ========================================================================= */}
+      <div className="hidden md:flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Link href="/dashboard/gate" className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
             <ArrowLeft className="h-5 w-5 text-slate-500" />
@@ -344,8 +363,129 @@ export function GateDetailsClient({ entryId }: { entryId: string }) {
         </div>
       </div>
 
-      {/* Lifecycle Stepper */}
-      <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm overflow-x-auto">
+      {/* ========================================================================= */}
+      {/* MOBILE HERO HEADER (High-visibility, low-education friendly, no wrapping) */}
+      {/* ========================================================================= */}
+      <div className="block md:hidden space-y-3">
+        {/* Top Navigation Row */}
+        <div className="flex items-center justify-between gap-2">
+          <Link 
+            href="/dashboard/gate" 
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 shadow-sm active:bg-slate-100"
+          >
+            <ArrowLeft className="h-4 w-4 text-slate-600" /> Back
+          </Link>
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-xs font-bold text-slate-600 bg-slate-100 px-2 py-1 rounded border border-slate-200">
+              {entry.entryNumber}
+            </span>
+            <span className={`text-xs font-bold px-2.5 py-1 rounded-full border ${
+              entry.status === "GATE_OUT" ? "bg-slate-100 text-slate-700 border-slate-300" :
+              entry.status === "COMPLETED" || entry.status === "VERIFIED" ? "bg-emerald-100 text-emerald-800 border-emerald-300" :
+              "bg-primary/10 text-primary border-primary/20"
+            }`}>
+              {entry.status.replace("_", " ")}
+            </span>
+          </div>
+        </div>
+
+        {/* Truck Details Card */}
+        <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            {/* Number Plate Visual */}
+            <div className="inline-flex items-center gap-2 bg-amber-400 text-slate-950 px-3 py-1.5 rounded-lg border-2 border-amber-500 shadow-sm">
+              <Truck className="h-4 w-4 text-slate-900" />
+              <span className="font-mono font-black text-base tracking-wider uppercase">
+                {entry.truckNumber}
+              </span>
+            </div>
+            
+            {/* Purpose Badge */}
+            <span className={`text-xs font-bold px-3 py-1.5 rounded-lg border uppercase tracking-wider ${
+              entry.purpose === "LOADING" ? "bg-blue-50 text-blue-700 border-blue-200" :
+              entry.purpose === "UNLOADING" ? "bg-indigo-50 text-indigo-700 border-indigo-200" :
+              "bg-slate-100 text-slate-700 border-slate-200"
+            }`}>
+              {entry.purpose}
+            </span>
+          </div>
+
+          {/* Quick Info Bar */}
+          <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 text-xs">
+            <div>
+              <span className="text-slate-400 block font-medium">Driver:</span>
+              <span className="font-bold text-slate-800 truncate block">{entry.driverName || "—"}</span>
+            </div>
+            <div>
+              <span className="text-slate-400 block font-medium">Party / Supplier:</span>
+              <span className="font-bold text-slate-800 truncate block">{entry.supplierCustomer || "—"}</span>
+            </div>
+          </div>
+
+          {/* Mobile Big Action Button */}
+          {nextStatus && entry.status !== "GATE_OUT" && entry.status !== "CANCELLED" && (
+            <div className="pt-2">
+              <button
+                onClick={() => updateStatus(nextStatus)}
+                disabled={updating}
+                className="w-full py-3 px-4 bg-primary text-white font-bold text-sm rounded-xl shadow-md flex items-center justify-center gap-2 active:scale-[0.98] transition-all disabled:opacity-50"
+              >
+                <span>Advance to {nextStatus.replace("_", " ")}</span>
+                <ArrowRight className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+
+          {/* Status Override Trigger */}
+          {entry.status !== "GATE_OUT" && entry.status !== "CANCELLED" && (
+            <div className="relative pt-1">
+              <button
+                onClick={() => setShowStatusMenu(!showStatusMenu)}
+                className="w-full py-2 px-3 bg-slate-50 border border-slate-200 text-slate-700 font-semibold text-xs rounded-lg flex items-center justify-between active:bg-slate-100"
+              >
+                <span>Change / Override Status</span>
+                <ChevronDown className="h-3.5 w-3.5 text-slate-500" />
+              </button>
+
+              {showStatusMenu && (
+                <>
+                  <div className="fixed inset-0 z-40 bg-slate-900/30 backdrop-blur-xs" onClick={() => setShowStatusMenu(false)} />
+                  <div className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-2xl shadow-2xl p-4 max-h-[70vh] overflow-y-auto border-t border-slate-200 animate-in slide-in-from-bottom duration-200">
+                    <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-2">
+                      <h3 className="font-bold text-sm text-slate-800">Select Entry Status</h3>
+                      <button onClick={() => setShowStatusMenu(false)} className="p-1 text-slate-400 hover:text-slate-600">
+                        <X className="h-5 w-5" />
+                      </button>
+                    </div>
+                    <div className="space-y-1">
+                      {Object.values(GateEntryStatus).map(s => (
+                        <button
+                          key={s}
+                          onClick={() => {
+                            setShowStatusMenu(false);
+                            updateStatus(s);
+                          }}
+                          className={`w-full text-left px-3 py-2.5 rounded-lg text-sm font-semibold flex items-center justify-between transition-colors ${
+                            entry.status === s ? 'text-primary bg-primary/10 border border-primary/20' : 'text-slate-700 hover:bg-slate-50'
+                          }`}
+                        >
+                          <span>{s.replace("_", " ")}</span>
+                          {entry.status === s && <Check className="h-4 w-4 text-primary" />}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* DESKTOP LIFECYCLE STEPPER (Preserved 100% for desktop screens)            */}
+      {/* ========================================================================= */}
+      <div className="hidden md:block bg-white p-6 rounded-xl border border-slate-200 shadow-sm overflow-x-auto">
         <div className="flex items-center min-w-[600px]">
           {LIFECYCLE_STEPS.map((step, idx) => {
             let state = "pending";
@@ -393,9 +533,65 @@ export function GateDetailsClient({ entryId }: { entryId: string }) {
         </div>
       </div>
 
-      {/* Tabs */}
+      {/* ========================================================================= */}
+      {/* MOBILE LIFECYCLE STEPPER (Stage progress tracker card, crystal clear)      */}
+      {/* ========================================================================= */}
+      <div className="block md:hidden bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
+            Stage {activeStepIdx + 1} of 5
+          </span>
+          <span className="text-xs font-bold px-2 py-0.5 rounded bg-primary/10 text-primary">
+            {activeStepLabel}
+          </span>
+        </div>
+
+        {/* 5-Step Segmented Bar */}
+        <div className="grid grid-cols-5 gap-1.5 h-2">
+          {LIFECYCLE_STEPS.map((_, idx) => {
+            const isDone = idx < activeStepIdx || entry.status === "GATE_OUT";
+            const isCurrent = idx === activeStepIdx && entry.status !== "GATE_OUT";
+            return (
+              <div
+                key={idx}
+                className={`rounded-full h-full transition-all ${
+                  isDone ? "bg-emerald-500" :
+                  isCurrent ? "bg-primary ring-2 ring-primary/30" :
+                  "bg-slate-200"
+                }`}
+              />
+            );
+          })}
+        </div>
+
+        {/* Step Chips */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 pt-1 no-scrollbar text-[11px]">
+          {LIFECYCLE_STEPS.map((step, idx) => {
+            const isDone = idx < activeStepIdx || entry.status === "GATE_OUT";
+            const isCurrent = idx === activeStepIdx && entry.status !== "GATE_OUT";
+            return (
+              <div
+                key={step.id}
+                className={`flex items-center gap-1 px-2 py-1 rounded-md whitespace-nowrap font-medium ${
+                  isDone ? "bg-emerald-50 text-emerald-700 border border-emerald-200" :
+                  isCurrent ? "bg-primary text-white font-bold shadow-xs" :
+                  "bg-slate-50 text-slate-400 border border-slate-200"
+                }`}
+              >
+                {isDone ? <Check className="h-3 w-3" /> : <span>{idx + 1}.</span>}
+                <span>{step.label}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* TABS CONTAINER                                                            */}
+      {/* ========================================================================= */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
-        <div className="flex items-center border-b border-slate-100 px-2 overflow-x-auto">
+        {/* Desktop Tab Bar */}
+        <div className="hidden md:flex items-center border-b border-slate-100 px-2 overflow-x-auto">
           {["overview", "stock", "documents"].map((tab) => (
             <button
               key={tab}
@@ -410,24 +606,52 @@ export function GateDetailsClient({ entryId }: { entryId: string }) {
             </button>
           ))}
         </div>
+
+        {/* Mobile Segmented Tab Bar */}
+        <div className="grid grid-cols-3 gap-1 p-1.5 bg-slate-100 md:hidden m-3 rounded-xl border border-slate-200">
+          {[
+            { id: "overview", label: "Overview" },
+            { id: "stock", label: `Stock (${entry.stockDetails?.length || 0})` },
+            { id: "documents", label: `Docs (${entry.documents?.length || 0})` },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`py-2 px-1 text-xs font-bold rounded-lg transition-all text-center ${
+                activeTab === tab.id
+                  ? "bg-white text-primary shadow-sm"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
         
-        <div className="p-6">
+        <div className="p-4 sm:p-6">
+          {/* TAB 1: OVERVIEW */}
           {activeTab === "overview" && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <div className="space-y-4">
-                <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Arrival Information</h3>
-                <div className="bg-slate-50 rounded-xl p-4 space-y-3 border border-slate-100">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-8">
+              <div className="space-y-3 sm:space-y-4">
+                <h3 className="text-xs sm:text-sm font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                  <ShieldCheck className="h-4 w-4 text-slate-400" />
+                  Arrival Information
+                </h3>
+                <div className="bg-slate-50 rounded-xl p-3.5 sm:p-4 space-y-3 border border-slate-100">
                   <DetailRow icon={<Clock />} label="Arrived At" value={new Date(entry.arrivalTime).toLocaleString()} />
-                  <DetailRow icon={<User />} label="Driver" value={entry.driverName} />
+                  <DetailRow icon={<User />} label="Driver Name" value={entry.driverName} />
                   <DetailRow icon={<Phone />} label="Driver Contact" value={entry.driverContact || "—"} />
                   <DetailRow icon={<Briefcase />} label="Transporter" value={entry.transporter || "—"} />
-                  <DetailRow icon={<MapPin />} label="Party" value={entry.supplierCustomer || "—"} />
+                  <DetailRow icon={<MapPin />} label="Party / Supplier" value={entry.supplierCustomer || "—"} />
                 </div>
               </div>
 
-              <div className="space-y-4">
-                <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Consignment / Purpose</h3>
-                <div className="bg-slate-50 rounded-xl p-4 space-y-3 border border-slate-100">
+              <div className="space-y-3 sm:space-y-4">
+                <h3 className="text-xs sm:text-sm font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                  <Package className="h-4 w-4 text-slate-400" />
+                  Consignment & Material
+                </h3>
+                <div className="bg-slate-50 rounded-xl p-3.5 sm:p-4 space-y-3 border border-slate-100">
                   <DetailRow icon={<FileText />} label="Purpose" value={entry.purpose} />
                   <DetailRow icon={<Package />} label="Expected Material" value={entry.expectedMaterial || "—"} />
                   <DetailRow icon={<RefreshCw />} label="Expected Quantity" value={entry.expectedQuantity ? `${entry.expectedQuantity}` : "—"} />
@@ -436,28 +660,28 @@ export function GateDetailsClient({ entryId }: { entryId: string }) {
               </div>
 
               {["PARKING", "READY", "ON_HOLD", "LOADING", "UNLOADING", "COMPLETED"].includes(entry.status) && (
-                <div className="md:col-span-2 space-y-4">
-                  <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Parking & Waiting</h3>
-                  <div className="bg-slate-50 rounded-xl p-4 space-y-4 border border-slate-100">
+                <div className="col-span-1 md:col-span-2 space-y-3 sm:space-y-4">
+                  <h3 className="text-xs sm:text-sm font-bold text-slate-500 uppercase tracking-wider">Parking & Waiting</h3>
+                  <div className="bg-slate-50 rounded-xl p-3.5 sm:p-4 space-y-4 border border-slate-100">
                     <div>
-                      <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Parking Location</label>
+                      <label className="text-xs font-semibold text-slate-600 uppercase tracking-wider block mb-1">Parking Location</label>
                       <input
                         type="text"
                         value={entry.parkingLocation || ""}
                         onChange={(e) => setEntry({ ...entry, parkingLocation: e.target.value })}
                         placeholder="e.g. Bay A-3, Waiting Zone 2"
-                        className="mt-1 w-full px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white"
+                        className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-lg bg-white focus:ring-2 focus:ring-primary/20 outline-none"
                         disabled={entry.status === "GATE_OUT"}
                       />
                     </div>
                     <div>
-                      <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">Waiting Reason</label>
+                      <label className="text-xs font-semibold text-slate-600 uppercase tracking-wider block mb-1">Waiting Reason</label>
                       <textarea
                         value={entry.waitingReason || ""}
                         onChange={(e) => setEntry({ ...entry, waitingReason: e.target.value })}
                         placeholder="Reason for waiting or hold..."
                         rows={2}
-                        className="mt-1 w-full px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white resize-none"
+                        className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-lg bg-white resize-none focus:ring-2 focus:ring-primary/20 outline-none"
                         disabled={entry.status === "GATE_OUT"}
                       />
                     </div>
@@ -465,7 +689,7 @@ export function GateDetailsClient({ entryId }: { entryId: string }) {
                       <button
                         onClick={saveParkingDetails}
                         disabled={updating}
-                        className="px-4 py-2 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary/90 disabled:opacity-50"
+                        className="w-full sm:w-auto px-4 py-2.5 bg-primary text-white text-sm font-bold rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors shadow-sm"
                       >
                         Save Parking Details
                       </button>
@@ -476,89 +700,140 @@ export function GateDetailsClient({ entryId }: { entryId: string }) {
             </div>
           )}
 
+          {/* TAB 2: STOCK DETAILS */}
           {activeTab === "stock" && (
             <div className="space-y-4">
               <div className="flex justify-between items-center">
-                <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Stock Details</h3>
+                <h3 className="text-xs sm:text-sm font-bold text-slate-500 uppercase tracking-wider">
+                  Stock Items ({entry.stockDetails?.length || 0})
+                </h3>
                 <button 
                   onClick={() => setShowStockModal(true)}
                   disabled={entry.status === "GATE_OUT"}
                   title={entry.status === "GATE_OUT" ? "Cannot add stock after Gate Out" : ""}
-                  className={`inline-flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded-md ${
+                  className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-lg transition-colors shadow-xs ${
                     entry.status === "GATE_OUT" 
                       ? "text-slate-400 bg-slate-100 cursor-not-allowed" 
-                      : "text-primary hover:underline bg-primary/5"
+                      : "text-white bg-primary hover:bg-primary/90 active:scale-95"
                   }`}
                 >
-                  <Package className="h-3.5 w-3.5" /> Add Stock Item
+                  <Plus className="h-4 w-4" /> Add Stock Item
                 </button>
               </div>
+
               {entry.stockDetails?.length > 0 ? (
-                <div className="overflow-x-auto border border-slate-200 rounded-lg">
-                  <table className="w-full text-sm text-left">
-                    <thead className="bg-slate-50 border-b border-slate-200 text-xs uppercase font-semibold text-slate-600">
-                      <tr>
-                        <th className="px-4 py-3">Material</th>
-                        <th className="px-4 py-3">Type</th>
-                        <th className="px-4 py-3">Batch/Lot</th>
-                        <th className="px-4 py-3 text-right">Declared Qty</th>
-                        <th className="px-4 py-3 text-right">Inventory Status</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {entry.stockDetails.map((item: any) => (
-                        <tr key={item.id} className="hover:bg-slate-50/60 transition-colors">
-                          <td className="px-4 py-3 font-bold text-slate-800">{item.materialName}</td>
-                          <td className="px-4 py-3 text-slate-500 text-xs">{item.materialType ? item.materialType.replace(/_/g, " ") : "—"}</td>
-                          <td className="px-4 py-3 text-slate-500 font-mono text-xs">{item.batchLot || "—"}</td>
-                          <td className="px-4 py-3 font-semibold text-slate-800 text-right">
+                <>
+                  {/* DESKTOP TABLE VIEW */}
+                  <div className="hidden md:block overflow-x-auto border border-slate-200 rounded-lg">
+                    <table className="w-full text-sm text-left">
+                      <thead className="bg-slate-50 border-b border-slate-200 text-xs uppercase font-semibold text-slate-600">
+                        <tr>
+                          <th className="px-4 py-3">Material</th>
+                          <th className="px-4 py-3">Type</th>
+                          <th className="px-4 py-3">Batch/Lot</th>
+                          <th className="px-4 py-3 text-right">Declared Qty</th>
+                          <th className="px-4 py-3 text-right">Inventory Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {entry.stockDetails.map((item: any) => (
+                          <tr key={item.id} className="hover:bg-slate-50/60 transition-colors">
+                            <td className="px-4 py-3 font-bold text-slate-800">{item.materialName}</td>
+                            <td className="px-4 py-3 text-slate-500 text-xs">{item.materialType ? item.materialType.replace(/_/g, " ") : "—"}</td>
+                            <td className="px-4 py-3 text-slate-500 font-mono text-xs">{item.batchLot || "—"}</td>
+                            <td className="px-4 py-3 font-semibold text-slate-800 text-right">
+                              {item.expectedQuantity ?? item.quantity} {item.unit}
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              {item.actualQuantity !== null && item.actualQuantity !== undefined ? (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                  Received {item.actualQuantity} {item.unit}
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                                  Pending Inward
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* MOBILE CARDS VIEW (High-contrast, easy to read for operators) */}
+                  <div className="block md:hidden space-y-3">
+                    {entry.stockDetails.map((item: any) => (
+                      <div key={item.id} className="bg-slate-50 rounded-xl p-3.5 border border-slate-200 space-y-2.5">
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <h4 className="font-bold text-slate-900 text-sm">{item.materialName}</h4>
+                            <span className="text-[11px] font-semibold text-slate-500">
+                              {item.materialType ? item.materialType.replace(/_/g, " ") : "Raw Material"}
+                            </span>
+                          </div>
+                          <span className="font-bold text-sm bg-white border border-slate-200 px-2.5 py-1 rounded-md text-slate-800 shadow-xs">
                             {item.expectedQuantity ?? item.quantity} {item.unit}
-                          </td>
-                          <td className="px-4 py-3 text-right">
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-200/60 text-xs">
+                          <div>
+                            <span className="text-slate-400 block font-medium">Batch / Lot:</span>
+                            <span className="font-mono font-semibold text-slate-700">{item.batchLot || "—"}</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-400 block font-medium">Inward Status:</span>
                             {item.actualQuantity !== null && item.actualQuantity !== undefined ? (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 mt-0.5">
                                 Received {item.actualQuantity} {item.unit}
                               </span>
                             ) : (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 mt-0.5">
                                 Pending Inward
                               </span>
                             )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
               ) : (
-                <div className="text-center py-8 bg-slate-50 rounded-lg border border-slate-200 border-dashed text-slate-500 text-sm">
-                  No stock details added yet.
+                <div className="text-center py-8 bg-slate-50 rounded-xl border border-slate-200 border-dashed text-slate-500 text-sm flex flex-col items-center gap-2">
+                  <Package className="h-8 w-8 text-slate-300" />
+                  <p className="font-medium">No stock items added yet.</p>
+                  <p className="text-xs text-slate-400">Click &apos;Add Stock Item&apos; above to record declared materials.</p>
                 </div>
               )}
             </div>
           )}
 
+          {/* TAB 3: DOCUMENTS */}
           {activeTab === "documents" && (
             <div className="space-y-4">
                <div className="flex justify-between items-center">
-                <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Documents</h3>
+                <h3 className="text-xs sm:text-sm font-bold text-slate-500 uppercase tracking-wider">
+                  Documents ({entry.documents?.length || 0})
+                </h3>
                 <button 
                   onClick={() => setShowDocModal(true)}
-                  className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline bg-primary/5 px-3 py-1.5 rounded-md"
+                  className="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-primary hover:bg-primary/90 px-3 py-2 rounded-lg shadow-xs active:scale-95 transition-all"
                 >
-                  <Upload className="h-3.5 w-3.5" /> Add Document
+                  <Upload className="h-4 w-4" /> Add Document
                 </button>
               </div>
+
               {entry.documents?.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                   {entry.documents.map((doc: any) => (
-                    <div key={doc.id} className="p-4 bg-white border border-slate-200 rounded-xl shadow-sm flex items-start gap-4">
-                       <div className="p-3 bg-blue-50 text-blue-600 rounded-lg shrink-0">
-                         <FileText className="h-6 w-6" />
+                    <div key={doc.id} className="p-3.5 sm:p-4 bg-white border border-slate-200 rounded-xl shadow-xs flex items-start gap-3">
+                       <div className="p-2.5 bg-blue-50 text-blue-600 rounded-lg shrink-0 mt-0.5">
+                         <FileText className="h-5 w-5" />
                        </div>
                        <div className="flex-1 min-w-0">
                          <div className="flex items-center justify-between gap-2 mb-1">
-                           <h4 className="font-semibold text-slate-800 truncate">{doc.documentType}</h4>
+                           <h4 className="font-bold text-slate-800 text-sm truncate">{doc.documentType}</h4>
                            <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full ${
                              doc.status === 'VERIFIED' ? 'bg-emerald-100 text-emerald-700' :
                              doc.status === 'REJECTED' ? 'bg-red-100 text-red-700' :
@@ -567,7 +842,7 @@ export function GateDetailsClient({ entryId }: { entryId: string }) {
                              {doc.status}
                            </span>
                          </div>
-                         <p className="text-xs text-slate-500 truncate mb-2">{doc.remarks || "No remarks"}</p>
+                         <p className="text-xs text-slate-500 truncate mb-1">{doc.remarks || "No remarks"}</p>
                          {doc.verifier && (
                            <p className="text-[10px] text-slate-400 mb-2">
                              {doc.status === "VERIFIED" ? "Verified" : "Reviewed"} by {doc.verifier.name}
@@ -575,27 +850,29 @@ export function GateDetailsClient({ entryId }: { entryId: string }) {
                            </p>
                          )}
                          {doc.fileUrl && doc.fileUrl !== "local-check" && (
-                           <a href={doc.fileUrl} target="_blank" rel="noreferrer" className="text-xs text-primary hover:underline">View File</a>
+                           <a href={doc.fileUrl} target="_blank" rel="noreferrer" className="text-xs text-primary font-semibold hover:underline block mb-2">
+                             View File
+                           </a>
                          )}
                          {doc.status !== "VERIFIED" && doc.status !== "REJECTED" && entry.status !== "GATE_OUT" && (
-                           <div className="flex gap-2 mt-2">
+                           <div className="flex flex-wrap gap-1.5 mt-2">
                              <button
                                onClick={() => updateDocumentStatus(doc.id, "VERIFIED")}
-                               className="text-xs px-2.5 py-1 bg-emerald-100 text-emerald-700 rounded-md font-medium hover:bg-emerald-200"
+                               className="text-xs px-3 py-1.5 bg-emerald-100 text-emerald-800 rounded-lg font-bold hover:bg-emerald-200 active:scale-95 transition-all"
                              >
                                Verify
                              </button>
                              <button
                                onClick={() => updateDocumentStatus(doc.id, "REJECTED")}
-                               className="text-xs px-2.5 py-1 bg-red-100 text-red-700 rounded-md font-medium hover:bg-red-200"
+                               className="text-xs px-3 py-1.5 bg-red-100 text-red-800 rounded-lg font-bold hover:bg-red-200 active:scale-95 transition-all"
                              >
                                Reject
                              </button>
                              <button
                                onClick={() => updateDocumentStatus(doc.id, "UNDER_VERIFICATION")}
-                               className="text-xs px-2.5 py-1 bg-amber-100 text-amber-700 rounded-md font-medium hover:bg-amber-200"
+                               className="text-xs px-3 py-1.5 bg-amber-100 text-amber-800 rounded-lg font-bold hover:bg-amber-200 active:scale-95 transition-all"
                              >
-                               Mark Reviewing
+                               Reviewing
                              </button>
                            </div>
                          )}
@@ -604,9 +881,10 @@ export function GateDetailsClient({ entryId }: { entryId: string }) {
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-8 bg-slate-50 rounded-lg border border-slate-200 border-dashed text-slate-500 text-sm flex flex-col items-center gap-2">
+                <div className="text-center py-8 bg-slate-50 rounded-xl border border-slate-200 border-dashed text-slate-500 text-sm flex flex-col items-center gap-2">
                   <Upload className="h-8 w-8 text-slate-300" />
-                  No documents uploaded.
+                  <p className="font-medium">No documents uploaded.</p>
+                  <p className="text-xs text-slate-400">Click &apos;Add Document&apos; to attach invoice, weighbridge slip, or challan.</p>
                 </div>
               )}
             </div>
@@ -614,19 +892,21 @@ export function GateDetailsClient({ entryId }: { entryId: string }) {
         </div>
       </div>
 
-      {/* Stock Modal */}
+      {/* ========================================================================= */}
+      {/* STOCK MODAL                                                               */}
+      {/* ========================================================================= */}
       {showStockModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
-              <h3 className="font-semibold text-slate-800">Add Stock Detail</h3>
-              <button onClick={() => setShowStockModal(false)} className="text-slate-400 hover:text-slate-600">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/50 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <div className="px-5 py-4 border-b border-slate-100 flex justify-between items-center sticky top-0 bg-white z-10">
+              <h3 className="font-bold text-slate-800 text-base">Add Stock Detail</h3>
+              <button onClick={() => setShowStockModal(false)} className="text-slate-400 hover:text-slate-600 p-1">
                 <XCircle className="h-5 w-5" />
               </button>
             </div>
-            <form onSubmit={handleAddStock} className="p-6 space-y-4">
+            <form onSubmit={handleAddStock} className="p-5 space-y-4">
               <div ref={stockDropdownRef} className="relative">
-                <label className="block text-xs font-medium text-slate-700 mb-1">Material Name *</label>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Material Name *</label>
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                   <input
@@ -641,27 +921,27 @@ export function GateDetailsClient({ entryId }: { entryId: string }) {
                       setShowStockSuggestions(true);
                     }}
                     onFocus={() => stockSearchTerm.length >= 2 && setShowStockSuggestions(true)}
-                    className="w-full pl-9 pr-9 py-2 border rounded-md text-sm"
-                    placeholder="Search catalog or type a new name"
+                    className="w-full pl-9 pr-9 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-primary/20 outline-none"
+                    placeholder="Search catalog or type a name"
                     disabled={isStockLocked}
                   />
                   {isStockLocked && (
-                    <button type="button" onClick={handleClearCatalogStock} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                    <button type="button" onClick={handleClearCatalogStock} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1">
                       <X className="h-4 w-4" />
                     </button>
                   )}
                 </div>
                 {showStockSuggestions && suggestedStocks.length > 0 && !isStockLocked && (
-                  <ul className="absolute z-10 mt-1 w-full bg-white border border-slate-200 rounded-md shadow-sm max-h-48 overflow-y-auto text-sm">
+                  <ul className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-xl max-h-48 overflow-y-auto text-sm divide-y divide-slate-100">
                     {suggestedStocks.map((stock) => (
                       <li key={stock.id}>
                         <button
                           type="button"
-                          className="w-full text-left px-3 py-2 hover:bg-slate-50"
+                          className="w-full text-left px-3 py-2.5 hover:bg-slate-50 transition-colors"
                           onClick={() => handleSelectCatalogStock(stock)}
                         >
-                          <span className="font-medium text-slate-800">{stock.name}</span>
-                          <span className="ml-2 text-xs text-slate-500">{stock.code} · {stock.uom?.abbreviation}</span>
+                          <span className="font-bold text-slate-800 block">{stock.name}</span>
+                          <span className="text-xs text-slate-500">{stock.code} · {stock.uom?.abbreviation}</span>
                         </button>
                       </li>
                     ))}
@@ -669,31 +949,39 @@ export function GateDetailsClient({ entryId }: { entryId: string }) {
                 )}
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">Material Type *</label>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Material Type *</label>
                 <select
                   required
                   value={stockForm.materialType}
                   onChange={(e) => setStockForm({ ...stockForm, materialType: e.target.value })}
                   disabled={isStockLocked}
-                  className="w-full px-3 py-2 border rounded-md text-sm disabled:bg-slate-50"
+                  className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm disabled:bg-slate-50 focus:ring-2 focus:ring-primary/20 outline-none"
                 >
                   {MATERIAL_TYPE_OPTIONS.map((opt) => (
                     <option key={opt.value} value={opt.value}>{opt.label}</option>
                   ))}
                 </select>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">Quantity *</label>
-                  <input required type="number" step="0.01" value={stockForm.quantity} onChange={e => setStockForm({...stockForm, quantity: e.target.value})} className="w-full px-3 py-2 border rounded-md text-sm" />
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Quantity *</label>
+                  <input 
+                    required 
+                    type="number" 
+                    step="0.01" 
+                    value={stockForm.quantity} 
+                    onChange={e => setStockForm({...stockForm, quantity: e.target.value})} 
+                    className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-primary/20 outline-none" 
+                    placeholder="0.00"
+                  />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">Unit *</label>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Unit *</label>
                   <select
                     value={stockForm.unit}
                     onChange={e => setStockForm({...stockForm, unit: e.target.value})}
                     disabled={isStockLocked}
-                    className="w-full px-3 py-2 border rounded-md text-sm disabled:bg-slate-50"
+                    className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm disabled:bg-slate-50 focus:ring-2 focus:ring-primary/20 outline-none"
                   >
                     <option value="kg">kg</option>
                     <option value="tons">tons</option>
@@ -703,32 +991,57 @@ export function GateDetailsClient({ entryId }: { entryId: string }) {
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">Batch / Lot (Optional)</label>
-                <input type="text" value={stockForm.batchLot} onChange={e => setStockForm({...stockForm, batchLot: e.target.value})} className="w-full px-3 py-2 border rounded-md text-sm" placeholder="e.g. LOT-1234" />
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Batch / Lot (Optional)</label>
+                <input 
+                  type="text" 
+                  value={stockForm.batchLot} 
+                  onChange={e => setStockForm({...stockForm, batchLot: e.target.value})} 
+                  className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-primary/20 outline-none" 
+                  placeholder="e.g. LOT-1234" 
+                />
               </div>
-              <div className="pt-4 flex justify-end gap-2 border-t border-slate-100 mt-4">
-                <button type="button" onClick={() => setShowStockModal(false)} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-md border border-slate-200">Cancel</button>
-                <button type="submit" disabled={submitting} className="px-4 py-2 text-sm bg-primary text-white rounded-md hover:bg-primary/90">{submitting ? "Saving..." : "Save Stock"}</button>
+              <div className="pt-3 flex justify-end gap-2 border-t border-slate-100">
+                <button 
+                  type="button" 
+                  onClick={() => setShowStockModal(false)} 
+                  className="px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 rounded-lg border border-slate-200"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit" 
+                  disabled={submitting} 
+                  className="px-4 py-2.5 text-sm font-bold bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 shadow-sm"
+                >
+                  {submitting ? "Saving..." : "Save Stock"}
+                </button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* Document Modal */}
+      {/* ========================================================================= */}
+      {/* DOCUMENT MODAL                                                            */}
+      {/* ========================================================================= */}
       {showDocModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
-              <h3 className="font-semibold text-slate-800">Add Document</h3>
-              <button onClick={() => setShowDocModal(false)} className="text-slate-400 hover:text-slate-600">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/50 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <div className="px-5 py-4 border-b border-slate-100 flex justify-between items-center sticky top-0 bg-white z-10">
+              <h3 className="font-bold text-slate-800 text-base">Add Document</h3>
+              <button onClick={() => setShowDocModal(false)} className="text-slate-400 hover:text-slate-600 p-1">
                 <XCircle className="h-5 w-5" />
               </button>
             </div>
-            <form onSubmit={handleAddDoc} className="p-6 space-y-4">
+            <form onSubmit={handleAddDoc} className="p-5 space-y-4">
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">Document Type *</label>
-                <select required value={docForm.documentType} onChange={e => setDocForm({...docForm, documentType: e.target.value})} className="w-full px-3 py-2 border rounded-md text-sm">
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Document Type *</label>
+                <select 
+                  required 
+                  value={docForm.documentType} 
+                  onChange={e => setDocForm({...docForm, documentType: e.target.value})} 
+                  className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-primary/20 outline-none"
+                >
                   <option value="">Select Type</option>
                   <option value="Weighbridge Slip">Weighbridge Slip</option>
                   <option value="Invoice">Invoice</option>
@@ -738,12 +1051,30 @@ export function GateDetailsClient({ entryId }: { entryId: string }) {
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">Remarks / Reference No.</label>
-                <textarea value={docForm.remarks} onChange={e => setDocForm({...docForm, remarks: e.target.value})} className="w-full px-3 py-2 border rounded-md text-sm" placeholder="e.g. Challan #12345" rows={3}></textarea>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Remarks / Reference No.</label>
+                <textarea 
+                  value={docForm.remarks} 
+                  onChange={e => setDocForm({...docForm, remarks: e.target.value})} 
+                  className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-primary/20 outline-none resize-none" 
+                  placeholder="e.g. Challan #12345" 
+                  rows={3}
+                />
               </div>
-              <div className="pt-4 flex justify-end gap-2 border-t border-slate-100 mt-4">
-                <button type="button" onClick={() => setShowDocModal(false)} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-md border border-slate-200">Cancel</button>
-                <button type="submit" disabled={submitting} className="px-4 py-2 text-sm bg-primary text-white rounded-md hover:bg-primary/90">{submitting ? "Saving..." : "Add Document"}</button>
+              <div className="pt-3 flex justify-end gap-2 border-t border-slate-100">
+                <button 
+                  type="button" 
+                  onClick={() => setShowDocModal(false)} 
+                  className="px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 rounded-lg border border-slate-200"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit" 
+                  disabled={submitting} 
+                  className="px-4 py-2.5 text-sm font-bold bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 shadow-sm"
+                >
+                  {submitting ? "Saving..." : "Add Document"}
+                </button>
               </div>
             </form>
           </div>
@@ -757,10 +1088,10 @@ export function GateDetailsClient({ entryId }: { entryId: string }) {
 function DetailRow({ icon, label, value }: { icon: React.ReactNode; label: string; value: React.ReactNode }) {
   return (
     <div className="flex items-start gap-3">
-      <div className="text-slate-400 [&>svg]:h-4 [&>svg]:w-4 mt-0.5">{icon}</div>
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">{label}</p>
-        <p className="text-sm font-medium text-slate-800">{value}</p>
+      <div className="text-slate-400 [&>svg]:h-4 [&>svg]:w-4 mt-0.5 shrink-0">{icon}</div>
+      <div className="min-w-0 flex-1">
+        <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">{label}</p>
+        <p className="text-sm font-semibold text-slate-800 break-words">{value}</p>
       </div>
     </div>
   );
