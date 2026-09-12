@@ -3,7 +3,6 @@ import { SidebarProvider } from "@/components/ui/sidebar";
 import { BreadcrumbProvider } from "@/components/layout/breadcrumb-context";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { AppHeader } from "@/components/layout/AppHeader";
-import { MobileBottomBar } from "@/components/layout/MobileBottomBar";
 import { getAuthenticatedUserWithRole } from "@/lib/permissions";
 import { isSuperAdminRole } from "@/lib/api-auth";
 import { redirect } from "next/navigation";
@@ -25,23 +24,17 @@ export default async function DashboardLayout({
     });
   }
 
-  const isSuperAdmin = isSuperAdminRole(user.role?.name);
-
   return (
     <SidebarProvider>
       <BreadcrumbProvider>
         <AppSidebar user={user} allowedModules={allowedModules} />
         <div className="flex flex-1 flex-col overflow-hidden bg-background">
           <AppHeader />
-          <main className="flex-1 overflow-y-auto p-3 pb-24 md:p-6 md:pb-6 bg-secondary/30">
+          <main className="flex-1 overflow-y-auto p-3 pb-6 md:p-6 md:pb-6 bg-secondary/30">
             <div className="mx-auto max-w-7xl h-full">
               {children}
             </div>
           </main>
-          <MobileBottomBar
-            allowedModules={allowedModules}
-            isSuperAdmin={isSuperAdmin}
-          />
         </div>
       </BreadcrumbProvider>
     </SidebarProvider>
