@@ -207,40 +207,44 @@ export function NewGateClient() {
   };
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-      <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-        <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden w-full max-w-full min-w-0">
+      <div className="p-4 sm:p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+        <h2 className="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2">
           <Truck className="h-5 w-5 text-primary" />
-          Truck Arrival & Gate Registration
+          <span>Truck Arrival Registration</span>
         </h2>
-        <Link href="/dashboard/gate" className="text-sm font-medium text-slate-500 hover:text-slate-800 flex items-center gap-1 transition-colors">
-          <ArrowLeft className="h-4 w-4" /> Back to Dashboard
+        <Link
+          href="/dashboard/gate"
+          className="text-xs sm:text-sm font-medium text-slate-500 hover:text-slate-800 flex items-center gap-1 transition-colors px-2 py-1 rounded-md hover:bg-slate-100"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          <span>Back</span>
         </Link>
       </div>
 
-      <form onSubmit={handleSubmit} className="p-6 space-y-8">
+      <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-6 sm:space-y-8">
         {/* Vehicle & Driver Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
           {/* Truck Details */}
-          <div className="space-y-4">
+          <div className="space-y-3 sm:space-y-4">
             <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
               <Truck className="h-4 w-4 text-primary" /> Vehicle Info
             </h3>
             
             <div className="space-y-1">
-              <label className="text-sm font-medium text-slate-700">Truck Number *</label>
+              <label className="text-xs sm:text-sm font-medium text-slate-700">Truck Number *</label>
               <input
                 type="text"
                 placeholder="e.g. WB11A1234"
                 value={formData.truckNumber}
                 onChange={(e) => setFormData({ ...formData, truckNumber: e.target.value.toUpperCase() })}
-                className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all font-mono font-bold uppercase"
+                className="w-full px-3.5 py-2 sm:py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all font-mono font-bold uppercase text-sm sm:text-base tracking-wider bg-slate-50/50"
                 required
               />
             </div>
 
             <div className="space-y-1">
-              <label className="text-sm font-medium text-slate-700">Transporter</label>
+              <label className="text-xs sm:text-sm font-medium text-slate-700">Transporter</label>
               <div className="relative">
                 <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <input
@@ -248,20 +252,20 @@ export function NewGateClient() {
                   placeholder="Transport Company / Fleet"
                   value={formData.transporter}
                   onChange={(e) => setFormData({ ...formData, transporter: e.target.value })}
-                  className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                  className="w-full pl-9 pr-4 py-2 sm:py-2.5 text-xs sm:text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all bg-slate-50/50"
                 />
               </div>
             </div>
           </div>
 
           {/* Driver Details */}
-          <div className="space-y-4">
+          <div className="space-y-3 sm:space-y-4">
             <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
               <User className="h-4 w-4 text-primary" /> Driver Info
             </h3>
             
             <div className="space-y-1 relative" ref={dropdownRef}>
-              <label className="text-sm font-medium text-slate-700">Driver Contact *</label>
+              <label className="text-xs sm:text-sm font-medium text-slate-700">Driver Contact *</label>
               <div className="relative">
                 <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <input
@@ -275,14 +279,15 @@ export function NewGateClient() {
                   }}
                   onFocus={() => setShowDriverSuggestions(true)}
                   disabled={isDriverLocked}
-                  className="w-full pl-10 pr-10 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all disabled:bg-slate-50 disabled:text-slate-500 font-mono"
+                  className="w-full pl-9 pr-9 py-2 sm:py-2.5 text-xs sm:text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all disabled:bg-slate-100 disabled:text-slate-600 font-mono bg-slate-50/50"
                   required
                 />
                 {isDriverLocked && (
                   <button 
                     type="button" 
                     onClick={handleClearDriver}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-red-500"
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-red-500 p-1"
+                    title="Unlock driver"
                   >
                     <X className="h-4 w-4" />
                   </button>
@@ -296,10 +301,10 @@ export function NewGateClient() {
                       key={driver.id}
                       type="button"
                       onClick={() => handleSelectDriver(driver)}
-                      className="w-full text-left px-4 py-2 hover:bg-slate-50 flex flex-col transition-colors border-b border-slate-100 last:border-0"
+                      className="w-full text-left px-3.5 py-2 hover:bg-slate-50 flex flex-col transition-colors border-b border-slate-100 last:border-0"
                     >
-                      <span className="font-mono font-bold text-slate-900">{driver.phone}</span>
-                      <span className="text-xs text-slate-500">{driver.name}</span>
+                      <span className="font-mono font-bold text-slate-900 text-xs sm:text-sm">{driver.phone}</span>
+                      <span className="text-[11px] text-slate-500">{driver.name}</span>
                     </button>
                   ))}
                 </div>
@@ -307,20 +312,20 @@ export function NewGateClient() {
             </div>
 
             <div className="space-y-1">
-              <label className="text-sm font-medium text-slate-700">Driver Name *</label>
+              <label className="text-xs sm:text-sm font-medium text-slate-700">Driver Name *</label>
               <input
                 type="text"
                 placeholder="Full Name"
                 value={formData.driverName}
                 onChange={(e) => setFormData({ ...formData, driverName: e.target.value })}
                 disabled={isDriverLocked}
-                className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all disabled:bg-slate-50 disabled:text-slate-500"
+                className="w-full px-3.5 py-2 sm:py-2.5 text-xs sm:text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all disabled:bg-slate-100 disabled:text-slate-600 bg-slate-50/50"
                 required
               />
             </div>
 
             <div className="space-y-1">
-              <label className="text-sm font-medium text-slate-700">Driver License Number</label>
+              <label className="text-xs sm:text-sm font-medium text-slate-700">Driver License Number</label>
               <div className="relative">
                 <FileText className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <input
@@ -329,7 +334,7 @@ export function NewGateClient() {
                   value={formData.driverLicenseNumber}
                   onChange={(e) => setFormData({ ...formData, driverLicenseNumber: e.target.value.toUpperCase() })}
                   disabled={isDriverLocked && !!formData.driverLicenseNumber}
-                  className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all disabled:bg-slate-50 disabled:text-slate-500 font-mono"
+                  className="w-full pl-9 pr-4 py-2 sm:py-2.5 text-xs sm:text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all disabled:bg-slate-100 disabled:text-slate-600 font-mono bg-slate-50/50"
                 />
               </div>
             </div>
@@ -337,59 +342,64 @@ export function NewGateClient() {
         </div>
 
         {/* Purpose & Party */}
-        <div className="space-y-4 pt-6 border-t border-slate-100">
+        <div className="space-y-3 sm:space-y-4 pt-4 sm:pt-6 border-t border-slate-100">
           <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
             <FileText className="h-4 w-4 text-primary" /> Purpose & Party Details
           </h3>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-1">
-              <label className="text-sm font-medium text-slate-700">Purpose *</label>
-              <div className="flex gap-4 pt-1">
-                {Object.values(GatePurpose).map((p) => (
-                  <label key={p} className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="purpose"
-                      value={p}
-                      checked={formData.purpose === p}
-                      onChange={(e) => setFormData({ ...formData, purpose: e.target.value as GatePurpose })}
-                      className="text-primary focus:ring-primary"
-                    />
-                    <span className="text-sm font-semibold text-slate-700">{p}</span>
-                  </label>
-                ))}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+            <div className="space-y-1.5">
+              <label className="text-xs sm:text-sm font-medium text-slate-700">Purpose *</label>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {Object.values(GatePurpose).map((p) => {
+                  const isSelected = formData.purpose === p;
+                  return (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => setFormData({ ...formData, purpose: p as GatePurpose })}
+                      className={cn(
+                        "py-2.5 px-3 rounded-lg border text-xs sm:text-sm font-bold transition-all text-center touch-manipulation",
+                        isSelected
+                          ? "bg-slate-900 border-slate-900 text-white shadow-xs"
+                          : "bg-slate-50/70 border-slate-200 text-slate-700 hover:bg-slate-100"
+                      )}
+                    >
+                      {p}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
-            <div className="space-y-1">
-              <label className="text-sm font-medium text-slate-700">Supplier / Customer</label>
+            <div className="space-y-1.5">
+              <label className="text-xs sm:text-sm font-medium text-slate-700">Supplier / Customer</label>
               <input
                 type="text"
                 placeholder="Party Name / Client"
                 value={formData.supplierCustomer}
                 onChange={(e) => setFormData({ ...formData, supplierCustomer: e.target.value })}
-                className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                className="w-full px-3.5 py-2 sm:py-2.5 text-xs sm:text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all bg-slate-50/50"
               />
             </div>
           </div>
         </div>
 
         {/* Consignment Stock Items (Multi-Item Dynamic Builder) */}
-        <div className="space-y-4 pt-6 border-t border-slate-100">
-          <div className="flex items-center justify-between">
+        <div className="space-y-3 sm:space-y-4 pt-4 sm:pt-6 border-t border-slate-100">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div>
               <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
                 <Package className="h-4 w-4 text-primary" /> Consignment Stock Items
               </h3>
-              <p className="text-xs text-slate-500 mt-0.5">
+              <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5">
                 Declare all materials arriving on this truck. Each item will sync into inventory receiving.
               </p>
             </div>
             <button
               type="button"
               onClick={handleAddStockItem}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-primary bg-primary/10 hover:bg-primary/20 rounded-lg transition-colors"
+              className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-bold text-primary bg-primary/10 hover:bg-primary/20 rounded-lg transition-colors shrink-0 self-start sm:self-auto touch-manipulation"
             >
               <Plus className="h-4 w-4" /> Add Stock Item
             </button>
@@ -410,31 +420,31 @@ export function NewGateClient() {
         </div>
 
         {/* Submit Actions */}
-        <div className="pt-6 border-t border-slate-100 flex items-center justify-between">
-          <div className="text-xs text-slate-500">
+        <div className="pt-4 sm:pt-6 border-t border-slate-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4">
+          <div className="text-xs text-slate-500 text-center sm:text-left">
             Total Declared Items:{" "}
             <span className="font-bold text-slate-800">
               {stockItems.filter((s) => s.materialName && s.quantity).length}
             </span>
           </div>
-          <div className="flex gap-3">
+          <div className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-3">
             <Link
               href="/dashboard/gate"
-              className="px-5 py-2.5 text-sm font-medium rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
+              className="min-h-[42px] px-5 flex items-center justify-center text-xs sm:text-sm font-medium rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
             >
               Cancel
             </Link>
             <button
               type="submit"
               disabled={loading}
-              className="inline-flex items-center gap-2 px-6 py-2.5 text-sm font-bold rounded-lg bg-primary text-white hover:bg-primary/90 transition-all shadow-sm disabled:opacity-50"
+              className="min-h-[44px] inline-flex items-center justify-center gap-2 px-6 py-2.5 text-xs sm:text-sm font-bold rounded-lg bg-primary text-white hover:bg-primary/90 transition-all shadow-sm disabled:opacity-50 touch-manipulation"
             >
               {loading ? (
                 <span className="animate-spin text-lg block h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
               ) : (
                 <PlusCircle className="h-4 w-4" />
               )}
-              Create Gate Entry
+              <span>Create Gate Entry</span>
             </button>
           </div>
         </div>
@@ -512,147 +522,283 @@ function StockItemRow({
   };
 
   return (
-    <div className="p-4 bg-slate-50/70 border border-slate-200 rounded-xl flex flex-col md:flex-row gap-3 items-start md:items-center relative transition-all hover:bg-slate-50">
-      <div className="flex items-center gap-2 w-full md:w-auto">
-        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-bold text-slate-700">
-          {index + 1}
-        </span>
-      </div>
-
-      {/* Material Name / Autocomplete */}
-      <div className="flex-1 w-full min-w-[200px] relative" ref={containerRef}>
-        <label className="block text-[11px] font-bold text-slate-500 uppercase md:hidden mb-1">
-          Material Name *
-        </label>
-        <div className="relative">
-          <input
-            type="text"
-            placeholder="Material Name (e.g. PP Granules 1110MAS)"
-            value={searchTerm}
-            disabled={isLocked}
-            onChange={(e) => {
-              setSearchTerm(e.target.value);
-              onUpdate({ materialName: e.target.value });
-              setShowSuggestions(true);
-            }}
-            onFocus={() => setShowSuggestions(true)}
-            className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white disabled:bg-slate-100 disabled:text-slate-600"
-            required
-          />
-          {isLocked ? (
+    <div className="p-3.5 sm:p-4 bg-slate-50/80 border border-slate-200 rounded-xl relative transition-all hover:bg-slate-50">
+      {/* ── Mobile Layout (Structured Card) ── */}
+      <div className="flex md:hidden flex-col gap-2.5">
+        {/* Card Header: Item badge + Delete button */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-200 text-[11px] font-bold text-slate-700">
+              {index + 1}
+            </span>
+            <span className="text-xs font-bold text-slate-700">
+              Item #{index + 1}
+            </span>
+          </div>
+          {canDelete && (
             <button
               type="button"
-              onClick={handleClear}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-red-500"
-              title="Unlock to change material"
+              onClick={onDelete}
+              className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors"
+              title="Remove Item"
             >
-              <X className="h-4 w-4" />
+              <Trash2 className="h-4 w-4" />
             </button>
-          ) : (
-            <Search className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
           )}
         </div>
 
-        {showSuggestions && suggestions.length > 0 && !isLocked && (
-          <div className="absolute z-20 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-xl max-h-52 overflow-y-auto">
-            {suggestions.map((stock) => (
+        {/* Material Name Autocomplete */}
+        <div className="relative" ref={containerRef}>
+          <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
+            Material Name *
+          </label>
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="e.g. PP Granules 1110MAS"
+              value={searchTerm}
+              disabled={isLocked}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                onUpdate({ materialName: e.target.value });
+                setShowSuggestions(true);
+              }}
+              onFocus={() => setShowSuggestions(true)}
+              className="w-full pl-3 pr-8 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white disabled:bg-slate-100 disabled:text-slate-600"
+              required
+            />
+            {isLocked ? (
               <button
-                key={stock.id}
                 type="button"
-                onClick={() => handleSelectCatalog(stock)}
-                className="w-full text-left px-3 py-2 hover:bg-primary/5 flex items-center justify-between text-xs border-b border-slate-100 last:border-0"
+                onClick={handleClear}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-red-500 p-0.5"
+                title="Unlock to change material"
               >
-                <div>
-                  <span className="font-bold text-slate-800 block">{stock.name}</span>
-                  <span className="text-[10px] text-slate-400 font-mono">{stock.code}</span>
-                </div>
-                <span className="text-[10px] font-semibold text-primary px-2 py-0.5 bg-primary/10 rounded">
-                  {stock.materialType?.replace(/_/g, " ")}
-                </span>
+                <X className="h-3.5 w-3.5" />
               </button>
-            ))}
+            ) : (
+              <Search className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
+            )}
           </div>
+
+          {showSuggestions && suggestions.length > 0 && !isLocked && (
+            <div className="absolute z-20 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-xl max-h-52 overflow-y-auto">
+              {suggestions.map((stock) => (
+                <button
+                  key={stock.id}
+                  type="button"
+                  onClick={() => handleSelectCatalog(stock)}
+                  className="w-full text-left px-3 py-2 hover:bg-primary/5 flex items-center justify-between text-xs border-b border-slate-100 last:border-0"
+                >
+                  <div>
+                    <span className="font-bold text-slate-800 block">{stock.name}</span>
+                    <span className="text-[10px] text-slate-400 font-mono">{stock.code}</span>
+                  </div>
+                  <span className="text-[10px] font-semibold text-primary px-2 py-0.5 bg-primary/10 rounded">
+                    {stock.materialType?.replace(/_/g, " ")}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Row 2: Quantity & Unit */}
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
+              Quantity *
+            </label>
+            <input
+              type="number"
+              step="any"
+              min="0"
+              placeholder="0.00"
+              value={item.quantity}
+              onChange={(e) => onUpdate({ quantity: e.target.value })}
+              className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white text-right font-semibold"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
+              Unit
+            </label>
+            <select
+              value={item.unit}
+              onChange={(e) => onUpdate({ unit: e.target.value })}
+              className="w-full px-2.5 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white font-medium"
+            >
+              {COMMON_UNITS.map((u) => (
+                <option key={u} value={u}>
+                  {u}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Row 3: Material Type & Batch/Lot */}
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
+              Type
+            </label>
+            <select
+              value={item.materialType}
+              onChange={(e) => onUpdate({ materialType: e.target.value })}
+              className="w-full px-2 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white font-medium truncate"
+            >
+              {MATERIAL_TYPE_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
+              Batch / Lot
+            </label>
+            <input
+              type="text"
+              placeholder="Optional"
+              value={item.batchLot}
+              onChange={(e) => onUpdate({ batchLot: e.target.value })}
+              className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* ── Desktop Layout (1-Row Flex Table) ── */}
+      <div className="hidden md:flex flex-row gap-3 items-center w-full">
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-bold text-slate-700">
+            {index + 1}
+          </span>
+        </div>
+
+        {/* Material Name / Autocomplete */}
+        <div className="flex-1 min-w-[200px] relative" ref={containerRef}>
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Material Name (e.g. PP Granules 1110MAS)"
+              value={searchTerm}
+              disabled={isLocked}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                onUpdate({ materialName: e.target.value });
+                setShowSuggestions(true);
+              }}
+              onFocus={() => setShowSuggestions(true)}
+              className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white disabled:bg-slate-100 disabled:text-slate-600"
+              required
+            />
+            {isLocked ? (
+              <button
+                type="button"
+                onClick={handleClear}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-red-500"
+                title="Unlock to change material"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            ) : (
+              <Search className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
+            )}
+          </div>
+
+          {showSuggestions && suggestions.length > 0 && !isLocked && (
+            <div className="absolute z-20 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-xl max-h-52 overflow-y-auto">
+              {suggestions.map((stock) => (
+                <button
+                  key={stock.id}
+                  type="button"
+                  onClick={() => handleSelectCatalog(stock)}
+                  className="w-full text-left px-3 py-2 hover:bg-primary/5 flex items-center justify-between text-xs border-b border-slate-100 last:border-0"
+                >
+                  <div>
+                    <span className="font-bold text-slate-800 block">{stock.name}</span>
+                    <span className="text-[10px] text-slate-400 font-mono">{stock.code}</span>
+                  </div>
+                  <span className="text-[10px] font-semibold text-primary px-2 py-0.5 bg-primary/10 rounded">
+                    {stock.materialType?.replace(/_/g, " ")}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Material Type */}
+        <div className="w-44 shrink-0">
+          <select
+            value={item.materialType}
+            onChange={(e) => onUpdate({ materialType: e.target.value })}
+            className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white text-xs font-medium"
+          >
+            {MATERIAL_TYPE_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Quantity */}
+        <div className="w-28 shrink-0">
+          <input
+            type="number"
+            step="any"
+            min="0"
+            placeholder="Quantity"
+            value={item.quantity}
+            onChange={(e) => onUpdate({ quantity: e.target.value })}
+            className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white text-right font-semibold"
+            required
+          />
+        </div>
+
+        {/* Unit */}
+        <div className="w-24 shrink-0">
+          <select
+            value={item.unit}
+            onChange={(e) => onUpdate({ unit: e.target.value })}
+            className="w-full px-2.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white text-xs font-medium"
+          >
+            {COMMON_UNITS.map((u) => (
+              <option key={u} value={u}>
+                {u}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Batch / Lot */}
+        <div className="w-36 shrink-0">
+          <input
+            type="text"
+            placeholder="Batch / Invoice #"
+            value={item.batchLot}
+            onChange={(e) => onUpdate({ batchLot: e.target.value })}
+            className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white text-xs"
+          />
+        </div>
+
+        {/* Delete button */}
+        {canDelete && (
+          <button
+            type="button"
+            onClick={onDelete}
+            className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors shrink-0"
+            title="Remove Item"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
         )}
       </div>
-
-      {/* Material Type */}
-      <div className="w-full md:w-44">
-        <label className="block text-[11px] font-bold text-slate-500 uppercase md:hidden mb-1">
-          Material Type
-        </label>
-        <select
-          value={item.materialType}
-          onChange={(e) => onUpdate({ materialType: e.target.value })}
-          className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white text-xs font-medium"
-        >
-          {MATERIAL_TYPE_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {/* Quantity */}
-      <div className="w-full md:w-28">
-        <label className="block text-[11px] font-bold text-slate-500 uppercase md:hidden mb-1">
-          Declared Qty *
-        </label>
-        <input
-          type="number"
-          step="any"
-          min="0"
-          placeholder="Quantity"
-          value={item.quantity}
-          onChange={(e) => onUpdate({ quantity: e.target.value })}
-          className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white text-right font-semibold"
-          required
-        />
-      </div>
-
-      {/* Unit */}
-      <div className="w-full md:w-24">
-        <label className="block text-[11px] font-bold text-slate-500 uppercase md:hidden mb-1">
-          Unit
-        </label>
-        <select
-          value={item.unit}
-          onChange={(e) => onUpdate({ unit: e.target.value })}
-          className="w-full px-2.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white text-xs font-medium"
-        >
-          {COMMON_UNITS.map((u) => (
-            <option key={u} value={u}>
-              {u}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {/* Batch / Lot */}
-      <div className="w-full md:w-36">
-        <label className="block text-[11px] font-bold text-slate-500 uppercase md:hidden mb-1">
-          Batch / Lot (Optional)
-        </label>
-        <input
-          type="text"
-          placeholder="Batch / Invoice #"
-          value={item.batchLot}
-          onChange={(e) => onUpdate({ batchLot: e.target.value })}
-          className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white text-xs"
-        />
-      </div>
-
-      {/* Delete button */}
-      {canDelete && (
-        <button
-          type="button"
-          onClick={onDelete}
-          className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors shrink-0 self-end md:self-center"
-          title="Remove Item"
-        >
-          <Trash2 className="h-4 w-4" />
-        </button>
-      )}
     </div>
   );
 }
