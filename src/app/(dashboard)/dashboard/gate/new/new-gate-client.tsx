@@ -16,6 +16,9 @@ import {
   X,
   Plus,
   Trash2,
+  AlertTriangle,
+  Info,
+  CheckCircle2,
 } from "lucide-react";
 import Link from "next/link";
 import { GatePurpose } from "@/generated/prisma";
@@ -47,6 +50,8 @@ interface StockItemRowData {
   quantity: string;
   unit: string;
   batchLot: string;
+  availableStock?: number | null;
+  currentStock?: number | null;
 }
 
 const createEmptyStockItem = (): StockItemRowData => ({
@@ -57,6 +62,8 @@ const createEmptyStockItem = (): StockItemRowData => ({
   quantity: "",
   unit: "kg",
   batchLot: "",
+  availableStock: null,
+  currentStock: null,
 });
 
 export function NewGateClient() {
@@ -169,6 +176,7 @@ export function NewGateClient() {
         quantity: parseFloat(item.quantity) || 0,
         unit: item.unit || "kg",
         batchLot: item.batchLot.trim() || undefined,
+        availableStock: item.availableStock,
       }));
 
     if (
@@ -178,6 +186,20 @@ export function NewGateClient() {
       toast.error("Please add at least one consignment stock item with material name and quantity.");
       return;
     }
+
+    // For Loading: Enforce that requested quantity cannot exceed available stock
+    if (formData.purpose === GatePurpose.LOADING) {
+      for (const item of validStockItems) {
+        if (item.availableStock !== undefined && item.availableStock !== null) {
+          if (item.quantity > item.availableStock) {
+            toast.error(
+              `Cannot load ${item.quantity} ${item.unit} for "${item.materialName}". Available stock in factory is only ${item.availableStock} ${item.unit}.`
+            );
+            return;
+          }
+        }
+      }
+    }
     
     setLoading(true);
     try {
@@ -186,7 +208,7 @@ export function NewGateClient() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...formData,
-          stockItems: validStockItems,
+          stockItems: validStockItems.map(({ availableStock, ...rest }) => rest),
         }),
       });
       
@@ -196,7 +218,8 @@ export function NewGateClient() {
       }
       const data = await res.json();
       toast.success("Gate entry created successfully with consignment stock items");
-      router.push(`/dashboard/gate/${data.entryNumber}`);
+      const entryNum = data.data?.entryNumber || data.entryNumber;
+      router.push(`/dashboard/gate/${entryNum}`);
     } catch (err: any) {
       console.error(err);
       toast.error(err.message || "An error occurred while creating the entry");
@@ -369,6 +392,20 @@ export function NewGateClient() {
                   );
                 })}
               </div>
+              <p className="text-[11px] text-slate-500 mt-1">
+                {formData.purpose === GatePurpose.LOADING && (
+                  <span className="text-amber-700 font-medium inline-flex items-center gap-1">
+                    <AlertTriangle className="h-3 w-3 inline shrink-0" />
+                    Loading dispatch requires checking and restricting quantity against available factory stock.
+                  </span>
+                )}
+                {formData.purpose === GatePurpose.UNLOADING && (
+                  <span className="text-blue-700 font-medium inline-flex items-center gap-1">
+                    <Info className="h-3 w-3 inline shrink-0" />
+                    Unloading receiving shows current factory stock as an informational reference.
+                  </span>
+                )}
+              </p>
             </div>
 
             <div className="space-y-1.5">
@@ -392,7 +429,9 @@ export function NewGateClient() {
                 <Package className="h-4 w-4 text-primary" /> Consignment Stock Items
               </h3>
               <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5">
-                Declare all materials arriving on this truck. Each item will sync into inventory receiving.
+                {formData.purpose === GatePurpose.LOADING
+                  ? "Declare materials being dispatched/loaded. Quantity is capped at available factory stock."
+                  : "Declare materials arriving on this truck. Current stock is displayed for reference."}
               </p>
             </div>
             <button
@@ -407,9 +446,9 @@ export function NewGateClient() {
           {/* Desktop Column Header */}
           <div className="hidden md:flex flex-row gap-2.5 items-center w-full px-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">
             <span className="w-6 shrink-0 text-center">#</span>
-            <span className="flex-1 min-w-[130px]">Material Name</span>
+            <span className="flex-1 min-w-[130px]">Material Name & Stock Level</span>
             <span className="w-36 lg:w-44 shrink-0">Category / Type</span>
-            <span className="w-24 lg:w-28 shrink-0 text-right pr-1">Quantity</span>
+            <span className="w-28 lg:w-32 shrink-0 text-right pr-1">Quantity</span>
             <span className="w-16 lg:w-20 shrink-0">Unit</span>
             <span className="w-28 lg:w-36 shrink-0">Batch / Lot #</span>
             <span className="w-8 shrink-0" />
@@ -421,6 +460,7 @@ export function NewGateClient() {
                 key={item.id}
                 index={index}
                 item={item}
+                purpose={formData.purpose}
                 canDelete={stockItems.length > 1}
                 onUpdate={(updates) => handleUpdateStockItem(item.id, updates)}
                 onDelete={() => handleRemoveStockItem(item.id)}
@@ -466,21 +506,41 @@ export function NewGateClient() {
 function StockItemRow({
   index,
   item,
+  purpose,
   canDelete,
   onUpdate,
   onDelete,
 }: {
   index: number;
   item: StockItemRowData;
+  purpose: GatePurpose;
   canDelete: boolean;
   onUpdate: (updates: Partial<StockItemRowData>) => void;
   onDelete: () => void;
-  }) {
+}) {
   const [searchTerm, setSearchTerm] = useState(item.materialName);
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isLocked, setIsLocked] = useState(Boolean(item.stockId));
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Auto-fetch stock if stockId is present but availableStock not loaded
+  useEffect(() => {
+    if (item.stockId && (item.availableStock === undefined || item.availableStock === null)) {
+      fetch(`/api/stocks/search?id=${encodeURIComponent(item.stockId)}`)
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (data) {
+            onUpdate({
+              availableStock: data.availableStock ?? 0,
+              currentStock: data.currentStock ?? 0,
+              unit: data.uom?.abbreviation || item.unit,
+            });
+          }
+        })
+        .catch((err) => console.error("Failed to fetch stock item details", err));
+    }
+  }, [item.stockId]);
 
   useEffect(() => {
     if (isLocked || searchTerm.length < 2) {
@@ -492,7 +552,20 @@ function StockItemRow({
       try {
         const res = await fetch(`/api/stocks/search?q=${encodeURIComponent(searchTerm)}`);
         if (res.ok) {
-          setSuggestions(await res.json());
+          const list = await res.json();
+          setSuggestions(list);
+          const exact = list.find(
+            (s: any) => s.name.trim().toLowerCase() === searchTerm.trim().toLowerCase()
+          );
+          if (exact) {
+            onUpdate({
+              stockId: exact.id,
+              availableStock: exact.availableStock ?? 0,
+              currentStock: exact.currentStock ?? 0,
+              unit: exact.uom?.abbreviation || item.unit,
+              materialType: exact.materialType || item.materialType,
+            });
+          }
         }
       } catch (err) {
         console.error("Failed to search stocks", err);
@@ -519,6 +592,8 @@ function StockItemRow({
       materialName: catalog.name,
       materialType: catalog.materialType || item.materialType,
       unit: catalog.uom?.abbreviation || item.unit,
+      availableStock: catalog.availableStock ?? 0,
+      currentStock: catalog.currentStock ?? 0,
     });
     setSearchTerm(catalog.name);
     setIsLocked(true);
@@ -526,13 +601,30 @@ function StockItemRow({
   };
 
   const handleClear = () => {
-    onUpdate({ stockId: "", materialName: "" });
+    onUpdate({
+      stockId: "",
+      materialName: "",
+      availableStock: null,
+      currentStock: null,
+    });
     setSearchTerm("");
     setIsLocked(false);
   };
 
+  const qtyValue = parseFloat(item.quantity) || 0;
+  const isExceedingStock =
+    purpose === GatePurpose.LOADING &&
+    item.availableStock !== undefined &&
+    item.availableStock !== null &&
+    qtyValue > (item.availableStock ?? 0);
+
   return (
-    <div className="p-3 sm:p-3.5 bg-slate-50/80 border border-slate-200 rounded-xl relative transition-all hover:bg-slate-50 overflow-hidden">
+    <div className={cn(
+      "p-3 sm:p-3.5 rounded-xl border transition-all overflow-hidden",
+      isExceedingStock
+        ? "bg-red-50/40 border-red-200"
+        : "bg-slate-50/80 border-slate-200 hover:bg-slate-50"
+    )}>
       {/* ── Mobile Layout (Structured Card) ── */}
       <div className="flex md:hidden flex-col gap-2.5">
         {/* Card Header: Item badge + Delete button */}
@@ -590,6 +682,32 @@ function StockItemRow({
             )}
           </div>
 
+          {/* Stock Info Badge (Mobile) */}
+          {item.availableStock !== undefined && item.availableStock !== null && (
+            <div className="mt-1.5 flex items-center justify-between text-[11px]">
+              {purpose === GatePurpose.LOADING ? (
+                <span className={cn(
+                  "font-bold px-2 py-0.5 rounded-md inline-flex items-center gap-1 border",
+                  (item.availableStock ?? 0) > 0
+                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                    : "bg-red-50 text-red-600 border-red-200"
+                )}>
+                  {(item.availableStock ?? 0) > 0 ? (
+                    <CheckCircle2 className="h-3 w-3 text-emerald-600" />
+                  ) : (
+                    <AlertTriangle className="h-3 w-3 text-red-600" />
+                  )}
+                  Available Stock: {(item.availableStock ?? 0).toLocaleString()} {item.unit}
+                </span>
+              ) : (
+                <span className="font-semibold px-2 py-0.5 rounded-md inline-flex items-center gap-1 bg-blue-50 text-blue-700 border border-blue-200">
+                  <Info className="h-3 w-3 text-blue-600" />
+                  Current Stock: {(item.currentStock ?? item.availableStock ?? 0).toLocaleString()} {item.unit}
+                </span>
+              )}
+            </div>
+          )}
+
           {showSuggestions && suggestions.length > 0 && !isLocked && (
             <div className="absolute z-20 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-xl max-h-52 overflow-y-auto">
               {suggestions.map((stock) => (
@@ -603,9 +721,19 @@ function StockItemRow({
                     <span className="font-bold text-slate-800 block">{stock.name}</span>
                     <span className="text-[10px] text-slate-400 font-mono">{stock.code}</span>
                   </div>
-                  <span className="text-[10px] font-semibold text-primary px-2 py-0.5 bg-primary/10 rounded">
-                    {stock.materialType?.replace(/_/g, " ")}
-                  </span>
+                  <div className="text-right shrink-0">
+                    <span className={cn(
+                      "text-[10px] font-bold px-1.5 py-0.5 rounded block",
+                      (stock.availableStock ?? 0) > 0
+                        ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                        : "bg-slate-100 text-slate-500"
+                    )}>
+                      Stock: {(stock.availableStock ?? 0).toLocaleString()} {stock.uom?.abbreviation || "kg"}
+                    </span>
+                    <span className="text-[9px] text-slate-400 capitalize block mt-0.5">
+                      {stock.materialType?.replace(/_/g, " ").toLowerCase()}
+                    </span>
+                  </div>
                 </button>
               ))}
             </div>
@@ -615,19 +743,38 @@ function StockItemRow({
         {/* Row 2: Quantity & Unit */}
         <div className="grid grid-cols-2 gap-2">
           <div>
-            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
-              Quantity *
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-[10px] font-bold text-slate-500 uppercase">
+                Quantity *
+              </label>
+              {purpose === GatePurpose.LOADING && item.availableStock !== undefined && item.availableStock !== null && (
+                <span className="text-[10px] text-slate-400">
+                  Max: {(item.availableStock ?? 0).toLocaleString()}
+                </span>
+              )}
+            </div>
             <input
               type="number"
               step="any"
               min="0"
+              max={purpose === GatePurpose.LOADING && item.availableStock !== null && item.availableStock !== undefined ? item.availableStock : undefined}
               placeholder="0.00"
               value={item.quantity}
               onChange={(e) => onUpdate({ quantity: e.target.value })}
-              className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white text-right font-semibold"
+              className={cn(
+                "w-full px-3 py-2 text-xs border rounded-lg focus:outline-none transition-all text-right font-semibold",
+                isExceedingStock
+                  ? "border-red-500 bg-red-50 text-red-900 focus:ring-2 focus:ring-red-200"
+                  : "border-slate-200 bg-white focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              )}
               required
             />
+            {isExceedingStock && (
+              <p className="text-[10px] font-bold text-red-600 mt-1 flex items-center gap-1">
+                <AlertTriangle className="h-3 w-3 shrink-0" />
+                Exceeds stock of {(item.availableStock ?? 0).toLocaleString()} {item.unit}
+              </p>
+            )}
           </div>
           <div>
             <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
@@ -681,130 +828,183 @@ function StockItemRow({
       </div>
 
       {/* ── Desktop Layout (1-Row Proportional Flex) ── */}
-      <div className="hidden md:flex flex-row gap-2.5 items-center w-full min-w-0">
-        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-bold text-slate-700">
-          {index + 1}
-        </span>
+      <div className="hidden md:flex flex-col gap-1.5 w-full min-w-0">
+        <div className="flex flex-row gap-2.5 items-center w-full min-w-0">
+          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-bold text-slate-700">
+            {index + 1}
+          </span>
 
-        {/* Material Name / Autocomplete (Search icon on left, no text collision) */}
-        <div className="flex-1 min-w-[130px] relative" ref={containerRef}>
-          <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
-            <input
-              type="text"
-              placeholder="Search or enter material..."
-              value={searchTerm}
-              disabled={isLocked}
-              onChange={(e) => {
-                setSearchTerm(e.target.value);
-                onUpdate({ materialName: e.target.value });
-                setShowSuggestions(true);
-              }}
-              onFocus={() => setShowSuggestions(true)}
-              className="w-full pl-8 pr-7 py-2 text-xs sm:text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white disabled:bg-slate-100 disabled:text-slate-600 truncate"
-              required
-            />
-            {isLocked && (
-              <button
-                type="button"
-                onClick={handleClear}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-red-500 p-0.5"
-                title="Unlock to change material"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
+          {/* Material Name / Autocomplete */}
+          <div className="flex-1 min-w-[130px] relative" ref={containerRef}>
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Search or enter material..."
+                value={searchTerm}
+                disabled={isLocked}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  onUpdate({ materialName: e.target.value });
+                  setShowSuggestions(true);
+                }}
+                onFocus={() => setShowSuggestions(true)}
+                className="w-full pl-8 pr-7 py-2 text-xs sm:text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white disabled:bg-slate-100 disabled:text-slate-600 truncate"
+                required
+              />
+              {isLocked && (
+                <button
+                  type="button"
+                  onClick={handleClear}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-red-500 p-0.5"
+                  title="Unlock to change material"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+
+            {showSuggestions && suggestions.length > 0 && !isLocked && (
+              <div className="absolute z-20 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-xl max-h-52 overflow-y-auto">
+                {suggestions.map((stock) => (
+                  <button
+                    key={stock.id}
+                    type="button"
+                    onClick={() => handleSelectCatalog(stock)}
+                    className="w-full text-left px-3 py-2 hover:bg-primary/5 flex items-center justify-between text-xs border-b border-slate-100 last:border-0"
+                  >
+                    <div>
+                      <span className="font-bold text-slate-800 block">{stock.name}</span>
+                      <span className="text-[10px] text-slate-400 font-mono">{stock.code}</span>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <span className={cn(
+                        "text-[10px] font-bold px-1.5 py-0.5 rounded block",
+                        (stock.availableStock ?? 0) > 0
+                          ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                          : "bg-slate-100 text-slate-500"
+                      )}>
+                        Stock: {(stock.availableStock ?? 0).toLocaleString()} {stock.uom?.abbreviation || "kg"}
+                      </span>
+                      <span className="text-[9px] text-slate-400 capitalize block mt-0.5">
+                        {stock.materialType?.replace(/_/g, " ").toLowerCase()}
+                      </span>
+                    </div>
+                  </button>
+                ))}
+              </div>
             )}
           </div>
 
-          {showSuggestions && suggestions.length > 0 && !isLocked && (
-            <div className="absolute z-20 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-xl max-h-52 overflow-y-auto">
-              {suggestions.map((stock) => (
-                <button
-                  key={stock.id}
-                  type="button"
-                  onClick={() => handleSelectCatalog(stock)}
-                  className="w-full text-left px-3 py-2 hover:bg-primary/5 flex items-center justify-between text-xs border-b border-slate-100 last:border-0"
-                >
-                  <div>
-                    <span className="font-bold text-slate-800 block">{stock.name}</span>
-                    <span className="text-[10px] text-slate-400 font-mono">{stock.code}</span>
-                  </div>
-                  <span className="text-[10px] font-semibold text-primary px-2 py-0.5 bg-primary/10 rounded">
-                    {stock.materialType?.replace(/_/g, " ")}
-                  </span>
-                </button>
+          {/* Material Type */}
+          <div className="w-36 lg:w-44 shrink-0 min-w-0">
+            <select
+              value={item.materialType}
+              onChange={(e) => onUpdate({ materialType: e.target.value })}
+              className="w-full px-2.5 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white font-medium truncate"
+            >
+              {MATERIAL_TYPE_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
               ))}
-            </div>
+            </select>
+          </div>
+
+          {/* Quantity */}
+          <div className="w-28 lg:w-32 shrink-0 min-w-0">
+            <input
+              type="number"
+              step="any"
+              min="0"
+              max={purpose === GatePurpose.LOADING && item.availableStock !== null && item.availableStock !== undefined ? item.availableStock : undefined}
+              placeholder="0.00"
+              value={item.quantity}
+              onChange={(e) => onUpdate({ quantity: e.target.value })}
+              className={cn(
+                "w-full px-2.5 py-2 text-xs sm:text-sm border rounded-lg focus:outline-none transition-all text-right font-semibold",
+                isExceedingStock
+                  ? "border-red-500 bg-red-50 text-red-900 focus:ring-2 focus:ring-red-200"
+                  : "border-slate-200 bg-white focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              )}
+              required
+            />
+          </div>
+
+          {/* Unit */}
+          <div className="w-16 lg:w-20 shrink-0 min-w-0">
+            <select
+              value={item.unit}
+              onChange={(e) => onUpdate({ unit: e.target.value })}
+              className="w-full px-2 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white font-medium"
+            >
+              {COMMON_UNITS.map((u) => (
+                <option key={u} value={u}>
+                  {u}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Batch / Lot */}
+          <div className="w-28 lg:w-36 shrink-0 min-w-0">
+            <input
+              type="text"
+              placeholder="Batch/Lot #"
+              value={item.batchLot}
+              onChange={(e) => onUpdate({ batchLot: e.target.value })}
+              className="w-full px-2.5 py-2 text-xs sm:text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white truncate"
+            />
+          </div>
+
+          {/* Delete button */}
+          {canDelete ? (
+            <button
+              type="button"
+              onClick={onDelete}
+              className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors shrink-0"
+              title="Remove Item"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          ) : (
+            <div className="w-7 shrink-0" />
           )}
         </div>
 
-        {/* Material Type */}
-        <div className="w-36 lg:w-44 shrink-0 min-w-0">
-          <select
-            value={item.materialType}
-            onChange={(e) => onUpdate({ materialType: e.target.value })}
-            className="w-full px-2.5 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white font-medium truncate"
-          >
-            {MATERIAL_TYPE_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-        </div>
+        {/* Stock Status Bar & Validation Warning (Desktop) */}
+        {item.availableStock !== undefined && item.availableStock !== null && (
+          <div className="flex items-center justify-between pl-8 pr-10 text-[11px]">
+            <div className="flex items-center gap-2">
+              {purpose === GatePurpose.LOADING ? (
+                <span className={cn(
+                  "font-semibold px-2 py-0.5 rounded-md inline-flex items-center gap-1 border",
+                  (item.availableStock ?? 0) > 0
+                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                    : "bg-red-50 text-red-600 border-red-200"
+                )}>
+                  {(item.availableStock ?? 0) > 0 ? (
+                    <CheckCircle2 className="h-3 w-3 text-emerald-600" />
+                  ) : (
+                    <AlertTriangle className="h-3 w-3 text-red-600" />
+                  )}
+                  Available Stock: {(item.availableStock ?? 0).toLocaleString()} {item.unit}
+                </span>
+              ) : (
+                <span className="font-semibold px-2 py-0.5 rounded-md inline-flex items-center gap-1 bg-blue-50 text-blue-700 border border-blue-200">
+                  <Info className="h-3 w-3 text-blue-600" />
+                  Current Factory Stock: {(item.currentStock ?? item.availableStock ?? 0).toLocaleString()} {item.unit}
+                </span>
+              )}
+            </div>
 
-        {/* Quantity */}
-        <div className="w-24 lg:w-28 shrink-0 min-w-0">
-          <input
-            type="number"
-            step="any"
-            min="0"
-            placeholder="0.00"
-            value={item.quantity}
-            onChange={(e) => onUpdate({ quantity: e.target.value })}
-            className="w-full px-2.5 py-2 text-xs sm:text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white text-right font-semibold"
-            required
-          />
-        </div>
-
-        {/* Unit */}
-        <div className="w-16 lg:w-20 shrink-0 min-w-0">
-          <select
-            value={item.unit}
-            onChange={(e) => onUpdate({ unit: e.target.value })}
-            className="w-full px-2 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white font-medium"
-          >
-            {COMMON_UNITS.map((u) => (
-              <option key={u} value={u}>
-                {u}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Batch / Lot */}
-        <div className="w-28 lg:w-36 shrink-0 min-w-0">
-          <input
-            type="text"
-            placeholder="Batch/Lot #"
-            value={item.batchLot}
-            onChange={(e) => onUpdate({ batchLot: e.target.value })}
-            className="w-full px-2.5 py-2 text-xs sm:text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white truncate"
-          />
-        </div>
-
-        {/* Delete button */}
-        {canDelete ? (
-          <button
-            type="button"
-            onClick={onDelete}
-            className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors shrink-0"
-            title="Remove Item"
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
-        ) : (
-          <div className="w-7 shrink-0" />
+            {isExceedingStock && (
+              <span className="text-red-600 font-bold flex items-center gap-1">
+                <AlertTriangle className="h-3.5 w-3.5" />
+                Requested quantity ({qtyValue.toLocaleString()} {item.unit}) exceeds available stock of {(item.availableStock ?? 0).toLocaleString()} {item.unit}!
+              </span>
+            )}
+          </div>
         )}
       </div>
     </div>
