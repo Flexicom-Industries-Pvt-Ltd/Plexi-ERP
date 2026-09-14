@@ -181,6 +181,66 @@ export class GateService {
 
     const createdEntry = await db.$transaction(
       async (tx) => {
+        // Enforce stock availability check for LOADING purpose
+        if (data.purpose === GatePurpose.LOADING) {
+          for (const item of rawStockItems) {
+            if (!item.materialName || item.quantity === undefined || item.quantity === "") continue;
+            const requestedQty = parseFloat(item.quantity) || 0;
+            if (requestedQty <= 0) continue;
+
+            let catalog = item.stockId
+              ? await tx.stock.findUnique({
+                  where: { id: item.stockId },
+                  include: {
+                    uom: true,
+                    inventoryItems: {
+                      select: { currentStock: true, reservedStock: true },
+                    },
+                  },
+                })
+              : null;
+
+            if (!catalog) {
+              catalog = await tx.stock.findFirst({
+                where: { name: { equals: String(item.materialName).trim(), mode: "insensitive" } },
+                include: {
+                  uom: true,
+                  inventoryItems: {
+                    select: { currentStock: true, reservedStock: true },
+                  },
+                },
+              });
+            }
+
+            let availableStock = 0;
+            if (catalog && catalog.inventoryItems.length > 0) {
+              const current = catalog.inventoryItems.reduce((acc, inv) => acc + (inv.currentStock || 0), 0);
+              const reserved = catalog.inventoryItems.reduce((acc, inv) => acc + (inv.reservedStock || 0), 0);
+              availableStock = Math.max(0, current - reserved);
+            } else {
+              const standalone = await tx.inventoryItem.findFirst({
+                where: {
+                  isActive: true,
+                  OR: [
+                    { name: { equals: String(item.materialName).trim(), mode: "insensitive" } },
+                    { code: { equals: String(item.materialName).trim(), mode: "insensitive" } },
+                  ],
+                },
+              });
+              if (standalone) {
+                availableStock = Math.max(0, (standalone.currentStock || 0) - (standalone.reservedStock || 0));
+              }
+            }
+
+            if (requestedQty > availableStock) {
+              const unitStr = catalog?.uom?.abbreviation || item.unit || "units";
+              throw new Error(
+                `Cannot create loading gate entry: Requested quantity for "${item.materialName}" (${requestedQty} ${unitStr}) exceeds available stock in factory (${availableStock} ${unitStr}).`
+              );
+            }
+          }
+        }
+
         const entry = await tx.gateEntry.create({
           data: {
             entryNumber,
