@@ -17,7 +17,6 @@ beforeEach(() => {
       return Promise.all(callback);
     }
     // If it's a callback, execute it and pass the mocked db as the `tx` object
-    // @ts-ignore - complex type matching
     return await callback(db);
   });
 });

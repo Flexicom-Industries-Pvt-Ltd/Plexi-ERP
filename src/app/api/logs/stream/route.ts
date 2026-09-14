@@ -5,7 +5,7 @@ export const runtime = 'nodejs'; // required for SSE
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const module = searchParams.get('module');
+  const moduleFilter = searchParams.get('module');
 
   const headers = new Headers({
     'Content-Type': 'text/event-stream',

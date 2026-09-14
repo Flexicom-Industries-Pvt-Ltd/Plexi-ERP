@@ -6,6 +6,11 @@ const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
   {
+    settings: {
+      react: {
+        version: "19.0.0",
+      },
+    },
     rules: {
       "@typescript-eslint/no-explicit-any": "warn",
       "@typescript-eslint/no-unused-vars": "warn",
@@ -13,7 +18,9 @@ const eslintConfig = defineConfig([
       "@typescript-eslint/no-unused-expressions": "warn",
       "react-hooks/rules-of-hooks": "off",
       "react-hooks/exhaustive-deps": "off",
-      "react/react-in-jsx-scope": "off"
+      "react-hooks/set-state-in-effect": "off",
+      "react/react-in-jsx-scope": "off",
+      "react/display-name": "off",
     }
   },
   // Override default ignores of eslint-config-next.
@@ -23,6 +30,16 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    "next.config.ts",
+    "vitest.config.ts",
+    "prisma.config.ts",
+    "prisma/**",
+    "scratch/**",
+    "scripts/**",
+    "test/**",
+    "test-*.*",
+    "*.js",
+    "src/generated/**",
     "src/components/ui/**",
     "src/hooks/use-mobile.ts",
   ]),
