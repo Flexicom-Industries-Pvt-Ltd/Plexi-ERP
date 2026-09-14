@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const page = Math.max(1, parseInt(searchParams.get('page') || '1'));
   const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '50')));
-  const module = searchParams.get('module') || undefined;
+  const moduleParam = searchParams.get('module') || undefined;
   const severity = searchParams.get('severity') || undefined;
   const action = searchParams.get('action') || undefined;
   const search = searchParams.get('search') || undefined;
@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
 
   // Build where clause
   const where: any = {};
-  if (module) where.module = module;
+  if (moduleParam) where.module = moduleParam;
   if (severity) where.severity = severity;
   if (httpMethod) where.httpMethod = httpMethod;
   if (userId) where.userId = userId;
