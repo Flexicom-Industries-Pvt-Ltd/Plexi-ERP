@@ -1,12 +1,12 @@
-import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
-import { db } from "@/lib/db";
-import { logEvent } from "@/lib/logging";
+import { NextRequest } from "next/server";
+import { requireApiAuth } from "@/lib/api-auth";
+import { apiError, apiSuccess } from "@/lib/api-response";
+import { Module } from "@/generated/prisma";
+import { InventoryService } from "@/services/inventory.service";
 import { z } from "zod";
 
-
 export const dynamic = "force-dynamic";
-// Define Zod Schema for input
+
 const CreateInventoryItemSchema = z.object({
   code: z.string().min(1, "Item code is required"),
   name: z.string().min(1, "Item name is required"),
@@ -22,161 +22,60 @@ const CreateInventoryItemSchema = z.object({
 });
 
 export async function GET(request: NextRequest) {
-  const session = await auth();
-  if (!session?.user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const permissions = session.user.permissions || [];
-  const hasAccess =
-    session.user.role === "SUPERADMIN" ||
-    permissions.some((p: any) => p.module === "INVENTORY" && p.canRead);
-
-  if (!hasAccess) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  const authResult = await requireApiAuth({
+    module: Module.INVENTORY,
+    action: "canRead",
+  });
+  if (!authResult.ok) return authResult.response;
 
   const { searchParams } = new URL(request.url);
   const type = searchParams.get("type");
   const search = searchParams.get("search");
   const materialType = searchParams.get("materialType");
   const includeMovement = searchParams.get("includeMovement") === "true";
-
-  const where: Record<string, unknown> = {};
-  if (type) where.itemType = type;
-  if (materialType) where.stock = { materialType };
-  if (search) {
-    where.OR = [
-      { name: { contains: search, mode: "insensitive" } },
-      { code: { contains: search, mode: "insensitive" } },
-    ];
-  }
+  const page = searchParams.get("page");
+  const limit = searchParams.get("limit");
 
   try {
-    const items = await db.inventoryItem.findMany({
-      where,
-      orderBy: { name: "asc" },
-      include: {
-        category: true,
-        subCategory: true,
-        uom: true,
-        location: true,
-        stock: true,
-      },
+    const result = await InventoryService.listInventoryItems({
+      type,
+      search,
+      materialType,
+      includeMovement,
+      page,
+      limit,
     });
 
-    if (!includeMovement) {
-      return NextResponse.json(items);
-    }
-
-    const itemIds = items.map((i) => i.id);
-    const movements = itemIds.length
-      ? await db.inventoryTransaction.groupBy({
-          by: ["itemId", "type"],
-          where: { itemId: { in: itemIds } },
-          _sum: { quantity: true },
-        })
-      : [];
-
-    const movementMap = new Map<string, { received: number; consumed: number }>();
-    for (const row of movements) {
-      const current = movementMap.get(row.itemId) || { received: 0, consumed: 0 };
-      const qty = row._sum.quantity ?? 0;
-      if (row.type === "IN") current.received += qty;
-      if (row.type === "OUT") current.consumed += qty;
-      movementMap.set(row.itemId, current);
-    }
-
-    const enriched = items.map((item) => {
-      const movement = movementMap.get(item.id) || { received: 0, consumed: 0 };
-      return {
-        ...item,
-        movementSummary: {
-          available: item.currentStock,
-          reserved: item.reservedStock,
-          received: movement.received,
-          consumed: movement.consumed,
-        },
-      };
-    });
-
-    return NextResponse.json(enriched);
+    return apiSuccess(result.items, { meta: result.meta as any });
   } catch (error) {
     console.error("Error fetching inventory items:", error);
-    return NextResponse.json({ error: "Failed to fetch inventory items" }, { status: 500 });
+    return apiError("Failed to fetch inventory items", 500);
   }
 }
 
 export async function POST(request: NextRequest) {
-  const session = await auth();
-  if (!session?.user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const permissions = session.user.permissions || [];
-  const hasAccess =
-    session.user.role === "SUPERADMIN" ||
-    permissions.some((p: any) => p.module === "INVENTORY" && p.canCreate);
-
-  if (!hasAccess) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  const authResult = await requireApiAuth({
+    module: Module.INVENTORY,
+    action: "canCreate",
+  });
+  if (!authResult.ok) return authResult.response;
 
   try {
     const jsonBody = await request.json();
     const parseResult = CreateInventoryItemSchema.safeParse(jsonBody);
 
     if (!parseResult.success) {
-      return NextResponse.json({ error: "Validation failed", details: parseResult.error.format() }, { status: 400 });
+      return apiError("Validation failed", 400, { details: parseResult.error.format() });
     }
 
-    const body = parseResult.data;
-    
-    // Ensure code is unique
-    const existing = await db.inventoryItem.findUnique({
-      where: { code: body.code },
-    });
+    const newItem = await InventoryService.createInventoryItem(
+      parseResult.data,
+      authResult.user.id
+    );
 
-    if (existing) {
-      return NextResponse.json({ error: "Item code already exists" }, { status: 400 });
-    }
-
-    const newItem = await db.inventoryItem.create({
-      data: {
-        code: body.code,
-        name: body.name,
-        description: body.description,
-        itemType: body.itemType,
-        categoryId: body.categoryId || null,
-        subCategoryId: body.subCategoryId || null,
-        uomId: body.uomId,
-        locationId: body.locationId || null,
-        currentStock: body.currentStock || 0,
-        minimumStock: body.minimumStock || 0,
-        isActive: body.isActive ?? true,
-      },
-    });
-
-    // Log the creation
-    await logEvent({
-      userId: session.user.id,
-      module: "INVENTORY",
-      action: "CREATE_ITEM",
-      severity: "INFO",
-      payload: { itemId: newItem.id, code: newItem.code },
-      diffs: [
-        {
-          entity: "InventoryItem",
-          entityId: newItem.id,
-          before: {},
-          after: newItem,
-        }
-      ]
-    });
-
-    return NextResponse.json(newItem, { status: 201 });
-  } catch (error) {
+    return apiSuccess(newItem, { status: 201 });
+  } catch (error: any) {
     console.error("Error creating inventory item:", error);
-    return NextResponse.json({ error: "Failed to create inventory item" }, { status: 500 });
+    return apiError(error.message || "Failed to create inventory item", 400);
   }
 }
