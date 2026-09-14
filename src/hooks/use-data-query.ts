@@ -120,7 +120,13 @@ export function useDataQuery<T>(
     listeners.add(listener);
 
     // Initial fetch (if cache not fresh)
-    fetchData(Boolean(!cached && !initialData));
+    if (!cached && !initialData) {
+      Promise.resolve().then(() => {
+        if (isMountedRef.current) {
+          fetchData(true);
+        }
+      });
+    }
 
     return () => {
       listeners?.delete(listener);
