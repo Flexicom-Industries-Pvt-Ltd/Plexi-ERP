@@ -16,7 +16,6 @@ import {
   X,
   Plus,
   Trash2,
-  Layers,
 } from "lucide-react";
 import Link from "next/link";
 import { GatePurpose } from "@/generated/prisma";
@@ -350,7 +349,7 @@ export function NewGateClient() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
             <div className="space-y-1.5">
               <label className="text-xs sm:text-sm font-medium text-slate-700">Purpose *</label>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 {Object.values(GatePurpose).map((p) => {
                   const isSelected = formData.purpose === p;
                   return (
@@ -403,6 +402,17 @@ export function NewGateClient() {
             >
               <Plus className="h-4 w-4" /> Add Stock Item
             </button>
+          </div>
+
+          {/* Desktop Column Header */}
+          <div className="hidden md:flex flex-row gap-2.5 items-center w-full px-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+            <span className="w-6 shrink-0 text-center">#</span>
+            <span className="flex-1 min-w-[130px]">Material Name</span>
+            <span className="w-36 lg:w-44 shrink-0">Category / Type</span>
+            <span className="w-24 lg:w-28 shrink-0 text-right pr-1">Quantity</span>
+            <span className="w-16 lg:w-20 shrink-0">Unit</span>
+            <span className="w-28 lg:w-36 shrink-0">Batch / Lot #</span>
+            <span className="w-8 shrink-0" />
           </div>
 
           <div className="space-y-3">
@@ -465,7 +475,7 @@ function StockItemRow({
   canDelete: boolean;
   onUpdate: (updates: Partial<StockItemRowData>) => void;
   onDelete: () => void;
-}) {
+  }) {
   const [searchTerm, setSearchTerm] = useState(item.materialName);
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -522,7 +532,7 @@ function StockItemRow({
   };
 
   return (
-    <div className="p-3.5 sm:p-4 bg-slate-50/80 border border-slate-200 rounded-xl relative transition-all hover:bg-slate-50">
+    <div className="p-3 sm:p-3.5 bg-slate-50/80 border border-slate-200 rounded-xl relative transition-all hover:bg-slate-50 overflow-hidden">
       {/* ── Mobile Layout (Structured Card) ── */}
       <div className="flex md:hidden flex-col gap-2.5">
         {/* Card Header: Item badge + Delete button */}
@@ -553,6 +563,7 @@ function StockItemRow({
             Material Name *
           </label>
           <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
             <input
               type="text"
               placeholder="e.g. PP Granules 1110MAS"
@@ -564,10 +575,10 @@ function StockItemRow({
                 setShowSuggestions(true);
               }}
               onFocus={() => setShowSuggestions(true)}
-              className="w-full pl-3 pr-8 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white disabled:bg-slate-100 disabled:text-slate-600"
+              className="w-full pl-8 pr-8 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white disabled:bg-slate-100 disabled:text-slate-600"
               required
             />
-            {isLocked ? (
+            {isLocked && (
               <button
                 type="button"
                 onClick={handleClear}
@@ -576,8 +587,6 @@ function StockItemRow({
               >
                 <X className="h-3.5 w-3.5" />
               </button>
-            ) : (
-              <Search className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
             )}
           </div>
 
@@ -671,20 +680,19 @@ function StockItemRow({
         </div>
       </div>
 
-      {/* ── Desktop Layout (1-Row Flex Table) ── */}
-      <div className="hidden md:flex flex-row gap-3 items-center w-full">
-        <div className="flex items-center gap-2 shrink-0">
-          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-bold text-slate-700">
-            {index + 1}
-          </span>
-        </div>
+      {/* ── Desktop Layout (1-Row Proportional Flex) ── */}
+      <div className="hidden md:flex flex-row gap-2.5 items-center w-full min-w-0">
+        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-bold text-slate-700">
+          {index + 1}
+        </span>
 
-        {/* Material Name / Autocomplete */}
-        <div className="flex-1 min-w-[200px] relative" ref={containerRef}>
+        {/* Material Name / Autocomplete (Search icon on left, no text collision) */}
+        <div className="flex-1 min-w-[130px] relative" ref={containerRef}>
           <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
             <input
               type="text"
-              placeholder="Material Name (e.g. PP Granules 1110MAS)"
+              placeholder="Search or enter material..."
               value={searchTerm}
               disabled={isLocked}
               onChange={(e) => {
@@ -693,20 +701,18 @@ function StockItemRow({
                 setShowSuggestions(true);
               }}
               onFocus={() => setShowSuggestions(true)}
-              className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white disabled:bg-slate-100 disabled:text-slate-600"
+              className="w-full pl-8 pr-7 py-2 text-xs sm:text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white disabled:bg-slate-100 disabled:text-slate-600 truncate"
               required
             />
-            {isLocked ? (
+            {isLocked && (
               <button
                 type="button"
                 onClick={handleClear}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-red-500"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-red-500 p-0.5"
                 title="Unlock to change material"
               >
-                <X className="h-4 w-4" />
+                <X className="h-3.5 w-3.5" />
               </button>
-            ) : (
-              <Search className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
             )}
           </div>
 
@@ -733,11 +739,11 @@ function StockItemRow({
         </div>
 
         {/* Material Type */}
-        <div className="w-44 shrink-0">
+        <div className="w-36 lg:w-44 shrink-0 min-w-0">
           <select
             value={item.materialType}
             onChange={(e) => onUpdate({ materialType: e.target.value })}
-            className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white text-xs font-medium"
+            className="w-full px-2.5 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white font-medium truncate"
           >
             {MATERIAL_TYPE_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>
@@ -748,25 +754,25 @@ function StockItemRow({
         </div>
 
         {/* Quantity */}
-        <div className="w-28 shrink-0">
+        <div className="w-24 lg:w-28 shrink-0 min-w-0">
           <input
             type="number"
             step="any"
             min="0"
-            placeholder="Quantity"
+            placeholder="0.00"
             value={item.quantity}
             onChange={(e) => onUpdate({ quantity: e.target.value })}
-            className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white text-right font-semibold"
+            className="w-full px-2.5 py-2 text-xs sm:text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white text-right font-semibold"
             required
           />
         </div>
 
         {/* Unit */}
-        <div className="w-24 shrink-0">
+        <div className="w-16 lg:w-20 shrink-0 min-w-0">
           <select
             value={item.unit}
             onChange={(e) => onUpdate({ unit: e.target.value })}
-            className="w-full px-2.5 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white text-xs font-medium"
+            className="w-full px-2 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white font-medium"
           >
             {COMMON_UNITS.map((u) => (
               <option key={u} value={u}>
@@ -777,26 +783,28 @@ function StockItemRow({
         </div>
 
         {/* Batch / Lot */}
-        <div className="w-36 shrink-0">
+        <div className="w-28 lg:w-36 shrink-0 min-w-0">
           <input
             type="text"
-            placeholder="Batch / Invoice #"
+            placeholder="Batch/Lot #"
             value={item.batchLot}
             onChange={(e) => onUpdate({ batchLot: e.target.value })}
-            className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white text-xs"
+            className="w-full px-2.5 py-2 text-xs sm:text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white truncate"
           />
         </div>
 
         {/* Delete button */}
-        {canDelete && (
+        {canDelete ? (
           <button
             type="button"
             onClick={onDelete}
-            className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors shrink-0"
+            className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors shrink-0"
             title="Remove Item"
           >
             <Trash2 className="h-4 w-4" />
           </button>
+        ) : (
+          <div className="w-7 shrink-0" />
         )}
       </div>
     </div>
