@@ -73,9 +73,9 @@
     "qs": "6.16.0",
     "mysql2": "3.22.0",
     "serialize-javascript": "7.0.5",
-    "js-yaml": "^4.1.1",
+    "js-yaml": "^4.3.2",
     "hono": "^4.13.5",
     "@ai-sdk/provider-utils": "^4.0.33",
-    "sharp": "^0.33.5"
+    "sharp": "^0.35.4"
   }
 }
