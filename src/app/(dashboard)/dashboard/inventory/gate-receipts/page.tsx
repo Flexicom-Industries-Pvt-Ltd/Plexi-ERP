@@ -15,10 +15,10 @@ export default async function GateReceiptsPage() {
   const canCreate = await requirePermission(Module.INVENTORY, "canCreate").then(() => true).catch(() => false);
 
   return (
-    <div className="flex flex-col gap-6 p-6 lg:p-8 max-w-7xl mx-auto w-full">
+    <div className="flex flex-col gap-4 sm:gap-6 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full min-w-0">
       <div>
-        <h1 className="text-2xl font-bold text-slate-800">Pending Gate Receipts</h1>
-        <p className="text-sm text-slate-500 mt-1">
+        <h1 className="text-xl sm:text-2xl font-bold text-slate-800">Pending Gate Receipts</h1>
+        <p className="text-xs sm:text-sm text-slate-500 mt-1">
           Review incoming materials from the Security Gate and commit them to the physical inventory.
         </p>
       </div>
