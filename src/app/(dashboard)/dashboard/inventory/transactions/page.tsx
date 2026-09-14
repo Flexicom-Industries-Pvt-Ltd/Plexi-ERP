@@ -14,10 +14,10 @@ export default async function InventoryTransactionsPage() {
   await requirePermission(Module.INVENTORY, "canRead");
 
   return (
-    <div className="flex flex-col gap-6 p-6 lg:p-8 max-w-7xl mx-auto w-full">
+    <div className="flex flex-col gap-4 sm:gap-6 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full min-w-0">
       <div>
-        <h1 className="text-2xl font-bold text-slate-800">Inventory Ledger</h1>
-        <p className="text-sm text-slate-500 mt-1">
+        <h1 className="text-xl sm:text-2xl font-bold text-slate-800">Inventory Ledger</h1>
+        <p className="text-xs sm:text-sm text-slate-500 mt-1">
           Immutable audit trail of all IN, OUT, and ADJUSTMENT stock movements.
         </p>
       </div>
