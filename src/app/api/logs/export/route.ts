@@ -28,14 +28,14 @@ export async function GET(request: NextRequest) {
 
   const { searchParams } = new URL(request.url);
   const format = searchParams.get('format') || 'csv';
-  const module = searchParams.get('module') || undefined;
+  const moduleParam = searchParams.get('module') || undefined;
   const severity = searchParams.get('severity') || undefined;
   const from = searchParams.get('from') || undefined;
   const to = searchParams.get('to') || undefined;
 
   // Build where clause
   const where: any = {};
-  if (module) where.module = module;
+  if (moduleParam) where.module = moduleParam;
   if (severity) where.severity = severity;
   if (from || to) {
     where.timestamp = {};
