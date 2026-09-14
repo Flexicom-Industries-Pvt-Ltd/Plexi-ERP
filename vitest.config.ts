@@ -8,6 +8,7 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./test/setup.ts'],
+    fileParallelism: false,
     alias: {
       '@': path.resolve(__dirname, './src'),
       '~test': path.resolve(__dirname, './test')
