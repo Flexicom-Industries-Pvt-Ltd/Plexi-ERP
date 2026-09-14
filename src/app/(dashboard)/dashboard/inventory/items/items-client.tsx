@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import { Search, Plus, Edit2, Trash2, Package, AlertTriangle, X, Activity } from "lucide-react";
 import { ItemType } from "@/generated/prisma";
+import { DeleteConfirmDialog } from "@/components/ui/delete-confirm-dialog";
 
 export function InventoryItemsClient({ 
   canCreate, 
@@ -22,6 +23,10 @@ export function InventoryItemsClient({
   const [showModal, setShowModal] = useState(false);
   const [modalMode, setModalMode] = useState<"CREATE" | "EDIT" | "ADJUST">("CREATE");
   const [selectedItem, setSelectedItem] = useState<any>(null);
+
+  // Delete modal state
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   
   // Adjustment form state
   const [adjustForm, setAdjustForm] = useState({ quantity: 0, remarks: "" });
@@ -170,15 +175,26 @@ export function InventoryItemsClient({
     }
   };
 
-  const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`Are you sure you want to delete ${name}? This action cannot be undone.`)) return;
+  const handleOpenDelete = (item: { id: string; name: string }) => {
+    setDeleteTarget(item);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
     try {
-      const res = await fetch(`/api/inventory/items/${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Failed to delete item");
-      toast.success("Item deleted");
+      const res = await fetch(`/api/inventory/items/${deleteTarget.id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Failed to delete item");
+      }
+      toast.success("Item deleted successfully");
+      setDeleteTarget(null);
       fetchData();
     } catch (err: any) {
-      toast.error(err.message);
+      toast.error(err.message || "Failed to delete item");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -322,7 +338,7 @@ export function InventoryItemsClient({
                     )}
                     {canDelete && (
                       <button
-                        onClick={() => handleDelete(item.id, item.name)}
+                        onClick={() => handleOpenDelete({ id: item.id, name: item.name })}
                         className="px-3 py-1.5 text-xs font-bold text-red-700 bg-red-100 hover:bg-red-200 rounded-lg flex items-center gap-1 transition-colors"
                       >
                         <Trash2 className="h-3.5 w-3.5" /> Delete
@@ -423,7 +439,7 @@ export function InventoryItemsClient({
                           )}
                           {canDelete && (
                             <button
-                              onClick={() => handleDelete(item.id, item.name)}
+                              onClick={() => handleOpenDelete({ id: item.id, name: item.name })}
                               className="p-1.5 text-slate-400 hover:text-red-600 rounded-md hover:bg-red-50 transition-colors"
                               title="Delete"
                             >
@@ -441,7 +457,7 @@ export function InventoryItemsClient({
         </div>
       </div>
 
-      {/* Modal Dialog */}
+      {/* Item Form Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/50 backdrop-blur-xs">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
@@ -652,6 +668,17 @@ export function InventoryItemsClient({
           </div>
         </div>
       )}
+
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmDialog
+        isOpen={Boolean(deleteTarget)}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleConfirmDelete}
+        title="Delete Inventory Item"
+        itemName={deleteTarget?.name}
+        itemType="inventory item"
+        isLoading={isDeleting}
+      />
     </div>
   );
 }
