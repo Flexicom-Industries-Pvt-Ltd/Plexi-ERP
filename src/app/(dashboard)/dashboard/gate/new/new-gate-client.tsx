@@ -229,8 +229,8 @@ export function NewGateClient() {
   };
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden w-full max-w-full min-w-0">
-      <div className="p-4 sm:p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+    <div className="bg-white rounded-xl border border-slate-200 shadow-sm w-full max-w-full min-w-0">
+      <div className="p-4 sm:p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50 rounded-t-xl">
         <h2 className="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2">
           <Truck className="h-5 w-5 text-primary" />
           <span>Truck Arrival Registration</span>
@@ -317,13 +317,17 @@ export function NewGateClient() {
               </div>
               
               {showDriverSuggestions && suggestedDrivers.length > 0 && !isDriverLocked && (
-                <div className="absolute z-20 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-xl max-h-60 overflow-y-auto">
+                <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-2xl max-h-60 overflow-y-auto">
                   {suggestedDrivers.map((driver) => (
                     <button
                       key={driver.id}
                       type="button"
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        handleSelectDriver(driver);
+                      }}
                       onClick={() => handleSelectDriver(driver)}
-                      className="w-full text-left px-3.5 py-2 hover:bg-slate-50 flex flex-col transition-colors border-b border-slate-100 last:border-0"
+                      className="w-full text-left px-3.5 py-2 hover:bg-slate-50 flex flex-col transition-colors border-b border-slate-100 last:border-0 cursor-pointer"
                     >
                       <span className="font-mono font-bold text-slate-900 text-xs sm:text-sm">{driver.phone}</span>
                       <span className="text-[11px] text-slate-500">{driver.name}</span>
@@ -620,10 +624,11 @@ function StockItemRow({
 
   return (
     <div className={cn(
-      "p-3 sm:p-3.5 rounded-xl border transition-all overflow-hidden",
+      "p-3 sm:p-3.5 rounded-xl border transition-all relative overflow-visible",
+      showSuggestions ? "z-30 shadow-md ring-1 ring-primary/20 bg-white" : "z-10",
       isExceedingStock
         ? "bg-red-50/40 border-red-200"
-        : "bg-slate-50/80 border-slate-200 hover:bg-slate-50"
+        : !showSuggestions && "bg-slate-50/80 border-slate-200 hover:bg-slate-50"
     )}>
       {/* ── Mobile Layout (Structured Card) ── */}
       <div className="flex md:hidden flex-col gap-2.5">
@@ -709,21 +714,25 @@ function StockItemRow({
           )}
 
           {showSuggestions && suggestions.length > 0 && !isLocked && (
-            <div className="absolute z-20 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-xl max-h-52 overflow-y-auto">
+            <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-2xl max-h-56 overflow-y-auto divide-y divide-slate-100">
               {suggestions.map((stock) => (
                 <button
                   key={stock.id}
                   type="button"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    handleSelectCatalog(stock);
+                  }}
                   onClick={() => handleSelectCatalog(stock)}
-                  className="w-full text-left px-3 py-2 hover:bg-primary/5 flex items-center justify-between text-xs border-b border-slate-100 last:border-0"
+                  className="w-full text-left px-3 py-2.5 hover:bg-primary/5 flex items-center justify-between text-xs transition-colors cursor-pointer"
                 >
-                  <div>
-                    <span className="font-bold text-slate-800 block">{stock.name}</span>
-                    <span className="text-[10px] text-slate-400 font-mono">{stock.code}</span>
+                  <div className="pr-2 min-w-0">
+                    <span className="font-bold text-slate-800 block truncate">{stock.name}</span>
+                    <span className="text-[10px] text-slate-400 font-mono block">{stock.code}</span>
                   </div>
                   <div className="text-right shrink-0">
                     <span className={cn(
-                      "text-[10px] font-bold px-1.5 py-0.5 rounded block",
+                      "text-[10px] font-bold px-1.5 py-0.5 rounded inline-block",
                       (stock.availableStock ?? 0) > 0
                         ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                         : "bg-slate-100 text-slate-500"
@@ -865,21 +874,25 @@ function StockItemRow({
             </div>
 
             {showSuggestions && suggestions.length > 0 && !isLocked && (
-              <div className="absolute z-20 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-xl max-h-52 overflow-y-auto">
+              <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-2xl max-h-56 overflow-y-auto min-w-[280px] divide-y divide-slate-100">
                 {suggestions.map((stock) => (
                   <button
                     key={stock.id}
                     type="button"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      handleSelectCatalog(stock);
+                    }}
                     onClick={() => handleSelectCatalog(stock)}
-                    className="w-full text-left px-3 py-2 hover:bg-primary/5 flex items-center justify-between text-xs border-b border-slate-100 last:border-0"
+                    className="w-full text-left px-3 py-2.5 hover:bg-primary/5 flex items-center justify-between text-xs transition-colors cursor-pointer"
                   >
-                    <div>
-                      <span className="font-bold text-slate-800 block">{stock.name}</span>
-                      <span className="text-[10px] text-slate-400 font-mono">{stock.code}</span>
+                    <div className="pr-2 min-w-0">
+                      <span className="font-bold text-slate-800 block truncate">{stock.name}</span>
+                      <span className="text-[10px] text-slate-400 font-mono block">{stock.code}</span>
                     </div>
                     <div className="text-right shrink-0">
                       <span className={cn(
-                        "text-[10px] font-bold px-1.5 py-0.5 rounded block",
+                        "text-[10px] font-bold px-1.5 py-0.5 rounded inline-block",
                         (stock.availableStock ?? 0) > 0
                           ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                           : "bg-slate-100 text-slate-500"
