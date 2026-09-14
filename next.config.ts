@@ -4,12 +4,19 @@ import withPWAInit from "@ducanh2912/next-pwa";
 
 const withPWA = withPWAInit({
   dest: "public",
-  disable: false, // Ensure PWA is enabled even in dev for testing
+  disable: process.env.DISABLE_PWA === "true",
 });
 
 const nextConfig: NextConfig = {
   /* config options here */
   turbopack: {},
+  experimental: {
+    workerThreads: false,
+    cpus: 1,
+  },
+  typescript: {
+    ignoreBuildErrors: false,
+  },
   async headers() {
     return [
       {
