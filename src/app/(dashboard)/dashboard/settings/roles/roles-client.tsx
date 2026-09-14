@@ -14,6 +14,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { createRole, updateRole, deleteRole } from "@/actions/roles";
 import { z } from "zod";
 import { RolePermissionSchema } from "@/lib/schemas/roles";
+import { DeleteConfirmDialog } from "@/components/ui/delete-confirm-dialog";
 
 type RolePermissionInput = z.infer<typeof RolePermissionSchema>;
 
@@ -26,6 +27,9 @@ export function RolesClient({ roles, modules }: Props) {
   const [isPending, setIsPending] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingRole, setEditingRole] = useState<any | null>(null);
+
+  // Delete modal state
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
   
   // Form State
   const [name, setName] = useState("");
@@ -68,7 +72,7 @@ export function RolesClient({ roles, modules }: Props) {
       ...prev,
       [module]: {
         ...prev[module],
-        [action]: checked
+        [action]: checked,
       }
     }));
   };
@@ -76,14 +80,16 @@ export function RolesClient({ roles, modules }: Props) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsPending(true);
-    
-    // Transform permissions object back to array
-    const permissionsArray: RolePermissionInput[] = modules.map(m => ({
-      module: m as any,
-      ...permissions[m]
-    }));
 
     try {
+      const permissionsArray: RolePermissionInput[] = Object.entries(permissions).map(([module, perms]) => ({
+        module: module as any,
+        canRead: perms.canRead,
+        canCreate: perms.canCreate,
+        canUpdate: perms.canUpdate,
+        canDelete: perms.canDelete,
+      }));
+
       if (editingRole) {
         const res = await updateRole({ id: editingRole.id, name, description, permissions: permissionsArray });
         if (res.success) {
@@ -101,24 +107,25 @@ export function RolesClient({ roles, modules }: Props) {
           toast.error(res.error.message);
         }
       }
-    } catch (err) {
+    } catch {
       toast.error("An unexpected error occurred");
     } finally {
       setIsPending(false);
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this role?")) return;
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
     setIsPending(true);
     try {
-      const res = await deleteRole({ id });
+      const res = await deleteRole({ id: deleteTarget.id });
       if (res.success) {
         toast.success("Role deleted successfully");
+        setDeleteTarget(null);
       } else {
         toast.error(res.error.message);
       }
-    } catch (err) {
+    } catch {
       toast.error("Failed to delete role");
     } finally {
       setIsPending(false);
@@ -172,7 +179,13 @@ export function RolesClient({ roles, modules }: Props) {
                     <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(role)}>
                       <Edit className="w-4 h-4" />
                     </Button>
-                    <Button variant="ghost" size="icon" onClick={() => handleDelete(role.id)} disabled={isPending || role._count?.users > 0}>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setDeleteTarget({ id: role.id, name: role.name })}
+                      disabled={isPending || role._count?.users > 0}
+                      title={role._count?.users > 0 ? "Cannot delete role with assigned users" : "Delete role"}
+                    >
                       <Trash2 className="w-4 h-4 text-red-500" />
                     </Button>
                   </TableCell>
@@ -184,56 +197,58 @@ export function RolesClient({ roles, modules }: Props) {
       </Card>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-          <form onSubmit={handleSubmit}>
-            <DialogHeader>
-              <DialogTitle>{editingRole ? 'Edit Role' : 'Create New Role'}</DialogTitle>
-              <DialogDescription>
-                Define the role details and assign fine-grained permissions for each module.
-              </DialogDescription>
-            </DialogHeader>
-            
-            <div className="space-y-6 py-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name">Role Name *</Label>
-                  <Input 
-                    id="name" 
-                    value={name} 
-                    onChange={(e) => setName(e.target.value)} 
-                    placeholder="e.g. Store Manager" 
-                    required 
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="description">Description</Label>
-                  <Input 
-                    id="description" 
-                    value={description} 
-                    onChange={(e) => setDescription(e.target.value)} 
-                    placeholder="Optional description" 
-                  />
-                </div>
-              </div>
+        <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>{editingRole ? "Edit Role" : "Create New Role"}</DialogTitle>
+            <DialogDescription>
+              Define module-level permissions for this role.
+            </DialogDescription>
+          </DialogHeader>
 
-              <div>
-                <Label className="text-base font-semibold mb-3 block">Module Permissions</Label>
-                <div className="border rounded-md">
+          <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="name">Role Name</Label>
+                <Input 
+                  id="name" 
+                  value={name} 
+                  onChange={(e) => setName(e.target.value)} 
+                  placeholder="e.g. Production Manager"
+                  required 
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="description">Description</Label>
+                <Input 
+                  id="description" 
+                  value={description} 
+                  onChange={(e) => setDescription(e.target.value)} 
+                  placeholder="Brief role responsibilities"
+                />
+              </div>
+            </div>
+
+            <div className="flex-1 flex flex-col min-h-0 border rounded-md">
+              <div className="bg-muted p-2 border-b font-medium text-sm">
+                Module Permissions
+              </div>
+              <div className="flex-1 overflow-y-auto">
+                <div className="overflow-x-auto">
                   <Table>
-                    <TableHeader className="bg-muted/50">
+                    <TableHeader>
                       <TableRow>
-                        <TableHead className="w-[200px]">Module</TableHead>
-                        <TableHead className="text-center">Read</TableHead>
-                        <TableHead className="text-center">Create</TableHead>
-                        <TableHead className="text-center">Update</TableHead>
-                        <TableHead className="text-center">Delete</TableHead>
+                        <TableHead>Module</TableHead>
+                        <TableHead className="text-center w-20">Read</TableHead>
+                        <TableHead className="text-center w-20">Create</TableHead>
+                        <TableHead className="text-center w-20">Update</TableHead>
+                        <TableHead className="text-center w-20">Delete</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {modules.map(module => (
+                      {modules.map((module) => (
                         <TableRow key={module}>
-                          <TableCell className="font-medium text-sm">
-                            {module.replace(/_/g, ' ')}
+                          <TableCell className="font-medium">
+                            {module.replace(/_/g, " ")}
                           </TableCell>
                           <TableCell className="text-center">
                             <Checkbox 
@@ -276,6 +291,16 @@ export function RolesClient({ roles, modules }: Props) {
           </form>
         </DialogContent>
       </Dialog>
+
+      <DeleteConfirmDialog
+        isOpen={Boolean(deleteTarget)}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleConfirmDelete}
+        title="Delete Role"
+        itemName={deleteTarget?.name}
+        itemType="role"
+        isLoading={isPending}
+      />
     </>
   );
 }
