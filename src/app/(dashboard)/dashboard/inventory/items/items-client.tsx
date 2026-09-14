@@ -67,11 +67,17 @@ export function InventoryItemsClient({
         fetch("/api/settings/master-data/location").then(r => r.json()),
       ]);
 
-      setItems(Array.isArray(resItems) ? resItems : []);
-      setCategories(Array.isArray(resCat) ? resCat : []);
-      setSubCategories(Array.isArray(resSub) ? resSub : []);
-      setUoms(Array.isArray(resUom) ? resUom : []);
-      setLocations(Array.isArray(resLoc) ? resLoc : []);
+      const itemsList = Array.isArray(resItems)
+        ? resItems
+        : resItems?.data && Array.isArray(resItems.data)
+        ? resItems.data
+        : [];
+
+      setItems(itemsList);
+      setCategories(Array.isArray(resCat) ? resCat : resCat?.data || []);
+      setSubCategories(Array.isArray(resSub) ? resSub : resSub?.data || []);
+      setUoms(Array.isArray(resUom) ? resUom : resUom?.data || []);
+      setLocations(Array.isArray(resLoc) ? resLoc : resLoc?.data || []);
     } catch {
       toast.error("Failed to load data");
     } finally {
