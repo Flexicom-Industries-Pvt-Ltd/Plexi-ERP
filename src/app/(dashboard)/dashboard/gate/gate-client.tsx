@@ -77,7 +77,12 @@ export function GateClient({
       ]);
       if (!res.ok) throw new Error("Failed to fetch gate entries");
       const data = await res.json();
-      setEntries(data);
+      const entriesList = Array.isArray(data)
+        ? data
+        : data?.data && Array.isArray(data.data)
+        ? data.data
+        : [];
+      setEntries(entriesList);
       if (statsRes.ok) {
         setStats(await statsRes.json());
       }
