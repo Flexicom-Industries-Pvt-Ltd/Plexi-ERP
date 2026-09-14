@@ -75,7 +75,6 @@
     "serialize-javascript": "7.0.5",
     "js-yaml": "^4.1.1",
     "hono": "^4.13.5",
-    "@ai-sdk/provider-utils": "^5.0.1",
     "sharp": "^0.33.5"
   }
 }
