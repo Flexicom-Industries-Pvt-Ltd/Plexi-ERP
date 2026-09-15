@@ -88,6 +88,9 @@ model User {
   reworkTicketsCompleted       QcReworkTicket[]             @relation("ReworkCompleter")
   scrapRecordsRecorded         ScrapRecord[]                @relation("ScrapRecorder")
   recyclingBatchesOperated     RecyclingBatch[]             @relation("RecyclingOperator")
+  maintenanceLogsReported      MaintenanceLog[]             @relation("MaintenanceReporter")
+  maintenanceLogsAssigned      MaintenanceLog[]             @relation("MaintenanceTechnician")
+  maintenanceLogsResolved      MaintenanceLog[]             @relation("MaintenanceResolver")
   createdAt         DateTime       @default(now())
   updatedAt     DateTime    @updatedAt
 
@@ -368,6 +371,7 @@ model Machine {
   convertexRuns          ConvertexProductionRun[]  @relation("ConvertexRunMachine")
   valvomaticRuns         ValvomaticProductionRun[] @relation("ValvomaticRunMachine")
   bcsRuns                BcsProductionRun[]        @relation("BcsRunMachine")
+  maintenanceLogs        MaintenanceLog[]
 
   @@index([sectionId])
 }
@@ -1404,6 +1408,66 @@ model RecyclingBatch {
   @@index([startedAt])
   @@index([completedAt])
 }
+
+enum MaintenanceType {
+  BREAKDOWN
+  PREVENTATIVE
+  ROUTINE_SERVICE
+  INSPECTION
+  CALIBRATION
+}
+
+enum MaintenanceStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CANCELLED
+}
+
+enum MaintenancePriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+model MaintenanceLog {
+  id                   String              @id @default(cuid())
+  logNumber            String              @unique
+  machineId            String
+  type                 MaintenanceType     @default(BREAKDOWN)
+  priority             MaintenancePriority @default(MEDIUM)
+  status               MaintenanceStatus   @default(OPEN)
+  title                String
+  description          String
+  downtimeMinutes      Int                 @default(0)
+  cost                 Float?
+  reportedById         String?
+  assignedTechnicianId String?
+  resolvedById         String?
+  reportedAt           DateTime            @default(now())
+  startedAt            DateTime?
+  resolvedAt           DateTime?
+  correctiveAction     String?
+  partsReplaced        String?
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+
+  machine            Machine @relation(fields: [machineId], references: [id], onDelete: Cascade)
+  reportedBy         User?   @relation("MaintenanceReporter", fields: [reportedById], references: [id], onDelete: SetNull)
+  assignedTechnician User?   @relation("MaintenanceTechnician", fields: [assignedTechnicianId], references: [id], onDelete: SetNull)
+  resolvedBy         User?   @relation("MaintenanceResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
+
+  @@index([machineId])
+  @@index([type])
+  @@index([status])
+  @@index([priority])
+  @@index([reportedById])
+  @@index([assignedTechnicianId])
+  @@index([reportedAt])
+  @@index([resolvedAt])
+}
+
 
 
 
