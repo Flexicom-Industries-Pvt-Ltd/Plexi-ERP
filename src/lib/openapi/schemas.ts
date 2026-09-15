@@ -808,3 +808,65 @@ export const OperatorSchema = z.object({
   email: z.string(),
   employeeId: z.string().nullable().optional(),
 }).openapi("Operator");
+
+// ─── Identity & Access (Users & Roles) ────────────────────────────────────────
+
+export const UserListQuery = z.object({
+  search: z.string().optional().openapi({ description: "Search by name, email, employee ID, or phone" }),
+  roleId: z.string().optional().openapi({ description: "Filter by Role ID" }),
+  departmentId: z.string().optional().openapi({ description: "Filter by Department ID" }),
+  isActive: z.enum(["true", "false"]).optional().openapi({ description: "Filter by active status" }),
+  page: z.string().optional().openapi({ description: "Page number for pagination" }),
+  limit: z.string().optional().openapi({ description: "Page limit (default 50, max 200)" }),
+});
+
+export const CreateUserBody = z.object({
+  name: z.string().min(1).optional().openapi({ description: "Full name" }),
+  email: z.string().email().optional().openapi({ description: "Email address (unique)" }),
+  password: z.string().min(6).optional().openapi({ description: "Account password (min 6 chars)" }),
+  employeeId: z.string().optional().openapi({ description: "Unique Employee ID" }),
+  roleId: z.string().optional().openapi({ description: "Role ID" }),
+  departmentId: z.string().optional().openapi({ description: "Department ID" }),
+  phone: z.string().optional().openapi({ description: "Phone number" }),
+}).openapi("CreateUser");
+
+export const UpdateUserBody = z.object({
+  name: z.string().min(1).optional(),
+  email: z.string().email().optional(),
+  password: z.string().min(6).optional().or(z.literal("")),
+  employeeId: z.string().optional(),
+  roleId: z.string().optional(),
+  departmentId: z.string().optional(),
+  phone: z.string().optional(),
+  isActive: z.boolean().optional(),
+}).openapi("UpdateUser");
+
+export const RolePermissionBody = z.object({
+  module: z.enum([
+    "SETTINGS",
+    "USERS",
+    "SECURITY_GATE",
+    "INVENTORY",
+    "PRODUCTION",
+    "QUALITY_CONTROL",
+    "DISPATCH",
+    "DATA_CENTRE",
+  ]),
+  canCreate: z.boolean().default(false),
+  canRead: z.boolean().default(false),
+  canUpdate: z.boolean().default(false),
+  canDelete: z.boolean().default(false),
+}).openapi("RolePermission");
+
+export const CreateRoleBody = z.object({
+  name: z.string().min(1).openapi({ description: "Unique role name" }),
+  description: z.string().optional().openapi({ description: "Role description" }),
+  permissions: z.array(RolePermissionBody).openapi({ description: "Matrix of module permissions" }),
+}).openapi("CreateRole");
+
+export const UpdateRoleBody = z.object({
+  name: z.string().min(1).optional(),
+  description: z.string().optional(),
+  permissions: z.array(RolePermissionBody).optional(),
+}).openapi("UpdateRole");
+
