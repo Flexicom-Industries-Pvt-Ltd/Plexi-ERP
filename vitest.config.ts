@@ -19,6 +19,8 @@ export default defineConfig({
       exclude: [
         'node_modules/',
         'src/components/ui/**',
+        'src/generated/**',
+        'test/**',
         '.next/**',
       ],
     },
