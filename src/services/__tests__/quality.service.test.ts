@@ -241,4 +241,85 @@ describe("QualityService", () => {
       ).rejects.toThrow("QC inspection record not found.");
     });
   });
+
+  describe("getInspectionQueue", () => {
+    it("should fetch queue items and calculate KPI metrics", async () => {
+      vi.mocked(db.productionRoll.count).mockResolvedValueOnce(5); // pendingRolls
+      vi.mocked(db.bale.count).mockResolvedValueOnce(3); // pendingBales
+      vi.mocked(db.productionRoll.count).mockResolvedValueOnce(1); // onHoldRolls
+      vi.mocked(db.bale.count).mockResolvedValueOnce(0); // onHoldBales
+      vi.mocked(db.productionRoll.count).mockResolvedValueOnce(2); // reworkRolls
+      vi.mocked(db.bale.count).mockResolvedValueOnce(1); // reworkBales
+      vi.mocked(db.qcInspection.count).mockResolvedValueOnce(10); // inspectedToday
+      vi.mocked(db.qcInspection.count).mockResolvedValueOnce(8); // passedToday
+      vi.mocked(db.qcInspection.count).mockResolvedValueOnce(1); // failedToday
+      vi.mocked(db.qcInspection.count).mockResolvedValueOnce(1); // reworkToday
+      vi.mocked(db.qcInspection.count).mockResolvedValueOnce(0); // onHoldToday
+
+      vi.mocked(db.productionRoll.findMany).mockResolvedValue([
+        {
+          id: "roll-1",
+          rollNumber: "R-101",
+          rollType: "PP_WOVEN",
+          sourcePhase: "LOOM",
+          qualityStatus: RollQualityStatus.PENDING_QC,
+          weight: 120,
+          length: 500,
+          inventoryItem: { code: "ITEM-1", name: "PP Fabric" },
+          createdAt: new Date("2026-09-15T09:00:00Z"),
+        },
+      ] as any);
+
+      vi.mocked(db.bale.findMany).mockResolvedValue([
+        {
+          id: "bale-1",
+          baleNumber: "B-201",
+          bagsPerBale: 500,
+          quantity: 500,
+          qualityStatus: RollQualityStatus.PENDING_QC,
+          product: { code: "BAG-1", name: "PP Bag 50kg" },
+          shift: { name: "Morning Shift" },
+          createdAt: new Date("2026-09-15T08:00:00Z"),
+        },
+      ] as any);
+
+      const result = await QualityService.getInspectionQueue();
+
+      expect(result.stats.pendingCount).toBe(8);
+      expect(result.stats.onHoldCount).toBe(1);
+      expect(result.stats.reworkCount).toBe(3);
+      expect(result.stats.inspectedToday).toBe(10);
+      expect(result.stats.passedToday).toBe(8);
+      expect(result.stats.passRate).toBe(80);
+      expect(result.items).toHaveLength(2);
+      expect(result.items[0].identifier).toBe("R-101");
+      expect(result.items[1].identifier).toBe("B-201");
+    });
+
+    it("should filter queue items by referenceType = ROLL", async () => {
+      vi.mocked(db.productionRoll.count).mockResolvedValue(0);
+      vi.mocked(db.bale.count).mockResolvedValue(0);
+      vi.mocked(db.qcInspection.count).mockResolvedValue(0);
+
+      vi.mocked(db.productionRoll.findMany).mockResolvedValue([
+        {
+          id: "roll-2",
+          rollNumber: "R-102",
+          rollType: "PP_WOVEN",
+          sourcePhase: "LOOM",
+          qualityStatus: RollQualityStatus.PENDING_QC,
+          createdAt: new Date(),
+        },
+      ] as any);
+
+      const result = await QualityService.getInspectionQueue({
+        referenceType: QcReferenceType.ROLL,
+      });
+
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0].referenceType).toBe("ROLL");
+      expect(db.bale.findMany).not.toHaveBeenCalled();
+    });
+  });
 });
+

@@ -3,6 +3,7 @@ import {
   QcReferenceType,
   QcDecision,
   QcInspectionStatus,
+  RollQualityStatus,
 } from "@/generated/prisma";
 
 export const QcInspectionLineInputSchema = z.object({
@@ -45,3 +46,12 @@ export const ListQcInspectionsQuerySchema = z.object({
   page: z.union([z.string(), z.number()]).optional(),
   limit: z.union([z.string(), z.number()]).optional(),
 });
+
+export const GetQcQueueQuerySchema = z.object({
+  referenceType: z.nativeEnum(QcReferenceType).optional(),
+  status: z.union([z.nativeEnum(RollQualityStatus), z.literal("ALL")]).optional(),
+  search: z.string().optional(),
+  page: z.union([z.string(), z.number()]).optional(),
+  limit: z.union([z.string(), z.number()]).optional(),
+});
+

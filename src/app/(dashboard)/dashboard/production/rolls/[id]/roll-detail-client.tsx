@@ -4,8 +4,9 @@ import { useCallback, useEffect, useState } from "react";
 import { format } from "date-fns";
 import Link from "next/link";
 import { toast } from "sonner";
-import { ArrowLeft, Factory, Loader2, MapPin, Package, ScrollText } from "lucide-react";
+import { ArrowLeft, Factory, Loader2, MapPin, Package, ScrollText, ShieldCheck } from "lucide-react";
 import { ProductionInventoryMovements } from "@/components/production/ProductionInventoryMovements";
+
 
 const qualityOptions = [
   { value: "PENDING_QC", label: "Pending QC" },
@@ -20,6 +21,7 @@ export function RollDetailClient({ rollId }: { rollId: string }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [locations, setLocations] = useState<any[]>([]);
+  const [qcInspections, setQcInspections] = useState<any[]>([]);
   const [form, setForm] = useState({
     qualityStatus: "",
     weight: "",
@@ -57,7 +59,13 @@ export function RollDetailClient({ rollId }: { rollId: string }) {
       .then((r) => (r.ok ? r.json() : []))
       .then(setLocations)
       .catch(() => {});
-  }, [fetchRoll]);
+
+    fetch(`/api/quality/inspections?referenceType=ROLL&referenceId=${rollId}`)
+      .then((r) => (r.ok ? r.json() : { inspections: [] }))
+      .then((d) => setQcInspections(d.inspections || []))
+      .catch(() => {});
+  }, [fetchRoll, rollId]);
+
 
   const handleSave = async () => {
     setSaving(true);
@@ -228,7 +236,58 @@ export function RollDetailClient({ rollId }: { rollId: string }) {
               </Link>
             )}
           </section>
+
+          <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm ring-1 ring-black/5">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
+                <ShieldCheck className="size-4 text-primary" />
+                QC Inspection History
+              </h2>
+              <Link
+                href="/dashboard/quality"
+                className="text-xs font-semibold text-primary hover:underline"
+              >
+                Open QC Center
+              </Link>
+            </div>
+            {qcInspections.length === 0 ? (
+              <div className="rounded-lg bg-slate-50 p-4 text-center text-xs text-muted-foreground">
+                No formal QC inspection certificates logged yet for this roll.
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100 rounded-lg border border-slate-100">
+                {qcInspections.map((insp: any) => (
+                  <div key={insp.id} className="flex items-center justify-between p-3 text-xs">
+                    <div>
+                      <Link
+                        href={`/dashboard/quality/inspections/${insp.id}`}
+                        className="font-mono font-semibold text-primary hover:underline"
+                      >
+                        {insp.inspectionNumber}
+                      </Link>
+                      <div className="text-slate-500">
+                        {insp.inspector?.name ? `Inspector: ${insp.inspector.name}` : "System Inspector"}
+                        {insp.inspectedAt ? ` · ${format(new Date(insp.inspectedAt), "dd MMM yyyy")}` : ""}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-700">
+                        {insp.decision || insp.status}
+                      </span>
+                      <Link
+                        href={`/dashboard/quality/inspections/${insp.id}`}
+                        className="text-primary hover:underline"
+                      >
+                        Certificate →
+                      </Link>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
         </div>
+
 
         <div className="space-y-6">
           <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm ring-1 ring-black/5">
