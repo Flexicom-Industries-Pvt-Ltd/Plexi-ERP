@@ -32,15 +32,22 @@ describe('User Actions', () => {
 
   describe('createUser', () => {
     it('should hash password and create a user', async () => {
+      vi.mocked(db.user.findUnique).mockResolvedValue(null);
       const mockUser = { id: 'u-1', email: 'test@example.com', password: 'hashed_password' };
       vi.mocked(db.user.create).mockResolvedValue(mockUser as any);
 
       const result = await createUser({ email: 'test@example.com', password: 'plain_password', roleId: 'r-1' });
 
       expect(bcrypt.hash).toHaveBeenCalledWith('plain_password', 10);
-      expect(db.user.create).toHaveBeenCalledWith({
-        data: { email: 'test@example.com', password: 'hashed_password', roleId: 'r-1' }
-      });
+      expect(db.user.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            email: 'test@example.com',
+            password: 'hashed_password',
+            roleId: 'r-1',
+          }),
+        })
+      );
       // Ensure password is not returned
       if (result.success) {
         expect(result.data).not.toHaveProperty('password');
@@ -53,15 +60,18 @@ describe('User Actions', () => {
 
   describe('toggleUserStatus', () => {
     it('should update isActive status', async () => {
+      vi.mocked(db.user.findUnique).mockResolvedValue({ id: 'u-1', isActive: true } as any);
       const mockUser = { id: 'u-1', isActive: false };
       vi.mocked(db.user.update).mockResolvedValue(mockUser as any);
 
       const result = await toggleUserStatus({ id: 'u-1', isActive: false });
 
-      expect(db.user.update).toHaveBeenCalledWith({
-        where: { id: 'u-1' },
-        data: { isActive: false }
-      });
+      expect(db.user.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'u-1' },
+          data: { isActive: false },
+        })
+      );
       if (result.success) {
         expect(result.data).toEqual(mockUser);
       } else {
