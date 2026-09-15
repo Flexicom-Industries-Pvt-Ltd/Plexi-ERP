@@ -11,6 +11,6 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function RecyclingPage() {
-  await requirePermission(Module.PRODUCTION, "canRead");
+  await requirePermission(Module.RECYCLING_PLANT, "canRead");
   return <RecyclingClient />;
 }

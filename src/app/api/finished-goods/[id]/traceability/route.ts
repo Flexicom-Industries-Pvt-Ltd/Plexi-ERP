@@ -9,7 +9,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const auth = await requireApiAuth({
-    module: [Module.INVENTORY, Module.PRODUCTION, Module.DISPATCH],
+    module: [Module.FINISHED_GOODS, Module.INVENTORY, Module.PRODUCTION, Module.DISPATCH],
     action: "canRead",
   });
   if (!auth.ok) return auth.response;

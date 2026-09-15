@@ -11,6 +11,6 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function MaintenancePage() {
-  await requirePermission(Module.PRODUCTION, "canRead");
+  await requirePermission(Module.MAINTENANCE, "canRead");
   return <MaintenanceClient />;
 }

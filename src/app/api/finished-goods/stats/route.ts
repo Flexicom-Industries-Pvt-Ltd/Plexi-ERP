@@ -6,7 +6,7 @@ import { FinishedGoodsService } from "@/services/finished-goods.service";
 
 export async function GET(request: NextRequest) {
   const auth = await requireApiAuth({
-    module: [Module.INVENTORY, Module.PRODUCTION, Module.DISPATCH],
+    module: [Module.FINISHED_GOODS, Module.INVENTORY, Module.PRODUCTION, Module.DISPATCH],
     action: "canRead",
   });
   if (!auth.ok) return auth.response;

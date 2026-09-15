@@ -10,7 +10,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const auth = await requireApiAuth({
-    module: [Module.PRODUCTION, Module.QUALITY_CONTROL],
+    module: [Module.RECYCLING_PLANT, Module.PRODUCTION, Module.QUALITY_CONTROL],
     action: "canUpdate",
   });
   if (!auth.ok) return auth.response;
