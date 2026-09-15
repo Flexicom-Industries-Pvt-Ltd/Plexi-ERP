@@ -7,6 +7,7 @@ import { registerLogsRoutes } from "./logs";
 import { registerSystemRoutes } from "./system";
 import { registerIdentityRoutes } from "./identity";
 import { registerQualityRoutes } from "./quality";
+import { registerRecyclingRoutes } from "./recycling";
 
 let loaded = false;
 
@@ -19,10 +20,12 @@ export function loadAllRouteRegistrations() {
   registerInventoryRoutes();
   registerProductionRoutes();
   registerQualityRoutes();
+  registerRecyclingRoutes();
   registerSettingsRoutes();
   registerProfileRoutes();
   registerLogsRoutes();
   registerSystemRoutes();
 }
+
 
 

@@ -87,6 +87,7 @@ model User {
   reworkTicketsAssigned        QcReworkTicket[]             @relation("ReworkOperator")
   reworkTicketsCompleted       QcReworkTicket[]             @relation("ReworkCompleter")
   scrapRecordsRecorded         ScrapRecord[]                @relation("ScrapRecorder")
+  recyclingBatchesOperated     RecyclingBatch[]             @relation("RecyclingOperator")
   createdAt         DateTime       @default(now())
   updatedAt     DateTime    @updatedAt
 
@@ -341,6 +342,7 @@ model Location {
   inventoryBatches InventoryBatch[]
   productionRolls  ProductionRoll[]
   scrapRecords     ScrapRecord[]    @relation("LocationScrapRecords")
+  recyclingBatches RecyclingBatch[] @relation("RecyclingOutputLocation")
 }
 
 
@@ -591,6 +593,7 @@ model InventoryItem {
   balesAsProduct          Bale[] @relation("BaleProduct")
   balesAsOutput           Bale[] @relation("BaleOutputItem")
   scrapRecords            ScrapRecord[] @relation("ItemScrapRecords")
+  recyclingBatchesAsOutput RecyclingBatch[] @relation("RecyclingOutputItem")
 
   @@index([itemType])
   @@index([categoryId])
@@ -620,6 +623,7 @@ model InventoryTransaction {
   item            InventoryItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
   user            User?         @relation(fields: [userId], references: [id])
   scrapRecords    ScrapRecord[] @relation("ScrapInventoryTransaction")
+  recyclingBatches RecyclingBatch[] @relation("RecyclingInventoryTransaction")
 
   @@index([itemId])
   @@index([type])
@@ -1338,6 +1342,8 @@ model ScrapRecord {
   inventoryItemId        String?
   locationId             String?
   inventoryTransactionId String?
+  recyclingBatchId       String?
+  isRecycled             Boolean         @default(false)
   recordedById           String?
   notes                  String?
   recordedAt             DateTime        @default(now())
@@ -1348,6 +1354,7 @@ model ScrapRecord {
   location             Location?             @relation("LocationScrapRecords", fields: [locationId], references: [id], onDelete: SetNull)
   recordedBy           User?                 @relation("ScrapRecorder", fields: [recordedById], references: [id], onDelete: SetNull)
   inventoryTransaction InventoryTransaction? @relation("ScrapInventoryTransaction", fields: [inventoryTransactionId], references: [id], onDelete: SetNull)
+  recyclingBatch       RecyclingBatch?       @relation("BatchScrapRecords", fields: [recyclingBatchId], references: [id], onDelete: SetNull)
 
   @@index([sourceType, sourceId])
   @@index([phase])
@@ -1356,7 +1363,48 @@ model ScrapRecord {
   @@index([locationId])
   @@index([recordedById])
   @@index([recordedAt])
+  @@index([recyclingBatchId])
+  @@index([isRecycled])
 }
+
+enum RecyclingStatus {
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+model RecyclingBatch {
+  id                     String          @id @default(cuid())
+  batchNumber            String          @unique
+  inputScrapQty          Float           @default(0)
+  outputRpQty            Float?
+  wasteLossQty           Float?
+  granuleGrade           String?         // e.g. "RP-PP-GRADE-A", "RP-HDPE", "STANDARD"
+  status                 RecyclingStatus @default(IN_PROGRESS)
+  outputItemId           String?
+  outputLocationId       String?
+  operatorId             String?
+  inventoryTransactionId String?
+  notes                  String?
+  startedAt              DateTime        @default(now())
+  completedAt            DateTime?
+  createdAt              DateTime        @default(now())
+  updatedAt              DateTime        @updatedAt
+
+  outputItem           InventoryItem?        @relation("RecyclingOutputItem", fields: [outputItemId], references: [id], onDelete: SetNull)
+  outputLocation       Location?             @relation("RecyclingOutputLocation", fields: [outputLocationId], references: [id], onDelete: SetNull)
+  operator             User?                 @relation("RecyclingOperator", fields: [operatorId], references: [id], onDelete: SetNull)
+  inventoryTransaction InventoryTransaction? @relation("RecyclingInventoryTransaction", fields: [inventoryTransactionId], references: [id], onDelete: SetNull)
+  scrapRecords         ScrapRecord[]         @relation("BatchScrapRecords")
+
+  @@index([status])
+  @@index([outputItemId])
+  @@index([outputLocationId])
+  @@index([operatorId])
+  @@index([startedAt])
+  @@index([completedAt])
+}
+
 
 
 
