@@ -926,5 +926,42 @@ export const QcQueueQuery = z.object({
   limit: z.string().optional(),
 });
 
+export const CreateQcReworkTicketBody = z.object({
+  inspectionId: z.string().optional(),
+  sourceReferenceType: z.enum(["ROLL", "BALE", "PRODUCTION_RUN", "BATCH"]),
+  sourceReferenceId: z.string().min(1),
+  targetPhase: z.string().min(1).openapi({ description: "Target routing phase (e.g. LOOM, LAMINATION, PRINTING, BALING)" }),
+  defectReason: z.string().optional(),
+  reworkInstructions: z.string().optional(),
+  assignedOperatorId: z.string().optional(),
+  reworkQty: z.number().positive().optional(),
+  reworkCost: z.number().nonnegative().optional(),
+  notes: z.string().optional(),
+}).openapi("CreateQcReworkTicket");
+
+export const UpdateQcReworkTicketBody = z.object({
+  status: z.enum(["OPEN", "IN_PROGRESS", "COMPLETED", "CANCELLED"]).optional(),
+  assignedOperatorId: z.string().optional(),
+  completedById: z.string().optional(),
+  reworkQty: z.number().positive().optional(),
+  reworkCost: z.number().nonnegative().optional(),
+  notes: z.string().optional(),
+  defectReason: z.string().optional(),
+  reworkInstructions: z.string().optional(),
+  reInspectionId: z.string().optional(),
+}).openapi("UpdateQcReworkTicket");
+
+export const QcReworkTicketQuery = z.object({
+  status: z.enum(["OPEN", "IN_PROGRESS", "COMPLETED", "CANCELLED"]).optional(),
+  targetPhase: z.string().optional(),
+  sourceReferenceType: z.enum(["ROLL", "BALE", "PRODUCTION_RUN", "BATCH"]).optional(),
+  sourceReferenceId: z.string().optional(),
+  assignedOperatorId: z.string().optional(),
+  search: z.string().optional(),
+  page: z.string().optional(),
+  limit: z.string().optional(),
+});
+
+
 
 

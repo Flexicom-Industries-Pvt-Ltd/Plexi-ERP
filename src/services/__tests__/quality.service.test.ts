@@ -6,7 +6,9 @@ import {
   QcDecision,
   QcInspectionStatus,
   RollQualityStatus,
+  QcReworkStatus,
 } from "@/generated/prisma";
+
 
 describe("QualityService", () => {
   beforeEach(() => {
@@ -321,5 +323,88 @@ describe("QualityService", () => {
       expect(db.bale.findMany).not.toHaveBeenCalled();
     });
   });
+
+  describe("generateReworkTicketNumber", () => {
+    it("should generate initial rework ticket number if none exists today", async () => {
+      vi.mocked(db.qcReworkTicket.findFirst).mockResolvedValue(null);
+
+      const num = await QualityService.generateReworkTicketNumber();
+
+      expect(num).toMatch(/^RW-\d{8}-0001$/);
+    });
+
+    it("should increment sequence number from latest ticket", async () => {
+      const today = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+      vi.mocked(db.qcReworkTicket.findFirst).mockResolvedValue({
+        ticketNumber: `RW-${today}-0007`,
+      } as any);
+
+      const num = await QualityService.generateReworkTicketNumber();
+
+      expect(num).toBe(`RW-${today}-0008`);
+    });
+  });
+
+  describe("createReworkTicket", () => {
+    it("should create a rework ticket and update source roll qualityStatus to REWORK", async () => {
+      const today = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+      vi.mocked(db.qcReworkTicket.findFirst).mockResolvedValue(null);
+      vi.mocked(db.qcReworkTicket.create).mockResolvedValue({
+        id: "rw-1",
+        ticketNumber: `RW-${today}-0001`,
+        sourceReferenceType: QcReferenceType.ROLL,
+        sourceReferenceId: "roll-1",
+        targetPhase: "LOOM",
+        status: QcReworkStatus.OPEN,
+      } as any);
+      vi.mocked(db.productionRoll.updateMany).mockResolvedValue({ count: 1 });
+
+      const ticket = await QualityService.createReworkTicket({
+        sourceReferenceType: QcReferenceType.ROLL,
+        sourceReferenceId: "roll-1",
+        targetPhase: "LOOM",
+        defectReason: "Weave gap",
+        reworkInstructions: "Re-thread harness",
+      });
+
+      expect(ticket.id).toBe("rw-1");
+      expect(ticket.ticketNumber).toBe(`RW-${today}-0001`);
+      expect(db.productionRoll.updateMany).toHaveBeenCalledWith({
+        where: { id: "roll-1" },
+        data: { qualityStatus: RollQualityStatus.REWORK },
+      });
+    });
+  });
+
+  describe("updateReworkTicket", () => {
+    it("should update ticket and auto-reset roll qualityStatus to PENDING_QC when completed", async () => {
+      vi.mocked(db.qcReworkTicket.findUnique).mockResolvedValue({
+        id: "rw-1",
+        sourceReferenceType: QcReferenceType.ROLL,
+        sourceReferenceId: "roll-1",
+        status: QcReworkStatus.IN_PROGRESS,
+      } as any);
+
+      vi.mocked(db.qcReworkTicket.update).mockResolvedValue({
+        id: "rw-1",
+        status: QcReworkStatus.COMPLETED,
+        notes: "Re-threaded successfully",
+      } as any);
+
+      vi.mocked(db.productionRoll.updateMany).mockResolvedValue({ count: 1 });
+
+      const updated = await QualityService.updateReworkTicket("rw-1", {
+        status: QcReworkStatus.COMPLETED,
+        notes: "Re-threaded successfully",
+      });
+
+      expect(updated.status).toBe(QcReworkStatus.COMPLETED);
+      expect(db.productionRoll.updateMany).toHaveBeenCalledWith({
+        where: { id: "roll-1" },
+        data: { qualityStatus: RollQualityStatus.PENDING_QC },
+      });
+    });
+  });
 });
+
 

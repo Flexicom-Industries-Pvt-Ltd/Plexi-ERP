@@ -25,6 +25,7 @@ import {
   Search,
   ShieldCheck,
   UserCheck,
+  Wrench,
   X,
   XCircle,
 } from "lucide-react";
@@ -81,6 +82,41 @@ interface InspectionRecord {
   }>;
 }
 
+interface ReworkTicket {
+  id: string;
+  ticketNumber: string;
+  inspectionId?: string;
+  sourceReferenceType: string;
+  sourceReferenceId: string;
+  targetPhase: string;
+  status: "OPEN" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
+  defectReason?: string;
+  reworkInstructions?: string;
+  assignedOperatorId?: string;
+  completedById?: string;
+  reworkQty?: number;
+  reworkCost?: number;
+  notes?: string;
+  reworkCompletedAt?: string;
+  createdAt: string;
+  assignedOperator?: {
+    id: string;
+    name: string;
+    email: string;
+    employeeId?: string;
+  };
+  completedBy?: {
+    id: string;
+    name: string;
+    email: string;
+  };
+  inspection?: {
+    id: string;
+    inspectionNumber: string;
+    decision: string;
+  };
+}
+
 interface QueueStats {
   pendingCount: number;
   onHoldCount: number;
@@ -113,12 +149,25 @@ const DEFAULT_LINE_PARAMETERS = [
   { parameterName: "Tensile & Integrity", standardValue: "Standard", actualValue: "Pass", unit: "N" },
 ];
 
+const PRODUCTION_PHASES = [
+  "LOOM",
+  "LAMINATION",
+  "PRINTING",
+  "CUTTING",
+  "CONVERTEX",
+  "VALVOMATIC",
+  "BCS",
+  "MANUAL_STITCH",
+  "BALING",
+];
+
 export function QualityClient() {
-  const [activeTab, setActiveTab] = useState<"queue" | "history">("queue");
+  const [activeTab, setActiveTab] = useState<"queue" | "rework" | "history">("queue");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [queueItems, setQueueItems] = useState<QueueItem[]>([]);
   const [historyItems, setHistoryItems] = useState<InspectionRecord[]>([]);
+  const [reworkTickets, setReworkTickets] = useState<ReworkTicket[]>([]);
   const [stats, setStats] = useState<QueueStats>({
     pendingCount: 0,
     onHoldCount: 0,
@@ -135,6 +184,7 @@ export function QualityClient() {
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("ALL");
   const [statusFilter, setStatusFilter] = useState<string>("PENDING_QC");
+  const [reworkStatusFilter, setReworkStatusFilter] = useState<string>("ALL");
   const [historyDecisionFilter, setHistoryDecisionFilter] = useState<string>("ALL");
 
   // Inspection Modal State
@@ -144,9 +194,15 @@ export function QualityClient() {
   const [defectReason, setDefectReason] = useState("");
   const [customDefectReason, setCustomDefectReason] = useState("");
   const [reworkInstructions, setReworkInstructions] = useState("");
+  const [targetPhase, setTargetPhase] = useState("LOOM");
   const [notes, setNotes] = useState("");
   const [samplesInspected, setSamplesInspected] = useState(1);
   const [parameterLines, setParameterLines] = useState(DEFAULT_LINE_PARAMETERS);
+
+  // Complete Rework Modal State
+  const [completingTicket, setCompletingTicket] = useState<ReworkTicket | null>(null);
+  const [reworkCompletionNotes, setReworkCompletionNotes] = useState("");
+  const [completingSubmitting, setCompletingSubmitting] = useState(false);
 
   const fetchQueue = useCallback(async (showRefreshing = false) => {
     if (showRefreshing) setRefreshing(true);
@@ -171,7 +227,27 @@ export function QualityClient() {
     }
   }, [typeFilter, statusFilter, search]);
 
+  const fetchReworkTickets = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (reworkStatusFilter !== "ALL") params.append("status", reworkStatusFilter);
+      if (search.trim()) params.append("search", search.trim());
+      params.append("limit", "50");
+
+      const res = await fetch(`/api/quality/rework?${params.toString()}`);
+      if (!res.ok) throw new Error("Failed to load rework tickets");
+      const data = await res.json();
+      setReworkTickets(data.tickets || []);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to fetch rework tickets");
+    } finally {
+      setLoading(false);
+    }
+  }, [reworkStatusFilter, search]);
+
   const fetchHistory = useCallback(async () => {
+    setLoading(true);
     try {
       const params = new URLSearchParams();
       if (historyDecisionFilter !== "ALL") params.append("decision", historyDecisionFilter);
@@ -184,16 +260,20 @@ export function QualityClient() {
       setHistoryItems(data.inspections || []);
     } catch (err: any) {
       toast.error(err.message || "Failed to fetch inspection history");
+    } finally {
+      setLoading(false);
     }
   }, [historyDecisionFilter, search]);
 
   useEffect(() => {
     if (activeTab === "queue") {
       fetchQueue();
+    } else if (activeTab === "rework") {
+      fetchReworkTickets();
     } else {
       fetchHistory();
     }
-  }, [activeTab, fetchQueue, fetchHistory]);
+  }, [activeTab, fetchQueue, fetchReworkTickets, fetchHistory]);
 
   const openInspectionModal = (item: QueueItem) => {
     setSelectedTarget(item);
@@ -201,6 +281,7 @@ export function QualityClient() {
     setDefectReason("");
     setCustomDefectReason("");
     setReworkInstructions("");
+    setTargetPhase(item.sourcePhase || "LOOM");
     setNotes("");
     setSamplesInspected(1);
     setParameterLines(
@@ -292,6 +373,23 @@ export function QualityClient() {
         throw new Error(err.error || "Failed to record inspection decision");
       }
 
+      // 3. If decision is REWORK, automatically generate a Rework Ticket
+      if (decision === "REWORK") {
+        await fetch("/api/quality/rework", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            inspectionId: inspection.id,
+            sourceReferenceType: selectedTarget.referenceType,
+            sourceReferenceId: selectedTarget.referenceId,
+            targetPhase: targetPhase || "LOOM",
+            defectReason: finalDefectReason,
+            reworkInstructions: reworkInstructions || "Corrective reprocessing required",
+            notes: notes || undefined,
+          }),
+        });
+      }
+
       toast.success(
         `QC Decision [${decision}] recorded for ${selectedTarget.identifier} (${inspection.inspectionNumber})`
       );
@@ -302,6 +400,51 @@ export function QualityClient() {
       toast.error(err.message || "An error occurred while saving the inspection");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleStartRework = async (ticket: ReworkTicket) => {
+    try {
+      const res = await fetch(`/api/quality/rework/${ticket.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "IN_PROGRESS" }),
+      });
+      if (!res.ok) throw new Error("Failed to start rework");
+      toast.success(`Rework ticket ${ticket.ticketNumber} marked IN PROGRESS`);
+      fetchReworkTickets();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update rework ticket");
+    }
+  };
+
+  const handleCompleteRework = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!completingTicket) return;
+
+    setCompletingSubmitting(true);
+    try {
+      const res = await fetch(`/api/quality/rework/${completingTicket.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          status: "COMPLETED",
+          notes: reworkCompletionNotes || undefined,
+        }),
+      });
+
+      if (!res.ok) throw new Error("Failed to complete rework");
+
+      toast.success(
+        `Rework completed for ${completingTicket.ticketNumber}. Item returned to Inspection Queue for re-verification.`
+      );
+      setCompletingTicket(null);
+      setReworkCompletionNotes("");
+      fetchReworkTickets();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to finalize rework completion");
+    } finally {
+      setCompletingSubmitting(false);
     }
   };
 
@@ -341,6 +484,36 @@ export function QualityClient() {
     }
   };
 
+  const getReworkTicketBadge = (status: string) => {
+    switch (status) {
+      case "COMPLETED":
+        return (
+          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-800 ring-1 ring-emerald-600/20">
+            <CheckCircle2 className="size-3.5 text-emerald-600" /> Completed
+          </span>
+        );
+      case "IN_PROGRESS":
+        return (
+          <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-semibold text-blue-800 ring-1 ring-blue-600/20">
+            <Wrench className="size-3.5 text-blue-600" /> In Progress
+          </span>
+        );
+      case "CANCELLED":
+        return (
+          <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-800 ring-1 ring-slate-400/20">
+            <XCircle className="size-3.5 text-slate-500" /> Cancelled
+          </span>
+        );
+      case "OPEN":
+      default:
+        return (
+          <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800 ring-1 ring-amber-600/20">
+            <Clock className="size-3.5 text-amber-600" /> Open Ticket
+          </span>
+        );
+    }
+  };
+
   return (
     <div className="flex flex-col gap-6 pb-12">
       {/* Top Header */}
@@ -355,7 +528,7 @@ export function QualityClient() {
                 Quality Control Center
               </h1>
               <p className="text-sm text-muted-foreground">
-                Inspection queue, parameter validation, and pass / fail / rework verification
+                Inspection queue, rework workflows, and pass / fail / hold quality verification
               </p>
             </div>
           </div>
@@ -364,7 +537,11 @@ export function QualityClient() {
         <div className="flex items-center gap-3">
           <button
             type="button"
-            onClick={() => (activeTab === "queue" ? fetchQueue(true) : fetchHistory())}
+            onClick={() => {
+              if (activeTab === "queue") fetchQueue(true);
+              else if (activeTab === "rework") fetchReworkTickets();
+              else fetchHistory();
+            }}
             disabled={refreshing}
             className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-50"
           >
@@ -460,6 +637,22 @@ export function QualityClient() {
 
             <button
               type="button"
+              onClick={() => setActiveTab("rework")}
+              className={`flex items-center gap-2 border-b-2 pb-3 text-sm font-semibold transition ${
+                activeTab === "rework"
+                  ? "border-primary text-primary"
+                  : "border-transparent text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              <RotateCcw className="size-4" />
+              Rework Workflow & Tickets
+              <span className="ml-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-800 font-bold">
+                {stats.reworkCount}
+              </span>
+            </button>
+
+            <button
+              type="button"
               onClick={() => setActiveTab("history")}
               className={`flex items-center gap-2 border-b-2 pb-3 text-sm font-semibold transition ${
                 activeTab === "history"
@@ -479,7 +672,7 @@ export function QualityClient() {
             <Search className="absolute left-3 top-2.5 size-4 text-slate-400" />
             <input
               type="text"
-              placeholder="Search by Roll #, Bale #, Item code, or Lot..."
+              placeholder="Search by ID, Roll #, Bale #, Ticket #, or Material..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="h-9 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm text-slate-800 placeholder-slate-400 shadow-sm focus:border-primary focus:outline-none"
@@ -487,7 +680,7 @@ export function QualityClient() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            {activeTab === "queue" ? (
+            {activeTab === "queue" && (
               <>
                 <select
                   value={typeFilter}
@@ -510,7 +703,22 @@ export function QualityClient() {
                   <option value="ALL">Status: All Statuses</option>
                 </select>
               </>
-            ) : (
+            )}
+
+            {activeTab === "rework" && (
+              <select
+                value={reworkStatusFilter}
+                onChange={(e) => setReworkStatusFilter(e.target.value)}
+                className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 shadow-sm focus:border-primary focus:outline-none"
+              >
+                <option value="ALL">All Rework Statuses</option>
+                <option value="OPEN">Open Tickets</option>
+                <option value="IN_PROGRESS">In Progress</option>
+                <option value="COMPLETED">Completed</option>
+              </select>
+            )}
+
+            {activeTab === "history" && (
               <select
                 value={historyDecisionFilter}
                 onChange={(e) => setHistoryDecisionFilter(e.target.value)}
@@ -620,6 +828,103 @@ export function QualityClient() {
                               <ShieldCheck className="size-3.5" />
                               Inspect
                             </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        ) : activeTab === "rework" ? (
+          <div>
+            {loading ? (
+              <div className="flex items-center justify-center gap-2 py-16 text-muted-foreground">
+                <Loader2 className="size-5 animate-spin text-primary" />
+                Loading rework tickets...
+              </div>
+            ) : reworkTickets.length === 0 ? (
+              <div className="py-16 text-center">
+                <RotateCcw className="mx-auto size-12 text-slate-300" />
+                <h3 className="mt-3 text-base font-semibold text-slate-800">No active rework tickets</h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Items flagged for rework in QC will automatically appear here with routing instructions.
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead className="border-b border-slate-100 bg-slate-50/75 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                    <tr>
+                      <th className="px-6 py-3">Ticket #</th>
+                      <th className="px-6 py-3">Source Item</th>
+                      <th className="px-6 py-3">Routing Phase</th>
+                      <th className="px-6 py-3">Defect & Instructions</th>
+                      <th className="px-6 py-3">Operator</th>
+                      <th className="px-6 py-3">Status</th>
+                      <th className="px-6 py-3 text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-slate-700">
+                    {reworkTickets.map((ticket) => (
+                      <tr key={ticket.id} className="hover:bg-slate-50/60 transition">
+                        <td className="px-6 py-4 font-mono font-semibold text-slate-900">
+                          {ticket.ticketNumber}
+                          {ticket.inspection && (
+                            <div className="text-[11px] text-muted-foreground">
+                              QC: {ticket.inspection.inspectionNumber}
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 text-xs">
+                          <span className="font-semibold text-slate-900">{ticket.sourceReferenceType}</span>
+                          <div className="font-mono text-[11px] text-muted-foreground truncate max-w-[120px]">
+                            {ticket.sourceReferenceId}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="inline-flex items-center gap-1 rounded bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-900 border border-amber-200">
+                            <Factory className="size-3 text-amber-700" />
+                            {ticket.targetPhase}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-xs max-w-xs space-y-0.5">
+                          {ticket.defectReason && (
+                            <div className="font-semibold text-rose-700">{ticket.defectReason}</div>
+                          )}
+                          <div className="text-slate-600 truncate">{ticket.reworkInstructions || "—"}</div>
+                        </td>
+                        <td className="px-6 py-4 text-xs">
+                          <div className="font-medium text-slate-900">{ticket.assignedOperator?.name || "Unassigned"}</div>
+                          <div className="text-muted-foreground">{ticket.assignedOperator?.employeeId}</div>
+                        </td>
+                        <td className="px-6 py-4">
+                          {getReworkTicketBadge(ticket.status)}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            {ticket.status === "OPEN" && (
+                              <button
+                                type="button"
+                                onClick={() => handleStartRework(ticket)}
+                                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
+                              >
+                                <Wrench className="size-3" /> Start
+                              </button>
+                            )}
+                            {ticket.status === "IN_PROGRESS" && (
+                              <button
+                                type="button"
+                                onClick={() => setCompletingTicket(ticket)}
+                                className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700 transition"
+                              >
+                                <CheckCircle2 className="size-3.5" /> Complete Rework
+                              </button>
+                            )}
+                            {ticket.status === "COMPLETED" && (
+                              <span className="text-xs text-muted-foreground">Re-queued for QC</span>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -793,7 +1098,7 @@ export function QualityClient() {
                   >
                     <RotateCcw className="size-5 text-amber-600" />
                     <span className="text-xs font-bold">REWORK</span>
-                    <span className="text-[10px] text-muted-foreground">Requires fix</span>
+                    <span className="text-[10px] text-muted-foreground">Auto rework ticket</span>
                   </button>
 
                   <button
@@ -826,24 +1131,43 @@ export function QualityClient() {
                 </div>
               </div>
 
-              {/* Defect Reasons (if not passed) */}
+              {/* Defect Reasons & Target Phase Routing (if not passed) */}
               {(decision === "FAILED" || decision === "REWORK" || decision === "ON_HOLD") && (
                 <div className="space-y-3 rounded-xl border border-amber-200 bg-amber-50/50 p-4">
-                  <div>
-                    <label className="text-xs font-semibold text-slate-700">
-                      Primary Defect Reason / Classification
-                    </label>
-                    <select
-                      value={defectReason}
-                      onChange={(e) => setDefectReason(e.target.value)}
-                      className="mt-1 h-9 w-full rounded-lg border border-amber-300 bg-white px-3 text-sm text-slate-800 shadow-sm focus:border-primary focus:outline-none"
-                    >
-                      <option value="">— Select Defect Reason —</option>
-                      {COMMON_DEFECT_REASONS.map((r) => (
-                        <option key={r} value={r}>{r}</option>
-                      ))}
-                      <option value="OTHER">Other / Custom Defect</option>
-                    </select>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <label className="text-xs font-semibold text-slate-700">
+                        Primary Defect Reason / Classification
+                      </label>
+                      <select
+                        value={defectReason}
+                        onChange={(e) => setDefectReason(e.target.value)}
+                        className="mt-1 h-9 w-full rounded-lg border border-amber-300 bg-white px-3 text-xs text-slate-800 shadow-sm focus:border-primary focus:outline-none"
+                      >
+                        <option value="">— Select Defect Reason —</option>
+                        {COMMON_DEFECT_REASONS.map((r) => (
+                          <option key={r} value={r}>{r}</option>
+                        ))}
+                        <option value="OTHER">Other / Custom Defect</option>
+                      </select>
+                    </div>
+
+                    {decision === "REWORK" && (
+                      <div>
+                        <label className="text-xs font-semibold text-slate-700">
+                          Route Rework Back to Phase
+                        </label>
+                        <select
+                          value={targetPhase}
+                          onChange={(e) => setTargetPhase(e.target.value)}
+                          className="mt-1 h-9 w-full rounded-lg border border-amber-300 bg-white px-3 text-xs font-medium text-slate-800 shadow-sm focus:border-primary focus:outline-none"
+                        >
+                          {PRODUCTION_PHASES.map((ph) => (
+                            <option key={ph} value={ph}>{ph}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
                   </div>
 
                   {defectReason === "OTHER" && (
@@ -1004,6 +1328,73 @@ export function QualityClient() {
                 >
                   {submitting && <Loader2 className="size-4 animate-spin" />}
                   Confirm QC Verdict
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Complete Rework Modal */}
+      {completingTicket && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+          <div className="relative w-full max-w-md rounded-2xl bg-white shadow-2xl ring-1 ring-black/10">
+            <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/80 px-6 py-4">
+              <div className="flex items-center gap-2.5">
+                <div className="flex size-8 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
+                  <CheckCircle2 className="size-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">Complete Rework Ticket</h3>
+                  <p className="text-xs text-muted-foreground">{completingTicket.ticketNumber}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCompletingTicket(null)}
+                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCompleteRework} className="p-6 space-y-4">
+              <div className="rounded-lg bg-amber-50 p-3 text-xs text-amber-900 border border-amber-200">
+                <p className="font-semibold">Closing Rework Loop:</p>
+                <p className="mt-0.5">
+                  Completing this ticket will reset the source {completingTicket.sourceReferenceType} back to <strong>Pending QC</strong> status and re-insert it into the inspection queue for formal signoff.
+                </p>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-slate-700">
+                  Corrective Actions Taken / Operator Notes
+                </label>
+                <textarea
+                  rows={3}
+                  placeholder="Describe rework steps performed (e.g. edge trimmed, re-stitched, re-coated)..."
+                  value={reworkCompletionNotes}
+                  onChange={(e) => setReworkCompletionNotes(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-200 p-2.5 text-xs text-slate-800 focus:border-primary focus:outline-none"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setCompletingTicket(null)}
+                  disabled={completingSubmitting}
+                  className="rounded-lg border border-slate-200 px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={completingSubmitting}
+                  className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
+                >
+                  {completingSubmitting && <Loader2 className="size-3.5 animate-spin" />}
+                  Confirm Completion & Re-Queue
                 </button>
               </div>
             </form>
