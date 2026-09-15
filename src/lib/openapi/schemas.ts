@@ -984,9 +984,29 @@ export const ScrapRecordQuery = z.object({
   search: z.string().optional(),
   page: z.string().optional(),
   limit: z.string().optional(),
+});export const CreateRecyclingBatchBody = z.object({
+  scrapRecordIds: z.array(z.string().min(1)).min(1).openapi({ description: "Array of un-recycled scrap record IDs to consume" }),
+  granuleGrade: z.string().min(1).openapi({ description: "Recipe or grade (e.g. RP-PP-GRADE-A, RP-HDPE)" }),
+  outputItemId: z.string().optional().openapi({ description: "Target RP granules inventory item ID" }),
+  outputLocationId: z.string().optional().openapi({ description: "Target destination warehouse location" }),
+  operatorId: z.string().optional(),
+  notes: z.string().optional(),
+  startedAt: z.string().datetime().optional(),
+}).openapi("CreateRecyclingBatch");
+
+export const CompleteRecyclingBatchBody = z.object({
+  outputRpQty: z.number().positive().openapi({ description: "Produced RP granules weight in kg" }),
+  outputItemId: z.string().min(1).openapi({ description: "Target RP granules inventory item ID" }),
+  outputLocationId: z.string().optional(),
+  notes: z.string().optional(),
+  completedAt: z.string().datetime().optional(),
+}).openapi("CompleteRecyclingBatch");
+
+export const RecyclingBatchQuery = z.object({
+  status: z.enum(["IN_PROGRESS", "COMPLETED", "CANCELLED"]).optional(),
+  granuleGrade: z.string().optional(),
+  search: z.string().optional(),
+  page: z.string().optional(),
+  limit: z.string().optional(),
 });
-
-
-
-
 
