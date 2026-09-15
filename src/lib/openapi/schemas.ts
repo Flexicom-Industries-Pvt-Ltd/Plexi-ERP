@@ -1010,3 +1010,148 @@ export const RecyclingBatchQuery = z.object({
   limit: z.string().optional(),
 });
 
+export const CreateMaintenanceLogBody = z.object({
+  machineId: z.string().min(1).openapi({ description: "Target machine ID" }),
+  type: z.enum(["BREAKDOWN", "PREVENTATIVE", "ROUTINE_SERVICE", "INSPECTION", "CALIBRATION"]).default("BREAKDOWN"),
+  priority: z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]).default("MEDIUM"),
+  title: z.string().min(1).openapi({ description: "Summary / issue title" }),
+  description: z.string().min(1).openapi({ description: "Detailed issue or service description" }),
+  downtimeMinutes: z.number().int().min(0).default(0),
+  cost: z.number().min(0).optional(),
+  assignedTechnicianId: z.string().optional(),
+  reportedAt: z.string().datetime().optional(),
+}).openapi("CreateMaintenanceLog");
+
+export const UpdateMaintenanceLogBody = z.object({
+  type: z.enum(["BREAKDOWN", "PREVENTATIVE", "ROUTINE_SERVICE", "INSPECTION", "CALIBRATION"]).optional(),
+  priority: z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]).optional(),
+  status: z.enum(["OPEN", "IN_PROGRESS", "RESOLVED", "CANCELLED"]).optional(),
+  title: z.string().min(1).optional(),
+  description: z.string().min(1).optional(),
+  downtimeMinutes: z.number().int().min(0).optional(),
+  cost: z.number().min(0).optional(),
+  assignedTechnicianId: z.string().nullable().optional(),
+  startedAt: z.string().datetime().nullable().optional(),
+  resolvedAt: z.string().datetime().nullable().optional(),
+  correctiveAction: z.string().nullable().optional(),
+  partsReplaced: z.string().nullable().optional(),
+}).openapi("UpdateMaintenanceLog");
+
+export const MaintenanceLogQuery = z.object({
+  machineId: z.string().optional(),
+  sectionId: z.string().optional(),
+  type: z.enum(["BREAKDOWN", "PREVENTATIVE", "ROUTINE_SERVICE", "INSPECTION", "CALIBRATION"]).optional(),
+  status: z.enum(["OPEN", "IN_PROGRESS", "RESOLVED", "CANCELLED"]).optional(),
+  priority: z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]).optional(),
+  search: z.string().optional(),
+  page: z.string().optional(),
+  limit: z.string().optional(),
+});
+
+export const ReceiveFinishedGoodsBody = z.object({
+  baleIds: z.array(z.string().min(1)).optional().openapi({ description: "Array of passed bale IDs to promote into FG lots" }),
+  baleId: z.string().optional().openapi({ description: "Single bale ID to promote" }),
+  inventoryItemId: z.string().optional().openapi({ description: "Target finished goods item ID for manual receipt" }),
+  quantity: z.number().positive().optional().openapi({ description: "Quantity in bags for manual receipt" }),
+  unit: z.string().default("bags"),
+  productionBatch: z.string().optional(),
+  grossWeight: z.number().positive().optional(),
+  netWeight: z.number().positive().optional(),
+  locationId: z.string().optional(),
+  notes: z.string().optional(),
+  receivedAt: z.string().datetime().optional(),
+}).openapi("ReceiveFinishedGoods");
+
+export const UpdateFinishedGoodsLotBody = z.object({
+  locationId: z.string().nullable().optional(),
+  status: z.enum(["AVAILABLE", "RESERVED", "ALLOCATED", "DISPATCHED", "ON_HOLD", "SCRAPPED"]).optional(),
+  qualityStatus: z.enum(["PENDING_QC", "PASSED", "FAILED", "REWORK", "ON_HOLD"]).optional(),
+  notes: z.string().nullable().optional(),
+  grossWeight: z.number().positive().nullable().optional(),
+  netWeight: z.number().positive().nullable().optional(),
+}).openapi("UpdateFinishedGoodsLot");
+
+export const FinishedGoodsLotQuery = z.object({
+  inventoryItemId: z.string().optional(),
+  productionBatch: z.string().optional(),
+  locationId: z.string().optional(),
+  status: z.enum(["AVAILABLE", "RESERVED", "ALLOCATED", "DISPATCHED", "ON_HOLD", "SCRAPPED"]).optional(),
+  qualityStatus: z.enum(["PENDING_QC", "PASSED", "FAILED", "REWORK", "ON_HOLD"]).optional(),
+  search: z.string().optional(),
+  dateFrom: z.string().optional(),
+  dateTo: z.string().optional(),
+  page: z.string().optional(),
+  limit: z.string().optional(),
+});
+
+export const BalesQueueQuery = z.object({
+  shiftId: z.string().optional(),
+  search: z.string().optional(),
+});
+
+export const DispatchOrderLineBody = z.object({
+  inventoryItemId: z.string().min(1).openapi({ description: "Finished goods inventory item ID" }),
+  orderedQty: z.number().positive().openapi({ description: "Ordered bag quantity" }),
+  unit: z.string().default("bags"),
+  notes: z.string().optional(),
+});
+
+export const CreateDispatchOrderBody = z.object({
+  customerName: z.string().min(1).openapi({ description: "Customer / Client name" }),
+  customerContact: z.string().optional(),
+  customerAddress: z.string().optional(),
+  gateEntryId: z.string().optional().openapi({ description: "Optional link to outbound truck in Gate module" }),
+  transporter: z.string().optional(),
+  vehicleNumber: z.string().optional(),
+  driverName: z.string().optional(),
+  driverPhone: z.string().optional(),
+  notes: z.string().optional(),
+  lines: z.array(DispatchOrderLineBody).min(1),
+}).openapi("CreateDispatchOrder");
+
+export const UpdateDispatchOrderBody = z.object({
+  customerName: z.string().min(1).optional(),
+  customerContact: z.string().nullable().optional(),
+  customerAddress: z.string().nullable().optional(),
+  status: z.enum(["DRAFT", "CONFIRMED", "PICKING", "LOADED", "DISPATCHED", "CANCELLED"]).optional(),
+  gateEntryId: z.string().nullable().optional(),
+  transporter: z.string().nullable().optional(),
+  vehicleNumber: z.string().nullable().optional(),
+  driverName: z.string().nullable().optional(),
+  driverPhone: z.string().nullable().optional(),
+  notes: z.string().nullable().optional(),
+}).openapi("UpdateDispatchOrder");
+
+export const PickDispatchOrderBody = z.object({
+  allocations: z.array(
+    z.object({
+      dispatchOrderLineId: z.string().min(1),
+      finishedGoodsLotId: z.string().min(1),
+      quantity: z.number().positive(),
+      notes: z.string().optional(),
+    })
+  ).min(1),
+}).openapi("PickDispatchOrder");
+
+export const LoadDispatchOrderBody = z.object({
+  vehicleNumber: z.string().optional(),
+  driverName: z.string().optional(),
+  driverPhone: z.string().optional(),
+  transporter: z.string().optional(),
+  gateEntryId: z.string().optional(),
+  notes: z.string().optional(),
+}).openapi("LoadDispatchOrder");
+
+export const DispatchOrderQuery = z.object({
+  status: z.enum(["DRAFT", "CONFIRMED", "PICKING", "LOADED", "DISPATCHED", "CANCELLED"]).optional(),
+  customerName: z.string().optional(),
+  search: z.string().optional(),
+  dateFrom: z.string().optional(),
+  dateTo: z.string().optional(),
+  page: z.string().optional(),
+  limit: z.string().optional(),
+});
+
+
+
+
