@@ -30,7 +30,7 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
-/** Scalar custom CSS aligned with Flexicom ERP theme */
+/** Scalar custom CSS aligned with Flexicom ERP theme with visible, smooth scrollbars */
 const SCALAR_CUSTOM_CSS = `
   .scalar-app {
     --scalar-font: var(--font-sans, "Inter", system-ui, sans-serif);
@@ -49,20 +49,85 @@ const SCALAR_CUSTOM_CSS = `
     --scalar-radius: 8px;
     --scalar-radius-lg: 12px;
     --scalar-radius-xl: 16px;
+    height: 100% !important;
+    min-height: 650px !important;
   }
-  .scalar-app .sidebar {
-    border-right: 1px solid #e2e8f0;
-    background: #ffffff;
+
+  /* Universal visible scrollbars across all Scalar containers */
+  .scalar-app,
+  .scalar-app * {
+    scrollbar-width: thin !important;
+    scrollbar-color: #94a3b8 #f1f5f9 !important;
   }
+
+  .scalar-app *::-webkit-scrollbar,
+  .scalar-app::-webkit-scrollbar {
+    width: 8px !important;
+    height: 8px !important;
+    display: block !important;
+    -webkit-appearance: none !important;
+  }
+
+  .scalar-app *::-webkit-scrollbar-track,
+  .scalar-app::-webkit-scrollbar-track {
+    background: #f1f5f9 !important;
+    border-radius: 4px !important;
+  }
+
+  .scalar-app *::-webkit-scrollbar-thumb,
+  .scalar-app::-webkit-scrollbar-thumb {
+    background: #94a3b8 !important;
+    border-radius: 4px !important;
+    border: 2px solid #f1f5f9 !important;
+  }
+
+  .scalar-app *::-webkit-scrollbar-thumb:hover,
+  .scalar-app::-webkit-scrollbar-thumb:hover {
+    background: #64748b !important;
+  }
+
+  /* Sidebar styling & independent scrolling */
+  .scalar-app .sidebar,
+  .scalar-app aside,
+  .scalar-app [data-sidebar],
+  .scalar-app .sidebar-content,
+  .scalar-app .scalar-sidebar {
+    border-right: 1px solid #e2e8f0 !important;
+    background: #ffffff !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    height: 100% !important;
+    max-height: calc(100vh - 14rem) !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  /* Main content rendered documentation independent scrolling */
+  .scalar-app .references-rendered,
+  .scalar-app main,
+  .scalar-app .references-content,
+  .scalar-app .scalar-scroll-container,
+  .scalar-app .scalar-card,
+  .scalar-app .references-classic {
+    overflow-y: auto !important;
+    height: 100% !important;
+    max-height: calc(100vh - 14rem) !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
   .scalar-app .section-header {
-    font-weight: 700;
+    font-weight: 700 !important;
   }
+
   @media (max-width: 768px) {
     .scalar-app .sidebar {
       width: 100% !important;
+      position: static !important;
+      height: auto !important;
+      max-height: none !important;
     }
   }
 `;
+
 
 interface EndpointItem {
   id: string;
@@ -317,8 +382,8 @@ export function ApiDocsClient() {
 
       {/* ── View Mode: Interactive Scalar Playground ── */}
       {viewMode === "interactive" ? (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden min-h-[650px] w-full">
-          <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between text-xs text-slate-600">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden min-h-[700px] w-full flex flex-col">
+          <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between text-xs text-slate-600 shrink-0">
             <div className="flex items-center gap-2 font-medium">
               <Terminal className="h-4 w-4 text-sky-600" />
               <span>Live Interactive Request Runner (Scalar)</span>
@@ -333,7 +398,7 @@ export function ApiDocsClient() {
               <ExternalLink className="h-3.5 w-3.5" />
             </a>
           </div>
-          <div className="h-[calc(100vh-14rem)] min-h-[600px] w-full bg-white">
+          <div className="h-[calc(100vh-14rem)] min-h-[650px] w-full bg-white overflow-hidden">
             <ApiReferenceReact
               configuration={{
                 spec: { url: "/api/swagger" },
