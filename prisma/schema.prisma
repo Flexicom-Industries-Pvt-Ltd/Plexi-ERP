@@ -91,6 +91,9 @@ model User {
   maintenanceLogsReported      MaintenanceLog[]             @relation("MaintenanceReporter")
   maintenanceLogsAssigned      MaintenanceLog[]             @relation("MaintenanceTechnician")
   maintenanceLogsResolved      MaintenanceLog[]             @relation("MaintenanceResolver")
+  finishedGoodsLotsReceived    FinishedGoodsLot[]           @relation("FinishedGoodsReceiver")
+  dispatchOrdersCreated        DispatchOrder[]              @relation("DispatchOrderCreator")
+  dispatchOrdersLoaded         DispatchOrder[]              @relation("DispatchOrderLoader")
   createdAt         DateTime       @default(now())
   updatedAt     DateTime    @updatedAt
 
@@ -346,6 +349,7 @@ model Location {
   productionRolls  ProductionRoll[]
   scrapRecords     ScrapRecord[]    @relation("LocationScrapRecords")
   recyclingBatches RecyclingBatch[] @relation("RecyclingOutputLocation")
+  finishedGoodsLots FinishedGoodsLot[] @relation("LocationFinishedGoodsLots")
 }
 
 
@@ -498,6 +502,7 @@ model GateEntry {
 
   stockDetails     TruckStockDetail[]
   documents        GateDocument[]
+  dispatchOrders   DispatchOrder[]
   
   // Relation to user who created it
   user             User?           @relation("GateEntryCreator", fields: [createdBy], references: [id])
@@ -598,6 +603,8 @@ model InventoryItem {
   balesAsOutput           Bale[] @relation("BaleOutputItem")
   scrapRecords            ScrapRecord[] @relation("ItemScrapRecords")
   recyclingBatchesAsOutput RecyclingBatch[] @relation("RecyclingOutputItem")
+  finishedGoodsLots       FinishedGoodsLot[] @relation("ItemFinishedGoodsLots")
+  dispatchOrderLines      DispatchOrderLine[] @relation("ItemDispatchLines")
 
   @@index([itemType])
   @@index([categoryId])
@@ -628,6 +635,7 @@ model InventoryTransaction {
   user            User?         @relation(fields: [userId], references: [id])
   scrapRecords    ScrapRecord[] @relation("ScrapInventoryTransaction")
   recyclingBatches RecyclingBatch[] @relation("RecyclingInventoryTransaction")
+  finishedGoodsLots FinishedGoodsLot[] @relation("FinishedGoodsInventoryTransaction")
 
   @@index([itemId])
   @@index([type])
@@ -1135,6 +1143,7 @@ model Bale {
   baleItem  InventoryItem? @relation("BaleOutputItem", fields: [baleItemId], references: [id], onDelete: SetNull)
   shift     Shift          @relation(fields: [shiftId], references: [id], onDelete: Restrict)
   createdBy User?          @relation("BaleCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  finishedGoodsLots FinishedGoodsLot[] @relation("BaleFinishedGoodsLots")
 
   @@index([productId])
   @@index([baleItemId])
@@ -1467,6 +1476,145 @@ model MaintenanceLog {
   @@index([reportedAt])
   @@index([resolvedAt])
 }
+
+// ─── Phase 6: Finished Goods & Commercial Dispatch ─────────────────────────────
+
+enum FinishedGoodsStatus {
+  AVAILABLE
+  RESERVED
+  ALLOCATED
+  DISPATCHED
+  ON_HOLD
+  SCRAPPED
+}
+
+model FinishedGoodsLot {
+  id                     String              @id @default(cuid())
+  lotNumber              String              @unique
+  inventoryItemId        String
+  baleId                 String?
+  quantity               Float               @default(0)
+  initialQuantity        Float               @default(0)
+  allocatedQty           Float               @default(0)
+  dispatchedQty          Float               @default(0)
+  unit                   String              @default("bags")
+  productionBatch        String?
+  grossWeight            Float?
+  netWeight              Float?
+  qualityStatus          RollQualityStatus   @default(PASSED)
+  status                 FinishedGoodsStatus @default(AVAILABLE)
+  locationId             String?
+  inventoryTransactionId String?
+  notes                  String?
+  receivedById           String?
+  receivedAt             DateTime            @default(now())
+  createdAt              DateTime            @default(now())
+  updatedAt              DateTime            @updatedAt
+
+  inventoryItem        InventoryItem         @relation("ItemFinishedGoodsLots", fields: [inventoryItemId], references: [id], onDelete: Restrict)
+  bale                 Bale?                 @relation("BaleFinishedGoodsLots", fields: [baleId], references: [id], onDelete: SetNull)
+  location             Location?             @relation("LocationFinishedGoodsLots", fields: [locationId], references: [id], onDelete: SetNull)
+  receivedBy           User?                 @relation("FinishedGoodsReceiver", fields: [receivedById], references: [id], onDelete: SetNull)
+  inventoryTransaction InventoryTransaction? @relation("FinishedGoodsInventoryTransaction", fields: [inventoryTransactionId], references: [id], onDelete: SetNull)
+  dispatchAllocations  DispatchAllocation[]  @relation("FinishedGoodsAllocations")
+
+  @@index([inventoryItemId])
+  @@index([baleId])
+  @@index([locationId])
+  @@index([status])
+  @@index([qualityStatus])
+  @@index([productionBatch])
+  @@index([receivedAt])
+}
+
+enum DispatchOrderStatus {
+  DRAFT
+  CONFIRMED
+  PICKING
+  LOADED
+  DISPATCHED
+  CANCELLED
+}
+
+enum DispatchAllocationStatus {
+  ALLOCATED
+  LOADED
+  CANCELLED
+}
+
+model DispatchOrder {
+  id              String              @id @default(cuid())
+  orderNumber     String              @unique
+  customerName    String
+  customerContact String?
+  customerAddress String?
+  status          DispatchOrderStatus @default(DRAFT)
+  gateEntryId     String?
+  transporter     String?
+  vehicleNumber   String?
+  driverName      String?
+  driverPhone     String?
+  totalQty        Float               @default(0)
+  dispatchedQty   Float               @default(0)
+  dispatchedAt    DateTime?
+  notes           String?
+  createdById     String?
+  loadedById      String?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  createdBy User?               @relation("DispatchOrderCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  loadedBy  User?               @relation("DispatchOrderLoader", fields: [loadedById], references: [id], onDelete: SetNull)
+  gateEntry GateEntry?          @relation(fields: [gateEntryId], references: [id], onDelete: SetNull)
+  lines     DispatchOrderLine[]
+
+  @@index([status])
+  @@index([customerName])
+  @@index([gateEntryId])
+  @@index([createdById])
+  @@index([dispatchedAt])
+  @@index([createdAt])
+}
+
+model DispatchOrderLine {
+  id              String   @id @default(cuid())
+  dispatchOrderId String
+  inventoryItemId String
+  orderedQty      Float
+  pickedQty       Float    @default(0)
+  loadedQty       Float    @default(0)
+  unit            String   @default("bags")
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  dispatchOrder DispatchOrder        @relation(fields: [dispatchOrderId], references: [id], onDelete: Cascade)
+  inventoryItem InventoryItem        @relation("ItemDispatchLines", fields: [inventoryItemId], references: [id], onDelete: Restrict)
+  allocations   DispatchAllocation[]
+
+  @@index([dispatchOrderId])
+  @@index([inventoryItemId])
+}
+
+model DispatchAllocation {
+  id                  String                   @id @default(cuid())
+  dispatchOrderLineId String
+  finishedGoodsLotId  String
+  allocatedQty        Float
+  loadedQty           Float                    @default(0)
+  status              DispatchAllocationStatus @default(ALLOCATED)
+  notes               String?
+  createdAt           DateTime                 @default(now())
+  updatedAt           DateTime                 @updatedAt
+
+  dispatchOrderLine DispatchOrderLine @relation(fields: [dispatchOrderLineId], references: [id], onDelete: Cascade)
+  finishedGoodsLot  FinishedGoodsLot  @relation("FinishedGoodsAllocations", fields: [finishedGoodsLotId], references: [id], onDelete: Restrict)
+
+  @@index([dispatchOrderLineId])
+  @@index([finishedGoodsLotId])
+  @@index([status])
+}
+
 
 
 

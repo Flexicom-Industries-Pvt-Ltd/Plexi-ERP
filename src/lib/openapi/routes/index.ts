@@ -9,6 +9,7 @@ import { registerIdentityRoutes } from "./identity";
 import { registerQualityRoutes } from "./quality";
 import { registerRecyclingRoutes } from "./recycling";
 import { registerMaintenanceRoutes } from "./maintenance";
+import { registerFinishedGoodsRoutes } from "./finished-goods";
 
 let loaded = false;
 
@@ -19,6 +20,7 @@ export function loadAllRouteRegistrations() {
   registerIdentityRoutes();
   registerGateRoutes();
   registerInventoryRoutes();
+  registerFinishedGoodsRoutes();
   registerProductionRoutes();
   registerQualityRoutes();
   registerRecyclingRoutes();
@@ -28,6 +30,7 @@ export function loadAllRouteRegistrations() {
   registerLogsRoutes();
   registerSystemRoutes();
 }
+
 
 
 
