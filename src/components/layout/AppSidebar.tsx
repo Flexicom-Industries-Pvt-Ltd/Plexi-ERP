@@ -15,6 +15,7 @@ import {
   Truck,
   ChevronDown,
   Database,
+  Recycle,
 } from "lucide-react";
 
 import {
@@ -66,8 +67,10 @@ const navItems = [
   { title: "Inventory", url: "/dashboard/inventory", icon: PackageSearch, module: "INVENTORY" },
   { title: "Production", url: "/dashboard/production", icon: Factory, module: "PRODUCTION" },
   { title: "Quality Control", url: "/dashboard/quality", icon: CheckCircle, module: "QUALITY_CONTROL" },
+  { title: "Recycling Plant", url: "/dashboard/recycling", icon: Recycle, module: "PRODUCTION" },
   { title: "Dispatch", url: "/dashboard/dispatch", icon: Truck, module: "DISPATCH" },
 ];
+
 
 const settingsItems = [
   { title: "General Settings", url: "/dashboard/settings/organization" },
