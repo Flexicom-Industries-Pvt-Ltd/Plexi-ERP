@@ -10,7 +10,7 @@ import {
 
 export async function GET(request: NextRequest) {
   const auth = await requireApiAuth({
-    module: [Module.PRODUCTION, Module.SETTINGS],
+    module: [Module.MAINTENANCE, Module.PRODUCTION, Module.SETTINGS],
     action: "canRead",
   });
   if (!auth.ok) return auth.response;
@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   const auth = await requireApiAuth({
-    module: [Module.PRODUCTION, Module.SETTINGS],
+    module: [Module.MAINTENANCE, Module.PRODUCTION, Module.SETTINGS],
     action: "canCreate",
   });
   if (!auth.ok) return auth.response;
