@@ -9,6 +9,8 @@ import {
   CreateQcReworkTicketBody,
   UpdateQcReworkTicketBody,
   QcReworkTicketQuery,
+  CreateScrapRecordBody,
+  ScrapRecordQuery,
 } from "../schemas";
 
 const QUALITY = ["Quality Control"];
@@ -105,5 +107,33 @@ export function registerQualityRoutes() {
     params: IdPathParam,
     body: UpdateQcReworkTicketBody,
   });
+
+  reg({
+    method: "get",
+    path: "/api/quality/scrap",
+    summary: "List scrap and waste records",
+    description: "Retrieve paginated log of scrap generation across production phases with root causes, weights, and analytics breakdown.",
+    tags: QUALITY,
+    query: ScrapRecordQuery,
+  });
+
+  reg({
+    method: "post",
+    path: "/api/quality/scrap",
+    summary: "Record scrap generation & deduct inventory",
+    description: "Record production scrap waste with cause classification, optional inventory item deduction, and automatic roll/bale failure status sync.",
+    tags: QUALITY,
+    body: CreateScrapRecordBody,
+  });
+
+  reg({
+    method: "get",
+    path: "/api/quality/scrap/{id}",
+    summary: "Get scrap record details",
+    description: "Retrieve scrap record with linked inventory transaction and operator details.",
+    tags: QUALITY,
+    params: IdPathParam,
+  });
 }
+
 

@@ -962,6 +962,31 @@ export const QcReworkTicketQuery = z.object({
   limit: z.string().optional(),
 });
 
+export const CreateScrapRecordBody = z.object({
+  sourceType: z.enum(["QC_INSPECTION", "PRODUCTION_RUN", "ROLL", "BALE", "MANUAL"]).default("QC_INSPECTION"),
+  sourceId: z.string().optional(),
+  phase: z.string().min(1).openapi({ description: "Production phase where scrap originated (e.g. LOOM, LAMINATION, PRINTING)" }),
+  reasonCode: z.string().min(1).openapi({ description: "Scrap cause code (e.g. EDGE_TRIM, WEAVE_DEFECT, DELAMINATION)" }),
+  quantity: z.number().positive().openapi({ description: "Scrap weight or quantity" }),
+  unit: z.string().default("kg"),
+  inventoryItemId: z.string().optional().openapi({ description: "Inventory item ID to deduct stock from" }),
+  locationId: z.string().optional(),
+  notes: z.string().optional(),
+  recordedAt: z.string().datetime().optional(),
+}).openapi("CreateScrapRecord");
+
+export const ScrapRecordQuery = z.object({
+  phase: z.string().optional(),
+  sourceType: z.enum(["QC_INSPECTION", "PRODUCTION_RUN", "ROLL", "BALE", "MANUAL"]).optional(),
+  reasonCode: z.string().optional(),
+  inventoryItemId: z.string().optional(),
+  locationId: z.string().optional(),
+  search: z.string().optional(),
+  page: z.string().optional(),
+  limit: z.string().optional(),
+});
+
+
 
 
 

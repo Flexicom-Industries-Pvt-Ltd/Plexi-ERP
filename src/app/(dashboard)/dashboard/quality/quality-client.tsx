@@ -24,6 +24,7 @@ import {
   Scale,
   Search,
   ShieldCheck,
+  Trash2,
   UserCheck,
   Wrench,
   X,
@@ -117,6 +118,35 @@ interface ReworkTicket {
   };
 }
 
+interface ScrapRecord {
+  id: string;
+  scrapNumber: string;
+  sourceType: string;
+  sourceId?: string;
+  phase: string;
+  reasonCode: string;
+  quantity: number;
+  unit: string;
+  inventoryItemId?: string;
+  notes?: string;
+  recordedAt: string;
+  inventoryItem?: {
+    id: string;
+    code: string;
+    name: string;
+  };
+  recordedBy?: {
+    id: string;
+    name: string;
+    email: string;
+  };
+  inventoryTransaction?: {
+    id: string;
+    type: string;
+    quantity: number;
+  };
+}
+
 interface QueueStats {
   pendingCount: number;
   onHoldCount: number;
@@ -127,6 +157,14 @@ interface QueueStats {
   reworkToday: number;
   onHoldToday: number;
   passRate: number;
+}
+
+interface ScrapStats {
+  todayScrapWeight: number;
+  monthScrapWeight: number;
+  totalScrapWeight: number;
+  phaseBreakdown: Record<string, number>;
+  reasonBreakdown: Record<string, number>;
 }
 
 const COMMON_DEFECT_REASONS = [
@@ -140,6 +178,20 @@ const COMMON_DEFECT_REASONS = [
   "Contamination / Foreign Material",
   "Damaged Edge / Wrinkling",
   "Stitching / Seam Defect",
+];
+
+const SCRAP_REASON_CODES = [
+  "EDGE_TRIM",
+  "DEFECTIVE_WEAVE",
+  "DELAMINATION",
+  "MISPRINT",
+  "COLOR_CHANGE_PURGE",
+  "STARTUP_SCRAP",
+  "CONTAMINATION",
+  "SEAM_FAILURE",
+  "ROLL_CORE_REMNANT",
+  "MACHINE_JAM_SCRAP",
+  "OTHER",
 ];
 
 const DEFAULT_LINE_PARAMETERS = [
@@ -162,12 +214,20 @@ const PRODUCTION_PHASES = [
 ];
 
 export function QualityClient() {
-  const [activeTab, setActiveTab] = useState<"queue" | "rework" | "history">("queue");
+  const [activeTab, setActiveTab] = useState<"queue" | "rework" | "scrap" | "history">("queue");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [queueItems, setQueueItems] = useState<QueueItem[]>([]);
   const [historyItems, setHistoryItems] = useState<InspectionRecord[]>([]);
   const [reworkTickets, setReworkTickets] = useState<ReworkTicket[]>([]);
+  const [scrapRecords, setScrapRecords] = useState<ScrapRecord[]>([]);
+  const [scrapStats, setScrapStats] = useState<ScrapStats>({
+    todayScrapWeight: 0,
+    monthScrapWeight: 0,
+    totalScrapWeight: 0,
+    phaseBreakdown: {},
+    reasonBreakdown: {},
+  });
   const [stats, setStats] = useState<QueueStats>({
     pendingCount: 0,
     onHoldCount: 0,
@@ -185,6 +245,7 @@ export function QualityClient() {
   const [typeFilter, setTypeFilter] = useState<string>("ALL");
   const [statusFilter, setStatusFilter] = useState<string>("PENDING_QC");
   const [reworkStatusFilter, setReworkStatusFilter] = useState<string>("ALL");
+  const [scrapPhaseFilter, setScrapPhaseFilter] = useState<string>("ALL");
   const [historyDecisionFilter, setHistoryDecisionFilter] = useState<string>("ALL");
 
   // Inspection Modal State
@@ -203,6 +264,14 @@ export function QualityClient() {
   const [completingTicket, setCompletingTicket] = useState<ReworkTicket | null>(null);
   const [reworkCompletionNotes, setReworkCompletionNotes] = useState("");
   const [completingSubmitting, setCompletingSubmitting] = useState(false);
+
+  // Record Scrap Modal State
+  const [isScrapModalOpen, setIsScrapModalOpen] = useState(false);
+  const [scrapPhase, setScrapPhase] = useState("LOOM");
+  const [scrapReason, setScrapReason] = useState("EDGE_TRIM");
+  const [scrapQty, setScrapQty] = useState<string>("10");
+  const [scrapNotes, setScrapNotes] = useState("");
+  const [scrapSubmitting, setScrapSubmitting] = useState(false);
 
   const fetchQueue = useCallback(async (showRefreshing = false) => {
     if (showRefreshing) setRefreshing(true);
@@ -246,6 +315,26 @@ export function QualityClient() {
     }
   }, [reworkStatusFilter, search]);
 
+  const fetchScrapRecords = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (scrapPhaseFilter !== "ALL") params.append("phase", scrapPhaseFilter);
+      if (search.trim()) params.append("search", search.trim());
+      params.append("limit", "50");
+
+      const res = await fetch(`/api/quality/scrap?${params.toString()}`);
+      if (!res.ok) throw new Error("Failed to load scrap records");
+      const data = await res.json();
+      setScrapRecords(data.records || []);
+      if (data.stats) setScrapStats(data.stats);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to fetch scrap records");
+    } finally {
+      setLoading(false);
+    }
+  }, [scrapPhaseFilter, search]);
+
   const fetchHistory = useCallback(async () => {
     setLoading(true);
     try {
@@ -270,10 +359,12 @@ export function QualityClient() {
       fetchQueue();
     } else if (activeTab === "rework") {
       fetchReworkTickets();
+    } else if (activeTab === "scrap") {
+      fetchScrapRecords();
     } else {
       fetchHistory();
     }
-  }, [activeTab, fetchQueue, fetchReworkTickets, fetchHistory]);
+  }, [activeTab, fetchQueue, fetchReworkTickets, fetchScrapRecords, fetchHistory]);
 
   const openInspectionModal = (item: QueueItem) => {
     setSelectedTarget(item);
@@ -390,6 +481,23 @@ export function QualityClient() {
         });
       }
 
+      // 4. If decision is FAILED, auto record a scrap entry
+      if (decision === "FAILED") {
+        await fetch("/api/quality/scrap", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sourceType: selectedTarget.referenceType,
+            sourceId: selectedTarget.referenceId,
+            phase: selectedTarget.sourcePhase || "LOOM",
+            reasonCode: finalDefectReason || "QC_FAILURE",
+            quantity: selectedTarget.weight || 1,
+            unit: "kg",
+            notes: `Auto-scrapped from QC Inspection ${inspection.inspectionNumber}`,
+          }),
+        });
+      }
+
       toast.success(
         `QC Decision [${decision}] recorded for ${selectedTarget.identifier} (${inspection.inspectionNumber})`
       );
@@ -445,6 +553,42 @@ export function QualityClient() {
       toast.error(err.message || "Failed to finalize rework completion");
     } finally {
       setCompletingSubmitting(false);
+    }
+  };
+
+  const handleCreateScrap = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const qty = parseFloat(scrapQty);
+    if (isNaN(qty) || qty <= 0) {
+      toast.error("Please enter a valid positive scrap quantity");
+      return;
+    }
+
+    setScrapSubmitting(true);
+    try {
+      const res = await fetch("/api/quality/scrap", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sourceType: "MANUAL",
+          phase: scrapPhase,
+          reasonCode: scrapReason,
+          quantity: qty,
+          unit: "kg",
+          notes: scrapNotes || undefined,
+        }),
+      });
+
+      if (!res.ok) throw new Error("Failed to record scrap");
+      const scrap = await res.json();
+      toast.success(`Scrap entry logged: ${scrap.scrapNumber} (${qty} kg)`);
+      setIsScrapModalOpen(false);
+      setScrapNotes("");
+      fetchScrapRecords();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to record scrap");
+    } finally {
+      setScrapSubmitting(false);
     }
   };
 
@@ -528,18 +672,29 @@ export function QualityClient() {
                 Quality Control Center
               </h1>
               <p className="text-sm text-muted-foreground">
-                Inspection queue, rework workflows, and pass / fail / hold quality verification
+                Inspection queue, rework tickets, scrap tracking, and pass / fail verification
               </p>
             </div>
           </div>
         </div>
 
         <div className="flex items-center gap-3">
+          {activeTab === "scrap" && (
+            <button
+              type="button"
+              onClick={() => setIsScrapModalOpen(true)}
+              className="inline-flex items-center gap-2 rounded-lg bg-rose-600 px-3.5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-rose-700 transition"
+            >
+              <Trash2 className="size-4" />
+              Record Scrap
+            </button>
+          )}
           <button
             type="button"
             onClick={() => {
               if (activeTab === "queue") fetchQueue(true);
               else if (activeTab === "rework") fetchReworkTickets();
+              else if (activeTab === "scrap") fetchScrapRecords();
               else fetchHistory();
             }}
             disabled={refreshing}
@@ -607,18 +762,18 @@ export function QualityClient() {
 
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="flex items-center justify-between text-muted-foreground">
-            <span className="text-xs font-semibold uppercase tracking-wider">Failed Today</span>
-            <XCircle className="size-4 text-rose-600" />
+            <span className="text-xs font-semibold uppercase tracking-wider">Scrap Today</span>
+            <Trash2 className="size-4 text-rose-600" />
           </div>
-          <div className="mt-2 text-2xl font-bold text-rose-600">{stats.failedToday}</div>
-          <p className="mt-1 text-xs text-muted-foreground">Scrap / rejected</p>
+          <div className="mt-2 text-2xl font-bold text-rose-600">{scrapStats.todayScrapWeight} kg</div>
+          <p className="mt-1 text-xs text-muted-foreground">{scrapStats.monthScrapWeight} kg this month</p>
         </div>
       </div>
 
       {/* Main Tabs Container */}
       <div className="rounded-2xl border border-slate-200 bg-white shadow-sm ring-1 ring-black/5">
         <div className="border-b border-slate-100 px-6 pt-4">
-          <div className="flex gap-8">
+          <div className="flex flex-wrap gap-6 sm:gap-8">
             <button
               type="button"
               onClick={() => setActiveTab("queue")}
@@ -649,6 +804,19 @@ export function QualityClient() {
               <span className="ml-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-800 font-bold">
                 {stats.reworkCount}
               </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab("scrap")}
+              className={`flex items-center gap-2 border-b-2 pb-3 text-sm font-semibold transition ${
+                activeTab === "scrap"
+                  ? "border-primary text-primary"
+                  : "border-transparent text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              <Trash2 className="size-4" />
+              Scrap & Waste Tracking
             </button>
 
             <button
@@ -715,6 +883,19 @@ export function QualityClient() {
                 <option value="OPEN">Open Tickets</option>
                 <option value="IN_PROGRESS">In Progress</option>
                 <option value="COMPLETED">Completed</option>
+              </select>
+            )}
+
+            {activeTab === "scrap" && (
+              <select
+                value={scrapPhaseFilter}
+                onChange={(e) => setScrapPhaseFilter(e.target.value)}
+                className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 shadow-sm focus:border-primary focus:outline-none"
+              >
+                <option value="ALL">All Production Phases</option>
+                {PRODUCTION_PHASES.map((p) => (
+                  <option key={p} value={p}>{p}</option>
+                ))}
               </select>
             )}
 
@@ -934,6 +1115,78 @@ export function QualityClient() {
               </div>
             )}
           </div>
+        ) : activeTab === "scrap" ? (
+          <div>
+            {loading ? (
+              <div className="flex items-center justify-center gap-2 py-16 text-muted-foreground">
+                <Loader2 className="size-5 animate-spin text-primary" />
+                Loading scrap records...
+              </div>
+            ) : scrapRecords.length === 0 ? (
+              <div className="py-16 text-center">
+                <Trash2 className="mx-auto size-12 text-slate-300" />
+                <h3 className="mt-3 text-base font-semibold text-slate-800">No scrap waste records</h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Scrap generated during production or QC rejection will be tracked and audited here.
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead className="border-b border-slate-100 bg-slate-50/75 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                    <tr>
+                      <th className="px-6 py-3">Scrap #</th>
+                      <th className="px-6 py-3">Phase</th>
+                      <th className="px-6 py-3">Reason Code</th>
+                      <th className="px-6 py-3">Quantity</th>
+                      <th className="px-6 py-3">Stock Impact</th>
+                      <th className="px-6 py-3">Logged By</th>
+                      <th className="px-6 py-3">Timestamp</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-slate-700">
+                    {scrapRecords.map((scrap) => (
+                      <tr key={scrap.id} className="hover:bg-slate-50/60 transition">
+                        <td className="px-6 py-4 font-mono font-semibold text-slate-900">
+                          {scrap.scrapNumber}
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="inline-flex items-center gap-1 rounded bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">
+                            {scrap.phase}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-xs font-medium text-slate-800">
+                          {scrap.reasonCode}
+                          {scrap.notes && (
+                            <div className="text-[11px] text-muted-foreground truncate max-w-xs">{scrap.notes}</div>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 font-bold text-rose-600">
+                          {scrap.quantity} {scrap.unit}
+                        </td>
+                        <td className="px-6 py-4 text-xs">
+                          {scrap.inventoryTransaction ? (
+                            <span className="inline-flex items-center gap-1 rounded bg-rose-50 px-2 py-0.5 text-[11px] font-semibold text-rose-700 border border-rose-200">
+                              Auto-Deducted ({scrap.inventoryItem?.code || "Item"})
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground">General Waste</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 text-xs">
+                          <div className="font-medium text-slate-900">{scrap.recordedBy?.name || "System"}</div>
+                          <div className="text-muted-foreground">{scrap.recordedBy?.email}</div>
+                        </td>
+                        <td className="px-6 py-4 text-xs text-muted-foreground">
+                          {format(new Date(scrap.recordedAt), "dd MMM yyyy HH:mm")}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         ) : (
           <div>
             {historyItems.length === 0 ? (
@@ -1010,6 +1263,102 @@ export function QualityClient() {
           </div>
         )}
       </div>
+
+      {/* Record Scrap Modal */}
+      {isScrapModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+          <div className="relative w-full max-w-md rounded-2xl bg-white shadow-2xl ring-1 ring-black/10">
+            <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/80 px-6 py-4">
+              <div className="flex items-center gap-2.5">
+                <div className="flex size-8 items-center justify-center rounded-lg bg-rose-100 text-rose-700">
+                  <Trash2 className="size-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">Record Production Scrap</h3>
+                  <p className="text-xs text-muted-foreground">Log waste material & reason code</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsScrapModalOpen(false)}
+                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateScrap} className="p-6 space-y-4">
+              <div>
+                <label className="text-xs font-semibold text-slate-700">Production Phase</label>
+                <select
+                  value={scrapPhase}
+                  onChange={(e) => setScrapPhase(e.target.value)}
+                  className="mt-1 h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-800 focus:border-primary focus:outline-none"
+                >
+                  {PRODUCTION_PHASES.map((ph) => (
+                    <option key={ph} value={ph}>{ph}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-slate-700">Scrap Reason Code</label>
+                <select
+                  value={scrapReason}
+                  onChange={(e) => setScrapReason(e.target.value)}
+                  className="mt-1 h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-800 focus:border-primary focus:outline-none"
+                >
+                  {SCRAP_REASON_CODES.map((code) => (
+                    <option key={code} value={code}>{code}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-slate-700">Quantity (kg)</label>
+                <input
+                  type="number"
+                  min="0.1"
+                  step="0.1"
+                  value={scrapQty}
+                  onChange={(e) => setScrapQty(e.target.value)}
+                  className="mt-1 h-9 w-full rounded-lg border border-slate-200 px-3 text-xs text-slate-800 focus:border-primary focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-slate-700">Optional Notes / Observation</label>
+                <textarea
+                  rows={2}
+                  value={scrapNotes}
+                  onChange={(e) => setScrapNotes(e.target.value)}
+                  placeholder="Root cause notes..."
+                  className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-xs text-slate-800 focus:border-primary focus:outline-none"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsScrapModalOpen(false)}
+                  disabled={scrapSubmitting}
+                  className="rounded-lg border border-slate-200 px-4 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={scrapSubmitting}
+                  className="inline-flex items-center gap-2 rounded-lg bg-rose-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-rose-700 disabled:opacity-50"
+                >
+                  {scrapSubmitting && <Loader2 className="size-3.5 animate-spin" />}
+                  Save Scrap Record
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* QC Inspection & Decision Modal */}
       {selectedTarget && (
