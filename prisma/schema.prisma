@@ -86,8 +86,10 @@ model User {
   qcInspections                QcInspection[]               @relation("QcInspector")
   reworkTicketsAssigned        QcReworkTicket[]             @relation("ReworkOperator")
   reworkTicketsCompleted       QcReworkTicket[]             @relation("ReworkCompleter")
+  scrapRecordsRecorded         ScrapRecord[]                @relation("ScrapRecorder")
   createdAt         DateTime       @default(now())
   updatedAt     DateTime    @updatedAt
+
 
 
   @@index([roleId, isActive])
@@ -338,7 +340,9 @@ model Location {
   inventoryItems InventoryItem[]
   inventoryBatches InventoryBatch[]
   productionRolls  ProductionRoll[]
+  scrapRecords     ScrapRecord[]    @relation("LocationScrapRecords")
 }
+
 
 model Machine {
   id           String   @id @default(cuid())
@@ -586,6 +590,7 @@ model InventoryItem {
   manualStitchRunsAsOutput ManualStitchProductionRun[] @relation("ManualStitchRunOutput")
   balesAsProduct          Bale[] @relation("BaleProduct")
   balesAsOutput           Bale[] @relation("BaleOutputItem")
+  scrapRecords            ScrapRecord[] @relation("ItemScrapRecords")
 
   @@index([itemType])
   @@index([categoryId])
@@ -605,8 +610,8 @@ model InventoryTransaction {
   type            TransactionType
   quantity        Float
   batchLot        String?
-  referenceType   String?  // e.g. "GATE_ENTRY", "MANUAL"
-  referenceId     String?  // e.g. GateEntry.id
+  referenceType   String?  // e.g. "GATE_ENTRY", "MANUAL", "SCRAP"
+  referenceId     String?  // e.g. GateEntry.id, ScrapRecord.id
   remarks         String?
   
   userId          String?
@@ -614,11 +619,13 @@ model InventoryTransaction {
 
   item            InventoryItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
   user            User?         @relation(fields: [userId], references: [id])
+  scrapRecords    ScrapRecord[] @relation("ScrapInventoryTransaction")
 
   @@index([itemId])
   @@index([type])
   @@index([referenceType])
   @@index([referenceId])
+
   @@index([batchLot])
   @@index([createdAt])
 }
@@ -1310,5 +1317,46 @@ model QcReworkTicket {
   @@index([assignedOperatorId])
   @@index([createdAt])
 }
+
+enum ScrapSourceType {
+  QC_INSPECTION
+  PRODUCTION_RUN
+  ROLL
+  BALE
+  MANUAL
+}
+
+model ScrapRecord {
+  id                     String          @id @default(cuid())
+  scrapNumber            String          @unique
+  sourceType             ScrapSourceType @default(QC_INSPECTION)
+  sourceId               String?
+  phase                  String
+  reasonCode             String
+  quantity               Float
+  unit                   String          @default("kg")
+  inventoryItemId        String?
+  locationId             String?
+  inventoryTransactionId String?
+  recordedById           String?
+  notes                  String?
+  recordedAt             DateTime        @default(now())
+  createdAt              DateTime        @default(now())
+  updatedAt              DateTime        @updatedAt
+
+  inventoryItem        InventoryItem?        @relation("ItemScrapRecords", fields: [inventoryItemId], references: [id], onDelete: SetNull)
+  location             Location?             @relation("LocationScrapRecords", fields: [locationId], references: [id], onDelete: SetNull)
+  recordedBy           User?                 @relation("ScrapRecorder", fields: [recordedById], references: [id], onDelete: SetNull)
+  inventoryTransaction InventoryTransaction? @relation("ScrapInventoryTransaction", fields: [inventoryTransactionId], references: [id], onDelete: SetNull)
+
+  @@index([sourceType, sourceId])
+  @@index([phase])
+  @@index([reasonCode])
+  @@index([inventoryItemId])
+  @@index([locationId])
+  @@index([recordedById])
+  @@index([recordedAt])
+}
+
 
 
