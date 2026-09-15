@@ -1010,3 +1010,42 @@ export const RecyclingBatchQuery = z.object({
   limit: z.string().optional(),
 });
 
+export const CreateMaintenanceLogBody = z.object({
+  machineId: z.string().min(1).openapi({ description: "Target machine ID" }),
+  type: z.enum(["BREAKDOWN", "PREVENTATIVE", "ROUTINE_SERVICE", "INSPECTION", "CALIBRATION"]).default("BREAKDOWN"),
+  priority: z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]).default("MEDIUM"),
+  title: z.string().min(1).openapi({ description: "Summary / issue title" }),
+  description: z.string().min(1).openapi({ description: "Detailed issue or service description" }),
+  downtimeMinutes: z.number().int().min(0).default(0),
+  cost: z.number().min(0).optional(),
+  assignedTechnicianId: z.string().optional(),
+  reportedAt: z.string().datetime().optional(),
+}).openapi("CreateMaintenanceLog");
+
+export const UpdateMaintenanceLogBody = z.object({
+  type: z.enum(["BREAKDOWN", "PREVENTATIVE", "ROUTINE_SERVICE", "INSPECTION", "CALIBRATION"]).optional(),
+  priority: z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]).optional(),
+  status: z.enum(["OPEN", "IN_PROGRESS", "RESOLVED", "CANCELLED"]).optional(),
+  title: z.string().min(1).optional(),
+  description: z.string().min(1).optional(),
+  downtimeMinutes: z.number().int().min(0).optional(),
+  cost: z.number().min(0).optional(),
+  assignedTechnicianId: z.string().nullable().optional(),
+  startedAt: z.string().datetime().nullable().optional(),
+  resolvedAt: z.string().datetime().nullable().optional(),
+  correctiveAction: z.string().nullable().optional(),
+  partsReplaced: z.string().nullable().optional(),
+}).openapi("UpdateMaintenanceLog");
+
+export const MaintenanceLogQuery = z.object({
+  machineId: z.string().optional(),
+  sectionId: z.string().optional(),
+  type: z.enum(["BREAKDOWN", "PREVENTATIVE", "ROUTINE_SERVICE", "INSPECTION", "CALIBRATION"]).optional(),
+  status: z.enum(["OPEN", "IN_PROGRESS", "RESOLVED", "CANCELLED"]).optional(),
+  priority: z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]).optional(),
+  search: z.string().optional(),
+  page: z.string().optional(),
+  limit: z.string().optional(),
+});
+
+
