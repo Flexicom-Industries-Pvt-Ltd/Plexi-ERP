@@ -1089,5 +1089,69 @@ export const BalesQueueQuery = z.object({
   search: z.string().optional(),
 });
 
+export const DispatchOrderLineBody = z.object({
+  inventoryItemId: z.string().min(1).openapi({ description: "Finished goods inventory item ID" }),
+  orderedQty: z.number().positive().openapi({ description: "Ordered bag quantity" }),
+  unit: z.string().default("bags"),
+  notes: z.string().optional(),
+});
+
+export const CreateDispatchOrderBody = z.object({
+  customerName: z.string().min(1).openapi({ description: "Customer / Client name" }),
+  customerContact: z.string().optional(),
+  customerAddress: z.string().optional(),
+  gateEntryId: z.string().optional().openapi({ description: "Optional link to outbound truck in Gate module" }),
+  transporter: z.string().optional(),
+  vehicleNumber: z.string().optional(),
+  driverName: z.string().optional(),
+  driverPhone: z.string().optional(),
+  notes: z.string().optional(),
+  lines: z.array(DispatchOrderLineBody).min(1),
+}).openapi("CreateDispatchOrder");
+
+export const UpdateDispatchOrderBody = z.object({
+  customerName: z.string().min(1).optional(),
+  customerContact: z.string().nullable().optional(),
+  customerAddress: z.string().nullable().optional(),
+  status: z.enum(["DRAFT", "CONFIRMED", "PICKING", "LOADED", "DISPATCHED", "CANCELLED"]).optional(),
+  gateEntryId: z.string().nullable().optional(),
+  transporter: z.string().nullable().optional(),
+  vehicleNumber: z.string().nullable().optional(),
+  driverName: z.string().nullable().optional(),
+  driverPhone: z.string().nullable().optional(),
+  notes: z.string().nullable().optional(),
+}).openapi("UpdateDispatchOrder");
+
+export const PickDispatchOrderBody = z.object({
+  allocations: z.array(
+    z.object({
+      dispatchOrderLineId: z.string().min(1),
+      finishedGoodsLotId: z.string().min(1),
+      quantity: z.number().positive(),
+      notes: z.string().optional(),
+    })
+  ).min(1),
+}).openapi("PickDispatchOrder");
+
+export const LoadDispatchOrderBody = z.object({
+  vehicleNumber: z.string().optional(),
+  driverName: z.string().optional(),
+  driverPhone: z.string().optional(),
+  transporter: z.string().optional(),
+  gateEntryId: z.string().optional(),
+  notes: z.string().optional(),
+}).openapi("LoadDispatchOrder");
+
+export const DispatchOrderQuery = z.object({
+  status: z.enum(["DRAFT", "CONFIRMED", "PICKING", "LOADED", "DISPATCHED", "CANCELLED"]).optional(),
+  customerName: z.string().optional(),
+  search: z.string().optional(),
+  dateFrom: z.string().optional(),
+  dateTo: z.string().optional(),
+  page: z.string().optional(),
+  limit: z.string().optional(),
+});
+
+
 
 
