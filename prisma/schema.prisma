@@ -84,8 +84,11 @@ model User {
   manualStitchRunsOperated     ManualStitchProductionRun[]  @relation("ManualStitchRunOperator")
   balesCreated                 Bale[]                       @relation("BaleCreator")
   qcInspections                QcInspection[]               @relation("QcInspector")
+  reworkTicketsAssigned        QcReworkTicket[]             @relation("ReworkOperator")
+  reworkTicketsCompleted       QcReworkTicket[]             @relation("ReworkCompleter")
   createdAt         DateTime       @default(now())
   updatedAt     DateTime    @updatedAt
+
 
   @@index([roleId, isActive])
   @@index([departmentId])
@@ -1242,6 +1245,7 @@ model QcInspection {
 
   inspector          User?              @relation("QcInspector", fields: [inspectorId], references: [id], onDelete: SetNull)
   lines              QcInspectionLine[]
+  reworkTickets      QcReworkTicket[]
 
   @@index([referenceType, referenceId])
   @@index([status])
@@ -1267,4 +1271,44 @@ model QcInspectionLine {
   @@index([inspectionId])
   @@index([status])
 }
+
+enum QcReworkStatus {
+  OPEN
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+model QcReworkTicket {
+  id                  String          @id @default(cuid())
+  ticketNumber        String          @unique
+  inspectionId        String?
+  sourceReferenceType QcReferenceType
+  sourceReferenceId   String
+  targetPhase         String
+  status              QcReworkStatus  @default(OPEN)
+  defectReason        String?
+  reworkInstructions  String?
+  assignedOperatorId  String?
+  completedById       String?
+  reworkQty           Float?
+  reworkCost          Float?
+  notes               String?
+  reworkCompletedAt   DateTime?
+  reInspectionId      String?
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+
+  inspection       QcInspection? @relation(fields: [inspectionId], references: [id], onDelete: SetNull)
+  assignedOperator User?         @relation("ReworkOperator", fields: [assignedOperatorId], references: [id], onDelete: SetNull)
+  completedBy      User?         @relation("ReworkCompleter", fields: [completedById], references: [id], onDelete: SetNull)
+
+  @@index([inspectionId])
+  @@index([sourceReferenceType, sourceReferenceId])
+  @@index([status])
+  @@index([targetPhase])
+  @@index([assignedOperatorId])
+  @@index([createdAt])
+}
+
 
