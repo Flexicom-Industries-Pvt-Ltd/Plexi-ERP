@@ -83,6 +83,7 @@ model User {
   bcsRunsOperated              BcsProductionRun[]           @relation("BcsRunOperator")
   manualStitchRunsOperated     ManualStitchProductionRun[]  @relation("ManualStitchRunOperator")
   balesCreated                 Bale[]                       @relation("BaleCreator")
+  qcInspections                QcInspection[]               @relation("QcInspector")
   createdAt         DateTime       @default(now())
   updatedAt     DateTime    @updatedAt
 
@@ -1198,3 +1199,72 @@ model ShiftHandover {
   @@index([shiftId])
   @@index([handoverDate])
 }
+
+// ─── Quality Control (Phase 5) ────────────────────────────────────────────────
+
+enum QcReferenceType {
+  ROLL
+  BALE
+  PRODUCTION_RUN
+  BATCH
+}
+
+enum QcDecision {
+  PASSED
+  FAILED
+  REWORK
+  ON_HOLD
+}
+
+enum QcInspectionStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+model QcInspection {
+  id                 String             @id @default(cuid())
+  inspectionNumber   String             @unique
+  referenceType      QcReferenceType
+  referenceId        String
+  status             QcInspectionStatus @default(PENDING)
+  decision           QcDecision?
+  inspectorId        String?
+  notes              String?
+  defectReason       String?
+  reworkInstructions String?
+  samplesInspected   Int                @default(1)
+  parameters         Json?
+  inspectedAt        DateTime?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  inspector          User?              @relation("QcInspector", fields: [inspectorId], references: [id], onDelete: SetNull)
+  lines              QcInspectionLine[]
+
+  @@index([referenceType, referenceId])
+  @@index([status])
+  @@index([decision])
+  @@index([inspectorId])
+  @@index([createdAt])
+}
+
+model QcInspectionLine {
+  id             String       @id @default(cuid())
+  inspectionId   String
+  parameterName  String
+  standardValue  String?
+  actualValue    String
+  unit           String?
+  status         QcDecision   @default(PASSED)
+  remarks        String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  inspection     QcInspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+
+  @@index([inspectionId])
+  @@index([status])
+}
+
