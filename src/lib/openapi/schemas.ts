@@ -918,4 +918,13 @@ export const QcTargetQuery = z.object({
   id: z.string().min(1),
 });
 
+export const QcQueueQuery = z.object({
+  referenceType: z.enum(["ROLL", "BALE", "PRODUCTION_RUN", "BATCH"]).optional(),
+  status: z.enum(["PENDING_QC", "PASSED", "FAILED", "REWORK", "ON_HOLD", "ALL"]).optional(),
+  search: z.string().optional(),
+  page: z.string().optional(),
+  limit: z.string().optional(),
+});
+
+
 

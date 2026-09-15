@@ -5,6 +5,7 @@ import {
   RecordQcDecisionBody,
   QcInspectionQuery,
   QcTargetQuery,
+  QcQueueQuery,
 } from "../schemas";
 
 const QUALITY = ["Quality Control"];
@@ -12,12 +13,22 @@ const QUALITY = ["Quality Control"];
 export function registerQualityRoutes() {
   reg({
     method: "get",
+    path: "/api/quality/queue",
+    summary: "Get inspection queue & QC statistics",
+    description: "Retrieve pending production rolls, bales, and runs requiring quality inspection alongside today's QC performance KPIs.",
+    tags: QUALITY,
+    query: QcQueueQuery,
+  });
+
+  reg({
+    method: "get",
     path: "/api/quality/inspections",
-    summary: "List QC inspections queue",
+    summary: "List QC inspections history",
     description: "Retrieve paginated inspection queue with inspector and characteristic line evaluations.",
     tags: QUALITY,
     query: QcInspectionQuery,
   });
+
 
   reg({
     method: "post",
