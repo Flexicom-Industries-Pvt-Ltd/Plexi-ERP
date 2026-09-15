@@ -4,6 +4,7 @@ import {
   QcDecision,
   QcInspectionStatus,
   RollQualityStatus,
+  QcReworkStatus,
 } from "@/generated/prisma";
 
 export const QcInspectionLineInputSchema = z.object({
@@ -54,4 +55,41 @@ export const GetQcQueueQuerySchema = z.object({
   page: z.union([z.string(), z.number()]).optional(),
   limit: z.union([z.string(), z.number()]).optional(),
 });
+
+export const CreateQcReworkTicketSchema = z.object({
+  inspectionId: z.string().optional(),
+  sourceReferenceType: z.nativeEnum(QcReferenceType),
+  sourceReferenceId: z.string().min(1, "Source reference ID is required"),
+  targetPhase: z.string().min(1, "Target phase is required"),
+  defectReason: z.string().optional(),
+  reworkInstructions: z.string().optional(),
+  assignedOperatorId: z.string().optional(),
+  reworkQty: z.number().positive().optional(),
+  reworkCost: z.number().nonnegative().optional(),
+  notes: z.string().optional(),
+});
+
+export const UpdateQcReworkTicketSchema = z.object({
+  status: z.nativeEnum(QcReworkStatus).optional(),
+  assignedOperatorId: z.string().optional(),
+  completedById: z.string().optional(),
+  reworkQty: z.number().positive().optional(),
+  reworkCost: z.number().nonnegative().optional(),
+  notes: z.string().optional(),
+  defectReason: z.string().optional(),
+  reworkInstructions: z.string().optional(),
+  reInspectionId: z.string().optional(),
+});
+
+export const ListQcReworkTicketsQuerySchema = z.object({
+  status: z.nativeEnum(QcReworkStatus).optional(),
+  targetPhase: z.string().optional(),
+  sourceReferenceType: z.nativeEnum(QcReferenceType).optional(),
+  sourceReferenceId: z.string().optional(),
+  assignedOperatorId: z.string().optional(),
+  search: z.string().optional(),
+  page: z.union([z.string(), z.number()]).optional(),
+  limit: z.union([z.string(), z.number()]).optional(),
+});
+
 
