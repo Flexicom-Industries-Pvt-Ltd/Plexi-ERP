@@ -7,7 +7,7 @@ import { ReceiveFinishedGoodsSchema } from "@/lib/schemas/finished-goods";
 
 export async function POST(request: NextRequest) {
   const auth = await requireApiAuth({
-    module: [Module.INVENTORY, Module.PRODUCTION],
+    module: [Module.FINISHED_GOODS, Module.INVENTORY, Module.PRODUCTION],
     action: "canCreate",
   });
   if (!auth.ok) return auth.response;

@@ -7,7 +7,7 @@ import { CreateRecyclingBatchSchema, ListRecyclingBatchesQuerySchema } from "@/l
 
 export async function GET(request: NextRequest) {
   const auth = await requireApiAuth({
-    module: [Module.PRODUCTION, Module.QUALITY_CONTROL],
+    module: [Module.RECYCLING_PLANT, Module.PRODUCTION, Module.QUALITY_CONTROL],
     action: "canRead",
   });
   if (!auth.ok) return auth.response;
@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   const auth = await requireApiAuth({
-    module: [Module.PRODUCTION, Module.QUALITY_CONTROL],
+    module: [Module.RECYCLING_PLANT, Module.PRODUCTION, Module.QUALITY_CONTROL],
     action: "canCreate",
   });
   if (!auth.ok) return auth.response;
