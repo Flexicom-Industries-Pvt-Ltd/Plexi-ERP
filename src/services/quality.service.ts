@@ -341,4 +341,186 @@ export class QualityService {
 
     return result;
   }
+
+  /**
+   * Fetch QC Inspection Queue items and summary KPIs.
+   */
+  static async getInspectionQueue(
+    query: {
+      referenceType?: QcReferenceType | string | null;
+      status?: RollQualityStatus | "ALL" | string | null;
+      search?: string | null;
+      page?: number | string | null;
+      limit?: number | string | null;
+    } = {}
+  ) {
+    const today = new Date();
+    const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+
+    // 1. Gather global KPI metrics
+    const [
+      pendingRollsCount,
+      pendingBalesCount,
+      onHoldRollsCount,
+      onHoldBalesCount,
+      reworkRollsCount,
+      reworkBalesCount,
+      inspectedTodayCount,
+      passedTodayCount,
+      failedTodayCount,
+      reworkTodayCount,
+      onHoldTodayCount,
+    ] = await Promise.all([
+      db.productionRoll.count({ where: { qualityStatus: RollQualityStatus.PENDING_QC } }),
+      db.bale.count({ where: { qualityStatus: RollQualityStatus.PENDING_QC } }),
+      db.productionRoll.count({ where: { qualityStatus: RollQualityStatus.ON_HOLD } }),
+      db.bale.count({ where: { qualityStatus: RollQualityStatus.ON_HOLD } }),
+      db.productionRoll.count({ where: { qualityStatus: RollQualityStatus.REWORK } }),
+      db.bale.count({ where: { qualityStatus: RollQualityStatus.REWORK } }),
+      db.qcInspection.count({ where: { createdAt: { gte: startOfToday } } }),
+      db.qcInspection.count({ where: { createdAt: { gte: startOfToday }, decision: QcDecision.PASSED } }),
+      db.qcInspection.count({ where: { createdAt: { gte: startOfToday }, decision: QcDecision.FAILED } }),
+      db.qcInspection.count({ where: { createdAt: { gte: startOfToday }, decision: QcDecision.REWORK } }),
+      db.qcInspection.count({ where: { createdAt: { gte: startOfToday }, decision: QcDecision.ON_HOLD } }),
+    ]);
+
+    const stats = {
+      pendingCount: pendingRollsCount + pendingBalesCount,
+      onHoldCount: onHoldRollsCount + onHoldBalesCount,
+      reworkCount: reworkRollsCount + reworkBalesCount,
+      inspectedToday: inspectedTodayCount,
+      passedToday: passedTodayCount,
+      failedToday: failedTodayCount,
+      reworkToday: reworkTodayCount,
+      onHoldToday: onHoldTodayCount,
+      passRate: inspectedTodayCount > 0 ? Math.round((passedTodayCount / inspectedTodayCount) * 100) : 100,
+    };
+
+    const targetType = query.referenceType;
+    const filterStatus = query.status === "ALL" ? undefined : (query.status as RollQualityStatus) || RollQualityStatus.PENDING_QC;
+    const search = query.search?.trim();
+
+    const items: any[] = [];
+
+    // Fetch Rolls if not filtered to another type
+    if (!targetType || targetType === QcReferenceType.ROLL || targetType === "ROLL") {
+      const rollWhere: Record<string, unknown> = {};
+      if (filterStatus) rollWhere.qualityStatus = filterStatus;
+      if (search) {
+        rollWhere.OR = [
+          { rollNumber: { contains: search, mode: "insensitive" } },
+          { batchLot: { contains: search, mode: "insensitive" } },
+          { inventoryItem: { name: { contains: search, mode: "insensitive" } } },
+          { inventoryItem: { code: { contains: search, mode: "insensitive" } } },
+        ];
+      }
+
+      const rolls = await db.productionRoll.findMany({
+        where: rollWhere,
+        orderBy: { createdAt: "desc" },
+        take: 100,
+        include: {
+          inventoryItem: true,
+          location: true,
+          loomProductionRun: { include: { loomMachine: true, operator: true } },
+          laminationProductionRun: { include: { laminationMachine: true, operator: true } },
+          printingProductionRun: { include: { printingMachine: true, operator: true } },
+        },
+      });
+
+      for (const r of rolls) {
+        items.push({
+          id: r.id,
+          referenceType: "ROLL",
+          referenceId: r.id,
+          identifier: r.rollNumber,
+          type: r.rollType,
+          sourcePhase: r.sourcePhase,
+          status: r.qualityStatus,
+          itemCode: r.inventoryItem?.code || "—",
+          itemName: r.inventoryItem?.name || "Unassigned Item",
+          weight: r.weight,
+          length: r.length,
+          batchLot: r.batchLot || "—",
+          locationName: r.location ? `${r.location.code} (${r.location.name})` : "—",
+          machineName:
+            r.loomProductionRun?.loomMachine?.name ||
+            r.laminationProductionRun?.laminationMachine?.name ||
+            r.printingProductionRun?.printingMachine?.name ||
+            "—",
+          operatorName:
+            r.loomProductionRun?.operator?.name ||
+            r.laminationProductionRun?.operator?.name ||
+            r.printingProductionRun?.operator?.name ||
+            "—",
+          characteristics: r.characteristics,
+          createdAt: r.createdAt,
+        });
+      }
+    }
+
+    // Fetch Bales if not filtered to another type
+    if (!targetType || targetType === QcReferenceType.BALE || targetType === "BALE") {
+      const baleWhere: Record<string, unknown> = {};
+      if (filterStatus) baleWhere.qualityStatus = filterStatus;
+      if (search) {
+        baleWhere.OR = [
+          { baleNumber: { contains: search, mode: "insensitive" } },
+          { productionBatch: { contains: search, mode: "insensitive" } },
+          { product: { name: { contains: search, mode: "insensitive" } } },
+          { product: { code: { contains: search, mode: "insensitive" } } },
+        ];
+      }
+
+      const bales = await db.bale.findMany({
+        where: baleWhere,
+        orderBy: { createdAt: "desc" },
+        take: 100,
+        include: {
+          product: true,
+          baleItem: true,
+          shift: true,
+          createdBy: true,
+        },
+      });
+
+      for (const b of bales) {
+        items.push({
+          id: b.id,
+          referenceType: "BALE",
+          referenceId: b.id,
+          identifier: b.baleNumber,
+          type: "BALE",
+          sourcePhase: "BALING",
+          status: b.qualityStatus,
+          itemCode: b.product?.code || "—",
+          itemName: b.product?.name || "Baled Product",
+          bagsPerBale: b.bagsPerBale,
+          quantity: b.quantity,
+          batchLot: b.productionBatch || "—",
+          shiftName: b.shift?.name || "—",
+          operatorName: b.createdBy?.name || "—",
+          characteristics: b.characteristics,
+          createdAt: b.createdAt,
+        });
+      }
+    }
+
+    // Sort combined queue by creation date descending
+    items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    const { page, limit, skip, take } = parsePaginationParams(
+      { page: query.page, limit: query.limit },
+      { defaultLimit: 50, maxLimit: 200 }
+    );
+
+    const paginatedItems = items.slice(skip, skip + take);
+
+    return {
+      items: paginatedItems,
+      stats,
+      meta: createPaginationMeta(items.length, page, limit),
+    };
+  }
 }
+
