@@ -6,6 +6,9 @@ import {
   QcInspectionQuery,
   QcTargetQuery,
   QcQueueQuery,
+  CreateQcReworkTicketBody,
+  UpdateQcReworkTicketBody,
+  QcReworkTicketQuery,
 } from "../schemas";
 
 const QUALITY = ["Quality Control"];
@@ -28,7 +31,6 @@ export function registerQualityRoutes() {
     tags: QUALITY,
     query: QcInspectionQuery,
   });
-
 
   reg({
     method: "post",
@@ -66,4 +68,42 @@ export function registerQualityRoutes() {
     tags: QUALITY,
     query: QcTargetQuery,
   });
+
+  reg({
+    method: "get",
+    path: "/api/quality/rework",
+    summary: "List QC rework tickets",
+    description: "Retrieve paginated list of active and completed rework tickets with assigned operators and phase routing.",
+    tags: QUALITY,
+    query: QcReworkTicketQuery,
+  });
+
+  reg({
+    method: "post",
+    path: "/api/quality/rework",
+    summary: "Create a new rework ticket",
+    description: "Initialize a rework ticket for non-conforming roll or bale stock and route to target production phase.",
+    tags: QUALITY,
+    body: CreateQcReworkTicketBody,
+  });
+
+  reg({
+    method: "get",
+    path: "/api/quality/rework/{id}",
+    summary: "Get rework ticket details",
+    description: "Retrieve rework ticket with assigned operator, instructions, and source production item metadata.",
+    tags: QUALITY,
+    params: IdPathParam,
+  });
+
+  reg({
+    method: "patch",
+    path: "/api/quality/rework/{id}",
+    summary: "Update rework ticket status or complete rework",
+    description: "Assign operator, record corrective actions, or complete rework ticket which automatically re-queues item for QC inspection.",
+    tags: QUALITY,
+    params: IdPathParam,
+    body: UpdateQcReworkTicketBody,
+  });
 }
+

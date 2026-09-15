@@ -6,8 +6,46 @@ import {
   QcDecision,
   QcInspectionStatus,
   RollQualityStatus,
+  QcReworkStatus,
 } from "@/generated/prisma";
 import { parsePaginationParams, createPaginationMeta, PaginationMeta } from "@/lib/pagination";
+
+export interface CreateQcReworkTicketInput {
+  inspectionId?: string;
+  sourceReferenceType: QcReferenceType;
+  sourceReferenceId: string;
+  targetPhase: string;
+  defectReason?: string;
+  reworkInstructions?: string;
+  assignedOperatorId?: string;
+  reworkQty?: number;
+  reworkCost?: number;
+  notes?: string;
+}
+
+export interface UpdateQcReworkTicketInput {
+  status?: QcReworkStatus;
+  assignedOperatorId?: string;
+  completedById?: string;
+  reworkQty?: number;
+  reworkCost?: number;
+  notes?: string;
+  defectReason?: string;
+  reworkInstructions?: string;
+  reInspectionId?: string;
+}
+
+export interface ListQcReworkTicketsQuery {
+  status?: QcReworkStatus | string | null;
+  targetPhase?: string | null;
+  sourceReferenceType?: QcReferenceType | string | null;
+  sourceReferenceId?: string | null;
+  assignedOperatorId?: string | null;
+  search?: string | null;
+  page?: number | string | null;
+  limit?: number | string | null;
+}
+
 
 export interface QcInspectionLineInput {
   parameterName: string;
@@ -522,5 +560,243 @@ export class QualityService {
       meta: createPaginationMeta(items.length, page, limit),
     };
   }
+
+  /**
+   * Generates a unique rework sequence number (e.g. RW-20260915-0001).
+   */
+  static async generateReworkTicketNumber(): Promise<string> {
+    const today = new Date();
+    const dateStr = today.toISOString().slice(0, 10).replace(/-/g, "");
+    const prefix = `RW-${dateStr}-`;
+
+    const latest = await db.qcReworkTicket.findFirst({
+      where: { ticketNumber: { startsWith: prefix } },
+      orderBy: { ticketNumber: "desc" },
+      select: { ticketNumber: true },
+    });
+
+    let seq = 1;
+    if (latest && latest.ticketNumber) {
+      const parts = latest.ticketNumber.split("-");
+      const lastSeq = parseInt(parts[parts.length - 1], 10);
+      if (!isNaN(lastSeq)) seq = lastSeq + 1;
+    }
+
+    return `${prefix}${String(seq).padStart(4, "0")}`;
+  }
+
+  /**
+   * List rework tickets with filtering and pagination.
+   */
+  static async listReworkTickets(
+    query: ListQcReworkTicketsQuery = {},
+    options: { paginate?: boolean } = {}
+  ) {
+    const { status, targetPhase, sourceReferenceType, sourceReferenceId, assignedOperatorId, search } = query;
+
+    const where: Record<string, unknown> = {};
+
+    if (status) where.status = status as QcReworkStatus;
+    if (targetPhase) where.targetPhase = targetPhase;
+    if (sourceReferenceType) where.sourceReferenceType = sourceReferenceType as QcReferenceType;
+    if (sourceReferenceId) where.sourceReferenceId = sourceReferenceId;
+    if (assignedOperatorId) where.assignedOperatorId = assignedOperatorId;
+
+    if (search) {
+      where.OR = [
+        { ticketNumber: { contains: search, mode: "insensitive" } },
+        { defectReason: { contains: search, mode: "insensitive" } },
+        { reworkInstructions: { contains: search, mode: "insensitive" } },
+        { notes: { contains: search, mode: "insensitive" } },
+      ];
+    }
+
+    const { page, limit, skip, take, isPaginated } = parsePaginationParams(
+      { page: query.page, limit: query.limit },
+      { defaultLimit: 50, maxLimit: 200 }
+    );
+
+    const shouldPaginate = options.paginate || isPaginated;
+
+    const [tickets, total] = await Promise.all([
+      db.qcReworkTicket.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        include: {
+          assignedOperator: {
+            select: { id: true, name: true, email: true, employeeId: true },
+          },
+          completedBy: {
+            select: { id: true, name: true, email: true, employeeId: true },
+          },
+          inspection: {
+            select: { id: true, inspectionNumber: true, decision: true, defectReason: true },
+          },
+        },
+        ...(shouldPaginate ? { skip, take } : {}),
+      }),
+      db.qcReworkTicket.count({ where }),
+    ]);
+
+    return {
+      tickets,
+      ...(shouldPaginate ? { meta: createPaginationMeta(total, page, limit) } : {}),
+    };
+  }
+
+  /**
+   * Get single rework ticket by ID with full entity resolution.
+   */
+  static async getReworkTicketById(id: string) {
+    const ticket = await db.qcReworkTicket.findUnique({
+      where: { id },
+      include: {
+        assignedOperator: {
+          select: { id: true, name: true, email: true, employeeId: true },
+        },
+        completedBy: {
+          select: { id: true, name: true, email: true, employeeId: true },
+        },
+        inspection: {
+          include: { lines: true, inspector: true },
+        },
+      },
+    });
+
+    if (!ticket) return null;
+
+    const target = await this.resolveTarget(ticket.sourceReferenceType, ticket.sourceReferenceId);
+
+    return {
+      ...ticket,
+      target,
+    };
+  }
+
+  /**
+   * Create a new QC Rework ticket.
+   */
+  static async createReworkTicket(data: CreateQcReworkTicketInput) {
+    const ticketNumber = await this.generateReworkTicketNumber();
+
+    const result = await withTransaction(
+      {
+        action: "CREATE_QC_REWORK_TICKET",
+        module: Module.QUALITY_CONTROL,
+        newValues: {
+          ticketNumber,
+          sourceReferenceType: data.sourceReferenceType,
+          sourceReferenceId: data.sourceReferenceId,
+          targetPhase: data.targetPhase,
+          assignedOperatorId: data.assignedOperatorId,
+        },
+      },
+      async (tx) => {
+        const ticket = await tx.qcReworkTicket.create({
+          data: {
+            ticketNumber,
+            inspectionId: data.inspectionId,
+            sourceReferenceType: data.sourceReferenceType,
+            sourceReferenceId: data.sourceReferenceId,
+            targetPhase: data.targetPhase,
+            status: QcReworkStatus.OPEN,
+            defectReason: data.defectReason,
+            reworkInstructions: data.reworkInstructions,
+            assignedOperatorId: data.assignedOperatorId,
+            reworkQty: data.reworkQty,
+            reworkCost: data.reworkCost,
+            notes: data.notes,
+          },
+          include: {
+            assignedOperator: true,
+            inspection: true,
+          },
+        });
+
+        // Set target entity to REWORK status
+        if (data.sourceReferenceType === QcReferenceType.ROLL) {
+          await tx.productionRoll.updateMany({
+            where: { id: data.sourceReferenceId },
+            data: { qualityStatus: RollQualityStatus.REWORK },
+          });
+        } else if (data.sourceReferenceType === QcReferenceType.BALE) {
+          await tx.bale.updateMany({
+            where: { id: data.sourceReferenceId },
+            data: { qualityStatus: RollQualityStatus.REWORK },
+          });
+        }
+
+        return ticket;
+      }
+    );
+
+    return result;
+  }
+
+  /**
+   * Update rework ticket (assign operator, update status, complete rework).
+   */
+  static async updateReworkTicket(id: string, data: UpdateQcReworkTicketInput) {
+    const existing = await db.qcReworkTicket.findUnique({
+      where: { id },
+    });
+
+    if (!existing) {
+      throw new Error("Rework ticket not found.");
+    }
+
+    const isCompleting = data.status === QcReworkStatus.COMPLETED && existing.status !== QcReworkStatus.COMPLETED;
+
+    const result = await withTransaction(
+      {
+        action: "UPDATE_QC_REWORK_TICKET",
+        module: Module.QUALITY_CONTROL,
+        oldValues: { id, status: existing.status, assignedOperatorId: existing.assignedOperatorId },
+        newValues: { id, status: data.status, assignedOperatorId: data.assignedOperatorId },
+      },
+      async (tx) => {
+        const updated = await tx.qcReworkTicket.update({
+          where: { id },
+          data: {
+            status: data.status ?? existing.status,
+            assignedOperatorId: data.assignedOperatorId ?? existing.assignedOperatorId,
+            completedById: data.completedById ?? (isCompleting ? data.completedById : existing.completedById),
+            reworkCompletedAt: isCompleting ? new Date() : existing.reworkCompletedAt,
+            reworkQty: data.reworkQty ?? existing.reworkQty,
+            reworkCost: data.reworkCost ?? existing.reworkCost,
+            notes: data.notes ?? existing.notes,
+            defectReason: data.defectReason ?? existing.defectReason,
+            reworkInstructions: data.reworkInstructions ?? existing.reworkInstructions,
+            reInspectionId: data.reInspectionId ?? existing.reInspectionId,
+          },
+          include: {
+            assignedOperator: true,
+            completedBy: true,
+            inspection: true,
+          },
+        });
+
+        // When rework is completed, reset target entity's qualityStatus to PENDING_QC so it auto-queues for re-inspection!
+        if (isCompleting) {
+          if (existing.sourceReferenceType === QcReferenceType.ROLL) {
+            await tx.productionRoll.updateMany({
+              where: { id: existing.sourceReferenceId },
+              data: { qualityStatus: RollQualityStatus.PENDING_QC },
+            });
+          } else if (existing.sourceReferenceType === QcReferenceType.BALE) {
+            await tx.bale.updateMany({
+              where: { id: existing.sourceReferenceId },
+              data: { qualityStatus: RollQualityStatus.PENDING_QC },
+            });
+          }
+        }
+
+        return updated;
+      }
+    );
+
+    return result;
+  }
 }
+
 
