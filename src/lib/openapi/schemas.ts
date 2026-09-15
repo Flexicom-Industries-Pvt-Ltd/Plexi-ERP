@@ -870,3 +870,52 @@ export const UpdateRoleBody = z.object({
   permissions: z.array(RolePermissionBody).optional(),
 }).openapi("UpdateRole");
 
+// ─── Quality Control (Phase 5) ────────────────────────────────────────────────
+
+export const QcLineBody = z.object({
+  parameterName: z.string().min(1).openapi({ description: "Quality characteristic name (e.g. GSM, Tensile, Width)" }),
+  standardValue: z.string().optional().openapi({ description: "Target / tolerance specification" }),
+  actualValue: z.string().min(1).openapi({ description: "Measured reading" }),
+  unit: z.string().optional().openapi({ description: "Unit of measurement (e.g. gsm, kg, mm)" }),
+  status: z.enum(["PASSED", "FAILED", "REWORK", "ON_HOLD"]).default("PASSED"),
+  remarks: z.string().optional(),
+}).openapi("QcLine");
+
+export const CreateQcInspectionBody = z.object({
+  referenceType: z.enum(["ROLL", "BALE", "PRODUCTION_RUN", "BATCH"]).openapi({ description: "Type of production entity" }),
+  referenceId: z.string().min(1).openapi({ description: "ID of target roll, bale, or run" }),
+  inspectorId: z.string().optional().openapi({ description: "User ID of inspector" }),
+  notes: z.string().optional().openapi({ description: "Inspection notes" }),
+  samplesInspected: z.number().int().min(1).default(1),
+  parameters: z.record(z.string(), z.unknown()).optional(),
+  lines: z.array(QcLineBody).optional(),
+}).openapi("CreateQcInspection");
+
+export const RecordQcDecisionBody = z.object({
+  decision: z.enum(["PASSED", "FAILED", "REWORK", "ON_HOLD"]).openapi({ description: "Final inspection verdict" }),
+  inspectorId: z.string().optional(),
+  notes: z.string().optional(),
+  defectReason: z.string().optional().openapi({ description: "Reason for failure or rework" }),
+  reworkInstructions: z.string().optional().openapi({ description: "Corrective rework instructions" }),
+  samplesInspected: z.number().int().min(1).optional(),
+  parameters: z.record(z.string(), z.unknown()).optional(),
+  lines: z.array(QcLineBody).optional(),
+}).openapi("RecordQcDecision");
+
+export const QcInspectionQuery = z.object({
+  referenceType: z.enum(["ROLL", "BALE", "PRODUCTION_RUN", "BATCH"]).optional(),
+  referenceId: z.string().optional(),
+  status: z.enum(["PENDING", "IN_PROGRESS", "COMPLETED", "CANCELLED"]).optional(),
+  decision: z.enum(["PASSED", "FAILED", "REWORK", "ON_HOLD"]).optional(),
+  inspectorId: z.string().optional(),
+  search: z.string().optional(),
+  page: z.string().optional(),
+  limit: z.string().optional(),
+});
+
+export const QcTargetQuery = z.object({
+  type: z.enum(["ROLL", "BALE", "PRODUCTION_RUN", "BATCH"]),
+  id: z.string().min(1),
+});
+
+

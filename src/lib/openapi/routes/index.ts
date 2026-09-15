@@ -6,6 +6,7 @@ import { registerProfileRoutes } from "./profile";
 import { registerLogsRoutes } from "./logs";
 import { registerSystemRoutes } from "./system";
 import { registerIdentityRoutes } from "./identity";
+import { registerQualityRoutes } from "./quality";
 
 let loaded = false;
 
@@ -17,9 +18,11 @@ export function loadAllRouteRegistrations() {
   registerGateRoutes();
   registerInventoryRoutes();
   registerProductionRoutes();
+  registerQualityRoutes();
   registerSettingsRoutes();
   registerProfileRoutes();
   registerLogsRoutes();
   registerSystemRoutes();
 }
+
 
