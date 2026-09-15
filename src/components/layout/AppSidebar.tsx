@@ -67,11 +67,11 @@ const navItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, module: null },
   { title: "Security & Gate", url: "/dashboard/gate", icon: ShieldCheck, module: "SECURITY_GATE" },
   { title: "Inventory", url: "/dashboard/inventory", icon: PackageSearch, module: "INVENTORY" },
-  { title: "Finished Goods", url: "/dashboard/finished-goods", icon: PackageCheck, module: "INVENTORY" },
+  { title: "Finished Goods", url: "/dashboard/finished-goods", icon: PackageCheck, module: "FINISHED_GOODS" },
   { title: "Production", url: "/dashboard/production", icon: Factory, module: "PRODUCTION" },
   { title: "Quality Control", url: "/dashboard/quality", icon: CheckCircle, module: "QUALITY_CONTROL" },
-  { title: "Recycling Plant", url: "/dashboard/recycling", icon: Recycle, module: "PRODUCTION" },
-  { title: "Maintenance", url: "/dashboard/maintenance", icon: Wrench, module: "PRODUCTION" },
+  { title: "Recycling Plant", url: "/dashboard/recycling", icon: Recycle, module: "RECYCLING_PLANT" },
+  { title: "Maintenance", url: "/dashboard/maintenance", icon: Wrench, module: "MAINTENANCE" },
   { title: "Dispatch", url: "/dashboard/dispatch", icon: Truck, module: "DISPATCH" },
 ];
 

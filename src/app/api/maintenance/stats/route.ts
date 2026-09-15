@@ -6,7 +6,7 @@ import { MaintenanceService } from "@/services/maintenance.service";
 
 export async function GET(request: NextRequest) {
   const auth = await requireApiAuth({
-    module: [Module.PRODUCTION, Module.SETTINGS],
+    module: [Module.MAINTENANCE, Module.PRODUCTION, Module.SETTINGS],
     action: "canRead",
   });
   if (!auth.ok) return auth.response;

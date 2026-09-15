@@ -6,7 +6,7 @@ import { RecyclingService } from "@/services/recycling.service";
 
 export async function GET(request: NextRequest) {
   const auth = await requireApiAuth({
-    module: [Module.PRODUCTION, Module.QUALITY_CONTROL],
+    module: [Module.RECYCLING_PLANT, Module.PRODUCTION, Module.QUALITY_CONTROL],
     action: "canRead",
   });
   if (!auth.ok) return auth.response;
