@@ -1048,4 +1048,46 @@ export const MaintenanceLogQuery = z.object({
   limit: z.string().optional(),
 });
 
+export const ReceiveFinishedGoodsBody = z.object({
+  baleIds: z.array(z.string().min(1)).optional().openapi({ description: "Array of passed bale IDs to promote into FG lots" }),
+  baleId: z.string().optional().openapi({ description: "Single bale ID to promote" }),
+  inventoryItemId: z.string().optional().openapi({ description: "Target finished goods item ID for manual receipt" }),
+  quantity: z.number().positive().optional().openapi({ description: "Quantity in bags for manual receipt" }),
+  unit: z.string().default("bags"),
+  productionBatch: z.string().optional(),
+  grossWeight: z.number().positive().optional(),
+  netWeight: z.number().positive().optional(),
+  locationId: z.string().optional(),
+  notes: z.string().optional(),
+  receivedAt: z.string().datetime().optional(),
+}).openapi("ReceiveFinishedGoods");
+
+export const UpdateFinishedGoodsLotBody = z.object({
+  locationId: z.string().nullable().optional(),
+  status: z.enum(["AVAILABLE", "RESERVED", "ALLOCATED", "DISPATCHED", "ON_HOLD", "SCRAPPED"]).optional(),
+  qualityStatus: z.enum(["PENDING_QC", "PASSED", "FAILED", "REWORK", "ON_HOLD"]).optional(),
+  notes: z.string().nullable().optional(),
+  grossWeight: z.number().positive().nullable().optional(),
+  netWeight: z.number().positive().nullable().optional(),
+}).openapi("UpdateFinishedGoodsLot");
+
+export const FinishedGoodsLotQuery = z.object({
+  inventoryItemId: z.string().optional(),
+  productionBatch: z.string().optional(),
+  locationId: z.string().optional(),
+  status: z.enum(["AVAILABLE", "RESERVED", "ALLOCATED", "DISPATCHED", "ON_HOLD", "SCRAPPED"]).optional(),
+  qualityStatus: z.enum(["PENDING_QC", "PASSED", "FAILED", "REWORK", "ON_HOLD"]).optional(),
+  search: z.string().optional(),
+  dateFrom: z.string().optional(),
+  dateTo: z.string().optional(),
+  page: z.string().optional(),
+  limit: z.string().optional(),
+});
+
+export const BalesQueueQuery = z.object({
+  shiftId: z.string().optional(),
+  search: z.string().optional(),
+});
+
+
 
