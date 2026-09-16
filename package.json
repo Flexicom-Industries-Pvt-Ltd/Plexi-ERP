@@ -24,6 +24,7 @@
     "@prisma/client": "^7.10.0",
     "@scalar/api-reference-react": "^0.9.66",
     "@t3-oss/env-nextjs": "^0.13.11",
+    "@tanstack/react-virtual": "^3.14.13",
     "@types/uuid": "^10.0.0",
     "bcryptjs": "^3.0.3",
     "class-variance-authority": "^0.7.1",
