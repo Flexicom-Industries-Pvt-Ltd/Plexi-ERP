@@ -32,7 +32,8 @@ import { cn } from "@/lib/utils";
 
 /** Scalar custom CSS aligned with Flexicom ERP theme with visible, smooth scrollbars */
 const SCALAR_CUSTOM_CSS = `
-  .scalar-app {
+  .scalar-app,
+  .scalar-api-reference {
     --scalar-font: var(--font-sans, "Inter", system-ui, sans-serif);
     --scalar-font-code: var(--font-geist-mono, "JetBrains Mono", monospace);
     --scalar-color-accent: #0284c7;
@@ -50,7 +51,11 @@ const SCALAR_CUSTOM_CSS = `
     --scalar-radius-lg: 12px;
     --scalar-radius-xl: 16px;
     height: 100% !important;
-    min-height: 650px !important;
+    min-height: 100% !important;
+    width: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 1 auto !important;
   }
 
   /* Universal visible scrollbars across all Scalar containers */
@@ -97,7 +102,6 @@ const SCALAR_CUSTOM_CSS = `
     overflow-y: auto !important;
     overflow-x: hidden !important;
     height: 100% !important;
-    max-height: calc(100vh - 14rem) !important;
     -webkit-overflow-scrolling: touch !important;
   }
 
@@ -110,7 +114,7 @@ const SCALAR_CUSTOM_CSS = `
   .scalar-app .references-classic {
     overflow-y: auto !important;
     height: 100% !important;
-    max-height: calc(100vh - 14rem) !important;
+    flex: 1 1 auto !important;
     -webkit-overflow-scrolling: touch !important;
   }
 
@@ -202,6 +206,12 @@ export function ApiDocsClient() {
   const [copiedPath, setCopiedPath] = useState<string | null>(null);
 
   useEffect(() => {
+    if (typeof window !== "undefined" && window.location.hash) {
+      setViewMode("interactive");
+    }
+  }, []);
+
+  useEffect(() => {
     fetch("/api/swagger")
       .then((res) => (res.ok ? res.json() : null))
       .then((spec) => {
@@ -289,7 +299,7 @@ export function ApiDocsClient() {
   };
 
   return (
-    <div className="flex flex-col gap-5 sm:gap-6 p-3.5 sm:p-6 max-w-7xl mx-auto w-full min-w-0">
+    <div className="flex flex-col gap-4 sm:gap-6 p-2 sm:p-4 md:p-6 max-w-7xl mx-auto w-full min-w-0 flex-1 min-h-[calc(100vh-8rem)]">
       {/* ── Brand Hero Header ── */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-sky-600 via-sky-700 to-slate-900 p-5 sm:p-8 text-white shadow-md">
         <div className="absolute -right-10 -bottom-10 opacity-10 pointer-events-none">
@@ -382,8 +392,8 @@ export function ApiDocsClient() {
 
       {/* ── View Mode: Interactive Scalar Playground ── */}
       {viewMode === "interactive" ? (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden min-h-[700px] w-full flex flex-col">
-          <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between text-xs text-slate-600 shrink-0">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex-1 min-h-[calc(100vh-12rem)] w-full flex flex-col">
+          <div className="p-3.5 sm:p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between text-xs text-slate-600 shrink-0">
             <div className="flex items-center gap-2 font-medium">
               <Terminal className="h-4 w-4 text-sky-600" />
               <span>Live Interactive Request Runner (Scalar)</span>
@@ -398,7 +408,7 @@ export function ApiDocsClient() {
               <ExternalLink className="h-3.5 w-3.5" />
             </a>
           </div>
-          <div className="h-[calc(100vh-14rem)] min-h-[650px] w-full bg-white overflow-hidden">
+          <div className="flex-1 h-full min-h-[calc(100vh-16rem)] w-full bg-white overflow-hidden flex flex-col">
             <ApiReferenceReact
               configuration={{
                 spec: { url: "/api/swagger" },
