@@ -6,14 +6,20 @@ import { format } from "date-fns";
 import {
   Factory,
   ClipboardList,
-  ArrowRight,
-  AlertTriangle,
   Target,
   TrendingUp,
   Clock,
-  Play,
+  Layers,
+  Sparkles,
+  CheckCircle2,
+  Cpu,
+  Scissors,
+  Printer,
+  PackageCheck,
+  ShieldCheck,
+  ArrowRight,
+  Sparkle,
 } from "lucide-react";
-import { statusLabel } from "@/lib/production/phases";
 
 interface DashboardData {
   kpis: {
@@ -31,8 +37,74 @@ interface DashboardData {
   byPhase: Array<{ phase: string; label: string; target: number; actual: number; accepted: number; achievement: number; planCount: number }>;
   byShift: Array<{ shiftId: string; shiftName: string; target: number; actual: number; accepted: number; achievement: number; planCount: number }>;
   byMachine: Array<{ machineId: string; machineName: string; target: number; actual: number; accepted: number; achievement: number; runCount: number }>;
-  delayedPlans: Array<{ id: string; planNumber: string; planDate: string; shiftName: string; status: string }>;
 }
+
+const PRODUCTION_STAGES = [
+  {
+    step: 1,
+    title: "Shift Planning & Scheduling",
+    desc: "Create and approve shift plans, set target quantities, assign machines and operators.",
+    icon: ClipboardList,
+    badge: "Foundation",
+    color: "from-blue-500/20 to-blue-500/5 text-blue-600 border-blue-200",
+  },
+  {
+    step: 2,
+    title: "Tape Extrusion & Bobbin",
+    desc: "Melt raw polymer granules, slit into tapes, stretch, and wind precision bobbins.",
+    icon: Layers,
+    badge: "Stage 1",
+    color: "from-indigo-500/20 to-indigo-500/5 text-indigo-600 border-indigo-200",
+  },
+  {
+    step: 3,
+    title: "Circular Loom Weaving",
+    desc: "Weave warp and weft bobbins into continuous PP / LPP tubular fabric rolls.",
+    icon: Cpu,
+    badge: "Stage 2",
+    color: "from-cyan-500/20 to-cyan-500/5 text-cyan-600 border-cyan-200",
+  },
+  {
+    step: 4,
+    title: "Extrusion Lamination",
+    desc: "Apply molten polymer barrier coating for moisture and chemical resistance.",
+    icon: Sparkles,
+    badge: "Stage 3",
+    color: "from-amber-500/20 to-amber-500/5 text-amber-600 border-amber-200",
+  },
+  {
+    step: 5,
+    title: "Flexographic Printing",
+    desc: "Print custom customer artwork, branding, color codes, and certification marks.",
+    icon: Printer,
+    badge: "Stage 4",
+    color: "from-purple-500/20 to-purple-500/5 text-purple-600 border-purple-200",
+  },
+  {
+    step: 6,
+    title: "Precision Cutting",
+    desc: "Cut continuous rolls into precise bag lengths with heat or cold cut sealed edges.",
+    icon: Scissors,
+    badge: "Stage 5",
+    color: "from-pink-500/20 to-pink-500/5 text-pink-600 border-pink-200",
+  },
+  {
+    step: 7,
+    title: "Bag Finishing (BCS & Converting)",
+    desc: "Convert cut panels into finished bags via BCS, Convertex, Valvomatic, or Manual Stitch.",
+    icon: Factory,
+    badge: "Stage 6",
+    color: "from-emerald-500/20 to-emerald-500/5 text-emerald-600 border-emerald-200",
+  },
+  {
+    step: 8,
+    title: "Baling, QC & Warehouse Intake",
+    desc: "Compress finished bags into strapped bales, verify QC approval, and post to FG.",
+    icon: PackageCheck,
+    badge: "Final Stage",
+    color: "from-emerald-600/20 to-emerald-600/5 text-emerald-700 border-emerald-300",
+  },
+];
 
 export function ProductionDashboardClient() {
   const [data, setData] = useState<DashboardData | null>(null);
@@ -51,62 +123,130 @@ export function ProductionDashboardClient() {
   const kpis = data?.kpis;
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-end gap-4">
+    <div className="space-y-8">
+      {/* Date Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
         <div>
-          <label className="block text-xs font-medium text-slate-500 mb-1">Dashboard Date</label>
+          <h2 className="text-base font-semibold text-slate-800">Manufacturing Command Center</h2>
+          <p className="text-xs text-slate-500">Live operational overview across all production lines.</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <label className="text-xs font-medium text-slate-500">Filter Date:</label>
           <input
             type="date"
-            className="px-3 py-1.5 border border-slate-200 rounded-lg text-sm"
+            className="px-3 py-1.5 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
             value={selectedDate}
             onChange={(e) => setSelectedDate(e.target.value)}
           />
         </div>
       </div>
 
+      {/* KPI Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: "Today's Target", value: kpis?.todayTarget ?? 0, icon: Target, bg: "bg-blue-100", text: "text-blue-600", sub: "Planned output" },
-          { label: "Today's Actual", value: kpis?.todayAccepted ?? 0, icon: TrendingUp, bg: "bg-emerald-100", text: "text-emerald-600", sub: `${kpis?.todayActual ?? 0} gross produced` },
-          { label: "Achievement", value: `${kpis?.achievementPercent ?? 0}%`, icon: Factory, bg: "bg-amber-100", text: "text-amber-600", sub: "Accepted vs target" },
-          { label: "Delayed Plans", value: kpis?.delayedPlansCount ?? 0, icon: AlertTriangle, bg: (kpis?.delayedPlansCount ?? 0) > 0 ? "bg-red-100" : "bg-slate-100", text: (kpis?.delayedPlansCount ?? 0) > 0 ? "text-red-600" : "text-slate-600", sub: "Past due, not completed" },
+          { label: "Today's Target", value: kpis?.todayTarget ?? 0, icon: Target, bg: "bg-blue-50 text-blue-600 border-blue-100", sub: "Planned output units" },
+          { label: "Gross Produced", value: kpis?.todayActual ?? 0, icon: TrendingUp, bg: "bg-emerald-50 text-emerald-600 border-emerald-100", sub: `${kpis?.todayAccepted ?? 0} accepted units` },
+          { label: "Achievement Rate", value: `${kpis?.achievementPercent ?? 0}%`, icon: Factory, bg: "bg-amber-50 text-amber-600 border-amber-100", sub: "Accepted vs planned" },
+          { label: "Active Plans", value: kpis?.activePlans ?? 0, icon: Clock, bg: "bg-purple-50 text-purple-600 border-purple-100", sub: `${kpis?.inProgressPlans ?? 0} currently in progress` },
         ].map((card) => (
           <div key={card.label} className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className={`h-10 w-10 ${card.bg} ${card.text} rounded-lg flex items-center justify-center`}>
-                <card.icon className="h-5 w-5" />
+            <div className="flex items-center gap-4">
+              <div className={`h-12 w-12 rounded-xl flex items-center justify-center border ${card.bg}`}>
+                <card.icon className="h-6 w-6" />
               </div>
               <div>
                 <p className="text-xs font-medium text-slate-500">{card.label}</p>
-                <p className="text-2xl font-bold text-slate-800">{loading ? "—" : card.value}</p>
-                <p className="text-xs text-slate-400">{card.sub}</p>
+                <p className="text-2xl font-bold text-slate-800 tracking-tight">{loading ? "—" : card.value}</p>
+                <p className="text-xs text-slate-400 mt-0.5">{card.sub}</p>
               </div>
             </div>
           </div>
         ))}
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {[
-          { label: "Plans Today", value: kpis?.totalPlansToday ?? 0, icon: ClipboardList },
-          { label: "Active / In Progress", value: `${kpis?.activePlans ?? 0} / ${kpis?.inProgressPlans ?? 0}`, icon: Play },
-          { label: "Runs Completed", value: `${kpis?.completedRunsToday ?? 0} / ${kpis?.runsToday ?? 0}`, icon: Clock },
-        ].map((card) => (
-          <div key={card.label} className="bg-white rounded-xl border border-slate-200 p-4 flex items-center gap-3">
-            <card.icon className="h-5 w-5 text-slate-400" />
-            <div>
-              <p className="text-xs text-slate-500">{card.label}</p>
-              <p className="text-lg font-semibold text-slate-800">{loading ? "—" : card.value}</p>
-            </div>
+      {/* Tape Plant Banner */}
+      <div className="bg-gradient-to-r from-indigo-900 via-slate-900 to-indigo-950 text-white p-6 rounded-2xl border border-indigo-700/50 shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="space-y-1 max-w-2xl">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              v1.1 Active
+            </span>
+            <span className="text-xs uppercase tracking-wider text-indigo-300 font-bold">Plant: Kathua</span>
           </div>
-        ))}
+          <h3 className="text-xl font-bold text-white tracking-tight">Tape Plant Excel-Style Tabular Module</h3>
+          <p className="text-xs text-slate-300 leading-relaxed">
+            Directly record shift planning with material compositions, live process temperatures, drive parameters, raw material stock registers, post-production outputs, and consolidated reports.
+          </p>
+        </div>
+        <Link
+          href="/dashboard/production/tape-plant"
+          className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold text-sm rounded-xl transition-all shadow-md hover:shadow-emerald-500/25 shrink-0"
+        >
+          <span>Open Tape Plant</span>
+          <ArrowRight className="h-4 w-4" />
+        </Link>
       </div>
 
+      {/* Rebuild Architecture Roadmap */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-4 mb-6">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">
+                Step-by-Step Architecture
+              </span>
+              <h3 className="text-lg font-bold text-slate-900">End-to-End Production Workflow</h3>
+            </div>
+            <p className="text-xs text-slate-500 mt-1">
+              The full linear manufacturing pipeline from raw polymer intake to finished goods dispatch.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {PRODUCTION_STAGES.map((stage) => {
+            const Icon = stage.icon;
+            return (
+              <div
+                key={stage.step}
+                className="relative flex flex-col justify-between p-5 rounded-xl border bg-gradient-to-b transition-all duration-200 hover:shadow-md hover:-translate-y-0.5"
+                style={{ borderColor: "rgba(226, 232, 240, 0.8)" }}
+              >
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-xs font-bold text-slate-400 tracking-wider uppercase">
+                      Stage {stage.step}
+                    </span>
+                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md border bg-white ${stage.color}`}>
+                      {stage.badge}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="p-2 rounded-lg bg-slate-100 text-slate-700">
+                      <Icon className="h-5 w-5" />
+                    </div>
+                    <h4 className="text-sm font-bold text-slate-800 leading-snug">{stage.title}</h4>
+                  </div>
+                  <p className="text-xs text-slate-600 leading-relaxed mt-2">{stage.desc}</p>
+                </div>
+
+                <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-medium text-slate-400">
+                  <span>Ready for Build</span>
+                  <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Production Analytics Tables */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <SummaryTable
           title="Phase-wise Production"
           loading={loading}
-          emptyMessage="No production plans for this date."
+          emptyMessage="No phase production records for this date."
           headers={["Phase", "Target", "Accepted", "Achievement"]}
           rows={(data?.byPhase ?? []).map((row) => [
             row.label,
@@ -118,7 +258,7 @@ export function ProductionDashboardClient() {
         <SummaryTable
           title="Shift-wise Production"
           loading={loading}
-          emptyMessage="No shift plans for this date."
+          emptyMessage="No shift records for this date."
           headers={["Shift", "Plans", "Target", "Accepted", "Achievement"]}
           rows={(data?.byShift ?? []).map((row) => [
             row.shiftName,
@@ -133,7 +273,7 @@ export function ProductionDashboardClient() {
       <SummaryTable
         title="Machine-wise Output"
         loading={loading}
-        emptyMessage="No completed runs for this date."
+        emptyMessage="No machine production logs for this date."
         headers={["Machine", "Runs", "Target", "Accepted", "Achievement"]}
         rows={(data?.byMachine ?? []).map((row) => [
           row.machineName,
@@ -143,40 +283,6 @@ export function ProductionDashboardClient() {
           `${row.achievement}%`,
         ])}
       />
-
-      {(data?.delayedPlans?.length ?? 0) > 0 && (
-        <div className="bg-white rounded-xl border border-red-200 overflow-hidden">
-          <div className="px-5 py-4 border-b border-red-100 bg-red-50">
-            <h3 className="font-semibold text-red-800 flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4" /> Delayed Plans
-            </h3>
-          </div>
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50 border-b">
-              <tr>
-                <th className="px-4 py-2 text-left font-medium text-slate-600">Plan #</th>
-                <th className="px-4 py-2 text-left font-medium text-slate-600">Date</th>
-                <th className="px-4 py-2 text-left font-medium text-slate-600">Shift</th>
-                <th className="px-4 py-2 text-left font-medium text-slate-600">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {data!.delayedPlans.map((plan) => (
-                <tr key={plan.id} className="hover:bg-slate-50">
-                  <td className="px-4 py-2">
-                    <Link href={`/dashboard/production/plans/${plan.planNumber}`} className="text-primary font-medium">
-                      {plan.planNumber}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-2 text-slate-600">{format(new Date(plan.planDate), "dd MMM yyyy")}</td>
-                  <td className="px-4 py-2 text-slate-600">{plan.shiftName}</td>
-                  <td className="px-4 py-2 text-slate-600">{statusLabel(plan.status)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
     </div>
   );
 }
@@ -195,9 +301,9 @@ function SummaryTable({
   emptyMessage: string;
 }) {
   return (
-    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-      <div className="px-5 py-4 border-b border-slate-100">
-        <h3 className="font-semibold text-slate-800">{title}</h3>
+    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+      <div className="px-5 py-4 border-b border-slate-100 bg-slate-50/50">
+        <h3 className="font-semibold text-slate-800 text-sm">{title}</h3>
       </div>
       {loading ? (
         <p className="p-6 text-sm text-slate-400">Loading...</p>
@@ -206,18 +312,22 @@ function SummaryTable({
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-slate-50 border-b">
+            <thead className="bg-slate-50 border-b border-slate-100">
               <tr>
                 {headers.map((h) => (
-                  <th key={h} className="px-4 py-2 text-left font-medium text-slate-600">{h}</th>
+                  <th key={h} className="px-4 py-2.5 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                    {h}
+                  </th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {rows.map((row, i) => (
-                <tr key={i} className="hover:bg-slate-50">
+                <tr key={i} className="hover:bg-slate-50/80 transition-colors">
                   {row.map((cell, j) => (
-                    <td key={j} className="px-4 py-2 text-slate-700">{cell}</td>
+                    <td key={j} className="px-4 py-3 text-slate-700 font-medium text-xs">
+                      {cell}
+                    </td>
                   ))}
                 </tr>
               ))}
