@@ -89,11 +89,21 @@ export function AppSidebar({ user, allowedModules, ...props }: AppSidebarProps) 
   const [settingsOpen, setSettingsOpen] = useState(pathname.startsWith("/dashboard/settings"));
   const [dataCentreOpen, setDataCentreOpen] = useState(pathname.startsWith("/dashboard/data-centre"));
 
+  const [currentSearch, setCurrentSearch] = useState("");
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setCurrentSearch(window.location.search);
+    }
+  }, [pathname]);
+
+  const activeTabInUrl = (currentSearch ? new URLSearchParams(currentSearch).get("tab") : null) || "planning";
+
   // Super Admin bypass
   const isSuperAdmin = user?.role?.name === "Super Admin";
   const hasSettingsAccess = isSuperAdmin || allowedModules["SETTINGS"];
   const hasDataCentreAccess = isSuperAdmin || allowedModules["DATA_CENTRE"];
   const hasProductionAccess = isSuperAdmin || allowedModules["PRODUCTION"];
+  const hasTapePlantAccess = isSuperAdmin || allowedModules["TAPE_PLANT"] || allowedModules["PRODUCTION"];
 
   const visibleNavItems = navItems.filter(
     (item) => (!item.module || isSuperAdmin || allowedModules[item.module]),
@@ -127,7 +137,7 @@ export function AppSidebar({ user, allowedModules, ...props }: AppSidebarProps) 
             </SidebarMenuItem>
           ))}
           
-          {hasProductionAccess && (
+          {hasTapePlantAccess && (
             <Collapsible open={tapePlantOpen} onOpenChange={setTapePlantOpen} className="group/collapsible">
               <SidebarMenuItem>
                 <CollapsibleTrigger render={<SidebarMenuButton tooltip="Tape Plant" />}>
@@ -137,16 +147,20 @@ export function AppSidebar({ user, allowedModules, ...props }: AppSidebarProps) 
                 </CollapsibleTrigger>
                 <CollapsibleContent>
                   <SidebarMenuSub>
-                    {tapePlantItems.map((subItem) => (
-                      <SidebarMenuSubItem key={subItem.url}>
-                        <SidebarMenuSubButton
-                          render={<Link href={subItem.url} />}
-                          isActive={pathname === "/dashboard/production/tape-plant"}
-                        >
-                          <span>{subItem.title}</span>
-                        </SidebarMenuSubButton>
-                      </SidebarMenuSubItem>
-                    ))}
+                    {tapePlantItems.map((subItem) => {
+                      const subTab = subItem.url.split("tab=")[1];
+                      const isSubActive = pathname === "/dashboard/production/tape-plant" && activeTabInUrl === subTab;
+                      return (
+                        <SidebarMenuSubItem key={subItem.url}>
+                          <SidebarMenuSubButton
+                            render={<Link href={subItem.url} onClick={() => setCurrentSearch(`?tab=${subTab}`)} />}
+                            isActive={isSubActive}
+                          >
+                            <span>{subItem.title}</span>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      );
+                    })}
                   </SidebarMenuSub>
                 </CollapsibleContent>
               </SidebarMenuItem>
