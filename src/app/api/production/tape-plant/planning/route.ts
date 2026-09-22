@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireProductionApiPermission } from "@/lib/production/permissions";
+import { requireTapePlantApiPermission } from "@/lib/tape-plant/permissions";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
-  const authResult = await requireProductionApiPermission("canRead");
+  const authResult = await requireTapePlantApiPermission("canRead");
   if (!authResult.ok) {
     return NextResponse.json({ error: authResult.error }, { status: authResult.status });
   }
@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const authResult = await requireProductionApiPermission("canCreate");
+  const authResult = await requireTapePlantApiPermission("canCreate");
   if (!authResult.ok) {
     return NextResponse.json({ error: authResult.error }, { status: authResult.status });
   }
