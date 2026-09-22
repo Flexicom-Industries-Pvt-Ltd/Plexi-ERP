@@ -37,32 +37,6 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
-import { FINISHING_ROUTES } from "@/lib/production/finishing-routes";
-
-const baseProductionItems = [
-  { title: "Overview", url: "/dashboard/production" },
-  { title: "Shift Plans", url: "/dashboard/production/plans" },
-  { title: "Shift Handover", url: "/dashboard/production/handovers" },
-  { title: "Bobbin Production", url: "/dashboard/production/bobbin" },
-  { title: "Loom Production", url: "/dashboard/production/loom" },
-  { title: "Lamination", url: "/dashboard/production/lamination" },
-  { title: "Printing", url: "/dashboard/production/printing" },
-  { title: "Cutting", url: "/dashboard/production/cutting" },
-];
-
-const finishingNavItems = FINISHING_ROUTES.map((r) => ({
-  title: r.label,
-  url: r.path,
-  finishingRoute: r.value,
-}));
-
-const tailProductionItems = [
-  { title: "Baling", url: "/dashboard/production/baling" },
-  { title: "Reports", url: "/dashboard/production/reports" },
-  { title: "Roll Stock", url: "/dashboard/production/rolls" },
-  { title: "Phase Characteristics", url: "/dashboard/data-centre/production-characteristics" },
-];
-
 const navItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, module: null },
   { title: "Security & Gate", url: "/dashboard/gate", icon: ShieldCheck, module: "SECURITY_GATE" },
@@ -74,9 +48,6 @@ const navItems = [
   { title: "Maintenance", url: "/dashboard/maintenance", icon: Wrench, module: "MAINTENANCE" },
   { title: "Dispatch", url: "/dashboard/dispatch", icon: Truck, module: "DISPATCH" },
 ];
-
-
-
 
 const settingsItems = [
   { title: "General Settings", url: "/dashboard/settings/organization" },
@@ -96,29 +67,16 @@ const dataCentreItems = [
   { title: "Manpower Rules", url: "/dashboard/data-centre/manpower-rules" },
 ];
 
-function isProductionSubActive(pathname: string, url: string) {
-  if (url === "/dashboard/production") {
-    return pathname === url;
-  }
-  return pathname === url || pathname.startsWith(`${url}/`);
-}
-
 type AppSidebarProps = {
   user: any;
   allowedModules: Record<string, boolean>;
 };
-
-let cachedActiveRoutes: string[] | null = null;
 
 export function AppSidebar({ user, allowedModules, ...props }: AppSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [settingsOpen, setSettingsOpen] = useState(pathname.startsWith("/dashboard/settings"));
   const [dataCentreOpen, setDataCentreOpen] = useState(pathname.startsWith("/dashboard/data-centre"));
-  const [productionOpen, setProductionOpen] = useState(
-    pathname.startsWith("/dashboard/production") ||
-      pathname.startsWith("/dashboard/data-centre/production-characteristics"),
-  );
 
   // Super Admin bypass
   const isSuperAdmin = user?.role?.name === "Super Admin";
@@ -126,35 +84,8 @@ export function AppSidebar({ user, allowedModules, ...props }: AppSidebarProps) 
   const hasDataCentreAccess = isSuperAdmin || allowedModules["DATA_CENTRE"];
   const hasProductionAccess = isSuperAdmin || allowedModules["PRODUCTION"];
 
-  const [activeFinishingRoutes, setActiveFinishingRoutes] = useState<string[]>(
-    () => cachedActiveRoutes ?? [],
-  );
-
-  useEffect(() => {
-    if (!hasProductionAccess || cachedActiveRoutes !== null) return;
-    fetch("/api/production/finishing/active-routes")
-      .then((r) => (r.ok ? r.json() : { routes: [] }))
-      .then((data) => {
-        const routes = data.routes ?? [];
-        cachedActiveRoutes = routes;
-        setActiveFinishingRoutes(routes);
-      })
-      .catch(() => {
-        cachedActiveRoutes = [];
-        setActiveFinishingRoutes([]);
-      });
-  }, [hasProductionAccess]);
-
-  const productionItems = useMemo(() => {
-    const visibleFinishing = finishingNavItems.filter((item) =>
-      activeFinishingRoutes.includes(item.finishingRoute) ||
-      pathname.startsWith(item.url),
-    );
-    return [...baseProductionItems, ...visibleFinishing, ...tailProductionItems];
-  }, [activeFinishingRoutes, pathname]);
-
   const visibleNavItems = navItems.filter(
-    (item) => item.title !== "Production" && (!item.module || isSuperAdmin || allowedModules[item.module]),
+    (item) => (!item.module || isSuperAdmin || allowedModules[item.module]),
   );
 
   return (
@@ -173,53 +104,16 @@ export function AppSidebar({ user, allowedModules, ...props }: AppSidebarProps) 
       <SidebarContent className="px-2 py-4">
         <SidebarMenu>
           {visibleNavItems.map((item) => (
-            <Fragment key={item.url}>
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  render={<Link href={item.url} />}
-                  isActive={pathname === item.url || pathname.startsWith(item.url + "/")}
-                  tooltip={item.title}
-                >
-                  <item.icon className="h-4 w-4" />
-                  <span>{item.title}</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              {item.title === "Inventory" && hasProductionAccess && (
-                <Collapsible open={productionOpen} onOpenChange={setProductionOpen} className="group/collapsible">
-                  <SidebarMenuItem>
-                    <CollapsibleTrigger
-                      render={
-                        <SidebarMenuButton
-                          tooltip="Production"
-                          isActive={
-                            pathname.startsWith("/dashboard/production") ||
-                            pathname.startsWith("/dashboard/data-centre/production-characteristics")
-                          }
-                        />
-                      }
-                    >
-                      <Factory className="h-4 w-4" />
-                      <span>Production</span>
-                      <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180" />
-                    </CollapsibleTrigger>
-                    <CollapsibleContent>
-                      <SidebarMenuSub>
-                        {productionItems.map((subItem) => (
-                          <SidebarMenuSubItem key={subItem.url}>
-                            <SidebarMenuSubButton
-                              render={<Link href={subItem.url} />}
-                              isActive={isProductionSubActive(pathname, subItem.url)}
-                            >
-                              <span>{subItem.title}</span>
-                            </SidebarMenuSubButton>
-                          </SidebarMenuSubItem>
-                        ))}
-                      </SidebarMenuSub>
-                    </CollapsibleContent>
-                  </SidebarMenuItem>
-                </Collapsible>
-              )}
-            </Fragment>
+            <SidebarMenuItem key={item.url}>
+              <SidebarMenuButton
+                render={<Link href={item.url} />}
+                isActive={pathname === item.url || (item.url !== "/dashboard" && pathname.startsWith(item.url + "/"))}
+                tooltip={item.title}
+              >
+                <item.icon className="h-4 w-4" />
+                <span>{item.title}</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
           ))}
           
           {hasDataCentreAccess && (
