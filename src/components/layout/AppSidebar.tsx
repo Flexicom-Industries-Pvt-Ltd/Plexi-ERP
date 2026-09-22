@@ -42,11 +42,15 @@ const navItems = [
   { title: "Security & Gate", url: "/dashboard/gate", icon: ShieldCheck, module: "SECURITY_GATE" },
   { title: "Inventory", url: "/dashboard/inventory", icon: PackageSearch, module: "INVENTORY" },
   { title: "Finished Goods", url: "/dashboard/finished-goods", icon: PackageCheck, module: "FINISHED_GOODS" },
-  { title: "Production", url: "/dashboard/production", icon: Factory, module: "PRODUCTION" },
   { title: "Quality Control", url: "/dashboard/quality", icon: CheckCircle, module: "QUALITY_CONTROL" },
   { title: "Recycling Plant", url: "/dashboard/recycling", icon: Recycle, module: "RECYCLING_PLANT" },
   { title: "Maintenance", url: "/dashboard/maintenance", icon: Wrench, module: "MAINTENANCE" },
   { title: "Dispatch", url: "/dashboard/dispatch", icon: Truck, module: "DISPATCH" },
+];
+
+const productionItems = [
+  { title: "Overview", url: "/dashboard/production" },
+  { title: "Tape Plant (Kathua)", url: "/dashboard/production/tape-plant" },
 ];
 
 const settingsItems = [
@@ -75,6 +79,7 @@ type AppSidebarProps = {
 export function AppSidebar({ user, allowedModules, ...props }: AppSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const [productionOpen, setProductionOpen] = useState(pathname.startsWith("/dashboard/production"));
   const [settingsOpen, setSettingsOpen] = useState(pathname.startsWith("/dashboard/settings"));
   const [dataCentreOpen, setDataCentreOpen] = useState(pathname.startsWith("/dashboard/data-centre"));
 
@@ -116,6 +121,32 @@ export function AppSidebar({ user, allowedModules, ...props }: AppSidebarProps) 
             </SidebarMenuItem>
           ))}
           
+          {hasProductionAccess && (
+            <Collapsible open={productionOpen} onOpenChange={setProductionOpen} className="group/collapsible">
+              <SidebarMenuItem>
+                <CollapsibleTrigger render={<SidebarMenuButton tooltip="Production" />}>
+                    <Factory className="h-4 w-4" />
+                    <span>Production</span>
+                    <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180" />
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <SidebarMenuSub>
+                    {productionItems.map((subItem) => (
+                      <SidebarMenuSubItem key={subItem.url}>
+                        <SidebarMenuSubButton
+                          render={<Link href={subItem.url} />}
+                          isActive={pathname === subItem.url}
+                        >
+                          <span>{subItem.title}</span>
+                        </SidebarMenuSubButton>
+                      </SidebarMenuSubItem>
+                    ))}
+                  </SidebarMenuSub>
+                </CollapsibleContent>
+              </SidebarMenuItem>
+            </Collapsible>
+          )}
+
           {hasDataCentreAccess && (
             <Collapsible open={dataCentreOpen} onOpenChange={setDataCentreOpen} className="group/collapsible">
               <SidebarMenuItem>
