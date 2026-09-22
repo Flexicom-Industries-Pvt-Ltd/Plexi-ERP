@@ -170,9 +170,8 @@ export function ProductionDashboardClient() {
           <div className="flex items-center gap-2">
             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              v1.1 Active
+              Active Workspace
             </span>
-            <span className="text-xs uppercase tracking-wider text-indigo-300 font-bold">Plant: Kathua</span>
           </div>
           <h3 className="text-xl font-bold text-white tracking-tight">Tape Plant Excel-Style Tabular Module</h3>
           <p className="text-xs text-slate-300 leading-relaxed">
