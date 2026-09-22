@@ -168,6 +168,11 @@ model Shift {
   handovers       ShiftHandover[]
   loomAssignments LoomAssignment[]
   bales           Bale[]
+  tapePlantPlans              TapePlantPlan[]
+  tapePlantTemperatures       TapePlantTemperatureReading[]
+  tapePlantDriveParameters    TapePlantDriveParameter[]
+  tapePlantRawMaterials       TapePlantRawMaterial[]
+  tapePlantPostProductions    TapePlantPostProduction[]
 }
 
 enum StockMaterialType {
@@ -1617,6 +1622,153 @@ model DispatchAllocation {
   @@index([finishedGoodsLotId])
   @@index([status])
 }
+
+// ==========================================
+// Tape Plant (Kathua Plant v1.1)
+// ==========================================
+
+model TapePlantPlan {
+  id              String   @id @default(cuid())
+  date            String   // YYYY-MM-DD
+  shiftId         String
+  recipeQuality   String   // Internal codes e.g. "S1", "HC" preserved as plant uses them
+  tapeType        String?  // "PP" | "LPP"
+  denier          Float?
+  tapeWidth       Float?
+  strength        Float?
+  eloPercent      Float?
+  bobbinMarking   String?
+  colour          String?
+  spacerSize      String?
+  requiredAsh     Float?
+  ashPercent      Float?
+  plannedQtyKg    Float    @default(0)
+  omega           String?
+  vistPercent     Float?
+  remarks         String?
+  materials       Json     @default("[]") // Array of { material, quantity, percentage }
+  status          String   @default("DRAFT") // DRAFT | SUBMITTED
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  shift Shift @relation(fields: [shiftId], references: [id])
+
+  @@unique([date, shiftId])
+  @@index([date])
+  @@index([shiftId])
+}
+
+model TapePlantTemperatureReading {
+  id             String   @id @default(cuid())
+  date           String   // YYYY-MM-DD
+  shiftId        String
+  time           String   // e.g. "12:00", "14:00"
+  b1             Float?
+  b2             Float?
+  b3             Float?
+  b4             Float?
+  b5             Float?
+  b6             Float?
+  b7             Float?
+  screenChanger  Float?
+  ad1            Float?
+  ad2            Float?
+  meltPump       Float?
+  d1             Float?
+  d2             Float?
+  d3             Float?
+  d4             Float?
+  d5             Float?
+  d6             Float?
+  d7             Float?
+  housingWater   Float?
+  hotAirTemp     Float?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  shift Shift @relation(fields: [shiftId], references: [id])
+
+  @@index([date, shiftId])
+}
+
+model TapePlantDriveParameter {
+  id              String   @id @default(cuid())
+  date            String   // YYYY-MM-DD
+  shiftId         String
+  time            String   // e.g. "12:00", "14:00"
+  extruderRpm     Float?
+  meltPumpRpm     Float?
+  takeUpMpm       Float?
+  nipRollMpm      Float?
+  isuMpm          Float?
+  pauMpm          Float?
+  stretchingMpm   Float?
+  annealingMpm    Float?
+  stretchingRatio Float?
+  meltPressureP1  Float?
+  meltPressureP2  Float?
+  meltPressureP3  Float?
+  waterBath       Float?
+  colour          String?
+  denier          Float?
+  tapeWidth       Float?
+  strength        Float?
+  eloPercent      Float?
+  spacerWidth     Float?
+  numberOfTape    Int?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  shift Shift @relation(fields: [shiftId], references: [id])
+
+  @@index([date, shiftId])
+}
+
+model TapePlantRawMaterial {
+  id             String   @id @default(cuid())
+  date           String   // YYYY-MM-DD
+  shiftId        String
+  material       String   // PP, CC, MB, RP1, RP2, HD RP, TPT, etc.
+  grade          String?
+  openingStock   Float    @default(0)
+  received       Float    @default(0)
+  total          Float    @default(0)
+  consumption    Float    @default(0)
+  closingStock   Float    @default(0)
+  settingPercent Float?
+  actualPercent  Float?
+  wastage        Float?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  shift Shift @relation(fields: [shiftId], references: [id])
+
+  @@index([date, shiftId])
+}
+
+model TapePlantPostProduction {
+  id                 String   @id @default(cuid())
+  date               String   // YYYY-MM-DD
+  shiftId            String
+  recipeQuality      String?
+  plannedProductionKg Float   @default(0)
+  productionDoneKg   Float    @default(0)
+  gapKg              Float    @default(0)
+  wasteKg            Float    @default(0)
+  wastePercent       Float?
+  netProductionKg    Float    @default(0)
+  qualityChecks      Json     @default("[]") // Array of { time, colour, denier, width, strength, eloPercent, spacerWidth, remarks }
+  status             String   @default("DRAFT") // DRAFT | SUBMITTED
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  shift Shift @relation(fields: [shiftId], references: [id])
+
+  @@unique([date, shiftId])
+  @@index([date])
+  @@index([shiftId])
+}
+
 
 
 

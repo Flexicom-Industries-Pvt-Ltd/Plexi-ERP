@@ -1,0 +1,105 @@
+import { NextRequest, NextResponse } from "next/server";
+import { db } from "@/lib/db";
+import { requireProductionApiPermission } from "@/lib/production/permissions";
+
+export const dynamic = "force-dynamic";
+
+export async function GET(request: NextRequest) {
+  const authResult = await requireProductionApiPermission("canRead");
+  if (!authResult.ok) {
+    return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+  }
+
+  const { searchParams } = new URL(request.url);
+  const dateFrom = searchParams.get("dateFrom");
+  const dateTo = searchParams.get("dateTo");
+  const shiftId = searchParams.get("shiftId");
+  const recipeQuality = searchParams.get("recipeQuality");
+
+  const wherePost: any = {};
+  if (dateFrom && dateTo) {
+    wherePost.date = { gte: dateFrom, lte: dateTo };
+  } else if (dateFrom) {
+    wherePost.date = { gte: dateFrom };
+  } else if (dateTo) {
+    wherePost.date = { lte: dateTo };
+  }
+  if (shiftId) {
+    wherePost.shiftId = shiftId;
+  }
+  if (recipeQuality) {
+    wherePost.recipeQuality = { contains: recipeQuality, mode: "insensitive" };
+  }
+
+  try {
+    const postProductions = await db.tapePlantPostProduction.findMany({
+      where: wherePost,
+      include: {
+        shift: true,
+      },
+      orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+    });
+
+    const plans = await db.tapePlantPlan.findMany({
+      where: wherePost,
+      include: {
+        shift: true,
+      },
+    });
+
+    // Match each record
+    const summary = postProductions.map((p: any) => {
+      const plan = plans.find((pl: any) => pl.date === p.date && pl.shiftId === p.shiftId);
+      const plannedKg = p.plannedProductionKg || (plan ? plan.plannedQtyKg : 0);
+      const doneKg = p.productionDoneKg;
+      const gapKg = plannedKg - doneKg;
+      const wasteKg = p.wasteKg;
+      const netKg = doneKg - wasteKg;
+      const efficiency = plannedKg > 0 ? Number(((doneKg / plannedKg) * 100).toFixed(1)) : 0;
+      const wasteRate = doneKg > 0 ? Number(((wasteKg / doneKg) * 100).toFixed(2)) : 0;
+
+      return {
+        id: p.id,
+        date: p.date,
+        shiftId: p.shiftId,
+        shiftName: p.shift?.name || "Unknown Shift",
+        recipeQuality: p.recipeQuality || plan?.recipeQuality || "—",
+        plannedKg,
+        actualKg: doneKg,
+        gapKg,
+        wasteKg,
+        wastePercent: p.wastePercent !== null ? p.wastePercent : wasteRate,
+        netKg,
+        efficiencyPercent: efficiency,
+        status: p.status,
+      };
+    });
+
+    // Summary totals
+    const totals = summary.reduce(
+      (acc: any, curr: any) => ({
+        totalPlannedKg: acc.totalPlannedKg + curr.plannedKg,
+        totalActualKg: acc.totalActualKg + curr.actualKg,
+        totalGapKg: acc.totalGapKg + curr.gapKg,
+        totalWasteKg: acc.totalWasteKg + curr.wasteKg,
+        totalNetKg: acc.totalNetKg + curr.netKg,
+      }),
+      {
+        totalPlannedKg: 0,
+        totalActualKg: 0,
+        totalGapKg: 0,
+        totalWasteKg: 0,
+        totalNetKg: 0,
+      }
+    );
+
+    return NextResponse.json({
+      summary,
+      totals,
+      count: summary.length,
+    });
+  } catch (error) {
+    console.error("Error generating Tape Plant report:", error);
+    return NextResponse.json({ error: "Failed to generate reports" }, { status: 500 });
+  }
+}

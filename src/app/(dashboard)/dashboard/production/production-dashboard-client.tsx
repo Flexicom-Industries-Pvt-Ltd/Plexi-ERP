@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { format } from "date-fns";
 import {
   Factory,
@@ -17,6 +18,7 @@ import {
   PackageCheck,
   ShieldCheck,
   ArrowRight,
+  Sparkle,
 } from "lucide-react";
 
 interface DashboardData {
@@ -160,6 +162,30 @@ export function ProductionDashboardClient() {
             </div>
           </div>
         ))}
+      </div>
+
+      {/* Tape Plant Banner */}
+      <div className="bg-gradient-to-r from-indigo-900 via-slate-900 to-indigo-950 text-white p-6 rounded-2xl border border-indigo-700/50 shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="space-y-1 max-w-2xl">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              v1.1 Active
+            </span>
+            <span className="text-xs uppercase tracking-wider text-indigo-300 font-bold">Plant: Kathua</span>
+          </div>
+          <h3 className="text-xl font-bold text-white tracking-tight">Tape Plant Excel-Style Tabular Module</h3>
+          <p className="text-xs text-slate-300 leading-relaxed">
+            Directly record shift planning with material compositions, live process temperatures, drive parameters, raw material stock registers, post-production outputs, and consolidated reports.
+          </p>
+        </div>
+        <Link
+          href="/dashboard/production/tape-plant"
+          className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold text-sm rounded-xl transition-all shadow-md hover:shadow-emerald-500/25 shrink-0"
+        >
+          <span>Open Tape Plant</span>
+          <ArrowRight className="h-4 w-4" />
+        </Link>
       </div>
 
       {/* Rebuild Architecture Roadmap */}
