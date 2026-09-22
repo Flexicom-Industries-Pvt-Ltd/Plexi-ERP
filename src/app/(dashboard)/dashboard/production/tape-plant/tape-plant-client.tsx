@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { format, addDays, subDays } from "date-fns";
 import {
   ClipboardList,
@@ -13,7 +14,7 @@ import {
   Clock,
   ChevronLeft,
   ChevronRight,
-  Factory,
+  Layers,
 } from "lucide-react";
 import { TapePlantPlanningSection } from "@/components/tape-plant/TapePlantPlanningSection";
 import { ProcessTemperatureSection } from "@/components/tape-plant/ProcessTemperatureSection";
@@ -40,7 +41,25 @@ const TABS = [
 ];
 
 export function TapePlantClient() {
-  const [activeTab, setActiveTab] = useState<TapePlantTab>("planning");
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get("tab") as TapePlantTab | null;
+
+  const [activeTab, setActiveTab] = useState<TapePlantTab>(
+    tabParam && TABS.some((t) => t.id === tabParam) ? tabParam : "planning"
+  );
+
+  useEffect(() => {
+    if (tabParam && TABS.some((t) => t.id === tabParam)) {
+      setActiveTab(tabParam);
+    }
+  }, [tabParam]);
+
+  const handleTabChange = (tabId: TapePlantTab) => {
+    setActiveTab(tabId);
+    router.replace(`/dashboard/production/tape-plant?tab=${tabId}`, { scroll: false });
+  };
+
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [shifts, setShifts] = useState<{ id: string; name: string; startTime?: string; endTime?: string }[]>([]);
   const [selectedShiftId, setSelectedShiftId] = useState("");
@@ -91,11 +110,11 @@ export function TapePlantClient() {
           <div>
             <div className="flex items-center gap-2.5">
               <div className="p-2 bg-primary/10 text-primary rounded-xl">
-                <Factory className="h-6 w-6" />
+                <Layers className="h-6 w-6" />
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <h1 className="text-xl font-extrabold text-slate-900 tracking-tight">Tape Plant (Kathua)</h1>
+                  <h1 className="text-xl font-extrabold text-slate-900 tracking-tight">Tape Plant</h1>
                   <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
                     v1.1 Tabular
                   </span>
@@ -169,7 +188,7 @@ export function TapePlantClient() {
               <button
                 key={tab.id}
                 type="button"
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => handleTabChange(tab.id)}
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap active:scale-95 ${
                   isActive
                     ? "bg-slate-900 text-white shadow-sm"
