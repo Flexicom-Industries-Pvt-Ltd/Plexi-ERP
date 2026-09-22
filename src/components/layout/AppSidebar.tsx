@@ -18,6 +18,7 @@ import {
   Recycle,
   Wrench,
   PackageCheck,
+  Layers,
 } from "lucide-react";
 
 import {
@@ -42,15 +43,20 @@ const navItems = [
   { title: "Security & Gate", url: "/dashboard/gate", icon: ShieldCheck, module: "SECURITY_GATE" },
   { title: "Inventory", url: "/dashboard/inventory", icon: PackageSearch, module: "INVENTORY" },
   { title: "Finished Goods", url: "/dashboard/finished-goods", icon: PackageCheck, module: "FINISHED_GOODS" },
+  { title: "Production", url: "/dashboard/production", icon: Factory, module: "PRODUCTION" },
   { title: "Quality Control", url: "/dashboard/quality", icon: CheckCircle, module: "QUALITY_CONTROL" },
   { title: "Recycling Plant", url: "/dashboard/recycling", icon: Recycle, module: "RECYCLING_PLANT" },
   { title: "Maintenance", url: "/dashboard/maintenance", icon: Wrench, module: "MAINTENANCE" },
   { title: "Dispatch", url: "/dashboard/dispatch", icon: Truck, module: "DISPATCH" },
 ];
 
-const productionItems = [
-  { title: "Overview", url: "/dashboard/production" },
-  { title: "Tape Plant (Kathua)", url: "/dashboard/production/tape-plant" },
+const tapePlantItems = [
+  { title: "Planning", url: "/dashboard/production/tape-plant?tab=planning" },
+  { title: "Process Temperature", url: "/dashboard/production/tape-plant?tab=temperature" },
+  { title: "Process Drive Parameter", url: "/dashboard/production/tape-plant?tab=drive" },
+  { title: "Raw Material", url: "/dashboard/production/tape-plant?tab=raw-material" },
+  { title: "Post Production Entry", url: "/dashboard/production/tape-plant?tab=post-production" },
+  { title: "Report", url: "/dashboard/production/tape-plant?tab=reports" },
 ];
 
 const settingsItems = [
@@ -79,7 +85,7 @@ type AppSidebarProps = {
 export function AppSidebar({ user, allowedModules, ...props }: AppSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const [productionOpen, setProductionOpen] = useState(pathname.startsWith("/dashboard/production"));
+  const [tapePlantOpen, setTapePlantOpen] = useState(pathname.startsWith("/dashboard/production/tape-plant"));
   const [settingsOpen, setSettingsOpen] = useState(pathname.startsWith("/dashboard/settings"));
   const [dataCentreOpen, setDataCentreOpen] = useState(pathname.startsWith("/dashboard/data-centre"));
 
@@ -122,20 +128,20 @@ export function AppSidebar({ user, allowedModules, ...props }: AppSidebarProps) 
           ))}
           
           {hasProductionAccess && (
-            <Collapsible open={productionOpen} onOpenChange={setProductionOpen} className="group/collapsible">
+            <Collapsible open={tapePlantOpen} onOpenChange={setTapePlantOpen} className="group/collapsible">
               <SidebarMenuItem>
-                <CollapsibleTrigger render={<SidebarMenuButton tooltip="Production" />}>
-                    <Factory className="h-4 w-4" />
-                    <span>Production</span>
+                <CollapsibleTrigger render={<SidebarMenuButton tooltip="Tape Plant" />}>
+                    <Layers className="h-4 w-4" />
+                    <span>Tape Plant</span>
                     <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180" />
                 </CollapsibleTrigger>
                 <CollapsibleContent>
                   <SidebarMenuSub>
-                    {productionItems.map((subItem) => (
+                    {tapePlantItems.map((subItem) => (
                       <SidebarMenuSubItem key={subItem.url}>
                         <SidebarMenuSubButton
                           render={<Link href={subItem.url} />}
-                          isActive={pathname === subItem.url}
+                          isActive={pathname === "/dashboard/production/tape-plant"}
                         >
                           <span>{subItem.title}</span>
                         </SidebarMenuSubButton>
