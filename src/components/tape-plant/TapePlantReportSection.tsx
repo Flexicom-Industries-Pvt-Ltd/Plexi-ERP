@@ -60,7 +60,14 @@ export function TapePlantReportSection({ shifts }: TapePlantReportSectionProps) 
       if (shiftFilter) params.set("shiftId", shiftFilter);
       if (recipeFilter) params.set("recipeQuality", recipeFilter);
 
-      const res = await fetch(`/api/production/tape-plant/reports?${params.toString()}`);
+      params.set("_t", String(Date.now()));
+      const res = await fetch(`/api/production/tape-plant/reports?${params.toString()}`, {
+        cache: "no-store",
+        headers: {
+          Pragma: "no-cache",
+          "Cache-Control": "no-cache",
+        },
+      });
       if (!res.ok) throw new Error("Failed to load reports");
       const json = await res.json();
       setData(json);
