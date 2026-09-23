@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { requireTapePlantApiPermission } from "@/lib/tape-plant/permissions";
 
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export async function GET(request: NextRequest) {
   const authResult = await requireTapePlantApiPermission("canRead");
@@ -49,26 +50,31 @@ export async function GET(request: NextRequest) {
 
     // Match each record
     const summary = postProductions.map((p: any) => {
-      const plan = plans.find((pl: any) => pl.date === p.date && pl.shiftId === p.shiftId);
-      const plannedKg = p.plannedProductionKg || (plan ? plan.plannedQtyKg : 0);
-      const doneKg = p.productionDoneKg;
+      const shiftPlans = plans.filter((pl: any) => pl.date === p.date && pl.shiftId === p.shiftId);
+      const plannedKg = p.plannedProductionKg || shiftPlans.reduce((sum, pl) => sum + (pl.plannedQtyKg || 0), 0);
+      const doneKg = p.productionDoneKg || 0;
       const gapKg = plannedKg - doneKg;
-      const wasteKg = p.wasteKg;
+      const wasteKg = p.wasteKg || 0;
       const netKg = doneKg - wasteKg;
       const efficiency = plannedKg > 0 ? Number(((doneKg / plannedKg) * 100).toFixed(1)) : 0;
       const wasteRate = doneKg > 0 ? Number(((wasteKg / doneKg) * 100).toFixed(2)) : 0;
+
+      const combinedRecipe =
+        p.recipeQuality ||
+        Array.from(new Set(shiftPlans.map((pl) => pl.recipeQuality).filter(Boolean))).join(", ") ||
+        "—";
 
       return {
         id: p.id,
         date: p.date,
         shiftId: p.shiftId,
         shiftName: p.shift?.name || "Unknown Shift",
-        recipeQuality: p.recipeQuality || plan?.recipeQuality || "—",
+        recipeQuality: combinedRecipe,
         plannedKg,
         actualKg: doneKg,
         gapKg,
         wasteKg,
-        wastePercent: p.wastePercent !== null ? p.wastePercent : wasteRate,
+        wastePercent: p.wastePercent !== null && p.wastePercent !== undefined ? p.wastePercent : wasteRate,
         netKg,
         efficiencyPercent: efficiency,
         status: p.status,
@@ -93,11 +99,20 @@ export async function GET(request: NextRequest) {
       }
     );
 
-    return NextResponse.json({
-      summary,
-      totals,
-      count: summary.length,
-    });
+    return NextResponse.json(
+      {
+        summary,
+        totals,
+        count: summary.length,
+      },
+      {
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
+          Pragma: "no-cache",
+          Expires: "0",
+        },
+      }
+    );
   } catch (error) {
     console.error("Error generating Tape Plant report:", error);
     return NextResponse.json({ error: "Failed to generate reports" }, { status: 500 });
