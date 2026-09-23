@@ -10,14 +10,8 @@ import {
   Settings,
   ShieldCheck,
   PackageSearch,
-  Factory,
-  CheckCircle,
-  Truck,
   ChevronDown,
   Database,
-  Recycle,
-  Wrench,
-  PackageCheck,
   Layers,
 } from "lucide-react";
 
@@ -42,12 +36,6 @@ const navItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, module: null },
   { title: "Security & Gate", url: "/dashboard/gate", icon: ShieldCheck, module: "SECURITY_GATE" },
   { title: "Inventory", url: "/dashboard/inventory", icon: PackageSearch, module: "INVENTORY" },
-  { title: "Finished Goods", url: "/dashboard/finished-goods", icon: PackageCheck, module: "FINISHED_GOODS" },
-  { title: "Production", url: "/dashboard/production", icon: Factory, module: "PRODUCTION" },
-  { title: "Quality Control", url: "/dashboard/quality", icon: CheckCircle, module: "QUALITY_CONTROL" },
-  { title: "Recycling Plant", url: "/dashboard/recycling", icon: Recycle, module: "RECYCLING_PLANT" },
-  { title: "Maintenance", url: "/dashboard/maintenance", icon: Wrench, module: "MAINTENANCE" },
-  { title: "Dispatch", url: "/dashboard/dispatch", icon: Truck, module: "DISPATCH" },
 ];
 
 const tapePlantItems = [
@@ -102,7 +90,6 @@ export function AppSidebar({ user, allowedModules, ...props }: AppSidebarProps) 
   const isSuperAdmin = user?.role?.name === "Super Admin";
   const hasSettingsAccess = isSuperAdmin || allowedModules["SETTINGS"];
   const hasDataCentreAccess = isSuperAdmin || allowedModules["DATA_CENTRE"];
-  const hasProductionAccess = isSuperAdmin || allowedModules["PRODUCTION"];
   const hasTapePlantAccess = isSuperAdmin || allowedModules["TAPE_PLANT"] || allowedModules["PRODUCTION"];
 
   const visibleNavItems = navItems.filter(
