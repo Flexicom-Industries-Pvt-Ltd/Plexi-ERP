@@ -187,10 +187,10 @@ export function RecipeQualityInput({
   };
 
   return (
-    <div className="space-y-1.5 relative" ref={containerRef}>
+    <div className="space-y-1.5 relative w-full min-w-0 max-w-full" ref={containerRef}>
       {/* Header & Controls */}
-      <div className="flex items-center justify-between">
-        <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+      <div className="flex flex-wrap items-center justify-between gap-1.5 min-w-0">
+        <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider truncate">
           {label} {required && <span className="text-red-500">*</span>}
         </label>
         <div className="flex items-center gap-1.5">
