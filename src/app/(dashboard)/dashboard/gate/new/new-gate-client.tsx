@@ -9,62 +9,15 @@ import {
   Phone,
   Briefcase,
   FileText,
-  Package,
   PlusCircle,
   ArrowLeft,
-  Search,
   X,
-  Plus,
-  Trash2,
   AlertTriangle,
   Info,
-  CheckCircle2,
 } from "lucide-react";
 import Link from "next/link";
 import { GatePurpose } from "@/generated/prisma";
 import { cn } from "@/lib/utils";
-
-const MATERIAL_TYPE_OPTIONS = [
-  { label: "Raw materials", value: "RAW_MATERIALS" },
-  { label: "Bobbins", value: "BOBBINS" },
-  { label: "PP rolls", value: "PP_ROLLS" },
-  { label: "LPP rolls", value: "LPP_ROLLS" },
-  { label: "Laminated rolls", value: "LAMINATED_ROLLS" },
-  { label: "Printed rolls", value: "PRINTED_ROLLS" },
-  { label: "Cut material", value: "CUT_MATERIAL" },
-  { label: "Work-in-progress", value: "WORK_IN_PROGRESS" },
-  { label: "Finished bags", value: "FINISHED_BAGS" },
-  { label: "Bales", value: "BALES" },
-  { label: "Scrap", value: "SCRAP" },
-  { label: "RP granules", value: "RP_GRANULES" },
-  { label: "External materials", value: "EXTERNAL_MATERIALS" },
-];
-
-const COMMON_UNITS = ["kg", "ton", "bag", "pcs", "meter", "roll", "bale", "box"];
-
-interface StockItemRowData {
-  id: string;
-  stockId: string;
-  materialName: string;
-  materialType: string;
-  quantity: string;
-  unit: string;
-  batchLot: string;
-  availableStock?: number | null;
-  currentStock?: number | null;
-}
-
-const createEmptyStockItem = (): StockItemRowData => ({
-  id: Math.random().toString(36).slice(2, 9),
-  stockId: "",
-  materialName: "",
-  materialType: "RAW_MATERIALS",
-  quantity: "",
-  unit: "kg",
-  batchLot: "",
-  availableStock: null,
-  currentStock: null,
-});
 
 export function NewGateClient() {
   const router = useRouter();
@@ -86,8 +39,6 @@ export function NewGateClient() {
     supplierCustomer: "",
     purpose: GatePurpose.LOADING,
   });
-
-  const [stockItems, setStockItems] = useState<StockItemRowData[]>([createEmptyStockItem()]);
 
   const [driverSearchTerm, setDriverSearchTerm] = useState("");
   const [suggestedDrivers, setSuggestedDrivers] = useState<any[]>([]);
@@ -144,21 +95,6 @@ export function NewGateClient() {
     setIsDriverLocked(false);
   };
 
-  // Stock Row Handlers
-  const handleAddStockItem = () => {
-    setStockItems((prev) => [...prev, createEmptyStockItem()]);
-  };
-
-  const handleRemoveStockItem = (id: string) => {
-    setStockItems((prev) => (prev.length > 1 ? prev.filter((item) => item.id !== id) : prev));
-  };
-
-  const handleUpdateStockItem = (id: string, updates: Partial<StockItemRowData>) => {
-    setStockItems((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, ...updates } : item))
-    );
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.truckNumber || !formData.driverName) {
@@ -166,50 +102,12 @@ export function NewGateClient() {
       return;
     }
 
-    // Filter valid stock items
-    const validStockItems = stockItems
-      .filter((item) => item.materialName.trim() && item.quantity !== "")
-      .map((item) => ({
-        stockId: item.stockId || undefined,
-        materialName: item.materialName.trim(),
-        materialType: item.materialType,
-        quantity: parseFloat(item.quantity) || 0,
-        unit: item.unit || "kg",
-        batchLot: item.batchLot.trim() || undefined,
-        availableStock: item.availableStock,
-      }));
-
-    if (
-      (formData.purpose === GatePurpose.LOADING || formData.purpose === GatePurpose.UNLOADING) &&
-      validStockItems.length === 0
-    ) {
-      toast.error("Please add at least one consignment stock item with material name and quantity.");
-      return;
-    }
-
-    // For Loading: Enforce that requested quantity cannot exceed available stock
-    if (formData.purpose === GatePurpose.LOADING) {
-      for (const item of validStockItems) {
-        if (item.availableStock !== undefined && item.availableStock !== null) {
-          if (item.quantity > item.availableStock) {
-            toast.error(
-              `Cannot load ${item.quantity} ${item.unit} for "${item.materialName}". Available stock in factory is only ${item.availableStock} ${item.unit}.`
-            );
-            return;
-          }
-        }
-      }
-    }
-    
     setLoading(true);
     try {
       const res = await fetch("/api/gate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...formData,
-          stockItems: validStockItems.map(({ availableStock, ...rest }) => rest),
-        }),
+        body: JSON.stringify(formData),
       });
       
       if (!res.ok) {
@@ -217,7 +115,7 @@ export function NewGateClient() {
         throw new Error(errorData.error || "Failed to create entry");
       }
       const data = await res.json();
-      toast.success("Gate entry created successfully with consignment stock items");
+      toast.success("Gate entry created successfully");
       const entryNum = data.data?.entryNumber || data.entryNumber;
       router.push(`/dashboard/gate/${entryNum}`);
     } catch (err: any) {
@@ -400,13 +298,13 @@ export function NewGateClient() {
                 {formData.purpose === GatePurpose.LOADING && (
                   <span className="text-amber-700 font-medium inline-flex items-center gap-1">
                     <AlertTriangle className="h-3 w-3 inline shrink-0" />
-                    Loading dispatch requires checking and restricting quantity against available factory stock.
+                    Loading dispatch entry. Stock items can be added and managed in the vehicle management screen.
                   </span>
                 )}
                 {formData.purpose === GatePurpose.UNLOADING && (
                   <span className="text-blue-700 font-medium inline-flex items-center gap-1">
                     <Info className="h-3 w-3 inline shrink-0" />
-                    Unloading receiving shows current factory stock as an informational reference.
+                    Unloading receiving entry. Consignment materials can be recorded in the vehicle management screen.
                   </span>
                 )}
               </p>
@@ -425,63 +323,9 @@ export function NewGateClient() {
           </div>
         </div>
 
-        {/* Consignment Stock Items (Multi-Item Dynamic Builder) */}
-        <div className="space-y-3 sm:space-y-4 pt-4 sm:pt-6 border-t border-slate-100">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <div>
-              <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
-                <Package className="h-4 w-4 text-primary" /> Consignment Stock Items
-              </h3>
-              <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5">
-                {formData.purpose === GatePurpose.LOADING
-                  ? "Declare materials being dispatched/loaded. Quantity is capped at available factory stock."
-                  : "Declare materials arriving on this truck. Current stock is displayed for reference."}
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={handleAddStockItem}
-              className="inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-bold text-primary bg-primary/10 hover:bg-primary/20 rounded-lg transition-colors shrink-0 self-start sm:self-auto touch-manipulation"
-            >
-              <Plus className="h-4 w-4" /> Add Stock Item
-            </button>
-          </div>
-
-          {/* Desktop Column Header */}
-          <div className="hidden md:flex flex-row gap-2.5 items-center w-full px-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-            <span className="w-6 shrink-0 text-center">#</span>
-            <span className="flex-1 min-w-[130px]">Material Name & Stock Level</span>
-            <span className="w-36 lg:w-44 shrink-0">Category / Type</span>
-            <span className="w-28 lg:w-32 shrink-0 text-right pr-1">Quantity</span>
-            <span className="w-16 lg:w-20 shrink-0">Unit</span>
-            <span className="w-28 lg:w-36 shrink-0">Batch / Lot #</span>
-            <span className="w-8 shrink-0" />
-          </div>
-
-          <div className="space-y-3">
-            {stockItems.map((item, index) => (
-              <StockItemRow
-                key={item.id}
-                index={index}
-                item={item}
-                purpose={formData.purpose}
-                canDelete={stockItems.length > 1}
-                onUpdate={(updates) => handleUpdateStockItem(item.id, updates)}
-                onDelete={() => handleRemoveStockItem(item.id)}
-              />
-            ))}
-          </div>
-        </div>
-
         {/* Submit Actions */}
-        <div className="pt-4 sm:pt-6 border-t border-slate-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4">
-          <div className="text-xs text-slate-500 text-center sm:text-left">
-            Total Declared Items:{" "}
-            <span className="font-bold text-slate-800">
-              {stockItems.filter((s) => s.materialName && s.quantity).length}
-            </span>
-          </div>
-          <div className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-3">
+        <div className="pt-4 sm:pt-6 border-t border-slate-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-3 sm:gap-4">
+          <div className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-3 w-full sm:w-auto">
             <Link
               href="/dashboard/gate"
               className="min-h-[42px] px-5 flex items-center justify-center text-xs sm:text-sm font-medium rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
@@ -503,523 +347,6 @@ export function NewGateClient() {
           </div>
         </div>
       </form>
-    </div>
-  );
-}
-
-function StockItemRow({
-  index,
-  item,
-  purpose,
-  canDelete,
-  onUpdate,
-  onDelete,
-}: {
-  index: number;
-  item: StockItemRowData;
-  purpose: GatePurpose;
-  canDelete: boolean;
-  onUpdate: (updates: Partial<StockItemRowData>) => void;
-  onDelete: () => void;
-}) {
-  const [searchTerm, setSearchTerm] = useState(item.materialName);
-  const [suggestions, setSuggestions] = useState<any[]>([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [isLocked, setIsLocked] = useState(Boolean(item.stockId));
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  // Auto-fetch stock if stockId is present but availableStock not loaded
-  useEffect(() => {
-    if (item.stockId && (item.availableStock === undefined || item.availableStock === null)) {
-      fetch(`/api/stocks/search?id=${encodeURIComponent(item.stockId)}`)
-        .then((res) => (res.ok ? res.json() : null))
-        .then((data) => {
-          if (data) {
-            onUpdate({
-              availableStock: data.availableStock ?? 0,
-              currentStock: data.currentStock ?? 0,
-              unit: data.uom?.abbreviation || item.unit,
-            });
-          }
-        })
-        .catch((err) => console.error("Failed to fetch stock item details", err));
-    }
-  }, [item.stockId]);
-
-  useEffect(() => {
-    if (isLocked || searchTerm.length < 2) {
-      setSuggestions([]);
-      return;
-    }
-
-    const fetchSuggestions = async () => {
-      try {
-        const res = await fetch(`/api/stocks/search?q=${encodeURIComponent(searchTerm)}`);
-        if (res.ok) {
-          const list = await res.json();
-          setSuggestions(list);
-          const exact = list.find(
-            (s: any) => s.name.trim().toLowerCase() === searchTerm.trim().toLowerCase()
-          );
-          if (exact) {
-            onUpdate({
-              stockId: exact.id,
-              availableStock: exact.availableStock ?? 0,
-              currentStock: exact.currentStock ?? 0,
-              unit: exact.uom?.abbreviation || item.unit,
-              materialType: exact.materialType || item.materialType,
-            });
-          }
-        }
-      } catch (err) {
-        console.error("Failed to search stocks", err);
-      }
-    };
-
-    const timeout = setTimeout(fetchSuggestions, 300);
-    return () => clearTimeout(timeout);
-  }, [searchTerm, isLocked]);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setShowSuggestions(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  const handleSelectCatalog = (catalog: any) => {
-    onUpdate({
-      stockId: catalog.id,
-      materialName: catalog.name,
-      materialType: catalog.materialType || item.materialType,
-      unit: catalog.uom?.abbreviation || item.unit,
-      availableStock: catalog.availableStock ?? 0,
-      currentStock: catalog.currentStock ?? 0,
-    });
-    setSearchTerm(catalog.name);
-    setIsLocked(true);
-    setShowSuggestions(false);
-  };
-
-  const handleClear = () => {
-    onUpdate({
-      stockId: "",
-      materialName: "",
-      availableStock: null,
-      currentStock: null,
-    });
-    setSearchTerm("");
-    setIsLocked(false);
-  };
-
-  const qtyValue = parseFloat(item.quantity) || 0;
-  const isExceedingStock =
-    purpose === GatePurpose.LOADING &&
-    item.availableStock !== undefined &&
-    item.availableStock !== null &&
-    qtyValue > (item.availableStock ?? 0);
-
-  return (
-    <div className={cn(
-      "p-3 sm:p-3.5 rounded-xl border transition-all relative overflow-visible",
-      showSuggestions ? "z-30 shadow-md ring-1 ring-primary/20 bg-white" : "z-10",
-      isExceedingStock
-        ? "bg-red-50/40 border-red-200"
-        : !showSuggestions && "bg-slate-50/80 border-slate-200 hover:bg-slate-50"
-    )}>
-      {/* ── Mobile Layout (Structured Card) ── */}
-      <div className="flex md:hidden flex-col gap-2.5">
-        {/* Card Header: Item badge + Delete button */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1.5">
-            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-200 text-[11px] font-bold text-slate-700">
-              {index + 1}
-            </span>
-            <span className="text-xs font-bold text-slate-700">
-              Item #{index + 1}
-            </span>
-          </div>
-          {canDelete && (
-            <button
-              type="button"
-              onClick={onDelete}
-              className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors"
-              title="Remove Item"
-            >
-              <Trash2 className="h-4 w-4" />
-            </button>
-          )}
-        </div>
-
-        {/* Material Name Autocomplete */}
-        <div className="relative" ref={containerRef}>
-          <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
-            Material Name *
-          </label>
-          <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
-            <input
-              type="text"
-              placeholder="e.g. PP Granules 1110MAS"
-              value={searchTerm}
-              disabled={isLocked}
-              onChange={(e) => {
-                setSearchTerm(e.target.value);
-                onUpdate({ materialName: e.target.value });
-                setShowSuggestions(true);
-              }}
-              onFocus={() => setShowSuggestions(true)}
-              className="w-full pl-8 pr-8 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white disabled:bg-slate-100 disabled:text-slate-600"
-              required
-            />
-            {isLocked && (
-              <button
-                type="button"
-                onClick={handleClear}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-red-500 p-0.5"
-                title="Unlock to change material"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            )}
-          </div>
-
-          {/* Stock Info Badge (Mobile) */}
-          {item.availableStock !== undefined && item.availableStock !== null && (
-            <div className="mt-1.5 flex items-center justify-between text-[11px]">
-              {purpose === GatePurpose.LOADING ? (
-                <span className={cn(
-                  "font-bold px-2 py-0.5 rounded-md inline-flex items-center gap-1 border",
-                  (item.availableStock ?? 0) > 0
-                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                    : "bg-red-50 text-red-600 border-red-200"
-                )}>
-                  {(item.availableStock ?? 0) > 0 ? (
-                    <CheckCircle2 className="h-3 w-3 text-emerald-600" />
-                  ) : (
-                    <AlertTriangle className="h-3 w-3 text-red-600" />
-                  )}
-                  Available Stock: {(item.availableStock ?? 0).toLocaleString()} {item.unit}
-                </span>
-              ) : (
-                <span className="font-semibold px-2 py-0.5 rounded-md inline-flex items-center gap-1 bg-blue-50 text-blue-700 border border-blue-200">
-                  <Info className="h-3 w-3 text-blue-600" />
-                  Current Stock: {(item.currentStock ?? item.availableStock ?? 0).toLocaleString()} {item.unit}
-                </span>
-              )}
-            </div>
-          )}
-
-          {showSuggestions && suggestions.length > 0 && !isLocked && (
-            <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-2xl max-h-56 overflow-y-auto divide-y divide-slate-100">
-              {suggestions.map((stock) => (
-                <button
-                  key={stock.id}
-                  type="button"
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    handleSelectCatalog(stock);
-                  }}
-                  onClick={() => handleSelectCatalog(stock)}
-                  className="w-full text-left px-3 py-2.5 hover:bg-primary/5 flex items-center justify-between text-xs transition-colors cursor-pointer"
-                >
-                  <div className="pr-2 min-w-0">
-                    <span className="font-bold text-slate-800 block truncate">{stock.name}</span>
-                    <span className="text-[10px] text-slate-400 font-mono block">{stock.code}</span>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <span className={cn(
-                      "text-[10px] font-bold px-1.5 py-0.5 rounded inline-block",
-                      (stock.availableStock ?? 0) > 0
-                        ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                        : "bg-slate-100 text-slate-500"
-                    )}>
-                      Stock: {(stock.availableStock ?? 0).toLocaleString()} {stock.uom?.abbreviation || "kg"}
-                    </span>
-                    <span className="text-[9px] text-slate-400 capitalize block mt-0.5">
-                      {stock.materialType?.replace(/_/g, " ").toLowerCase()}
-                    </span>
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Row 2: Quantity & Unit */}
-        <div className="grid grid-cols-2 gap-2">
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="block text-[10px] font-bold text-slate-500 uppercase">
-                Quantity *
-              </label>
-              {purpose === GatePurpose.LOADING && item.availableStock !== undefined && item.availableStock !== null && (
-                <span className="text-[10px] text-slate-400">
-                  Max: {(item.availableStock ?? 0).toLocaleString()}
-                </span>
-              )}
-            </div>
-            <input
-              type="number"
-              step="any"
-              min="0"
-              max={purpose === GatePurpose.LOADING && item.availableStock !== null && item.availableStock !== undefined ? item.availableStock : undefined}
-              placeholder="0.00"
-              value={item.quantity}
-              onChange={(e) => onUpdate({ quantity: e.target.value })}
-              className={cn(
-                "w-full px-3 py-2 text-xs border rounded-lg focus:outline-none transition-all text-right font-semibold",
-                isExceedingStock
-                  ? "border-red-500 bg-red-50 text-red-900 focus:ring-2 focus:ring-red-200"
-                  : "border-slate-200 bg-white focus:ring-2 focus:ring-primary/20 focus:border-primary"
-              )}
-              required
-            />
-            {isExceedingStock && (
-              <p className="text-[10px] font-bold text-red-600 mt-1 flex items-center gap-1">
-                <AlertTriangle className="h-3 w-3 shrink-0" />
-                Exceeds stock of {(item.availableStock ?? 0).toLocaleString()} {item.unit}
-              </p>
-            )}
-          </div>
-          <div>
-            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
-              Unit
-            </label>
-            <select
-              value={item.unit}
-              onChange={(e) => onUpdate({ unit: e.target.value })}
-              className="w-full px-2.5 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white font-medium"
-            >
-              {COMMON_UNITS.map((u) => (
-                <option key={u} value={u}>
-                  {u}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {/* Row 3: Material Type & Batch/Lot */}
-        <div className="grid grid-cols-2 gap-2">
-          <div>
-            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
-              Type
-            </label>
-            <select
-              value={item.materialType}
-              onChange={(e) => onUpdate({ materialType: e.target.value })}
-              className="w-full px-2 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white font-medium truncate"
-            >
-              {MATERIAL_TYPE_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
-              Batch / Lot
-            </label>
-            <input
-              type="text"
-              placeholder="Optional"
-              value={item.batchLot}
-              onChange={(e) => onUpdate({ batchLot: e.target.value })}
-              className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* ── Desktop Layout (1-Row Proportional Flex) ── */}
-      <div className="hidden md:flex flex-col gap-1.5 w-full min-w-0">
-        <div className="flex flex-row gap-2.5 items-center w-full min-w-0">
-          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-bold text-slate-700">
-            {index + 1}
-          </span>
-
-          {/* Material Name / Autocomplete */}
-          <div className="flex-1 min-w-[130px] relative" ref={containerRef}>
-            <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
-              <input
-                type="text"
-                placeholder="Search or enter material..."
-                value={searchTerm}
-                disabled={isLocked}
-                onChange={(e) => {
-                  setSearchTerm(e.target.value);
-                  onUpdate({ materialName: e.target.value });
-                  setShowSuggestions(true);
-                }}
-                onFocus={() => setShowSuggestions(true)}
-                className="w-full pl-8 pr-7 py-2 text-xs sm:text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white disabled:bg-slate-100 disabled:text-slate-600 truncate"
-                required
-              />
-              {isLocked && (
-                <button
-                  type="button"
-                  onClick={handleClear}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-red-500 p-0.5"
-                  title="Unlock to change material"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              )}
-            </div>
-
-            {showSuggestions && suggestions.length > 0 && !isLocked && (
-              <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-2xl max-h-56 overflow-y-auto min-w-[280px] divide-y divide-slate-100">
-                {suggestions.map((stock) => (
-                  <button
-                    key={stock.id}
-                    type="button"
-                    onMouseDown={(e) => {
-                      e.preventDefault();
-                      handleSelectCatalog(stock);
-                    }}
-                    onClick={() => handleSelectCatalog(stock)}
-                    className="w-full text-left px-3 py-2.5 hover:bg-primary/5 flex items-center justify-between text-xs transition-colors cursor-pointer"
-                  >
-                    <div className="pr-2 min-w-0">
-                      <span className="font-bold text-slate-800 block truncate">{stock.name}</span>
-                      <span className="text-[10px] text-slate-400 font-mono block">{stock.code}</span>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <span className={cn(
-                        "text-[10px] font-bold px-1.5 py-0.5 rounded inline-block",
-                        (stock.availableStock ?? 0) > 0
-                          ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                          : "bg-slate-100 text-slate-500"
-                      )}>
-                        Stock: {(stock.availableStock ?? 0).toLocaleString()} {stock.uom?.abbreviation || "kg"}
-                      </span>
-                      <span className="text-[9px] text-slate-400 capitalize block mt-0.5">
-                        {stock.materialType?.replace(/_/g, " ").toLowerCase()}
-                      </span>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Material Type */}
-          <div className="w-36 lg:w-44 shrink-0 min-w-0">
-            <select
-              value={item.materialType}
-              onChange={(e) => onUpdate({ materialType: e.target.value })}
-              className="w-full px-2.5 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white font-medium truncate"
-            >
-              {MATERIAL_TYPE_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Quantity */}
-          <div className="w-28 lg:w-32 shrink-0 min-w-0">
-            <input
-              type="number"
-              step="any"
-              min="0"
-              max={purpose === GatePurpose.LOADING && item.availableStock !== null && item.availableStock !== undefined ? item.availableStock : undefined}
-              placeholder="0.00"
-              value={item.quantity}
-              onChange={(e) => onUpdate({ quantity: e.target.value })}
-              className={cn(
-                "w-full px-2.5 py-2 text-xs sm:text-sm border rounded-lg focus:outline-none transition-all text-right font-semibold",
-                isExceedingStock
-                  ? "border-red-500 bg-red-50 text-red-900 focus:ring-2 focus:ring-red-200"
-                  : "border-slate-200 bg-white focus:ring-2 focus:ring-primary/20 focus:border-primary"
-              )}
-              required
-            />
-          </div>
-
-          {/* Unit */}
-          <div className="w-16 lg:w-20 shrink-0 min-w-0">
-            <select
-              value={item.unit}
-              onChange={(e) => onUpdate({ unit: e.target.value })}
-              className="w-full px-2 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white font-medium"
-            >
-              {COMMON_UNITS.map((u) => (
-                <option key={u} value={u}>
-                  {u}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Batch / Lot */}
-          <div className="w-28 lg:w-36 shrink-0 min-w-0">
-            <input
-              type="text"
-              placeholder="Batch/Lot #"
-              value={item.batchLot}
-              onChange={(e) => onUpdate({ batchLot: e.target.value })}
-              className="w-full px-2.5 py-2 text-xs sm:text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white truncate"
-            />
-          </div>
-
-          {/* Delete button */}
-          {canDelete ? (
-            <button
-              type="button"
-              onClick={onDelete}
-              className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors shrink-0"
-              title="Remove Item"
-            >
-              <Trash2 className="h-4 w-4" />
-            </button>
-          ) : (
-            <div className="w-7 shrink-0" />
-          )}
-        </div>
-
-        {/* Stock Status Bar & Validation Warning (Desktop) */}
-        {item.availableStock !== undefined && item.availableStock !== null && (
-          <div className="flex items-center justify-between pl-8 pr-10 text-[11px]">
-            <div className="flex items-center gap-2">
-              {purpose === GatePurpose.LOADING ? (
-                <span className={cn(
-                  "font-semibold px-2 py-0.5 rounded-md inline-flex items-center gap-1 border",
-                  (item.availableStock ?? 0) > 0
-                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                    : "bg-red-50 text-red-600 border-red-200"
-                )}>
-                  {(item.availableStock ?? 0) > 0 ? (
-                    <CheckCircle2 className="h-3 w-3 text-emerald-600" />
-                  ) : (
-                    <AlertTriangle className="h-3 w-3 text-red-600" />
-                  )}
-                  Available Stock: {(item.availableStock ?? 0).toLocaleString()} {item.unit}
-                </span>
-              ) : (
-                <span className="font-semibold px-2 py-0.5 rounded-md inline-flex items-center gap-1 bg-blue-50 text-blue-700 border border-blue-200">
-                  <Info className="h-3 w-3 text-blue-600" />
-                  Current Factory Stock: {(item.currentStock ?? item.availableStock ?? 0).toLocaleString()} {item.unit}
-                </span>
-              )}
-            </div>
-
-            {isExceedingStock && (
-              <span className="text-red-600 font-bold flex items-center gap-1">
-                <AlertTriangle className="h-3.5 w-3.5" />
-                Requested quantity ({qtyValue.toLocaleString()} {item.unit}) exceeds available stock of {(item.availableStock ?? 0).toLocaleString()} {item.unit}!
-              </span>
-            )}
-          </div>
-        )}
-      </div>
     </div>
   );
 }
