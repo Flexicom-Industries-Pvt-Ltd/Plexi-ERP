@@ -1,11 +1,13 @@
 "use client";
 
-import React, { useRef, useState, useCallback, useEffect } from "react";
-import { Plus, Trash2, Copy, Eraser, Check, AlertCircle } from "lucide-react";
+import React, { useRef, useState, useCallback } from "react";
+import { Plus, Trash2, Copy, Eraser } from "lucide-react";
 
 export type ColumnDef<T> = {
   key: string;
   label: string;
+  group?: string;
+  groupColor?: string;
   width?: string;
   type?: "text" | "number" | "select" | "readonly";
   options?: string[];
@@ -70,6 +72,18 @@ export function SpreadsheetTable<T extends Record<string, any>>({
     [data, columns, onChange]
   );
 
+  const focusCell = (row: number, col: number) => {
+    setActiveCell({ row, col });
+    const cellId = `cell-${row}-${col}`;
+    const element = document.getElementById(cellId);
+    if (element) {
+      element.focus();
+      if (element instanceof HTMLInputElement) {
+        element.select();
+      }
+    }
+  };
+
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent, rowIndex: number, colIndex: number) => {
       const totalRows = data.length;
@@ -78,14 +92,12 @@ export function SpreadsheetTable<T extends Record<string, any>>({
       if (e.key === "Tab") {
         e.preventDefault();
         if (e.shiftKey) {
-          // Move backwards
           if (colIndex > 0) {
             focusCell(rowIndex, colIndex - 1);
           } else if (rowIndex > 0) {
             focusCell(rowIndex - 1, totalCols - 1);
           }
         } else {
-          // Move forwards
           if (colIndex < totalCols - 1) {
             focusCell(rowIndex, colIndex + 1);
           } else if (rowIndex < totalRows - 1) {
@@ -118,18 +130,6 @@ export function SpreadsheetTable<T extends Record<string, any>>({
     [data.length, columns.length, allowAddRow, onAddRow]
   );
 
-  const focusCell = (row: number, col: number) => {
-    setActiveCell({ row, col });
-    const cellId = `cell-${row}-${col}`;
-    const element = document.getElementById(cellId);
-    if (element) {
-      element.focus();
-      if (element instanceof HTMLInputElement) {
-        element.select();
-      }
-    }
-  };
-
   const handleClearRow = (index: number) => {
     const updated = [...data];
     const cleared: Record<string, any> = {};
@@ -139,6 +139,38 @@ export function SpreadsheetTable<T extends Record<string, any>>({
     updated[index] = cleared as T;
     onChange(updated);
   };
+
+  // Group calculations for multi-tiered super header
+  const hasGroups = columns.some((col) => Boolean(col.group));
+  const headerGroups: { label?: string; span: number; className?: string; cols: ColumnDef<T>[] }[] = [];
+
+  if (hasGroups) {
+    let currentGroup: string | undefined = undefined;
+    let currentSpan = 0;
+    let currentClass = "";
+    let currentCols: ColumnDef<T>[] = [];
+
+    columns.forEach((col, idx) => {
+      if (idx === 0) {
+        currentGroup = col.group;
+        currentSpan = 1;
+        currentClass = col.groupColor || "";
+        currentCols = [col];
+      } else if (col.group === currentGroup) {
+        currentSpan += 1;
+        currentCols.push(col);
+      } else {
+        headerGroups.push({ label: currentGroup, span: currentSpan, className: currentClass, cols: currentCols });
+        currentGroup = col.group;
+        currentSpan = 1;
+        currentClass = col.groupColor || "";
+        currentCols = [col];
+      }
+    });
+    if (currentSpan > 0) {
+      headerGroups.push({ label: currentGroup, span: currentSpan, className: currentClass, cols: currentCols });
+    }
+  }
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
@@ -167,27 +199,101 @@ export function SpreadsheetTable<T extends Record<string, any>>({
       <div className="overflow-x-auto relative max-h-[620px] scrollbar-thin scrollbar-thumb-slate-300">
         <table ref={tableRef} className="w-full text-xs border-collapse text-left border-spacing-0">
           <thead className="bg-slate-100/90 sticky top-0 z-20 backdrop-blur-sm border-b border-slate-200 shadow-sm">
-            <tr>
-              <th className="w-10 px-2 py-2.5 text-center text-slate-400 font-bold text-[10px] border-r border-slate-200 bg-slate-100">
-                #
-              </th>
-              {columns.map((col, cIdx) => (
-                <th
-                  key={col.key}
-                  style={{ minWidth: col.minWidth ? `${col.minWidth}px` : undefined }}
-                  className={`px-3 py-2.5 text-slate-700 font-bold text-xs uppercase tracking-wider border-r border-slate-200 whitespace-nowrap ${
-                    col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"
-                  } ${cIdx === 0 && col.sticky ? "sticky left-0 z-30 bg-slate-100 shadow-r" : ""}`}
-                >
-                  {col.label}
+            {hasGroups ? (
+              <>
+                {/* Top Tier Header (Zone Groups) */}
+                <tr>
+                  <th
+                    rowSpan={2}
+                    className="w-10 px-2 py-2 text-center text-slate-400 font-bold text-[10px] border-r border-b border-slate-300 bg-slate-100"
+                  >
+                    #
+                  </th>
+
+                  {headerGroups.map((grp, gIdx) => {
+                    if (grp.label) {
+                      return (
+                        <th
+                          key={`grp-${gIdx}`}
+                          colSpan={grp.span}
+                          className={`px-3 py-1.5 text-center font-black text-[11px] uppercase tracking-wider border-r border-b border-slate-300 ${
+                            grp.className || "bg-slate-200/90 text-slate-800"
+                          }`}
+                        >
+                          {grp.label}
+                        </th>
+                      );
+                    }
+
+                    // Standalone ungrouped column spanning both header rows
+                    return grp.cols.map((col, cIdx) => {
+                      const isFirstCol = gIdx === 0 && cIdx === 0;
+                      return (
+                        <th
+                          key={col.key}
+                          rowSpan={2}
+                          style={{ minWidth: col.minWidth ? `${col.minWidth}px` : undefined }}
+                          className={`px-3 py-2 text-slate-700 font-bold text-xs uppercase tracking-wider border-r border-b border-slate-300 whitespace-nowrap ${
+                            col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"
+                          } ${isFirstCol && col.sticky ? "sticky left-0 z-30 bg-slate-100 shadow-r" : ""}`}
+                        >
+                          {col.label}
+                        </th>
+                      );
+                    });
+                  })}
+
+                  {(allowDeleteRow || allowCopyRow || allowClearRow) && (
+                    <th
+                      rowSpan={2}
+                      className="w-20 px-2 py-2 text-center text-slate-500 font-bold text-[10px] bg-slate-100 border-b border-slate-300"
+                    >
+                      Actions
+                    </th>
+                  )}
+                </tr>
+
+                {/* Sub Tier Header (Individual Column labels for grouped columns) */}
+                <tr>
+                  {columns
+                    .filter((col) => Boolean(col.group))
+                    .map((col) => (
+                      <th
+                        key={col.key}
+                        style={{ minWidth: col.minWidth ? `${col.minWidth}px` : undefined }}
+                        className={`px-2.5 py-1.5 text-slate-700 font-bold text-[11px] uppercase tracking-wider border-r border-b border-slate-300 whitespace-nowrap bg-slate-100/90 ${
+                          col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"
+                        }`}
+                      >
+                        {col.label}
+                      </th>
+                    ))}
+                </tr>
+              </>
+            ) : (
+              /* Single Tier Header (Standard) */
+              <tr>
+                <th className="w-10 px-2 py-2.5 text-center text-slate-400 font-bold text-[10px] border-r border-slate-200 bg-slate-100">
+                  #
                 </th>
-              ))}
-              {(allowDeleteRow || allowCopyRow || allowClearRow) && (
-                <th className="w-20 px-2 py-2.5 text-center text-slate-500 font-bold text-[10px] bg-slate-100">
-                  Actions
-                </th>
-              )}
-            </tr>
+                {columns.map((col, cIdx) => (
+                  <th
+                    key={col.key}
+                    style={{ minWidth: col.minWidth ? `${col.minWidth}px` : undefined }}
+                    className={`px-3 py-2.5 text-slate-700 font-bold text-xs uppercase tracking-wider border-r border-slate-200 whitespace-nowrap ${
+                      col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"
+                    } ${cIdx === 0 && col.sticky ? "sticky left-0 z-30 bg-slate-100 shadow-r" : ""}`}
+                  >
+                    {col.label}
+                  </th>
+                ))}
+                {(allowDeleteRow || allowCopyRow || allowClearRow) && (
+                  <th className="w-20 px-2 py-2.5 text-center text-slate-500 font-bold text-[10px] bg-slate-100">
+                    Actions
+                  </th>
+                )}
+              </tr>
+            )}
           </thead>
           <tbody className="divide-y divide-slate-200">
             {data.length === 0 ? (
