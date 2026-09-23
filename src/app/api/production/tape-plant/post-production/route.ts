@@ -132,7 +132,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { date, shiftId, entries, status, recipeQuality, plannedProductionKg, productionDoneKg, wasteKg, wastePercent } = body;
+    const { date, shiftId, entries, status, recipeQuality, plannedProductionKg, productionDoneKg, wasteKg, wastePercent, operatorName, operatorId } = body;
 
     if (!date || !shiftId) {
       return NextResponse.json({ error: "Date and Shift are required" }, { status: 400 });
@@ -204,6 +204,8 @@ export async function POST(request: NextRequest) {
       create: {
         date,
         shiftId,
+        operatorName: operatorName ? String(operatorName).trim() : null,
+        operatorId: operatorId ? String(operatorId).trim() : null,
         recipeQuality: combinedRecipeQuality || null,
         plannedProductionKg: totalPlanned,
         productionDoneKg: totalDone,
@@ -216,6 +218,8 @@ export async function POST(request: NextRequest) {
         status: status || "DRAFT",
       },
       update: {
+        operatorName: operatorName !== undefined ? (operatorName ? String(operatorName).trim() : null) : undefined,
+        operatorId: operatorId !== undefined ? (operatorId ? String(operatorId).trim() : null) : undefined,
         recipeQuality: combinedRecipeQuality || null,
         plannedProductionKg: totalPlanned,
         productionDoneKg: totalDone,

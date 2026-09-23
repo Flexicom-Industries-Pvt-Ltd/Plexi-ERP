@@ -1664,6 +1664,8 @@ model TapePlantTemperatureReading {
   date           String   // YYYY-MM-DD
   shiftId        String
   time           String   // e.g. "12:00", "14:00"
+  operatorName   String?
+  operatorId     String?
   b1             Float?
   b2             Float?
   b3             Float?
@@ -1700,6 +1702,8 @@ model TapePlantDriveParameter {
   date            String   // YYYY-MM-DD
   shiftId         String
   time            String   // e.g. "12:00", "14:00"
+  operatorName    String?
+  operatorId      String?
   extruderRpm     Float?
   meltPumpRpm     Float?
   takeUpMpm       Float?
@@ -1732,6 +1736,8 @@ model TapePlantRawMaterial {
   id             String   @id @default(cuid())
   date           String   // YYYY-MM-DD
   shiftId        String
+  operatorName   String?
+  operatorId     String?
   material       String   // PP, CC, MB, RP1, RP2, HD RP, TPT, etc.
   grade          String?
   openingStock   Float    @default(0)
@@ -1754,6 +1760,8 @@ model TapePlantPostProduction {
   id                 String   @id @default(cuid())
   date               String   // YYYY-MM-DD
   shiftId            String
+  operatorName       String?
+  operatorId         String?
   recipeQuality      String?
   plannedProductionKg Float   @default(0)
   productionDoneKg   Float    @default(0)
@@ -1805,5 +1813,24 @@ model TapePlantRecipe {
 
   @@index([code])
   @@index([tapeType])
+  @@index([isActive])
+}
+
+model Operator {
+  id              String   @id @default(cuid())
+  name            String
+  code            String?  @unique
+  section         String   // e.g. "TAPE_PLANT", "LOOM", "LAMINATION", "PRINTING", "CUTTING", "FINISHING", "RECYCLING", "MAINTENANCE", "QUALITY_CONTROL", "ALL"
+  sectionName     String?  // Human-readable section label e.g., "Tape Plant", "Loom Section"
+  phone           String?
+  shiftPreference String?  // "A", "B", "C", "GENERAL", "ALL"
+  designation     String?  // e.g. "Senior Operator", "Operator", "Technician", "Helper"
+  notes           String?
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([section, isActive])
+  @@index([name])
   @@index([isActive])
 }

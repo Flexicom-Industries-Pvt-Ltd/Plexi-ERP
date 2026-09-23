@@ -16,6 +16,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { RecipeQualityBadge } from "./RecipeQualityBadge";
+import { OperatorSelect } from "./OperatorSelect";
 
 export interface RecipePostProductionEntry {
   id: string;
@@ -41,6 +42,8 @@ export function PostProductionSection({ date, shiftId, shiftName }: PostProducti
   const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState("DRAFT");
+  const [operatorName, setOperatorName] = useState("");
+  const [operatorId, setOperatorId] = useState("");
   const [entries, setEntries] = useState<RecipePostProductionEntry[]>([]);
 
   const fetchPostProductionData = useCallback(
@@ -66,6 +69,8 @@ export function PostProductionSection({ date, shiftId, shiftName }: PostProducti
 
         const postProd = data.postProduction;
         setStatus(postProd?.status || "DRAFT");
+        setOperatorName(postProd?.operatorName || "");
+        setOperatorId(postProd?.operatorId || "");
 
         if (Array.isArray(data.entries) && data.entries.length > 0) {
           setEntries(data.entries);
@@ -132,6 +137,8 @@ export function PostProductionSection({ date, shiftId, shiftName }: PostProducti
       const payload = {
         date,
         shiftId,
+        operatorName,
+        operatorId,
         entries,
         status: submitStatus,
       };
@@ -196,12 +203,22 @@ export function PostProductionSection({ date, shiftId, shiftName }: PostProducti
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
+          <OperatorSelect
+            value={operatorName}
+            operatorId={operatorId}
+            onChange={(name, id) => {
+              setOperatorName(name);
+              setOperatorId(id || "");
+            }}
+            section="TAPE_PLANT"
+          />
+
           <button
             type="button"
             disabled={loading || refreshing || saving}
             onClick={() => fetchPostProductionData(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition-all active:scale-95 disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition-all active:scale-95 disabled:opacity-50 h-8"
             title="Reload latest recipes from Planning"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin text-primary" : ""}`} />
@@ -211,7 +228,7 @@ export function PostProductionSection({ date, shiftId, shiftName }: PostProducti
             type="button"
             disabled={saving || entries.length === 0}
             onClick={() => handleSave("DRAFT")}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition-all active:scale-95 disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition-all active:scale-95 disabled:opacity-50 h-8"
           >
             {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
             Save Draft
@@ -220,7 +237,7 @@ export function PostProductionSection({ date, shiftId, shiftName }: PostProducti
             type="button"
             disabled={saving || entries.length === 0}
             onClick={() => handleSave("SUBMITTED")}
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary hover:bg-primary/90 text-white text-xs font-semibold rounded-lg shadow-sm transition-all active:scale-95 disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary hover:bg-primary/90 text-white text-xs font-semibold rounded-lg shadow-sm transition-all active:scale-95 disabled:opacity-50 h-8"
           >
             {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle className="h-3.5 w-3.5" />}
             Submit Output
