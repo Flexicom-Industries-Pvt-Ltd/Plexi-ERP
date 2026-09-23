@@ -29,10 +29,9 @@ export async function GET(request: NextRequest) {
     });
 
     // Also fetch the plan to default planned quantity if post-production record is new
-    const plan = await db.tapePlantPlan.findUnique({
-      where: {
-        date_shiftId: { date, shiftId },
-      },
+    const plan = await db.tapePlantPlan.findFirst({
+      where: { date, shiftId },
+      orderBy: { createdAt: "desc" },
     });
 
     return NextResponse.json({
