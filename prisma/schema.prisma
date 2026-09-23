@@ -1774,9 +1774,36 @@ model TapePlantPostProduction {
   @@index([shiftId])
 }
 
+model TapePlantRecipe {
+  id              String   @id @default(cuid())
+  code            String   @unique // e.g. "AMB/PP/YL/74/500/S1"
+  tapeType        String   // "PP" | "LPP" | "HDPE"
+  denier          Float?
+  tapeWidth       Float?
+  strength        Float?
+  eloPercent      Float?
+  bobbinMarking   String?
+  colour          String?
+  spacerSize      Float?
+  requiredAsh     Float?
+  ashPercent      Float?
+  ppPercent       Float?
+  ccPercent       Float?
+  mbPercent       Float?
+  rp1Percent      Float?
+  rp2Percent      Float?
+  hdrpPercent     Float?
+  omega           Float?
+  vistamaxPercent Float?
+  tptPercent      Float?
+  totalPercent    Float?   @default(100)
+  defaultQtyKg    Float?
+  remarks         String?
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
-
-
-
-
-
+  @@index([code])
+  @@index([tapeType])
+  @@index([isActive])
+}
