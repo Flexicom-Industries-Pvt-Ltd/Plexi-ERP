@@ -5,6 +5,9 @@ import { toast } from "sonner";
 import { Save, CheckCircle, Loader2, Sparkles, AlertCircle } from "lucide-react";
 import { SpreadsheetTable, ColumnDef } from "./SpreadsheetTable";
 
+import { RecipeQualityInput } from "./RecipeQualityInput";
+import { DEFAULT_RECIPE_STRING } from "@/lib/tape-plant/recipe-format";
+
 interface MaterialRow {
   material: string;
   quantity: number | string;
@@ -37,14 +40,14 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  const [recipeQuality, setRecipeQuality] = useState("S1");
-  const [tapeType, setTapeType] = useState("PP");
+  const [recipeQuality, setRecipeQuality] = useState(DEFAULT_RECIPE_STRING);
+  const [tapeType, setTapeType] = useState("LPP");
   const [denier, setDenier] = useState<number | string>("");
-  const [tapeWidth, setTapeWidth] = useState<number | string>("");
+  const [tapeWidth, setTapeWidth] = useState<number | string>("500");
   const [strength, setStrength] = useState<number | string>("");
   const [eloPercent, setEloPercent] = useState<number | string>("");
   const [bobbinMarking, setBobbinMarking] = useState("");
-  const [colour, setColour] = useState("");
+  const [colour, setColour] = useState("YL (Yellow)");
   const [spacerSize, setSpacerSize] = useState("");
   const [requiredAsh, setRequiredAsh] = useState<number | string>("");
   const [ashPercent, setAshPercent] = useState<number | string>("");
@@ -62,8 +65,8 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (data) {
-          setRecipeQuality(data.recipeQuality || "S1");
-          setTapeType(data.tapeType || "PP");
+          setRecipeQuality(data.recipeQuality || DEFAULT_RECIPE_STRING);
+          setTapeType(data.tapeType || "LPP");
           setDenier(data.denier ?? "");
           setTapeWidth(data.tapeWidth ?? "");
           setStrength(data.strength ?? "");
@@ -85,14 +88,14 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
           }
         } else {
           // Reset to clean defaults
-          setRecipeQuality("S1");
-          setTapeType("PP");
+          setRecipeQuality(DEFAULT_RECIPE_STRING);
+          setTapeType("LPP");
           setDenier("");
-          setTapeWidth("");
+          setTapeWidth("500");
           setStrength("");
           setEloPercent("");
           setBobbinMarking("");
-          setColour("");
+          setColour("YL (Yellow)");
           setSpacerSize("");
           setRequiredAsh("");
           setAshPercent("");
@@ -110,7 +113,7 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
 
   const handleSave = async (submitStatus: "DRAFT" | "SUBMITTED") => {
     if (!recipeQuality.trim()) {
-      toast.error("Recipe / Quality code is required (e.g. S1, HC)");
+      toast.error("Recipe / Quality code is required (e.g. STYM/LPP/YL/500/64/HC)");
       return;
     }
 
@@ -219,29 +222,34 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
         </div>
       </div>
 
+      {/* Recipe / Quality ID Specification Card */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 sm:p-5">
+        <RecipeQualityInput
+          value={recipeQuality}
+          onChange={setRecipeQuality}
+          label="Target Recipe / Quality ID (Standard Format)"
+          required
+          onSyncSpecifications={({ tapeType: synType, colour: synColour, tapeWidth: synWidth }) => {
+            if (synType === "PP" || synType === "LPP") setTapeType(synType);
+            if (synColour) setColour(synColour);
+            if (synWidth) setTapeWidth(synWidth);
+            toast.success("Planning parameters synchronized with Recipe ID");
+          }}
+        />
+      </div>
+
       {/* Basic Planning Specifications Table / Spreadsheet View */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="px-5 py-3.5 bg-slate-50 border-b border-slate-200">
+        <div className="px-5 py-3.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
           <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
             Shift Specifications & Quality Parameters
           </h3>
+          <span className="text-[11px] font-mono font-bold text-primary bg-primary/10 px-2 py-0.5 rounded">
+            {recipeQuality}
+          </span>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 divide-x divide-y divide-slate-200 border-b border-slate-200 text-xs">
-          {/* Recipe / Quality */}
-          <div className="p-3 bg-white">
-            <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">
-              Recipe / Quality <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={recipeQuality}
-              placeholder="e.g. S1, HC"
-              onChange={(e) => setRecipeQuality(e.target.value)}
-              className="w-full h-8 px-2.5 text-xs font-bold text-slate-800 bg-slate-50 border border-slate-200 rounded focus:bg-white focus:ring-1 focus:ring-primary outline-none"
-            />
-          </div>
-
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 divide-x divide-y divide-slate-200 border-b border-slate-200 text-xs">
           {/* PP / LPP */}
           <div className="p-3 bg-white">
             <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">PP / LPP</label>
