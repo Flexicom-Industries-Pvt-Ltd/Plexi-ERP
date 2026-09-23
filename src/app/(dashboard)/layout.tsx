@@ -28,10 +28,10 @@ export default async function DashboardLayout({
     <SidebarProvider>
       <BreadcrumbProvider>
         <AppSidebar user={user} allowedModules={allowedModules} />
-        <div className="flex flex-1 flex-col overflow-hidden bg-background">
+        <div className="flex flex-1 flex-col min-w-0 max-w-full overflow-hidden bg-background">
           <AppHeader />
-          <main className="flex-1 overflow-y-auto p-3 pb-6 md:p-6 md:pb-6 bg-secondary/30">
-            <div className="mx-auto max-w-7xl h-full">
+          <main className="flex-1 min-w-0 max-w-full overflow-y-auto overflow-x-hidden p-3 pb-6 md:p-6 md:pb-6 bg-secondary/30">
+            <div className="mx-auto max-w-7xl w-full min-w-0 h-full">
               {children}
             </div>
           </main>
