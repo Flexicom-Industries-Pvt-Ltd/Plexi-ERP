@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { requireTapePlantApiPermission } from "@/lib/tape-plant/permissions";
 
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export async function GET(request: NextRequest) {
   const authResult = await requireTapePlantApiPermission("canRead");
@@ -24,7 +25,13 @@ export async function GET(request: NextRequest) {
       orderBy: { time: "asc" },
     });
 
-    return NextResponse.json(readings);
+    return NextResponse.json(readings, {
+      headers: {
+        "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
+        Pragma: "no-cache",
+        Expires: "0",
+      },
+    });
   } catch (error) {
     console.error("Error fetching Tape Plant temperature readings:", error);
     return NextResponse.json({ error: "Failed to fetch temperature readings" }, { status: 500 });
@@ -76,7 +83,14 @@ export async function POST(request: NextRequest) {
             d5: r.d5 !== "" && r.d5 !== null && r.d5 !== undefined ? Number(r.d5) : null,
             d6: r.d6 !== "" && r.d6 !== null && r.d6 !== undefined ? Number(r.d6) : null,
             d7: r.d7 !== "" && r.d7 !== null && r.d7 !== undefined ? Number(r.d7) : null,
-            housingWater: r.housingWater !== "" && r.housingWater !== null && r.housingWater !== undefined ? Number(r.housingWater) : null,
+            meltTemp: r.meltTemp !== "" && r.meltTemp !== null && r.meltTemp !== undefined ? Number(r.meltTemp) : null,
+            h1: r.h1 !== "" && r.h1 !== null && r.h1 !== undefined ? Number(r.h1) : null,
+            h2: r.h2 !== "" && r.h2 !== null && r.h2 !== undefined ? Number(r.h2) : null,
+            housingWater: r.housingWater !== "" && r.housingWater !== null && r.housingWater !== undefined
+              ? Number(r.housingWater)
+              : r.h1 !== "" && r.h1 !== null && r.h1 !== undefined
+              ? Number(r.h1)
+              : null,
             hotAirTemp: r.hotAirTemp !== "" && r.hotAirTemp !== null && r.hotAirTemp !== undefined ? Number(r.hotAirTemp) : null,
           }));
 

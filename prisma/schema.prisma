@@ -1682,6 +1682,9 @@ model TapePlantTemperatureReading {
   d5             Float?
   d6             Float?
   d7             Float?
+  meltTemp       Float?
+  h1             Float?
+  h2             Float?
   housingWater   Float?
   hotAirTemp     Float?
   createdAt      DateTime @default(now())

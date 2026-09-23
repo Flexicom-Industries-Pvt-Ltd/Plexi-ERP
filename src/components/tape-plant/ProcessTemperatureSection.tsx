@@ -26,7 +26,9 @@ interface TemperatureReading {
   d5: number | string;
   d6: number | string;
   d7: number | string;
-  housingWater: number | string;
+  meltTemp: number | string;
+  h1: number | string;
+  h2: number | string;
   hotAirTemp: number | string;
 }
 
@@ -34,26 +36,40 @@ const DEFAULT_SCHEDULED_TIMES = ["12:00", "14:00", "16:00", "18:00", "20:00"];
 
 const tempColumns: ColumnDef<TemperatureReading>[] = [
   { key: "time", label: "Time", width: "90px", minWidth: 90, sticky: true, placeholder: "HH:MM" },
-  { key: "b1", label: "B1", width: "70px", minWidth: 70, type: "number", align: "right", placeholder: "°C" },
-  { key: "b2", label: "B2", width: "70px", minWidth: 70, type: "number", align: "right", placeholder: "°C" },
-  { key: "b3", label: "B3", width: "70px", minWidth: 70, type: "number", align: "right", placeholder: "°C" },
-  { key: "b4", label: "B4", width: "70px", minWidth: 70, type: "number", align: "right", placeholder: "°C" },
-  { key: "b5", label: "B5", width: "70px", minWidth: 70, type: "number", align: "right", placeholder: "°C" },
-  { key: "b6", label: "B6", width: "70px", minWidth: 70, type: "number", align: "right", placeholder: "°C" },
-  { key: "b7", label: "B7", width: "70px", minWidth: 70, type: "number", align: "right", placeholder: "°C" },
-  { key: "screenChanger", label: "Screen Changer", width: "120px", minWidth: 110, type: "number", align: "right", placeholder: "°C" },
-  { key: "ad1", label: "AD-1", width: "80px", minWidth: 75, type: "number", align: "right", placeholder: "°C" },
-  { key: "ad2", label: "AD-2", width: "80px", minWidth: 75, type: "number", align: "right", placeholder: "°C" },
-  { key: "meltPump", label: "Melt Pump", width: "95px", minWidth: 90, type: "number", align: "right", placeholder: "°C" },
-  { key: "d1", label: "D-1", width: "70px", minWidth: 70, type: "number", align: "right", placeholder: "°C" },
-  { key: "d2", label: "D-2", width: "70px", minWidth: 70, type: "number", align: "right", placeholder: "°C" },
-  { key: "d3", label: "D-3", width: "70px", minWidth: 70, type: "number", align: "right", placeholder: "°C" },
-  { key: "d4", label: "D-4", width: "70px", minWidth: 70, type: "number", align: "right", placeholder: "°C" },
-  { key: "d5", label: "D-5", width: "70px", minWidth: 70, type: "number", align: "right", placeholder: "°C" },
-  { key: "d6", label: "D-6", width: "70px", minWidth: 70, type: "number", align: "right", placeholder: "°C" },
-  { key: "d7", label: "D-7", width: "70px", minWidth: 70, type: "number", align: "right", placeholder: "°C" },
-  { key: "housingWater", label: "Housing Water", width: "115px", minWidth: 110, type: "number", align: "right", placeholder: "°C" },
-  { key: "hotAirTemp", label: "Hot Air Temp", width: "115px", minWidth: 110, type: "number", align: "right", placeholder: "°C" },
+  
+  // Barrel Zone
+  { key: "b1", label: "B1", group: "Barrel Zone", groupColor: "bg-blue-100/90 text-blue-900 border-blue-200", width: "70px", minWidth: 65, type: "number", align: "right", placeholder: "°C" },
+  { key: "b2", label: "B2", group: "Barrel Zone", groupColor: "bg-blue-100/90 text-blue-900 border-blue-200", width: "70px", minWidth: 65, type: "number", align: "right", placeholder: "°C" },
+  { key: "b3", label: "B3", group: "Barrel Zone", groupColor: "bg-blue-100/90 text-blue-900 border-blue-200", width: "70px", minWidth: 65, type: "number", align: "right", placeholder: "°C" },
+  { key: "b4", label: "B4", group: "Barrel Zone", groupColor: "bg-blue-100/90 text-blue-900 border-blue-200", width: "70px", minWidth: 65, type: "number", align: "right", placeholder: "°C" },
+  { key: "b5", label: "B5", group: "Barrel Zone", groupColor: "bg-blue-100/90 text-blue-900 border-blue-200", width: "70px", minWidth: 65, type: "number", align: "right", placeholder: "°C" },
+  { key: "b6", label: "B6", group: "Barrel Zone", groupColor: "bg-blue-100/90 text-blue-900 border-blue-200", width: "70px", minWidth: 65, type: "number", align: "right", placeholder: "°C" },
+  { key: "b7", label: "B7", group: "Barrel Zone", groupColor: "bg-blue-100/90 text-blue-900 border-blue-200", width: "70px", minWidth: 65, type: "number", align: "right", placeholder: "°C" },
+
+  // Adaptor
+  { key: "screenChanger", label: "Screen Changer", group: "Adaptor", groupColor: "bg-indigo-100/90 text-indigo-900 border-indigo-200", width: "115px", minWidth: 105, type: "number", align: "right", placeholder: "°C" },
+  { key: "ad1", label: "AD-1", group: "Adaptor", groupColor: "bg-indigo-100/90 text-indigo-900 border-indigo-200", width: "75px", minWidth: 70, type: "number", align: "right", placeholder: "°C" },
+  { key: "ad2", label: "AD-2", group: "Adaptor", groupColor: "bg-indigo-100/90 text-indigo-900 border-indigo-200", width: "75px", minWidth: 70, type: "number", align: "right", placeholder: "°C" },
+  { key: "meltPump", label: "Melt Pump", group: "Adaptor", groupColor: "bg-indigo-100/90 text-indigo-900 border-indigo-200", width: "95px", minWidth: 90, type: "number", align: "right", placeholder: "°C" },
+
+  // Die Zone
+  { key: "d1", label: "D-1", group: "Die Zone", groupColor: "bg-amber-100/90 text-amber-900 border-amber-200", width: "70px", minWidth: 65, type: "number", align: "right", placeholder: "°C" },
+  { key: "d2", label: "D-2", group: "Die Zone", groupColor: "bg-amber-100/90 text-amber-900 border-amber-200", width: "70px", minWidth: 65, type: "number", align: "right", placeholder: "°C" },
+  { key: "d3", label: "D-3", group: "Die Zone", groupColor: "bg-amber-100/90 text-amber-900 border-amber-200", width: "70px", minWidth: 65, type: "number", align: "right", placeholder: "°C" },
+  { key: "d4", label: "D-4", group: "Die Zone", groupColor: "bg-amber-100/90 text-amber-900 border-amber-200", width: "70px", minWidth: 65, type: "number", align: "right", placeholder: "°C" },
+  { key: "d5", label: "D-5", group: "Die Zone", groupColor: "bg-amber-100/90 text-amber-900 border-amber-200", width: "70px", minWidth: 65, type: "number", align: "right", placeholder: "°C" },
+  { key: "d6", label: "D-6", group: "Die Zone", groupColor: "bg-amber-100/90 text-amber-900 border-amber-200", width: "70px", minWidth: 65, type: "number", align: "right", placeholder: "°C" },
+  { key: "d7", label: "D-7", group: "Die Zone", groupColor: "bg-amber-100/90 text-amber-900 border-amber-200", width: "70px", minWidth: 65, type: "number", align: "right", placeholder: "°C" },
+
+  // After D-7: Melt Temp
+  { key: "meltTemp", label: "Melt Temp", width: "100px", minWidth: 95, type: "number", align: "right", placeholder: "°C" },
+
+  // Housing Water Temp
+  { key: "h1", label: "H1", group: "Housing Water Temp", groupColor: "bg-cyan-100/90 text-cyan-900 border-cyan-200", width: "70px", minWidth: 65, type: "number", align: "right", placeholder: "°C" },
+  { key: "h2", label: "H2", group: "Housing Water Temp", groupColor: "bg-cyan-100/90 text-cyan-900 border-cyan-200", width: "70px", minWidth: 65, type: "number", align: "right", placeholder: "°C" },
+
+  // Hot Air Temp
+  { key: "hotAirTemp", label: "Hot Air Temp", width: "115px", minWidth: 105, type: "number", align: "right", placeholder: "°C" },
 ];
 
 interface ProcessTemperatureSectionProps {
@@ -72,9 +88,35 @@ export function ProcessTemperatureSection({ date, shiftId, shiftName }: ProcessT
     setLoading(true);
     fetch(`/api/production/tape-plant/temperature?date=${date}&shiftId=${shiftId}`)
       .then((r) => (r.ok ? r.json() : []))
-      .then((data: TemperatureReading[]) => {
+      .then((data: any[]) => {
         if (data && data.length > 0) {
-          setReadings(data);
+          const mapped: TemperatureReading[] = data.map((d) => ({
+            id: d.id,
+            time: d.time || "",
+            b1: d.b1 ?? "",
+            b2: d.b2 ?? "",
+            b3: d.b3 ?? "",
+            b4: d.b4 ?? "",
+            b5: d.b5 ?? "",
+            b6: d.b6 ?? "",
+            b7: d.b7 ?? "",
+            screenChanger: d.screenChanger ?? "",
+            ad1: d.ad1 ?? "",
+            ad2: d.ad2 ?? "",
+            meltPump: d.meltPump ?? "",
+            d1: d.d1 ?? "",
+            d2: d.d2 ?? "",
+            d3: d.d3 ?? "",
+            d4: d.d4 ?? "",
+            d5: d.d5 ?? "",
+            d6: d.d6 ?? "",
+            d7: d.d7 ?? "",
+            meltTemp: d.meltTemp ?? "",
+            h1: d.h1 !== undefined && d.h1 !== null ? d.h1 : (d.housingWater ?? ""),
+            h2: d.h2 ?? "",
+            hotAirTemp: d.hotAirTemp ?? "",
+          }));
+          setReadings(mapped);
         } else {
           // Initialize with standard shift intervals
           const initial: TemperatureReading[] = DEFAULT_SCHEDULED_TIMES.map((time) => ({
@@ -97,7 +139,9 @@ export function ProcessTemperatureSection({ date, shiftId, shiftName }: ProcessT
             d5: "",
             d6: "",
             d7: "",
-            housingWater: "",
+            meltTemp: "",
+            h1: "",
+            h2: "",
             hotAirTemp: "",
           }));
           setReadings(initial);
@@ -158,7 +202,9 @@ export function ProcessTemperatureSection({ date, shiftId, shiftName }: ProcessT
         d5: "",
         d6: "",
         d7: "",
-        housingWater: "",
+        meltTemp: "",
+        h1: "",
+        h2: "",
         hotAirTemp: "",
       },
     ]);
