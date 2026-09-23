@@ -14,10 +14,15 @@ import {
   Check,
   AlertCircle,
   FlaskConical,
+  Eye,
+  FileSpreadsheet,
+  Printer,
 } from "lucide-react";
 import { SpreadsheetTable, ColumnDef } from "./SpreadsheetTable";
 import { RecipeQualityInput } from "./RecipeQualityInput";
 import { RecipeQualityBadge } from "./RecipeQualityBadge";
+import { PlanningPrintPreviewModal } from "./PlanningPrintPreviewModal";
+import { generateTapePlantPlanningExcel } from "@/lib/tape-plant/planning-export";
 import { DEFAULT_RECIPE_STRING, parseRecipeQuality } from "@/lib/tape-plant/recipe-format";
 
 export interface MaterialRow {
@@ -95,11 +100,27 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState("DRAFT");
+  const [showPrintModal, setShowPrintModal] = useState(false);
 
   // Multi-recipe state
   const [recipePlans, setRecipePlans] = useState<RecipePlanItem[]>([createEmptyRecipePlan(1)]);
   const [activeRecipeIndex, setActiveRecipeIndex] = useState<number>(0);
   const [masterRecipes, setMasterRecipes] = useState<any[]>([]);
+
+  const handleExportExcel = () => {
+    try {
+      generateTapePlantPlanningExcel({
+        date,
+        shiftName,
+        status,
+        plans: recipePlans,
+      });
+      toast.success("Excel plan downloaded successfully");
+    } catch (err) {
+      console.error("Export error:", err);
+      toast.error("Failed to export Excel file");
+    }
+  };
 
   // Load Data Centre master recipes
   useEffect(() => {
@@ -453,12 +474,32 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
             </span>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowPrintModal(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition-all active:scale-95 h-8 cursor-pointer"
+              title="Preview printable planning document and print"
+            >
+              <Eye className="h-3.5 w-3.5 text-slate-600" />
+              <span>Preview & Print</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleExportExcel}
+              className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-semibold rounded-lg transition-all active:scale-95 h-8 cursor-pointer shadow-2xs"
+              title="Download full multi-recipe planning Excel spreadsheet (.xlsx)"
+            >
+              <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600" />
+              <span>Export Excel</span>
+            </button>
+
             <button
               type="button"
               disabled={saving}
               onClick={() => handleSave("DRAFT")}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition-all active:scale-95 disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition-all active:scale-95 disabled:opacity-50 h-8 cursor-pointer"
             >
               {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
               Save Draft
@@ -467,7 +508,7 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
               type="button"
               disabled={saving}
               onClick={() => handleSave("SUBMITTED")}
-              className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary hover:bg-primary/90 text-white text-xs font-semibold rounded-lg shadow-sm transition-all active:scale-95 disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary hover:bg-primary/90 text-white text-xs font-semibold rounded-lg shadow-sm transition-all active:scale-95 disabled:opacity-50 h-8 cursor-pointer"
             >
               {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle className="h-3.5 w-3.5" />}
               Submit Plan
@@ -866,6 +907,16 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
           />
         </div>
       </div>
+
+      {/* Interactive Print & Preview Document Modal */}
+      <PlanningPrintPreviewModal
+        open={showPrintModal}
+        onClose={() => setShowPrintModal(false)}
+        date={date}
+        shiftName={shiftName}
+        status={status}
+        plans={recipePlans}
+      />
     </div>
   );
 }
