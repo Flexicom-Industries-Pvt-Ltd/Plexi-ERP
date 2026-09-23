@@ -32,6 +32,7 @@ interface RecipeQualityInputProps {
     tapeWidth: number;
     grade: string;
   }) => void;
+  masterPresets?: { code: string; label?: string }[];
   label?: string;
   required?: boolean;
   compact?: boolean;
@@ -41,6 +42,7 @@ export function RecipeQualityInput({
   value,
   onChange,
   onSyncSpecifications,
+  masterPresets,
   label = "Recipe / Quality ID",
   required = false,
   compact = false,
@@ -148,26 +150,60 @@ export function RecipeQualityInput({
 
         {/* Quick Presets Dropdown */}
         {showPresets && (
-          <div className="absolute top-full left-0 right-0 mt-1 z-50 bg-white border border-slate-200 rounded-xl shadow-2xl p-2 divide-y divide-slate-100 max-h-60 overflow-y-auto animate-in fade-in zoom-in-95 duration-150">
-            <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-              Standard Quality Recipes
-            </div>
-            {COMMON_RECIPE_PRESETS.map((p) => (
-              <button
-                key={p.code}
-                type="button"
-                onClick={() => handleSelectPreset(p.code)}
-                className={`w-full text-left px-3 py-2 rounded-lg text-xs font-mono flex items-center justify-between hover:bg-slate-50 transition-colors ${
-                  value === p.code ? "bg-primary/10 text-primary font-bold" : "text-slate-700"
-                }`}
-              >
-                <div>
-                  <span className="block font-bold">{p.code}</span>
-                  <span className="text-[11px] text-slate-400 font-sans">{p.label}</span>
+          <div className="absolute top-full left-0 right-0 mt-1 z-50 bg-white border border-slate-200 rounded-xl shadow-2xl p-2 divide-y divide-slate-100 max-h-72 overflow-y-auto animate-in fade-in zoom-in-95 duration-150">
+            {masterPresets && masterPresets.length > 0 && (
+              <div className="pb-2">
+                <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-primary">
+                  Data Centre Master Recipes ({masterPresets.length})
                 </div>
-                {value === p.code && <Check className="h-4 w-4 text-primary" />}
-              </button>
-            ))}
+                <div className="space-y-0.5">
+                  {masterPresets.map((p) => (
+                    <button
+                      key={`master-${p.code}`}
+                      type="button"
+                      onClick={() => handleSelectPreset(p.code)}
+                      className={`w-full text-left px-3 py-1.5 rounded-lg text-xs font-mono flex items-center justify-between hover:bg-primary/5 transition-colors ${
+                        value?.toUpperCase() === p.code?.toUpperCase()
+                          ? "bg-primary/10 text-primary font-bold"
+                          : "text-slate-800"
+                      }`}
+                    >
+                      <div>
+                        <span className="block font-bold">{p.code}</span>
+                        {p.label && <span className="text-[11px] text-slate-400 font-sans">{p.label}</span>}
+                      </div>
+                      {value?.toUpperCase() === p.code?.toUpperCase() && (
+                        <Check className="h-4 w-4 text-primary shrink-0" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="pt-2">
+              <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                Standard Quality Recipes
+              </div>
+              <div className="space-y-0.5">
+                {COMMON_RECIPE_PRESETS.map((p) => (
+                  <button
+                    key={p.code}
+                    type="button"
+                    onClick={() => handleSelectPreset(p.code)}
+                    className={`w-full text-left px-3 py-1.5 rounded-lg text-xs font-mono flex items-center justify-between hover:bg-slate-50 transition-colors ${
+                      value === p.code ? "bg-primary/10 text-primary font-bold" : "text-slate-700"
+                    }`}
+                  >
+                    <div>
+                      <span className="block font-bold">{p.code}</span>
+                      <span className="text-[11px] text-slate-400 font-sans">{p.label}</span>
+                    </div>
+                    {value === p.code && <Check className="h-4 w-4 text-primary shrink-0" />}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         )}
       </div>
