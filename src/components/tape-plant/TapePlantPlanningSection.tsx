@@ -99,6 +99,17 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
   // Multi-recipe state
   const [recipePlans, setRecipePlans] = useState<RecipePlanItem[]>([createEmptyRecipePlan(1)]);
   const [activeRecipeIndex, setActiveRecipeIndex] = useState<number>(0);
+  const [masterRecipes, setMasterRecipes] = useState<any[]>([]);
+
+  // Load Data Centre master recipes
+  useEffect(() => {
+    fetch("/api/data-centre/tape-plant-recipes?activeOnly=true")
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => {
+        if (Array.isArray(data)) setMasterRecipes(data);
+      })
+      .catch((err) => console.error("Error loading master recipes:", err));
+  }, []);
 
   // Load plans for the shift
   useEffect(() => {
@@ -177,6 +188,96 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
     setRecipePlans((prev) =>
       prev.map((plan, idx) => (idx === activeRecipeIndex ? { ...plan, ...updates } : plan))
     );
+  };
+
+  // Auto-fetch and apply master recipe
+  const applyRecipeMaster = (recipe: any) => {
+    const plannedQty = currentPlan.plannedQtyKg
+      ? Number(currentPlan.plannedQtyKg)
+      : recipe.defaultQtyKg || 2500;
+
+    const computeQty = (percent: number | null | undefined) => {
+      if (!percent || !plannedQty) return "";
+      return Number(((plannedQty * Number(percent)) / 100).toFixed(2));
+    };
+
+    const updatedMaterials: MaterialRow[] = [
+      { material: "PP", percentage: recipe.ppPercent ?? "", quantity: computeQty(recipe.ppPercent) },
+      { material: "CC", percentage: recipe.ccPercent ?? "", quantity: computeQty(recipe.ccPercent) },
+      { material: "MB", percentage: recipe.mbPercent ?? "", quantity: computeQty(recipe.mbPercent) },
+      { material: "RP1", percentage: recipe.rp1Percent ?? "", quantity: computeQty(recipe.rp1Percent) },
+      { material: "RP2", percentage: recipe.rp2Percent ?? "", quantity: computeQty(recipe.rp2Percent) },
+      { material: "HD RP", percentage: recipe.hdrpPercent ?? "", quantity: computeQty(recipe.hdrpPercent) },
+      { material: "TPT", percentage: recipe.tptPercent ?? "", quantity: computeQty(recipe.tptPercent) },
+    ];
+
+    updateCurrentPlan({
+      recipeQuality: recipe.code,
+      tapeType: recipe.tapeType || "PP",
+      denier: recipe.denier ?? "",
+      tapeWidth: recipe.tapeWidth ?? "500",
+      strength: recipe.strength ?? "",
+      eloPercent:
+        recipe.eloPercent !== null && recipe.eloPercent !== undefined
+          ? typeof recipe.eloPercent === "number" && recipe.eloPercent < 1
+            ? (recipe.eloPercent * 100).toFixed(0)
+            : recipe.eloPercent
+          : "",
+      bobbinMarking: recipe.bobbinMarking || "",
+      colour: recipe.colour || "",
+      spacerSize: recipe.spacerSize ? String(recipe.spacerSize) : "",
+      requiredAsh: recipe.requiredAsh ?? "",
+      ashPercent: recipe.ashPercent ?? "",
+      plannedQtyKg: plannedQty,
+      vistPercent: recipe.vistamaxPercent ?? "",
+      remarks: recipe.remarks || "",
+      materials: updatedMaterials,
+    });
+
+    toast.success(`Auto-fetched parameters & formulation for ${recipe.code}`);
+  };
+
+  const handleRecipeCodeChange = (newCode: string) => {
+    updateCurrentPlan({ recipeQuality: newCode });
+    const match = masterRecipes.find(
+      (r) => r.code?.toUpperCase() === newCode?.trim().toUpperCase()
+    );
+    if (match) {
+      applyRecipeMaster(match);
+    }
+  };
+
+  const handlePlannedQtyChange = (newQtyStr: string) => {
+    const qty = Number(newQtyStr) || 0;
+    const updatedMaterials = currentPlan.materials.map((m) => {
+      const pct = Number(m.percentage);
+      return {
+        ...m,
+        quantity: pct && qty > 0 ? Number(((qty * pct) / 100).toFixed(2)) : m.quantity,
+      };
+    });
+    updateCurrentPlan({
+      plannedQtyKg: newQtyStr,
+      materials: updatedMaterials,
+    });
+  };
+
+  const handleMaterialsChange = (newMaterials: MaterialRow[]) => {
+    const plannedQty = Number(currentPlan.plannedQtyKg) || 0;
+    const processed = newMaterials.map((m) => {
+      const pct = m.percentage !== "" && m.percentage !== null && m.percentage !== undefined ? Number(m.percentage) : null;
+      const qty = m.quantity !== "" && m.quantity !== null && m.quantity !== undefined ? Number(m.quantity) : null;
+
+      let finalQty = m.quantity;
+      if (pct !== null && plannedQty > 0 && (qty === null || qty === 0)) {
+        finalQty = Number(((plannedQty * pct) / 100).toFixed(2));
+      }
+      return {
+        ...m,
+        quantity: finalQty,
+      };
+    });
+    updateCurrentPlan({ materials: processed });
   };
 
   const handleAddRecipe = () => {
@@ -301,6 +402,11 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
   const totalShiftPlannedKg = recipePlans.reduce((sum, p) => sum + (Number(p.plannedQtyKg) || 0), 0);
   const totalActiveMaterialQty = currentPlan.materials.reduce((sum, m) => sum + (Number(m.quantity) || 0), 0);
   const totalActivePercentage = currentPlan.materials.reduce((sum, m) => sum + (Number(m.percentage) || 0), 0);
+
+  // Check if current recipe matches master catalog
+  const matchingMaster = masterRecipes.find(
+    (r) => r.code?.toUpperCase() === currentPlan.recipeQuality?.trim().toUpperCase()
+  );
 
   if (loading) {
     return (
@@ -455,11 +561,54 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
 
       {/* Active Recipe Configuration Card */}
       <div className="space-y-6">
-        {/* 1. Recipe / Quality ID Input */}
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 sm:p-5">
+        {/* 1. Recipe / Quality ID Input & Master Quick Pick */}
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 sm:p-5 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                Recipe Selection for Run #{activeRecipeIndex + 1}
+              </span>
+              {matchingMaster ? (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full text-[10px] font-bold">
+                  <Check className="h-3 w-3" /> Auto-Mapped from Master Data
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-100 text-slate-600 border border-slate-200 rounded-full text-[10px] font-medium">
+                  Custom / Manual Entry
+                </span>
+              )}
+            </div>
+
+            {/* Quick Master Catalog Select */}
+            {masterRecipes.length > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-semibold text-slate-500">Pick Master Recipe:</span>
+                <select
+                  value={matchingMaster ? matchingMaster.code : ""}
+                  onChange={(e) => {
+                    const selected = masterRecipes.find((r) => r.code === e.target.value);
+                    if (selected) applyRecipeMaster(selected);
+                  }}
+                  className="h-8 px-2.5 text-xs font-mono font-bold text-primary bg-primary/5 border border-primary/20 rounded-lg hover:bg-primary/10 focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all cursor-pointer"
+                >
+                  <option value="">— Select from {masterRecipes.length} Master Recipes —</option>
+                  {masterRecipes.map((r) => (
+                    <option key={r.code} value={r.code}>
+                      {r.code} ({r.tapeType} • {r.colour || ""} • {r.bobbinMarking || ""})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+
           <RecipeQualityInput
             value={currentPlan.recipeQuality}
-            onChange={(newRecipe) => updateCurrentPlan({ recipeQuality: newRecipe })}
+            onChange={handleRecipeCodeChange}
+            masterPresets={masterRecipes.map((r) => ({
+              code: r.code,
+              label: `${r.tapeType} • ${r.colour || ""} • ${r.bobbinMarking || ""}`,
+            }))}
             label={`Recipe Run #${activeRecipeIndex + 1} Quality ID (Standard Format)`}
             required
             onSyncSpecifications={({ tapeType: synType, colour: synColour, tapeWidth: synWidth }) => {
@@ -623,7 +772,7 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
                 type="number"
                 value={currentPlan.plannedQtyKg}
                 placeholder="e.g. 5000"
-                onChange={(e) => updateCurrentPlan({ plannedQtyKg: e.target.value })}
+                onChange={(e) => handlePlannedQtyChange(e.target.value)}
                 className="w-full h-8 px-2.5 text-xs font-extrabold text-blue-900 bg-white border border-blue-200 rounded focus:ring-2 focus:ring-primary outline-none text-right shadow-xs"
               />
             </div>
@@ -700,7 +849,7 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
           <SpreadsheetTable<MaterialRow>
             data={currentPlan.materials}
             columns={materialColumns}
-            onChange={(newMaterials) => updateCurrentPlan({ materials: newMaterials })}
+            onChange={handleMaterialsChange}
             allowAddRow={true}
             allowDeleteRow={true}
             onAddRow={() =>
