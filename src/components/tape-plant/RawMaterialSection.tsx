@@ -159,9 +159,9 @@ export function RawMaterialSection({ date, shiftId, shiftName }: RawMaterialSect
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 w-full min-w-0 max-w-full">
       {/* Top Action Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm min-w-0">
         <div className="flex items-center gap-3">
           <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl border border-emerald-100">
             <FlaskConical className="h-5 w-5" />

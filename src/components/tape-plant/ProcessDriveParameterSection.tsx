@@ -197,9 +197,9 @@ export function ProcessDriveParameterSection({ date, shiftId, shiftName }: Proce
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 w-full min-w-0 max-w-full">
       {/* Top Action Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm min-w-0">
         <div className="flex items-center gap-3">
           <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl border border-indigo-100">
             <Gauge className="h-5 w-5" />
