@@ -104,7 +104,13 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
   useEffect(() => {
     if (!date || !shiftId) return;
     setLoading(true);
-    fetch(`/api/production/tape-plant/planning?date=${date}&shiftId=${shiftId}`)
+    fetch(`/api/production/tape-plant/planning?date=${date}&shiftId=${shiftId}&_t=${Date.now()}`, {
+      cache: "no-store",
+      headers: {
+        Pragma: "no-cache",
+        "Cache-Control": "no-cache",
+      },
+    })
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (data && Array.isArray(data.plans) && data.plans.length > 0) {
