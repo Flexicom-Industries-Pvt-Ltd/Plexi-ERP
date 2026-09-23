@@ -1654,7 +1654,7 @@ model TapePlantPlan {
 
   shift Shift @relation(fields: [shiftId], references: [id])
 
-  @@unique([date, shiftId])
+  @@index([date, shiftId])
   @@index([date])
   @@index([shiftId])
 }
