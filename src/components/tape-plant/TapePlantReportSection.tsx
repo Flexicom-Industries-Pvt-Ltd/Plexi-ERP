@@ -4,6 +4,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import { toast } from "sonner";
 import { Download, Filter, Loader2, BarChart3, TrendingUp, AlertTriangle, CheckCircle2, RefreshCw } from "lucide-react";
 import { format } from "date-fns";
+import { RecipeQualityBadge } from "./RecipeQualityBadge";
 
 interface ReportSummaryItem {
   id: string;
@@ -206,10 +207,10 @@ export function TapePlantReportSection({ shifts }: TapePlantReportSectionProps) 
           <span className="text-slate-500">Recipe:</span>
           <input
             type="text"
-            placeholder="e.g. S1, HC"
+            placeholder="STYM/LPP/YL/500/64/HC"
             value={recipeFilter}
             onChange={(e) => setRecipeFilter(e.target.value)}
-            className="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded text-xs text-slate-800 outline-none focus:ring-1 focus:ring-primary w-28"
+            className="px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded text-xs font-mono text-slate-800 outline-none focus:ring-1 focus:ring-primary w-40 sm:w-56"
           />
         </div>
       </div>
@@ -304,7 +305,9 @@ export function TapePlantReportSection({ shifts }: TapePlantReportSectionProps) 
                   <tr key={row.id} className="hover:bg-slate-50 transition-colors">
                     <td className="px-3 py-2.5 font-semibold text-slate-800">{row.date}</td>
                     <td className="px-3 py-2.5 font-medium text-slate-600">{row.shiftName}</td>
-                    <td className="px-3 py-2.5 font-bold text-primary">{row.recipeQuality}</td>
+                    <td className="px-3 py-2.5">
+                      <RecipeQualityBadge value={row.recipeQuality} />
+                    </td>
                     <td className="px-3 py-2.5 text-right font-mono text-slate-700">
                       {row.plannedKg.toLocaleString()}
                     </td>

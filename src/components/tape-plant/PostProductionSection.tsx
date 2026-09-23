@@ -5,6 +5,10 @@ import { toast } from "sonner";
 import { Save, CheckCircle, Loader2, PackageCheck, ShieldCheck, Plus, Sparkles } from "lucide-react";
 import { SpreadsheetTable, ColumnDef } from "./SpreadsheetTable";
 
+import { RecipeQualityInput } from "./RecipeQualityInput";
+import { RecipeQualityBadge } from "./RecipeQualityBadge";
+import { DEFAULT_RECIPE_STRING } from "@/lib/tape-plant/recipe-format";
+
 interface QualityCheckRow {
   time: string;
   colour: string;
@@ -45,7 +49,7 @@ export function PostProductionSection({ date, shiftId, shiftName }: PostProducti
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  const [recipeQuality, setRecipeQuality] = useState("");
+  const [recipeQuality, setRecipeQuality] = useState(DEFAULT_RECIPE_STRING);
   const [plannedProductionKg, setPlannedProductionKg] = useState<number | string>(0);
   const [productionDoneKg, setProductionDoneKg] = useState<number | string>("");
   const [wasteKg, setWasteKg] = useState<number | string>("");
@@ -63,7 +67,7 @@ export function PostProductionSection({ date, shiftId, shiftName }: PostProducti
         const plan = data.plan;
 
         if (p) {
-          setRecipeQuality(p.recipeQuality || plan?.recipeQuality || "S1");
+          setRecipeQuality(p.recipeQuality || plan?.recipeQuality || DEFAULT_RECIPE_STRING);
           setPlannedProductionKg(p.plannedProductionKg || plan?.plannedProductionKg || 0);
           setProductionDoneKg(p.productionDoneKg ?? "");
           setWasteKg(p.wasteKg ?? "");
@@ -75,7 +79,7 @@ export function PostProductionSection({ date, shiftId, shiftName }: PostProducti
             setQualityChecks(DEFAULT_QC_SCHEDULE);
           }
         } else {
-          setRecipeQuality(plan?.recipeQuality || "S1");
+          setRecipeQuality(plan?.recipeQuality || DEFAULT_RECIPE_STRING);
           setPlannedProductionKg(plan?.plannedProductionKg || 0);
           setProductionDoneKg("");
           setWasteKg("");
@@ -212,29 +216,31 @@ export function PostProductionSection({ date, shiftId, shiftName }: PostProducti
         </div>
       </div>
 
+      {/* Recipe / Quality ID Bar */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 sm:p-5">
+        <RecipeQualityInput
+          value={recipeQuality}
+          onChange={setRecipeQuality}
+          label="Production Run Recipe / Quality ID"
+          required
+        />
+      </div>
+
       {/* Production Output Spreadsheet Card */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="px-5 py-3.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
-          <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-            Shift Production Comparison (Planned vs Actual)
-          </h3>
+          <div className="flex items-center gap-2.5">
+            <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+              Shift Production Comparison (Planned vs Actual)
+            </h3>
+            <RecipeQualityBadge value={recipeQuality} />
+          </div>
           <span className="text-[11px] font-semibold text-slate-500">
             Net Production = Production Done − Waste
           </span>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 divide-x divide-y divide-slate-200 border-b border-slate-200 text-xs">
-          {/* Recipe / Quality */}
-          <div className="p-3 bg-white">
-            <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Recipe / Quality</label>
-            <input
-              type="text"
-              value={recipeQuality}
-              placeholder="e.g. S1"
-              onChange={(e) => setRecipeQuality(e.target.value)}
-              className="w-full h-8 px-2.5 text-xs font-bold text-slate-800 bg-slate-50 border border-slate-200 rounded focus:bg-white focus:ring-1 focus:ring-primary outline-none"
-            />
-          </div>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 divide-x divide-y divide-slate-200 border-b border-slate-200 text-xs">
 
           {/* Planned Production KG */}
           <div className="p-3 bg-slate-50/50">
