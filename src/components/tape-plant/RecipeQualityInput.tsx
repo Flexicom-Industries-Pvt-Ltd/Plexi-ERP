@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   parseRecipeQuality,
   formatRecipeQuality,
@@ -22,6 +22,12 @@ import {
   ShieldCheck,
   Building,
 } from "lucide-react";
+
+interface SuggestionItem {
+  code: string;
+  label: string;
+  isMaster: boolean;
+}
 
 interface RecipeQualityInputProps {
   value: string;
@@ -49,8 +55,11 @@ export function RecipeQualityInput({
 }: RecipeQualityInputProps) {
   const [showBuilder, setShowBuilder] = useState(false);
   const [showPresets, setShowPresets] = useState(false);
+  const [showAutocomplete, setShowAutocomplete] = useState(false);
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const [parts, setParts] = useState<RecipeQualityParts>(() => parseRecipeQuality(value));
   const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   // Synchronize internal parts when external value changes
   useEffect(() => {
@@ -62,11 +71,55 @@ export function RecipeQualityInput({
     const handleClickOutside = (event: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         setShowPresets(false);
+        setShowAutocomplete(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  // Compute all unified suggestions
+  const allSuggestions = useMemo<SuggestionItem[]>(() => {
+    const list: SuggestionItem[] = [];
+    const seen = new Set<string>();
+
+    if (masterPresets && masterPresets.length > 0) {
+      masterPresets.forEach((m) => {
+        if (!seen.has(m.code.toUpperCase())) {
+          seen.add(m.code.toUpperCase());
+          list.push({ code: m.code, label: m.label || "Master Recipe", isMaster: true });
+        }
+      });
+    }
+
+    COMMON_RECIPE_PRESETS.forEach((p) => {
+      if (!seen.has(p.code.toUpperCase())) {
+        seen.add(p.code.toUpperCase());
+        list.push({ code: p.code, label: p.label, isMaster: false });
+      }
+    });
+
+    return list;
+  }, [masterPresets]);
+
+  // Filter suggestions based on current typed value
+  const matchingSuggestions = useMemo<SuggestionItem[]>(() => {
+    const q = (value || "").trim().toUpperCase();
+    if (!q) return allSuggestions.slice(0, 10);
+
+    return allSuggestions
+      .filter((s: SuggestionItem) => s.code.toUpperCase().includes(q) || s.label.toUpperCase().includes(q))
+      .sort((a: SuggestionItem, b: SuggestionItem) => {
+        const aCode = a.code.toUpperCase();
+        const bCode = b.code.toUpperCase();
+        const aStarts = aCode.startsWith(q);
+        const bStarts = bCode.startsWith(q);
+        if (aStarts && !bStarts) return -1;
+        if (!aStarts && bStarts) return 1;
+        return 0;
+      })
+      .slice(0, 12);
+  }, [allSuggestions, value]);
 
   const handleUpdatePart = (key: keyof RecipeQualityParts, val: string) => {
     const updated = {
@@ -82,12 +135,42 @@ export function RecipeQualityInput({
     onChange(code);
     setParts(parseRecipeQuality(code));
     setShowPresets(false);
+    setShowAutocomplete(false);
+    setHighlightedIndex(-1);
   };
 
   const handleDirectInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value.toUpperCase();
     onChange(raw);
     setParts(parseRecipeQuality(raw));
+    setShowAutocomplete(true);
+    setHighlightedIndex(0);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!showAutocomplete || matchingSuggestions.length === 0) {
+      if (e.key === "ArrowDown") {
+        setShowAutocomplete(true);
+        setHighlightedIndex(0);
+      }
+      return;
+    }
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setHighlightedIndex((prev) => (prev < matchingSuggestions.length - 1 ? prev + 1 : 0));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHighlightedIndex((prev) => (prev > 0 ? prev - 1 : matchingSuggestions.length - 1));
+    } else if (e.key === "Enter") {
+      if (highlightedIndex >= 0 && highlightedIndex < matchingSuggestions.length) {
+        e.preventDefault();
+        handleSelectPreset(matchingSuggestions[highlightedIndex].code);
+      }
+    } else if (e.key === "Escape") {
+      setShowAutocomplete(false);
+      setHighlightedIndex(-1);
+    }
   };
 
   const handleSync = () => {
@@ -103,12 +186,8 @@ export function RecipeQualityInput({
     });
   };
 
-  const selectedColour = STANDARD_COLOURS.find(
-    (c) => c.code.toUpperCase() === parts.colour?.toUpperCase()
-  );
-
   return (
-    <div className="space-y-1.5" ref={containerRef}>
+    <div className="space-y-1.5 relative" ref={containerRef}>
       {/* Header & Controls */}
       <div className="flex items-center justify-between">
         <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wider">
@@ -117,15 +196,22 @@ export function RecipeQualityInput({
         <div className="flex items-center gap-1.5">
           <button
             type="button"
-            onClick={() => setShowPresets(!showPresets)}
+            onClick={() => {
+              setShowPresets(!showPresets);
+              setShowAutocomplete(false);
+            }}
             className="text-[11px] font-semibold text-slate-500 hover:text-slate-800 inline-flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-slate-100 transition-colors"
           >
-            <span>Presets</span>
+            <span>All Presets</span>
             <ChevronDown className="h-3 w-3" />
           </button>
           <button
             type="button"
-            onClick={() => setShowBuilder(!showBuilder)}
+            onClick={() => {
+              setShowBuilder(!showBuilder);
+              setShowPresets(false);
+              setShowAutocomplete(false);
+            }}
             className={`text-[11px] font-semibold inline-flex items-center gap-1 px-2 py-0.5 rounded transition-all ${
               showBuilder
                 ? "bg-primary text-white shadow-xs"
@@ -138,17 +224,73 @@ export function RecipeQualityInput({
         </div>
       </div>
 
-      {/* Main Formatted Input Bar */}
+      {/* Main Formatted Input Bar with Live Typeahead */}
       <div className="relative">
         <input
+          ref={inputRef}
           type="text"
           value={value}
           onChange={handleDirectInputChange}
-          placeholder="STYM/LPP/YL/500/64/HC"
+          onFocus={() => {
+            setShowAutocomplete(true);
+            setHighlightedIndex(0);
+          }}
+          onKeyDown={handleKeyDown}
+          placeholder="Type recipe code e.g. AMB/PP/YL/74/500/S1..."
           className="w-full h-9 px-3 text-xs sm:text-sm font-mono font-bold uppercase tracking-wider text-slate-900 bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all shadow-xs"
         />
 
-        {/* Quick Presets Dropdown */}
+        {/* Real-time Autocomplete Suggestions Dropdown on Typing */}
+        {showAutocomplete && matchingSuggestions.length > 0 && (
+          <div className="absolute top-full left-0 right-0 mt-1 z-50 bg-white border border-slate-200 rounded-xl shadow-2xl p-1.5 max-h-72 overflow-y-auto animate-in fade-in zoom-in-95 duration-100 divide-y divide-slate-100">
+            <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between">
+              <span>Matching Formulations ({matchingSuggestions.length})</span>
+              <span className="text-[9px] font-normal text-slate-400">Use ↑↓ keys & Enter</span>
+            </div>
+            <div className="space-y-0.5 pt-1">
+              {matchingSuggestions.map((s, idx) => {
+                const isHighlighted = idx === highlightedIndex;
+                const isExact = value?.trim().toUpperCase() === s.code.toUpperCase();
+                return (
+                  <div
+                    key={`suggest-${s.code}`}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      handleSelectPreset(s.code);
+                    }}
+                    onMouseEnter={() => setHighlightedIndex(idx)}
+                    className={`px-3 py-2 rounded-lg cursor-pointer flex items-center justify-between transition-colors ${
+                      isHighlighted
+                        ? "bg-primary/10 text-slate-900"
+                        : "hover:bg-slate-50 text-slate-700"
+                    }`}
+                  >
+                    <div className="flex-1 min-w-0 pr-2">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-bold text-xs text-slate-900">{s.code}</span>
+                        {s.isMaster ? (
+                          <span className="px-1.5 py-0.2 bg-emerald-100 text-emerald-800 rounded text-[9px] font-bold tracking-tight">
+                            DATA CENTRE MASTER
+                          </span>
+                        ) : (
+                          <span className="px-1.5 py-0.2 bg-slate-100 text-slate-600 rounded text-[9px] font-semibold tracking-tight">
+                            PRESET
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[11px] text-slate-500 truncate mt-0.5 font-sans">
+                        {s.label}
+                      </div>
+                    </div>
+                    {isExact && <Check className="h-4 w-4 text-emerald-600 shrink-0" />}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* All Presets Full Dropdown */}
         {showPresets && (
           <div className="absolute top-full left-0 right-0 mt-1 z-50 bg-white border border-slate-200 rounded-xl shadow-2xl p-2 divide-y divide-slate-100 max-h-72 overflow-y-auto animate-in fade-in zoom-in-95 duration-150">
             {masterPresets && masterPresets.length > 0 && (
@@ -161,7 +303,10 @@ export function RecipeQualityInput({
                     <button
                       key={`master-${p.code}`}
                       type="button"
-                      onClick={() => handleSelectPreset(p.code)}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        handleSelectPreset(p.code);
+                      }}
                       className={`w-full text-left px-3 py-1.5 rounded-lg text-xs font-mono flex items-center justify-between hover:bg-primary/5 transition-colors ${
                         value?.toUpperCase() === p.code?.toUpperCase()
                           ? "bg-primary/10 text-primary font-bold"
@@ -190,7 +335,10 @@ export function RecipeQualityInput({
                   <button
                     key={p.code}
                     type="button"
-                    onClick={() => handleSelectPreset(p.code)}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      handleSelectPreset(p.code);
+                    }}
                     className={`w-full text-left px-3 py-1.5 rounded-lg text-xs font-mono flex items-center justify-between hover:bg-slate-50 transition-colors ${
                       value === p.code ? "bg-primary/10 text-primary font-bold" : "text-slate-700"
                     }`}
