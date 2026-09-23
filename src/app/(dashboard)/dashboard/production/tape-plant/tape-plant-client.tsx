@@ -103,23 +103,23 @@ export function TapePlantClient() {
   const shiftName = currentShift?.name || "Shift A";
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 w-full min-w-0 max-w-full">
       {/* Module Title & Shift/Date Selector Bar */}
-      <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2.5">
-              <div className="p-2 bg-primary/10 text-primary rounded-xl">
+      <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm min-w-0">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 min-w-0">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="p-2 bg-primary/10 text-primary rounded-xl shrink-0">
                 <Layers className="h-6 w-6" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <h1 className="text-xl font-extrabold text-slate-900 tracking-tight">Tape Plant</h1>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 shrink-0">
                     v1.1 Tabular
                   </span>
                 </div>
-                <p className="text-xs text-slate-500 mt-0.5">
+                <p className="text-xs text-slate-500 mt-0.5 truncate">
                   Excel-like spreadsheet workspace for Tape Plant shift planning, telemetry, material consumption, output, and reports.
                 </p>
               </div>
@@ -127,7 +127,7 @@ export function TapePlantClient() {
           </div>
 
           {/* Date & Shift Context Control */}
-          <div className="flex flex-wrap items-center gap-3 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+          <div className="flex flex-wrap items-center gap-3 bg-slate-50 p-2.5 rounded-xl border border-slate-200 shrink-0">
             {/* Date Navigator */}
             <div className="flex items-center gap-1 bg-white rounded-lg border border-slate-200 p-1 shadow-sm">
               <button
@@ -181,7 +181,7 @@ export function TapePlantClient() {
       </div>
 
       {/* Active Section Workspace */}
-      <div className="transition-all duration-200">
+      <div className="transition-all duration-200 w-full min-w-0 max-w-full">
         {activeTab === "planning" && (
           <TapePlantPlanningSection date={selectedDate} shiftId={selectedShiftId} shiftName={shiftName} />
         )}

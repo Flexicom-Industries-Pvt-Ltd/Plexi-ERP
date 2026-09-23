@@ -173,14 +173,14 @@ export function SpreadsheetTable<T extends Record<string, any>>({
   }
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+    <div className="w-full min-w-0 max-w-full bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
       {(title || subtitle || actions || allowAddRow) && (
-        <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 bg-slate-50/80 border-b border-slate-200">
-          <div>
-            {title && <h3 className="text-sm font-bold text-slate-800">{title}</h3>}
-            {subtitle && <p className="text-xs text-slate-500 mt-0.5">{subtitle}</p>}
+        <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 bg-slate-50/80 border-b border-slate-200 min-w-0">
+          <div className="min-w-0">
+            {title && <h3 className="text-sm font-bold text-slate-800 truncate">{title}</h3>}
+            {subtitle && <p className="text-xs text-slate-500 mt-0.5 truncate">{subtitle}</p>}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             {actions}
             {allowAddRow && onAddRow && (
               <button
@@ -196,7 +196,7 @@ export function SpreadsheetTable<T extends Record<string, any>>({
         </div>
       )}
 
-      <div className="overflow-x-auto relative max-h-[620px] scrollbar-thin scrollbar-thumb-slate-300">
+      <div className="w-full min-w-0 overflow-x-auto relative max-h-[620px] scrollbar-thin scrollbar-thumb-slate-300">
         <table ref={tableRef} className="w-full text-xs border-collapse text-left border-spacing-0">
           <thead className="bg-slate-100/90 sticky top-0 z-20 backdrop-blur-sm border-b border-slate-200 shadow-sm">
             {hasGroups ? (

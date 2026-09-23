@@ -418,9 +418,9 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 w-full min-w-0 max-w-full">
       {/* Top Header & Status Banner */}
-      <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm min-w-0">
         <div className="flex items-center gap-3">
           <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl border border-blue-100">
             <Sparkles className="h-5 w-5" />
@@ -560,11 +560,11 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
       </div>
 
       {/* Active Recipe Configuration Card */}
-      <div className="space-y-6">
+      <div className="space-y-6 w-full min-w-0 max-w-full">
         {/* 1. Recipe / Quality ID Input & Master Quick Pick */}
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 sm:p-5 space-y-3">
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 sm:p-5 space-y-3 min-w-0">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2 min-w-0">
               <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
                 Recipe Selection for Run #{activeRecipeIndex + 1}
               </span>
@@ -581,15 +581,15 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
 
             {/* Quick Master Catalog Select */}
             {masterRecipes.length > 0 && (
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] font-semibold text-slate-500">Pick Master Recipe:</span>
+              <div className="flex items-center gap-2 max-w-full">
+                <span className="text-[11px] font-semibold text-slate-500 shrink-0">Pick Master Recipe:</span>
                 <select
                   value={matchingMaster ? matchingMaster.code : ""}
                   onChange={(e) => {
                     const selected = masterRecipes.find((r) => r.code === e.target.value);
                     if (selected) applyRecipeMaster(selected);
                   }}
-                  className="h-8 px-2.5 text-xs font-mono font-bold text-primary bg-primary/5 border border-primary/20 rounded-lg hover:bg-primary/10 focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all cursor-pointer"
+                  className="h-8 px-2.5 text-xs font-mono font-bold text-primary bg-primary/5 border border-primary/20 rounded-lg hover:bg-primary/10 focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all cursor-pointer max-w-[240px] sm:max-w-xs md:max-w-sm truncate"
                 >
                   <option value="">— Select from {masterRecipes.length} Master Recipes —</option>
                   {masterRecipes.map((r) => (
@@ -623,20 +623,20 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
         </div>
 
         {/* 2. Shift Specifications & Parameters Table */}
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="px-5 py-3.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
-            <div className="flex items-center gap-2">
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden min-w-0">
+          <div className="px-5 py-3.5 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-2 min-w-0">
               <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
                 Run #{activeRecipeIndex + 1} Specifications & Parameters
               </h3>
               <RecipeQualityBadge value={currentPlan.recipeQuality} />
             </div>
-            <span className="text-[11px] font-semibold text-slate-500">
+            <span className="text-[11px] font-semibold text-slate-500 shrink-0">
               Planned Qty: <strong className="text-slate-800 font-mono">{Number(currentPlan.plannedQtyKg).toLocaleString() || 0} KG</strong>
             </span>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 divide-x divide-y divide-slate-200 border-b border-slate-200 text-xs">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 divide-x divide-y divide-slate-200 border-b border-slate-200 text-xs min-w-0">
             {/* PP / LPP */}
             <div className="p-3 bg-white">
               <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">PP / LPP</label>
