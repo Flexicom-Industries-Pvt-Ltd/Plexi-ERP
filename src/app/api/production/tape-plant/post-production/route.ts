@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { requireTapePlantApiPermission } from "@/lib/tape-plant/permissions";
 
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export async function GET(request: NextRequest) {
   const authResult = await requireTapePlantApiPermission("canRead");
@@ -42,13 +43,23 @@ export async function GET(request: NextRequest) {
     if (plans.length > 0) {
       entries = plans.map((plan, idx) => {
         const matchingEntry =
-          savedEntries.find((e) => e.planId === plan.id) ||
-          savedEntries.find((e) => e.recipeQuality === plan.recipeQuality && !entries.some((al) => al.id === e.id)) ||
+          savedEntries.find((e) => e.planId === plan.id || e.id === plan.id) ||
+          savedEntries.find((e) => e.recipeQuality === plan.recipeQuality) ||
           savedEntries[idx];
 
         const plannedKg = plan.plannedQtyKg ?? 0;
-        const doneKg = matchingEntry?.productionDoneKg ?? "";
-        const wasteKg = matchingEntry?.wasteKg ?? "";
+        const doneKg =
+          matchingEntry?.productionDoneKg !== undefined &&
+          matchingEntry?.productionDoneKg !== null &&
+          matchingEntry?.productionDoneKg !== ""
+            ? Number(matchingEntry.productionDoneKg)
+            : "";
+        const wasteKg =
+          matchingEntry?.wasteKg !== undefined &&
+          matchingEntry?.wasteKg !== null &&
+          matchingEntry?.wasteKg !== ""
+            ? Number(matchingEntry.wasteKg)
+            : "";
         const numDone = Number(doneKg) || 0;
         const numWaste = Number(wasteKg) || 0;
         const gapKg = plannedKg - numDone;
@@ -61,7 +72,7 @@ export async function GET(request: NextRequest) {
             : "";
 
         return {
-          id: matchingEntry?.id || plan.id,
+          id: plan.id,
           planId: plan.id,
           recipeQuality: plan.recipeQuality,
           plannedProductionKg: plannedKg,
@@ -93,11 +104,20 @@ export async function GET(request: NextRequest) {
       ];
     }
 
-    return NextResponse.json({
-      postProduction: record,
-      plans,
-      entries,
-    });
+    return NextResponse.json(
+      {
+        postProduction: record,
+        plans,
+        entries,
+      },
+      {
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
+          Pragma: "no-cache",
+          Expires: "0",
+        },
+      }
+    );
   } catch (error) {
     console.error("Error fetching Tape Plant post production:", error);
     return NextResponse.json({ error: "Failed to fetch post production data" }, { status: 500 });

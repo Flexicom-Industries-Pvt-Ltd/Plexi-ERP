@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { requireTapePlantApiPermission } from "@/lib/tape-plant/permissions";
 
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export async function GET(request: NextRequest) {
   const authResult = await requireTapePlantApiPermission("canRead");
@@ -20,13 +21,8 @@ export async function GET(request: NextRequest) {
 
   try {
     const plans = await db.tapePlantPlan.findMany({
-      where: {
-        date,
-        shiftId,
-      },
-      orderBy: {
-        createdAt: "asc",
-      },
+      where: { date, shiftId },
+      orderBy: { createdAt: "asc" },
       include: {
         shift: true,
       },
@@ -34,15 +30,23 @@ export async function GET(request: NextRequest) {
 
     const totalPlannedKg = plans.reduce((acc, p) => acc + (p.plannedQtyKg || 0), 0);
 
-    return NextResponse.json({
-      plans,
-      count: plans.length,
-      totalPlannedKg,
-      // Backward compatibility for single plan consumer:
-      ...(plans[0] || {}),
-    });
+    return NextResponse.json(
+      {
+        plans,
+        count: plans.length,
+        totalPlannedKg,
+        ...(plans[0] || {}),
+      },
+      {
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
+          Pragma: "no-cache",
+          Expires: "0",
+        },
+      }
+    );
   } catch (error) {
-    console.error("Error fetching Tape Plant plans:", error);
+    console.error("Error fetching Tape Plant plan:", error);
     return NextResponse.json({ error: "Failed to fetch plan" }, { status: 500 });
   }
 }
@@ -129,6 +133,65 @@ export async function POST(request: NextRequest) {
     });
 
     const totalPlannedKg = savedPlans.reduce((acc, p) => acc + (p.plannedQtyKg || 0), 0);
+    const uniqueRecipes = Array.from(new Set(savedPlans.map((p) => p.recipeQuality).filter(Boolean)));
+    const combinedRecipe = uniqueRecipes.join(", ");
+
+    // Synchronize existing PostProduction record for this shift if it exists
+    const existingPostProd = await db.tapePlantPostProduction.findUnique({
+      where: { date_shiftId: { date, shiftId } },
+    });
+
+    if (existingPostProd) {
+      const existingEntries = Array.isArray(existingPostProd.entries) ? (existingPostProd.entries as any[]) : [];
+      let totalDone = 0;
+      let totalWaste = 0;
+
+      const syncedEntries = savedPlans.map((plan, idx) => {
+        const matching =
+          existingEntries.find((e) => e.planId === plan.id || e.id === plan.id) ||
+          existingEntries.find((e) => e.recipeQuality === plan.recipeQuality) ||
+          existingEntries[idx];
+
+        const plannedKg = plan.plannedQtyKg || 0;
+        const doneKg = matching?.productionDoneKg !== undefined && matching?.productionDoneKg !== null && matching?.productionDoneKg !== ""
+          ? Number(matching.productionDoneKg)
+          : "";
+        const wasteKg = matching?.wasteKg !== undefined && matching?.wasteKg !== null && matching?.wasteKg !== ""
+          ? Number(matching.wasteKg)
+          : "";
+        const numDone = Number(doneKg) || 0;
+        const numWaste = Number(wasteKg) || 0;
+
+        totalDone += numDone;
+        totalWaste += numWaste;
+
+        return {
+          id: plan.id,
+          planId: plan.id,
+          recipeQuality: plan.recipeQuality,
+          plannedProductionKg: plannedKg,
+          productionDoneKg: doneKg,
+          gapKg: plannedKg - numDone,
+          wasteKg: wasteKg,
+          wastePercent: matching?.wastePercent ?? (numDone > 0 ? Number(((numWaste / numDone) * 100).toFixed(2)) : null),
+          netProductionKg: numDone - numWaste,
+          remarks: matching?.remarks || "",
+        };
+      });
+
+      await db.tapePlantPostProduction.update({
+        where: { date_shiftId: { date, shiftId } },
+        data: {
+          plannedProductionKg: totalPlannedKg,
+          productionDoneKg: totalDone,
+          gapKg: totalPlannedKg - totalDone,
+          wasteKg: totalWaste,
+          netProductionKg: totalDone - totalWaste,
+          recipeQuality: combinedRecipe || null,
+          entries: syncedEntries,
+        },
+      });
+    }
 
     return NextResponse.json({
       plans: savedPlans,
@@ -162,7 +225,7 @@ export async function DELETE(request: NextRequest) {
     });
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Error deleting recipe plan:", error);
-    return NextResponse.json({ error: "Failed to delete recipe plan" }, { status: 500 });
+    console.error("Error deleting Tape Plant plan:", error);
+    return NextResponse.json({ error: "Failed to delete plan" }, { status: 500 });
   }
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { toast } from "sonner";
 import {
   Save,
@@ -13,6 +13,7 @@ import {
   TrendingUp,
   Percent,
   ClipboardList,
+  RefreshCw,
 } from "lucide-react";
 import { RecipeQualityBadge } from "./RecipeQualityBadge";
 
@@ -37,28 +38,59 @@ interface PostProductionSectionProps {
 
 export function PostProductionSection({ date, shiftId, shiftName }: PostProductionSectionProps) {
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState("DRAFT");
   const [entries, setEntries] = useState<RecipePostProductionEntry[]>([]);
 
-  useEffect(() => {
-    if (!date || !shiftId) return;
-    setLoading(true);
-    fetch(`/api/production/tape-plant/post-production?date=${date}&shiftId=${shiftId}`)
-      .then((r) => (r.ok ? r.json() : { postProduction: null, plans: [], entries: [] }))
-      .then((data) => {
+  const fetchPostProductionData = useCallback(
+    async (showSyncToast = false) => {
+      if (!date || !shiftId) return;
+      if (showSyncToast) setRefreshing(true);
+      else setLoading(true);
+
+      try {
+        const res = await fetch(
+          `/api/production/tape-plant/post-production?date=${date}&shiftId=${shiftId}&_t=${Date.now()}`,
+          {
+            cache: "no-store",
+            headers: {
+              Pragma: "no-cache",
+              "Cache-Control": "no-cache",
+            },
+          }
+        );
+
+        if (!res.ok) throw new Error("Failed to fetch post-production");
+        const data = await res.json();
+
         const postProd = data.postProduction;
         setStatus(postProd?.status || "DRAFT");
 
         if (Array.isArray(data.entries) && data.entries.length > 0) {
           setEntries(data.entries);
+          if (showSyncToast) {
+            toast.success(`Synchronized ${data.entries.length} recipe(s) from planning`);
+          }
         } else {
           setEntries([]);
+          if (showSyncToast) {
+            toast.info("No planned recipes found for this shift in Planning");
+          }
         }
-      })
-      .catch(() => toast.error("Failed to load post-production data"))
-      .finally(() => setLoading(false));
-  }, [date, shiftId]);
+      } catch {
+        toast.error("Failed to load post-production data");
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    },
+    [date, shiftId]
+  );
+
+  useEffect(() => {
+    fetchPostProductionData();
+  }, [fetchPostProductionData]);
 
   const updateEntryField = (index: number, field: keyof RecipePostProductionEntry, value: any) => {
     setEntries((prev) => {
@@ -88,7 +120,6 @@ export function PostProductionSection({ date, shiftId, shiftName }: PostProducti
   const totalGapKg = totalPlannedKg - totalDoneKg;
   const totalNetKg = totalDoneKg - totalWasteKg;
   const overallEfficiency = totalPlannedKg > 0 ? ((totalDoneKg / totalPlannedKg) * 100).toFixed(1) : "0";
-  const overallWastePct = totalDoneKg > 0 ? ((totalWasteKg / totalDoneKg) * 100).toFixed(2) : "0";
 
   const handleSave = async (submitStatus: "DRAFT" | "SUBMITTED") => {
     if (entries.length === 0) {
@@ -168,6 +199,16 @@ export function PostProductionSection({ date, shiftId, shiftName }: PostProducti
         <div className="flex items-center gap-2">
           <button
             type="button"
+            disabled={loading || refreshing || saving}
+            onClick={() => fetchPostProductionData(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition-all active:scale-95 disabled:opacity-50"
+            title="Reload latest recipes from Planning"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin text-primary" : ""}`} />
+            Sync Planning
+          </button>
+          <button
+            type="button"
             disabled={saving || entries.length === 0}
             onClick={() => handleSave("DRAFT")}
             className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition-all active:scale-95 disabled:opacity-50"
@@ -189,14 +230,27 @@ export function PostProductionSection({ date, shiftId, shiftName }: PostProducti
 
       {/* Empty State when no plans exist for shift */}
       {entries.length === 0 ? (
-        <div className="p-8 text-center bg-white rounded-xl border border-dashed border-slate-300 shadow-sm space-y-3">
+        <div className="p-8 text-center bg-white rounded-xl border border-dashed border-slate-300 shadow-sm space-y-4">
           <div className="inline-flex p-3 bg-amber-50 text-amber-600 rounded-full">
             <ClipboardList className="h-6 w-6" />
           </div>
-          <h3 className="text-sm font-bold text-slate-800">No Planned Recipes Found for This Shift</h3>
-          <p className="text-xs text-slate-500 max-w-md mx-auto">
-            Before entering post-production quantities, please define the recipe runs in the <strong>1. Planning</strong> submodule. All planned recipes will automatically appear here for actual output recording.
-          </p>
+          <div className="space-y-1">
+            <h3 className="text-sm font-bold text-slate-800">No Planned Recipes Found for This Shift</h3>
+            <p className="text-xs text-slate-500 max-w-md mx-auto">
+              Before entering post-production quantities, please define and save recipe runs in the <strong>1. Planning</strong> submodule. Once saved, all planned recipes will immediately appear here.
+            </p>
+          </div>
+          <div>
+            <button
+              type="button"
+              disabled={refreshing}
+              onClick={() => fetchPostProductionData(true)}
+              className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary hover:bg-primary/90 text-white text-xs font-semibold rounded-lg shadow-sm transition-all"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
+              Refresh from Planning
+            </button>
+          </div>
         </div>
       ) : (
         <>
