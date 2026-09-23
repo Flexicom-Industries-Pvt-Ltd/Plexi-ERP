@@ -63,6 +63,7 @@ const dataCentreItems = [
   { title: "Sub Categories", url: "/dashboard/data-centre/sub-categories" },
   { title: "Production Characteristics", url: "/dashboard/data-centre/production-characteristics" },
   { title: "Manpower Rules", url: "/dashboard/data-centre/manpower-rules" },
+  { title: "Tape Plant Recipe", url: "/dashboard/data-centre/tape-plant-recipe" },
 ];
 
 type AppSidebarProps = {
