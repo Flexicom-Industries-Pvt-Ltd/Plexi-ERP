@@ -1758,6 +1758,7 @@ model TapePlantPostProduction {
   wasteKg            Float    @default(0)
   wastePercent       Float?
   netProductionKg    Float    @default(0)
+  entries            Json     @default("[]") // Array of per-recipe outputs: { id, planId, recipeQuality, plannedProductionKg, productionDoneKg, gapKg, wasteKg, wastePercent, netProductionKg, remarks }
   qualityChecks      Json     @default("[]") // Array of { time, colour, denier, width, strength, eloPercent, spacerWidth, remarks }
   status             String   @default("DRAFT") // DRAFT | SUBMITTED
   createdAt          DateTime @default(now())

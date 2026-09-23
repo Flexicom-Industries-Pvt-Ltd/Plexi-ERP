@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { parseRecipeQuality, isStandardRecipeFormat, STANDARD_COLOURS } from "@/lib/tape-plant/recipe-format";
-import { Sparkles, Info } from "lucide-react";
+import { Sparkles } from "lucide-react";
 
 interface RecipeQualityBadgeProps {
   value?: string | null;
@@ -10,15 +10,15 @@ interface RecipeQualityBadgeProps {
   showBreakdown?: boolean;
 }
 
-export function RecipeQualityBadge({ value, className = "", showBreakdown = false }: RecipeQualityBadgeProps) {
+function SingleRecipeBadge({ recipe, className = "", showBreakdown = false }: { recipe: string; className?: string; showBreakdown?: boolean }) {
   const [showTooltip, setShowTooltip] = useState(false);
 
-  if (!value || value === "—") {
+  if (!recipe || recipe === "—") {
     return <span className="text-slate-400 font-mono text-xs">—</span>;
   }
 
-  const parts = parseRecipeQuality(value);
-  const isStandard = isStandardRecipeFormat(value);
+  const parts = parseRecipeQuality(recipe);
+  const isStandard = isStandardRecipeFormat(recipe);
   const colourObj = STANDARD_COLOURS.find((c) => c.code.toUpperCase() === parts.colour?.toUpperCase());
 
   return (
@@ -51,7 +51,7 @@ export function RecipeQualityBadge({ value, className = "", showBreakdown = fals
             <span className="font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1">
               <Sparkles className="h-3 w-3 text-amber-400" /> Recipe Breakdown
             </span>
-            <span className="font-mono text-cyan-400 font-bold">{value}</span>
+            <span className="font-mono text-cyan-400 font-bold">{recipe}</span>
           </div>
 
           <div className="grid grid-cols-2 gap-x-2 gap-y-1">
@@ -86,6 +86,26 @@ export function RecipeQualityBadge({ value, className = "", showBreakdown = fals
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+export function RecipeQualityBadge({ value, className = "", showBreakdown = false }: RecipeQualityBadgeProps) {
+  if (!value || value === "—") {
+    return <span className="text-slate-400 font-mono text-xs">—</span>;
+  }
+
+  const recipes = value.split(",").map((s) => s.trim()).filter(Boolean);
+
+  if (recipes.length <= 1) {
+    return <SingleRecipeBadge recipe={recipes[0] || value} className={className} showBreakdown={showBreakdown} />;
+  }
+
+  return (
+    <div className={`inline-flex flex-wrap items-center gap-1.5 ${className}`}>
+      {recipes.map((r, i) => (
+        <SingleRecipeBadge key={i} recipe={r} showBreakdown={showBreakdown} />
+      ))}
     </div>
   );
 }

@@ -2,42 +2,32 @@
 
 import React, { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Save, CheckCircle, Loader2, PackageCheck, ShieldCheck, Plus, Sparkles } from "lucide-react";
-import { SpreadsheetTable, ColumnDef } from "./SpreadsheetTable";
-
-import { RecipeQualityInput } from "./RecipeQualityInput";
+import {
+  Save,
+  CheckCircle,
+  Loader2,
+  PackageCheck,
+  AlertCircle,
+  Layers,
+  Scale,
+  TrendingUp,
+  Percent,
+  ClipboardList,
+} from "lucide-react";
 import { RecipeQualityBadge } from "./RecipeQualityBadge";
-import { DEFAULT_RECIPE_STRING } from "@/lib/tape-plant/recipe-format";
 
-interface QualityCheckRow {
-  time: string;
-  colour: string;
-  denier: number | string;
-  width: number | string;
-  strength: number | string;
-  eloPercent: number | string;
-  spacerWidth: number | string;
-  remarks: string;
+export interface RecipePostProductionEntry {
+  id: string;
+  planId?: string;
+  recipeQuality: string;
+  plannedProductionKg: number | string;
+  productionDoneKg: number | string;
+  gapKg?: number | string;
+  wasteKg: number | string;
+  wastePercent: number | string;
+  netProductionKg?: number | string;
+  remarks?: string;
 }
-
-const DEFAULT_QC_SCHEDULE: QualityCheckRow[] = [
-  { time: "12:00 PM", colour: "", denier: "", width: "", strength: "", eloPercent: "", spacerWidth: "", remarks: "" },
-  { time: "02:00 PM", colour: "", denier: "", width: "", strength: "", eloPercent: "", spacerWidth: "", remarks: "" },
-  { time: "04:00 PM", colour: "", denier: "", width: "", strength: "", eloPercent: "", spacerWidth: "", remarks: "" },
-  { time: "06:00 PM", colour: "", denier: "", width: "", strength: "", eloPercent: "", spacerWidth: "", remarks: "" },
-  { time: "08:00 PM", colour: "", denier: "", width: "", strength: "", eloPercent: "", spacerWidth: "", remarks: "" },
-];
-
-const qcColumns: ColumnDef<QualityCheckRow>[] = [
-  { key: "time", label: "Check Time", width: "110px", minWidth: 100, sticky: true, placeholder: "HH:MM AM/PM" },
-  { key: "colour", label: "Colour", width: "130px", minWidth: 120, placeholder: "Visual Check" },
-  { key: "denier", label: "Denier", width: "90px", minWidth: 85, type: "number", align: "right", placeholder: "D" },
-  { key: "width", label: "Width (mm)", width: "100px", minWidth: 95, type: "number", align: "right", placeholder: "mm" },
-  { key: "strength", label: "Strength (gpd)", width: "110px", minWidth: 100, type: "number", align: "right", placeholder: "gpd" },
-  { key: "eloPercent", label: "ELO %", width: "90px", minWidth: 85, type: "number", align: "right", placeholder: "%" },
-  { key: "spacerWidth", label: "Spacer Width", width: "110px", minWidth: 105, type: "number", align: "right", placeholder: "mm" },
-  { key: "remarks", label: "QC Remarks", width: "180px", minWidth: 160, placeholder: "Pass / Observation" },
-];
 
 interface PostProductionSectionProps {
   date: string;
@@ -48,73 +38,70 @@ interface PostProductionSectionProps {
 export function PostProductionSection({ date, shiftId, shiftName }: PostProductionSectionProps) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-
-  const [recipeQuality, setRecipeQuality] = useState(DEFAULT_RECIPE_STRING);
-  const [plannedProductionKg, setPlannedProductionKg] = useState<number | string>(0);
-  const [productionDoneKg, setProductionDoneKg] = useState<number | string>("");
-  const [wasteKg, setWasteKg] = useState<number | string>("");
-  const [wastePercent, setWastePercent] = useState<number | string>("");
   const [status, setStatus] = useState("DRAFT");
-  const [qualityChecks, setQualityChecks] = useState<QualityCheckRow[]>(DEFAULT_QC_SCHEDULE);
+  const [entries, setEntries] = useState<RecipePostProductionEntry[]>([]);
 
   useEffect(() => {
     if (!date || !shiftId) return;
     setLoading(true);
     fetch(`/api/production/tape-plant/post-production?date=${date}&shiftId=${shiftId}`)
-      .then((r) => (r.ok ? r.json() : { postProduction: null, plan: null }))
+      .then((r) => (r.ok ? r.json() : { postProduction: null, plans: [], entries: [] }))
       .then((data) => {
-        const p = data.postProduction;
-        const plan = data.plan;
+        const postProd = data.postProduction;
+        setStatus(postProd?.status || "DRAFT");
 
-        if (p) {
-          setRecipeQuality(p.recipeQuality || plan?.recipeQuality || DEFAULT_RECIPE_STRING);
-          setPlannedProductionKg(p.plannedProductionKg || plan?.plannedProductionKg || 0);
-          setProductionDoneKg(p.productionDoneKg ?? "");
-          setWasteKg(p.wasteKg ?? "");
-          setWastePercent(p.wastePercent ?? "");
-          setStatus(p.status || "DRAFT");
-          if (Array.isArray(p.qualityChecks) && p.qualityChecks.length > 0) {
-            setQualityChecks(p.qualityChecks);
-          } else {
-            setQualityChecks(DEFAULT_QC_SCHEDULE);
-          }
+        if (Array.isArray(data.entries) && data.entries.length > 0) {
+          setEntries(data.entries);
         } else {
-          setRecipeQuality(plan?.recipeQuality || DEFAULT_RECIPE_STRING);
-          setPlannedProductionKg(plan?.plannedProductionKg || 0);
-          setProductionDoneKg("");
-          setWasteKg("");
-          setWastePercent("");
-          setStatus("DRAFT");
-          setQualityChecks(DEFAULT_QC_SCHEDULE);
+          setEntries([]);
         }
       })
       .catch(() => toast.error("Failed to load post-production data"))
       .finally(() => setLoading(false));
   }, [date, shiftId]);
 
-  // Exact formulas confirmed in PRD:
-  // Gap = Planned - Done
-  // Net Production = Done - Waste
-  const planned = Number(plannedProductionKg) || 0;
-  const done = Number(productionDoneKg) || 0;
-  const gap = planned - done;
-  const waste = Number(wasteKg) || 0;
-  const netProduction = done - waste;
+  const updateEntryField = (index: number, field: keyof RecipePostProductionEntry, value: any) => {
+    setEntries((prev) => {
+      const copy = [...prev];
+      const item = { ...copy[index], [field]: value };
+
+      // Auto compute wastePercent when waste or done changes if user hasn't explicitly entered a percent
+      if (field === "productionDoneKg" || field === "wasteKg") {
+        const done = Number(field === "productionDoneKg" ? value : item.productionDoneKg) || 0;
+        const waste = Number(field === "wasteKg" ? value : item.wasteKg) || 0;
+        if (done > 0) {
+          item.wastePercent = Number(((waste / done) * 100).toFixed(2));
+        } else {
+          item.wastePercent = 0;
+        }
+      }
+
+      copy[index] = item;
+      return copy;
+    });
+  };
+
+  // Aggregated shift summary statistics
+  const totalPlannedKg = entries.reduce((acc, e) => acc + (Number(e.plannedProductionKg) || 0), 0);
+  const totalDoneKg = entries.reduce((acc, e) => acc + (Number(e.productionDoneKg) || 0), 0);
+  const totalWasteKg = entries.reduce((acc, e) => acc + (Number(e.wasteKg) || 0), 0);
+  const totalGapKg = totalPlannedKg - totalDoneKg;
+  const totalNetKg = totalDoneKg - totalWasteKg;
+  const overallEfficiency = totalPlannedKg > 0 ? ((totalDoneKg / totalPlannedKg) * 100).toFixed(1) : "0";
+  const overallWastePct = totalDoneKg > 0 ? ((totalWasteKg / totalDoneKg) * 100).toFixed(2) : "0";
 
   const handleSave = async (submitStatus: "DRAFT" | "SUBMITTED") => {
+    if (entries.length === 0) {
+      toast.error("No recipe plans found for this shift. Please add plans first.");
+      return;
+    }
+
     setSaving(true);
     try {
       const payload = {
         date,
         shiftId,
-        recipeQuality: recipeQuality.trim(),
-        plannedProductionKg: planned,
-        productionDoneKg: done,
-        gapKg: gap,
-        wasteKg: waste,
-        wastePercent: wastePercent !== "" ? Number(wastePercent) : null,
-        netProductionKg: netProduction,
-        qualityChecks,
+        entries,
         status: submitStatus,
       };
 
@@ -132,7 +119,7 @@ export function PostProductionSection({ date, shiftId, shiftName }: PostProducti
       setStatus(submitStatus);
       toast.success(
         submitStatus === "SUBMITTED"
-          ? "Post-production & QC record submitted successfully"
+          ? "Post-production record submitted successfully"
           : "Post-production saved as draft"
       );
     } catch (err: any) {
@@ -142,27 +129,11 @@ export function PostProductionSection({ date, shiftId, shiftName }: PostProducti
     }
   };
 
-  const handleAddQcRow = () => {
-    setQualityChecks([
-      ...qualityChecks,
-      {
-        time: "New Time",
-        colour: "",
-        denier: "",
-        width: "",
-        strength: "",
-        eloPercent: "",
-        spacerWidth: "",
-        remarks: "",
-      },
-    ]);
-  };
-
   if (loading) {
     return (
       <div className="flex items-center justify-center p-16 bg-white rounded-xl border border-slate-200">
         <Loader2 className="h-6 w-6 animate-spin text-primary mr-2" />
-        <span className="text-sm font-medium text-slate-500">Loading Post Production Data...</span>
+        <span className="text-sm font-medium text-slate-500">Loading Post-Production Data...</span>
       </div>
     );
   }
@@ -177,7 +148,7 @@ export function PostProductionSection({ date, shiftId, shiftName }: PostProducti
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-base font-bold text-slate-900">5. Post Production Entry & QC</h2>
+              <h2 className="text-base font-bold text-slate-900">5. Post Production Entry</h2>
               <span
                 className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border ${
                   status === "SUBMITTED"
@@ -189,7 +160,7 @@ export function PostProductionSection({ date, shiftId, shiftName }: PostProducti
               </span>
             </div>
             <p className="text-xs text-slate-500 mt-0.5">
-              Compare planned vs actual production output, record shift waste, and log 2-hourly QC checks for {shiftName} ({date}).
+              Record actual production done, waste, and net output for planned recipes in {shiftName} ({date}).
             </p>
           </div>
         </div>
@@ -197,7 +168,7 @@ export function PostProductionSection({ date, shiftId, shiftName }: PostProducti
         <div className="flex items-center gap-2">
           <button
             type="button"
-            disabled={saving}
+            disabled={saving || entries.length === 0}
             onClick={() => handleSave("DRAFT")}
             className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition-all active:scale-95 disabled:opacity-50"
           >
@@ -206,7 +177,7 @@ export function PostProductionSection({ date, shiftId, shiftName }: PostProducti
           </button>
           <button
             type="button"
-            disabled={saving}
+            disabled={saving || entries.length === 0}
             onClick={() => handleSave("SUBMITTED")}
             className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary hover:bg-primary/90 text-white text-xs font-semibold rounded-lg shadow-sm transition-all active:scale-95 disabled:opacity-50"
           >
@@ -216,115 +187,200 @@ export function PostProductionSection({ date, shiftId, shiftName }: PostProducti
         </div>
       </div>
 
-      {/* Recipe / Quality ID Bar */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 sm:p-5">
-        <RecipeQualityInput
-          value={recipeQuality}
-          onChange={setRecipeQuality}
-          label="Production Run Recipe / Quality ID"
-          required
-        />
-      </div>
-
-      {/* Production Output Spreadsheet Card */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="px-5 py-3.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-              Shift Production Comparison (Planned vs Actual)
-            </h3>
-            <RecipeQualityBadge value={recipeQuality} />
+      {/* Empty State when no plans exist for shift */}
+      {entries.length === 0 ? (
+        <div className="p-8 text-center bg-white rounded-xl border border-dashed border-slate-300 shadow-sm space-y-3">
+          <div className="inline-flex p-3 bg-amber-50 text-amber-600 rounded-full">
+            <ClipboardList className="h-6 w-6" />
           </div>
-          <span className="text-[11px] font-semibold text-slate-500">
-            Net Production = Production Done − Waste
-          </span>
+          <h3 className="text-sm font-bold text-slate-800">No Planned Recipes Found for This Shift</h3>
+          <p className="text-xs text-slate-500 max-w-md mx-auto">
+            Before entering post-production quantities, please define the recipe runs in the <strong>1. Planning</strong> submodule. All planned recipes will automatically appear here for actual output recording.
+          </p>
         </div>
+      ) : (
+        <>
+          {/* Shift Aggregate Summary KPI Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-sm">
+              <div className="flex items-center justify-between text-slate-500 mb-1">
+                <span className="text-[11px] font-bold uppercase">Total Planned</span>
+                <Scale className="h-3.5 w-3.5 text-slate-400" />
+              </div>
+              <div className="text-base font-extrabold text-slate-900 font-mono">
+                {totalPlannedKg.toLocaleString()} <span className="text-xs font-medium text-slate-400">KG</span>
+              </div>
+            </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 divide-x divide-y divide-slate-200 border-b border-slate-200 text-xs">
+            <div className="p-3 bg-blue-50/50 rounded-xl border border-blue-200 shadow-sm">
+              <div className="flex items-center justify-between text-blue-700 mb-1">
+                <span className="text-[11px] font-extrabold uppercase">Total Done</span>
+                <TrendingUp className="h-3.5 w-3.5 text-blue-500" />
+              </div>
+              <div className="text-base font-extrabold text-blue-950 font-mono">
+                {totalDoneKg.toLocaleString()} <span className="text-xs font-medium text-blue-600">KG</span>
+              </div>
+            </div>
 
-          {/* Planned Production KG */}
-          <div className="p-3 bg-slate-50/50">
-            <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Planned (KG)</label>
-            <input
-              type="number"
-              value={plannedProductionKg}
-              placeholder="0.0"
-              onChange={(e) => setPlannedProductionKg(e.target.value)}
-              className="w-full h-8 px-2.5 text-xs font-bold text-slate-700 bg-white border border-slate-200 rounded focus:ring-1 focus:ring-primary outline-none text-right"
-            />
-          </div>
+            <div className="p-3 bg-amber-50/50 rounded-xl border border-amber-200 shadow-sm">
+              <div className="flex items-center justify-between text-amber-700 mb-1">
+                <span className="text-[11px] font-bold uppercase">Total Gap</span>
+                <AlertCircle className="h-3.5 w-3.5 text-amber-500" />
+              </div>
+              <div className="text-base font-extrabold text-amber-900 font-mono">
+                {totalGapKg.toLocaleString()} <span className="text-xs font-medium text-amber-600">KG</span>
+              </div>
+            </div>
 
-          {/* Production Done KG */}
-          <div className="p-3 bg-blue-50/30">
-            <label className="block text-[11px] font-extrabold text-blue-700 uppercase mb-1">
-              Production Done (KG) <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="number"
-              value={productionDoneKg}
-              placeholder="e.g. 4800"
-              onChange={(e) => setProductionDoneKg(e.target.value)}
-              className="w-full h-8 px-2.5 text-xs font-extrabold text-blue-900 bg-white border border-blue-200 rounded focus:ring-2 focus:ring-primary outline-none text-right shadow-sm"
-            />
-          </div>
+            <div className="p-3 bg-red-50/50 rounded-xl border border-red-200 shadow-sm">
+              <div className="flex items-center justify-between text-red-700 mb-1">
+                <span className="text-[11px] font-extrabold uppercase">Total Waste</span>
+                <Percent className="h-3.5 w-3.5 text-red-500" />
+              </div>
+              <div className="text-base font-extrabold text-red-950 font-mono">
+                {totalWasteKg.toLocaleString()} <span className="text-xs font-medium text-red-600">KG</span>
+              </div>
+            </div>
 
-          {/* Gap KG (Planned - Done) */}
-          <div className="p-3 bg-slate-100/70">
-            <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Gap (KG)</label>
-            <div className="h-8 px-2.5 flex items-center justify-end font-mono font-extrabold text-xs text-amber-700 bg-white border border-slate-200 rounded">
-              {gap.toLocaleString()} KG
+            <div className="p-3 bg-emerald-50/50 rounded-xl border border-emerald-200 shadow-sm">
+              <div className="flex items-center justify-between text-emerald-800 mb-1">
+                <span className="text-[11px] font-extrabold uppercase">Net Output</span>
+                <PackageCheck className="h-3.5 w-3.5 text-emerald-600" />
+              </div>
+              <div className="text-base font-black text-emerald-950 font-mono">
+                {totalNetKg.toLocaleString()} <span className="text-xs font-semibold text-emerald-700">KG</span>
+              </div>
+            </div>
+
+            <div className="p-3 bg-indigo-50/50 rounded-xl border border-indigo-200 shadow-sm">
+              <div className="flex items-center justify-between text-indigo-700 mb-1">
+                <span className="text-[11px] font-bold uppercase">Efficiency</span>
+                <Layers className="h-3.5 w-3.5 text-indigo-500" />
+              </div>
+              <div className="text-base font-extrabold text-indigo-950 font-mono">
+                {overallEfficiency}%
+              </div>
             </div>
           </div>
 
-          {/* Waste KG */}
-          <div className="p-3 bg-red-50/30">
-            <label className="block text-[11px] font-extrabold text-red-700 uppercase mb-1">Waste (KG)</label>
-            <input
-              type="number"
-              value={wasteKg}
-              placeholder="e.g. 100"
-              onChange={(e) => setWasteKg(e.target.value)}
-              className="w-full h-8 px-2.5 text-xs font-extrabold text-red-900 bg-white border border-red-200 rounded focus:ring-2 focus:ring-red-500 outline-none text-right shadow-sm"
-            />
-          </div>
+          {/* Per-Recipe Output Cards / Table */}
+          <div className="space-y-4">
+            {entries.map((entry, index) => {
+              const planned = Number(entry.plannedProductionKg) || 0;
+              const done = Number(entry.productionDoneKg) || 0;
+              const gap = planned - done;
+              const waste = Number(entry.wasteKg) || 0;
+              const net = done - waste;
 
-          {/* Waste % */}
-          <div className="p-3 bg-white">
-            <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Waste %</label>
-            <input
-              type="number"
-              step="0.01"
-              value={wastePercent}
-              placeholder="%"
-              onChange={(e) => setWastePercent(e.target.value)}
-              className="w-full h-8 px-2.5 text-xs font-semibold text-slate-800 bg-slate-50 border border-slate-200 rounded focus:bg-white focus:ring-1 focus:ring-primary outline-none text-right"
-            />
-          </div>
+              return (
+                <div
+                  key={entry.id || `entry-${index}`}
+                  className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden transition-all hover:border-slate-300"
+                >
+                  {/* Header Row for Recipe Run */}
+                  <div className="px-5 py-3 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2.5">
+                      <span className="inline-flex items-center justify-center px-2 py-0.5 rounded text-[11px] font-bold bg-slate-200 text-slate-700">
+                        Run #{index + 1}
+                      </span>
+                      <RecipeQualityBadge value={entry.recipeQuality} />
+                    </div>
+                    <div className="flex items-center gap-3 text-xs">
+                      <span className="text-slate-500">
+                        Planned Target: <strong className="text-slate-800 font-mono font-bold">{planned.toLocaleString()} KG</strong>
+                      </span>
+                      <span className="text-slate-400">|</span>
+                      <span className="text-emerald-700 font-semibold">
+                        Net Output: <strong className="text-emerald-800 font-mono font-black">{net.toLocaleString()} KG</strong>
+                      </span>
+                    </div>
+                  </div>
 
-          {/* Net Production KG (Done - Waste) */}
-          <div className="p-3 bg-emerald-50/40">
-            <label className="block text-[11px] font-extrabold text-emerald-800 uppercase mb-1">
-              Net Production (KG)
-            </label>
-            <div className="h-8 px-2.5 flex items-center justify-end font-mono font-black text-sm text-emerald-800 bg-white border border-emerald-300 rounded shadow-sm">
-              {netProduction.toLocaleString()} KG
-            </div>
-          </div>
-        </div>
-      </div>
+                  {/* Input Grid for this Recipe */}
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 divide-x divide-y md:divide-y-0 divide-slate-200 text-xs">
+                    {/* Planned KG (Read-only reference from planning) */}
+                    <div className="p-3 bg-slate-50/50">
+                      <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">
+                        Planned (KG)
+                      </label>
+                      <div className="h-8 px-2.5 flex items-center justify-end font-mono font-bold text-xs text-slate-700 bg-slate-100 border border-slate-200 rounded">
+                        {planned.toLocaleString()} KG
+                      </div>
+                    </div>
 
-      {/* 2-Hourly Quality Check Table */}
-      <SpreadsheetTable<QualityCheckRow>
-        title="Periodic Quality Inspection Schedule (~Every 2 Hours)"
-        subtitle="Operator physical quality verification records: 12 PM, 2 PM, 4 PM, 6 PM, 8 PM."
-        columns={qcColumns}
-        data={qualityChecks}
-        onChange={setQualityChecks}
-        allowAddRow={true}
-        onAddRow={handleAddQcRow}
-        allowDeleteRow={true}
-        onDeleteRow={(idx) => setQualityChecks(qualityChecks.filter((_, i) => i !== idx))}
-      />
+                    {/* Production Done KG (Input) */}
+                    <div className="p-3 bg-blue-50/30">
+                      <label className="block text-[11px] font-extrabold text-blue-700 uppercase mb-1">
+                        Production Done (KG) <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="number"
+                        value={entry.productionDoneKg}
+                        placeholder="e.g. 3000"
+                        onChange={(e) => updateEntryField(index, "productionDoneKg", e.target.value)}
+                        className="w-full h-8 px-2.5 text-xs font-extrabold text-blue-900 bg-white border border-blue-300 rounded focus:ring-2 focus:ring-primary outline-none text-right shadow-sm"
+                      />
+                    </div>
+
+                    {/* Gap KG (Auto-calculated: Planned - Done) */}
+                    <div className="p-3 bg-slate-100/70">
+                      <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">
+                        Gap (KG)
+                      </label>
+                      <div
+                        className={`h-8 px-2.5 flex items-center justify-end font-mono font-extrabold text-xs bg-white border rounded ${
+                          gap <= 0 ? "text-emerald-700 border-emerald-300" : "text-amber-700 border-amber-200"
+                        }`}
+                      >
+                        {gap.toLocaleString()} KG
+                      </div>
+                    </div>
+
+                    {/* Waste KG (Input) */}
+                    <div className="p-3 bg-red-50/30">
+                      <label className="block text-[11px] font-extrabold text-red-700 uppercase mb-1">
+                        Waste (KG)
+                      </label>
+                      <input
+                        type="number"
+                        value={entry.wasteKg}
+                        placeholder="e.g. 50"
+                        onChange={(e) => updateEntryField(index, "wasteKg", e.target.value)}
+                        className="w-full h-8 px-2.5 text-xs font-extrabold text-red-900 bg-white border border-red-300 rounded focus:ring-2 focus:ring-red-500 outline-none text-right shadow-sm"
+                      />
+                    </div>
+
+                    {/* Waste % (Auto-calculated / Editable) */}
+                    <div className="p-3 bg-white">
+                      <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">
+                        Waste %
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={entry.wastePercent}
+                        placeholder="%"
+                        onChange={(e) => updateEntryField(index, "wastePercent", e.target.value)}
+                        className="w-full h-8 px-2.5 text-xs font-semibold text-slate-800 bg-slate-50 border border-slate-200 rounded focus:bg-white focus:ring-1 focus:ring-primary outline-none text-right"
+                      />
+                    </div>
+
+                    {/* Net Production KG (Auto-calculated: Done - Waste) */}
+                    <div className="p-3 bg-emerald-50/40">
+                      <label className="block text-[11px] font-extrabold text-emerald-800 uppercase mb-1">
+                        Net Production (KG)
+                      </label>
+                      <div className="h-8 px-2.5 flex items-center justify-end font-mono font-black text-sm text-emerald-800 bg-white border border-emerald-300 rounded shadow-sm">
+                        {net.toLocaleString()} KG
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
     </div>
   );
 }
