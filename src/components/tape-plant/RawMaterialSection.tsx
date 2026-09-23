@@ -4,9 +4,12 @@ import React, { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Save, Loader2, FlaskConical, Plus } from "lucide-react";
 import { SpreadsheetTable, ColumnDef } from "./SpreadsheetTable";
+import { OperatorSelect } from "./OperatorSelect";
 
 interface RawMaterialRow {
   id?: string;
+  operatorName?: string;
+  operatorId?: string;
   material: string;
   grade: string;
   openingStock: number | string;
@@ -75,6 +78,8 @@ interface RawMaterialSectionProps {
 export function RawMaterialSection({ date, shiftId, shiftName }: RawMaterialSectionProps) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [operatorName, setOperatorName] = useState("");
+  const [operatorId, setOperatorId] = useState("");
   const [records, setRecords] = useState<RawMaterialRow[]>(DEFAULT_MATERIALS);
 
   useEffect(() => {
@@ -82,10 +87,14 @@ export function RawMaterialSection({ date, shiftId, shiftName }: RawMaterialSect
     setLoading(true);
     fetch(`/api/production/tape-plant/raw-material?date=${date}&shiftId=${shiftId}`)
       .then((r) => (r.ok ? r.json() : []))
-      .then((data: RawMaterialRow[]) => {
+      .then((data: any[]) => {
         if (data && data.length > 0) {
+          if (data[0]?.operatorName) setOperatorName(data[0].operatorName);
+          if (data[0]?.operatorId) setOperatorId(data[0].operatorId);
           setRecords(data);
         } else {
+          setOperatorName("");
+          setOperatorId("");
           setRecords(DEFAULT_MATERIALS);
         }
       })
@@ -102,6 +111,8 @@ export function RawMaterialSection({ date, shiftId, shiftName }: RawMaterialSect
         body: JSON.stringify({
           date,
           shiftId,
+          operatorName,
+          operatorId,
           records,
         }),
       });
@@ -163,12 +174,22 @@ export function RawMaterialSection({ date, shiftId, shiftName }: RawMaterialSect
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
+          <OperatorSelect
+            value={operatorName}
+            operatorId={operatorId}
+            onChange={(name, id) => {
+              setOperatorName(name);
+              setOperatorId(id || "");
+            }}
+            section="TAPE_PLANT"
+          />
+
           <button
             type="button"
             disabled={saving}
             onClick={handleSave}
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary hover:bg-primary/90 text-white text-xs font-semibold rounded-lg shadow-sm transition-all active:scale-95 disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary hover:bg-primary/90 text-white text-xs font-semibold rounded-lg shadow-sm transition-all active:scale-95 disabled:opacity-50 h-8"
           >
             {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
             Save Raw Material Log

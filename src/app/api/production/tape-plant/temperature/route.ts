@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { date, shiftId, readings } = body;
+    const { date, shiftId, readings, operatorName, operatorId } = body;
 
     if (!date || !shiftId || !Array.isArray(readings)) {
       return NextResponse.json({ error: "Date, Shift, and Readings array are required" }, { status: 400 });
@@ -65,6 +65,8 @@ export async function POST(request: NextRequest) {
             date,
             shiftId,
             time: String(r.time).trim(),
+            operatorName: r.operatorName || operatorName || null,
+            operatorId: r.operatorId || operatorId || null,
             b1: r.b1 !== "" && r.b1 !== null && r.b1 !== undefined ? Number(r.b1) : null,
             b2: r.b2 !== "" && r.b2 !== null && r.b2 !== undefined ? Number(r.b2) : null,
             b3: r.b3 !== "" && r.b3 !== null && r.b3 !== undefined ? Number(r.b3) : null,
