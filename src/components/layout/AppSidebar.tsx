@@ -57,6 +57,7 @@ const settingsItems = [
 
 const dataCentreItems = [
   { title: "Drivers", url: "/dashboard/data-centre/driver" },
+  { title: "Operators", url: "/dashboard/data-centre/operators" },
   { title: "Stocks", url: "/dashboard/data-centre/stock" },
   { title: "Units", url: "/dashboard/data-centre/units" },
   { title: "Item Categories", url: "/dashboard/data-centre/categories" },

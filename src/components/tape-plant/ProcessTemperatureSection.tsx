@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Save, Loader2, Thermometer, Plus, Copy } from "lucide-react";
 import { SpreadsheetTable, ColumnDef } from "./SpreadsheetTable";
+import { OperatorSelect } from "./OperatorSelect";
 
 interface TemperatureReading {
   id?: string;
@@ -81,6 +82,8 @@ interface ProcessTemperatureSectionProps {
 export function ProcessTemperatureSection({ date, shiftId, shiftName }: ProcessTemperatureSectionProps) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [operatorName, setOperatorName] = useState("");
+  const [operatorId, setOperatorId] = useState("");
   const [readings, setReadings] = useState<TemperatureReading[]>([]);
 
   useEffect(() => {
@@ -90,6 +93,8 @@ export function ProcessTemperatureSection({ date, shiftId, shiftName }: ProcessT
       .then((r) => (r.ok ? r.json() : []))
       .then((data: any[]) => {
         if (data && data.length > 0) {
+          if (data[0]?.operatorName) setOperatorName(data[0].operatorName);
+          if (data[0]?.operatorId) setOperatorId(data[0].operatorId);
           const mapped: TemperatureReading[] = data.map((d) => ({
             id: d.id,
             time: d.time || "",
@@ -118,6 +123,8 @@ export function ProcessTemperatureSection({ date, shiftId, shiftName }: ProcessT
           }));
           setReadings(mapped);
         } else {
+          setOperatorName("");
+          setOperatorId("");
           // Initialize with standard shift intervals
           const initial: TemperatureReading[] = DEFAULT_SCHEDULED_TIMES.map((time) => ({
             time,
@@ -160,6 +167,8 @@ export function ProcessTemperatureSection({ date, shiftId, shiftName }: ProcessT
         body: JSON.stringify({
           date,
           shiftId,
+          operatorName,
+          operatorId,
           readings,
         }),
       });
@@ -248,12 +257,22 @@ export function ProcessTemperatureSection({ date, shiftId, shiftName }: ProcessT
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
+          <OperatorSelect
+            value={operatorName}
+            operatorId={operatorId}
+            onChange={(name, id) => {
+              setOperatorName(name);
+              setOperatorId(id || "");
+            }}
+            section="TAPE_PLANT"
+          />
+
           <button
             type="button"
             disabled={saving}
             onClick={handleSave}
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary hover:bg-primary/90 text-white text-xs font-semibold rounded-lg shadow-sm transition-all active:scale-95 disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary hover:bg-primary/90 text-white text-xs font-semibold rounded-lg shadow-sm transition-all active:scale-95 disabled:opacity-50 h-8"
           >
             {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
             Save Temperature Log
