@@ -1,8 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { User, ChevronDown, Check, Plus, Users, Search, X } from "lucide-react";
-import Link from "next/link";
+import { User, ChevronDown, Check, Search, X } from "lucide-react";
 
 export interface OperatorOption {
   id: string;
@@ -28,8 +27,7 @@ export function OperatorSelect({
   operatorId,
   onChange,
   section = "TAPE_PLANT",
-  label = "Shift Operator",
-  placeholder = "Select operating technician...",
+  placeholder = "Select Operator...",
   disabled = false,
 }: OperatorSelectProps) {
   const [operators, setOperators] = useState<OperatorOption[]>([]);
@@ -76,12 +74,6 @@ export function OperatorSelect({
     );
   });
 
-  const selectedOp = operators.find(
-    (op) =>
-      (operatorId && op.id === operatorId) ||
-      (value && op.name.toLowerCase() === value.toLowerCase())
-  );
-
   const handleSelect = (op: OperatorOption) => {
     onChange(op.name, op.id);
     setIsOpen(false);
@@ -94,45 +86,61 @@ export function OperatorSelect({
   };
 
   return (
-    <div className="relative inline-block text-left" ref={containerRef}>
-      {label && (
-        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-          {label}
-        </label>
-      )}
-
+    <div className="relative inline-flex items-center text-left" ref={containerRef}>
       <button
         type="button"
         disabled={disabled}
         onClick={() => setIsOpen(!isOpen)}
-        className={`h-8 px-2.5 rounded-lg border text-xs font-semibold flex items-center justify-between gap-2 transition-all min-w-[180px] max-w-[240px] ${
+        className={`h-8 px-2.5 rounded-lg border text-xs font-semibold flex items-center justify-between gap-2 transition-all min-w-[160px] max-w-[240px] shadow-2xs ${
           value
-            ? "bg-slate-900 text-white border-slate-900 shadow-xs"
-            : "bg-white text-slate-700 border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+            ? "bg-emerald-50/80 text-emerald-950 border-emerald-300 hover:bg-emerald-100/70 hover:border-emerald-400"
+            : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:border-slate-300"
         } ${disabled ? "opacity-60 cursor-not-allowed" : "cursor-pointer"}`}
       >
         <div className="flex items-center gap-1.5 truncate">
-          <User className={`h-3.5 w-3.5 shrink-0 ${value ? "text-primary-foreground" : "text-slate-400"}`} />
-          <span className="truncate font-medium">
-            {value || placeholder}
-          </span>
+          <User
+            className={`h-3.5 w-3.5 shrink-0 ${
+              value ? "text-emerald-600" : "text-slate-400"
+            }`}
+          />
+          {value ? (
+            <div className="flex items-center gap-1 truncate">
+              <span className="text-[10px] font-bold text-emerald-700/80 uppercase tracking-wider">
+                OP:
+              </span>
+              <span className="truncate font-semibold text-emerald-950">
+                {value}
+              </span>
+            </div>
+          ) : (
+            <span className="truncate font-normal text-slate-500">
+              {placeholder}
+            </span>
+          )}
         </div>
 
-        <div className="flex items-center gap-1 shrink-0">
+        <div className="flex items-center gap-1 shrink-0 ml-1">
           {value && !disabled && (
             <span
               onClick={handleClear}
-              className="p-0.5 rounded hover:bg-white/20 text-white/70 hover:text-white transition-colors"
+              role="button"
+              tabIndex={0}
+              className="p-0.5 rounded-full hover:bg-emerald-200/70 text-emerald-600 hover:text-emerald-800 transition-colors"
+              title="Clear operator"
             >
               <X className="h-3 w-3" />
             </span>
           )}
-          <ChevronDown className={`h-3 w-3 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+          <ChevronDown
+            className={`h-3 w-3 transition-transform ${
+              value ? "text-emerald-600" : "text-slate-400"
+            } ${isOpen ? "rotate-180" : ""}`}
+          />
         </div>
       </button>
 
       {isOpen && (
-        <div className="absolute top-full left-0 mt-1 z-50 w-72 bg-white rounded-xl shadow-2xl border border-slate-200 p-2 divide-y divide-slate-100 animate-in fade-in zoom-in-95 duration-100">
+        <div className="absolute top-full left-0 sm:left-auto sm:right-0 mt-1.5 z-50 w-72 bg-white rounded-xl shadow-xl border border-slate-200 p-2 divide-y divide-slate-100 animate-in fade-in zoom-in-95 duration-100">
           {/* Search Box */}
           <div className="pb-2">
             <div className="relative">
@@ -183,7 +191,7 @@ export function OperatorSelect({
                     }}
                     className={`px-2.5 py-1.5 rounded-lg cursor-pointer flex items-center justify-between text-xs transition-colors ${
                       isSelected
-                        ? "bg-primary/10 text-primary font-bold"
+                        ? "bg-emerald-50 text-emerald-900 font-bold"
                         : "hover:bg-slate-50 text-slate-700"
                     }`}
                   >
@@ -200,23 +208,11 @@ export function OperatorSelect({
                         {op.designation || "Operator"} {op.shiftPreference ? `• Shift ${op.shiftPreference}` : ""}
                       </div>
                     </div>
-                    {isSelected && <Check className="h-3.5 w-3.5 text-primary shrink-0" />}
+                    {isSelected && <Check className="h-3.5 w-3.5 text-emerald-600 shrink-0" />}
                   </div>
                 );
               })
             )}
-          </div>
-
-          {/* Quick link to Data Centre -> Operators */}
-          <div className="pt-1.5 px-1 flex items-center justify-between text-[11px]">
-            <Link
-              href="/dashboard/data-centre/operators"
-              target="_blank"
-              className="text-primary hover:underline inline-flex items-center gap-1 font-semibold"
-            >
-              <Users className="h-3 w-3" />
-              <span>Manage Operators</span>
-            </Link>
           </div>
         </div>
       )}
