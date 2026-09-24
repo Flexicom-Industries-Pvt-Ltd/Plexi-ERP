@@ -74,6 +74,9 @@ export async function PUT(
       tptPercent,
       totalPercent,
       defaultQtyKg,
+      colorGroup,
+      recipeGroup,
+      copiedFromCode,
       remarks,
       isActive,
     } = body;
@@ -86,13 +89,13 @@ export async function PUT(
       return NextResponse.json({ error: "Recipe not found" }, { status: 404 });
     }
 
-    if (code && String(code).trim().toUpperCase() !== existing.code) {
+    if (code && String(code).trim() !== existing.code) {
       const duplicate = await db.tapePlantRecipe.findUnique({
-        where: { code: String(code).trim().toUpperCase() },
+        where: { code: String(code).trim() },
       });
       if (duplicate && duplicate.id !== id) {
         return NextResponse.json(
-          { error: `Recipe with code '${String(code).trim().toUpperCase()}' already exists` },
+          { error: `Recipe with code '${String(code).trim()}' already exists` },
           { status: 409 }
         );
       }
@@ -101,7 +104,7 @@ export async function PUT(
     const updated = await db.tapePlantRecipe.update({
       where: { id },
       data: {
-        code: code ? String(code).trim().toUpperCase() : existing.code,
+        code: code ? String(code).trim() : existing.code,
         tapeType: tapeType !== undefined ? String(tapeType).trim().toUpperCase() : existing.tapeType,
         denier: denier !== "" && denier !== null && denier !== undefined ? Number(denier) : null,
         tapeWidth: tapeWidth !== "" && tapeWidth !== null && tapeWidth !== undefined ? Number(tapeWidth) : null,
@@ -123,6 +126,9 @@ export async function PUT(
         tptPercent: tptPercent !== "" && tptPercent !== null && tptPercent !== undefined ? Number(tptPercent) : null,
         totalPercent: totalPercent !== "" && totalPercent !== null && totalPercent !== undefined ? Number(totalPercent) : existing.totalPercent,
         defaultQtyKg: defaultQtyKg !== "" && defaultQtyKg !== null && defaultQtyKg !== undefined ? Number(defaultQtyKg) : null,
+        colorGroup: colorGroup !== undefined ? (colorGroup ? String(colorGroup).trim() : null) : existing.colorGroup,
+        recipeGroup: recipeGroup !== undefined ? (recipeGroup ? String(recipeGroup).trim() : null) : existing.recipeGroup,
+        copiedFromCode: copiedFromCode !== undefined ? (copiedFromCode ? String(copiedFromCode).trim() : null) : existing.copiedFromCode,
         remarks: remarks !== undefined ? (remarks ? String(remarks).trim() : null) : existing.remarks,
         isActive: isActive !== undefined ? Boolean(isActive) : existing.isActive,
       },
@@ -132,7 +138,7 @@ export async function PUT(
       action: "UPDATE_RECIPE",
       module: "DATA_CENTRE",
       severity: "INFO",
-      payload: { id: updated.id, code: updated.code },
+      payload: { id: updated.id, code: updated.code, colorGroup: updated.colorGroup, recipeGroup: updated.recipeGroup },
       meta: { description: `Updated Tape Plant Recipe ${updated.code}` },
       userId: auth.user.id,
     });

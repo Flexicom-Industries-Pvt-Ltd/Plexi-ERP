@@ -1,3 +1,76 @@
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
@@ -1806,6 +1879,9 @@ model TapePlantRecipe {
   tptPercent      Float?
   totalPercent    Float?   @default(100)
   defaultQtyKg    Float?
+  colorGroup      String?  // "Yellow" | "White" | "Light Green" | "Dark Green" | "Grey" | "Dark Blue" | "Light Blue"
+  recipeGroup     String?  // Shared recipe family e.g. "860D PP Family", "900D LPP White"
+  copiedFromCode  String?  // Reference to source recipe code if copied/cloned
   remarks         String?
   isActive        Boolean  @default(true)
   createdAt       DateTime @default(now())
@@ -1813,6 +1889,8 @@ model TapePlantRecipe {
 
   @@index([code])
   @@index([tapeType])
+  @@index([colorGroup])
+  @@index([recipeGroup])
   @@index([isActive])
 }
 
