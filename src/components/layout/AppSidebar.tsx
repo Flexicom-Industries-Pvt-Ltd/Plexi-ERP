@@ -65,6 +65,7 @@ const dataCentreItems = [
   { title: "Production Characteristics", url: "/dashboard/data-centre/production-characteristics" },
   { title: "Manpower Rules", url: "/dashboard/data-centre/manpower-rules" },
   { title: "Tape Plant Recipe", url: "/dashboard/data-centre/tape-plant-recipe" },
+  { title: "Loom Machine Mapping", url: "/dashboard/data-centre/loom-machine-mapping" },
 ];
 
 type AppSidebarProps = {
