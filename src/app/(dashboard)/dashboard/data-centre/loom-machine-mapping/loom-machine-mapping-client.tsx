@@ -353,12 +353,15 @@ export function LoomMachineMappingClient() {
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2.5 flex-wrap">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
               Data Centre Master
             </span>
             <span className="inline-flex items-center gap-1 text-[11px] font-semibold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">
               <CheckCircle2 className="h-3 w-3" /> 91 Looms Online
+            </span>
+            <span className="inline-flex items-center gap-1 text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-full">
+              <Sparkles className="h-3 w-3 text-indigo-500" /> Auto-Synced with Tape Recipes
             </span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 mt-1">
