@@ -16,6 +16,8 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const search = searchParams.get("search")?.trim();
   const tapeType = searchParams.get("tapeType")?.trim();
+  const colorGroup = searchParams.get("colorGroup")?.trim();
+  const recipeGroup = searchParams.get("recipeGroup")?.trim();
   const code = searchParams.get("code")?.trim();
   const activeOnly = searchParams.get("activeOnly") !== "false";
 
@@ -34,6 +36,14 @@ export async function GET(request: NextRequest) {
       where.tapeType = { equals: tapeType, mode: "insensitive" };
     }
 
+    if (colorGroup && colorGroup !== "ALL") {
+      where.colorGroup = { equals: colorGroup, mode: "insensitive" };
+    }
+
+    if (recipeGroup && recipeGroup !== "ALL") {
+      where.recipeGroup = { equals: recipeGroup, mode: "insensitive" };
+    }
+
     if (search) {
       where.OR = [
         { code: { contains: search, mode: "insensitive" } },
@@ -41,15 +51,41 @@ export async function GET(request: NextRequest) {
         { bobbinMarking: { contains: search, mode: "insensitive" } },
         { remarks: { contains: search, mode: "insensitive" } },
         { tapeType: { contains: search, mode: "insensitive" } },
+        { colorGroup: { contains: search, mode: "insensitive" } },
+        { recipeGroup: { contains: search, mode: "insensitive" } },
       ];
     }
 
     const recipes = await db.tapePlantRecipe.findMany({
       where,
-      orderBy: [{ tapeType: "asc" }, { code: "asc" }],
+      orderBy: [{ colorGroup: "asc" }, { tapeType: "asc" }, { code: "asc" }],
     });
 
-    return NextResponse.json(recipes, {
+    // Compute shared qualities for each recipe
+    // All active recipes mapped by recipeGroup
+    const allRecipes = await db.tapePlantRecipe.findMany({
+      where: { isActive: true },
+      select: { id: true, code: true, recipeGroup: true, copiedFromCode: true },
+    });
+
+    const enriched = recipes.map((r) => {
+      let sharedCodes: string[] = [];
+      if (r.recipeGroup) {
+        sharedCodes = allRecipes
+          .filter((item) => item.recipeGroup === r.recipeGroup && item.code !== r.code)
+          .map((item) => item.code);
+      } else if (r.copiedFromCode) {
+        sharedCodes = allRecipes
+          .filter((item) => (item.code === r.copiedFromCode || item.copiedFromCode === r.copiedFromCode) && item.code !== r.code)
+          .map((item) => item.code);
+      }
+      return {
+        ...r,
+        sharedQualities: sharedCodes,
+      };
+    });
+
+    return NextResponse.json(enriched, {
       headers: {
         "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
       },
@@ -95,6 +131,9 @@ export async function POST(request: NextRequest) {
       tptPercent,
       totalPercent,
       defaultQtyKg,
+      colorGroup,
+      recipeGroup,
+      copiedFromCode,
       remarks,
     } = body;
 
@@ -105,7 +144,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const trimmedCode = String(code).trim().toUpperCase();
+    const trimmedCode = String(code).trim();
 
     const existing = await db.tapePlantRecipe.findUnique({
       where: { code: trimmedCode },
@@ -142,6 +181,9 @@ export async function POST(request: NextRequest) {
         tptPercent: tptPercent !== "" && tptPercent !== null && tptPercent !== undefined ? Number(tptPercent) : null,
         totalPercent: totalPercent !== "" && totalPercent !== null && totalPercent !== undefined ? Number(totalPercent) : 100,
         defaultQtyKg: defaultQtyKg !== "" && defaultQtyKg !== null && defaultQtyKg !== undefined ? Number(defaultQtyKg) : null,
+        colorGroup: colorGroup ? String(colorGroup).trim() : null,
+        recipeGroup: recipeGroup ? String(recipeGroup).trim() : null,
+        copiedFromCode: copiedFromCode ? String(copiedFromCode).trim() : null,
         remarks: remarks ? String(remarks).trim() : null,
         isActive: true,
       },
@@ -151,7 +193,7 @@ export async function POST(request: NextRequest) {
       action: "CREATE_RECIPE",
       module: "DATA_CENTRE",
       severity: "INFO",
-      payload: { id: recipe.id, code: recipe.code },
+      payload: { id: recipe.id, code: recipe.code, colorGroup: recipe.colorGroup, recipeGroup: recipe.recipeGroup },
       meta: { description: `Created Tape Plant Recipe ${recipe.code}` },
       userId: auth.user.id,
     });
