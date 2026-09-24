@@ -55,7 +55,11 @@ export async function requirePermission(
   // Fast-path: Check session JWT permissions directly if available (0ms DB cost)
   const sessionPerms = (session.user as any).permissions as Array<{ module: string; canRead?: boolean; canCreate?: boolean; canUpdate?: boolean; canDelete?: boolean }> | undefined;
   if (sessionPerms && Array.isArray(sessionPerms) && sessionPerms.length > 0) {
-    const perm = sessionPerms.find((p) => p.module === module);
+    const perm = sessionPerms.find((p) => 
+      p.module === module || 
+      p.module === "ALL" || 
+      ((module === Module.LOOM || module === Module.TAPE_PLANT) && p.module === Module.PRODUCTION)
+    );
     if (perm && perm[action]) {
       return true;
     }
@@ -75,7 +79,10 @@ export async function requirePermission(
     redirect("/dashboard/unauthorized");
   }
 
-  const modulePerms = user.role.permissions.find((p) => p.module === module);
+  const modulePerms = user.role.permissions.find((p) => 
+    p.module === module || 
+    ((module === Module.LOOM || module === Module.TAPE_PLANT) && p.module === Module.PRODUCTION)
+  );
   if (!modulePerms || !modulePerms[action]) {
     redirect("/dashboard/unauthorized");
   }
