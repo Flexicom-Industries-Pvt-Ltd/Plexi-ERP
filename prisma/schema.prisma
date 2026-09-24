@@ -18,12 +18,14 @@ enum Module {
   FINISHED_GOODS
   PRODUCTION
   TAPE_PLANT
+  LOOM
   QUALITY_CONTROL
   RECYCLING_PLANT
   MAINTENANCE
   DISPATCH
   DATA_CENTRE
 }
+
 
 model Role {
   id          String           @id @default(cuid())
