@@ -1912,3 +1912,28 @@ model Operator {
   @@index([name])
   @@index([isActive])
 }
+
+model LoomMachineMapping {
+  id              String   @id @default(cuid())
+  qualityCode     String   @unique // Quality / Recipe code e.g. "wOND/LPP/WH/500/67/S1"
+  tapePlantRecipeId String? // Optional reference to TapePlantRecipe
+  colorGroup      String?  // "Yellow" | "White" | "Light Green" | "Dark Green" | "Grey" | "Dark Blue" | "Light Blue"
+  colour          String?  // e.g. "WHITE", "YELLOW", "MIX", "ORANGE", "WH+RED"
+  denier          Float?   // e.g. 900, 850, 700, 840, 860
+  tapeWidth       Float?   // e.g. 2.45, 3.00
+  bobbinMarking   String?  // e.g. "RED", "Black", "GREEN", "RED/GRN/YL"
+  loomNumbers     Int[]    // Array of assigned integer loom numbers e.g. [6, 7, 8, 12, 14, 16...]
+  totalLooms      Int      @default(0) // Count of looms assigned
+  reedSpaceCm     Float?   // e.g. 48, 50, 54, 60, 67
+  mesh            String?  // e.g. "10x10", "12x12"
+  targetPpm       Int?     // Target Picks Per Minute e.g. 850, 900
+  remarks         String?
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([qualityCode])
+  @@index([colorGroup])
+  @@index([isActive])
+}
+
