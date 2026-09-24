@@ -14,6 +14,7 @@ export const dynamic = "force-dynamic";
 export default async function LoomPage() {
   await requirePermission(Module.LOOM, "canRead");
 
+
   return (
     <Suspense fallback={<div className="p-8 text-center text-slate-400">Loading Loom section workspace...</div>}>
       <LoomClient />
