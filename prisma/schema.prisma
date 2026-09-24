@@ -141,6 +141,7 @@ model User {
   auditLogs     AuditLog[]
   files             FileAsset[]
   gateEntries       GateEntry[]    @relation("GateEntryCreator")
+  gateStatusLogs    GateStatusLog[] @relation("GateStatusLogger")
   verifiedDocuments GateDocument[] @relation("DocumentVerifier")
   inventoryTransactions InventoryTransaction[]
   productionPlansCreated   ProductionPlan[]     @relation("ProductionPlanCreator")
@@ -584,6 +585,7 @@ model GateEntry {
 
   stockDetails     TruckStockDetail[]
   documents        GateDocument[]
+  statusLogs       GateStatusLog[]
   dispatchOrders   DispatchOrder[]
   
   // Relation to user who created it
@@ -635,6 +637,25 @@ model GateDocument {
   verifier       User?          @relation("DocumentVerifier", fields: [verifiedBy], references: [id])
 
   @@index([gateEntryId, status])
+}
+
+model GateStatusLog {
+  id          String          @id @default(cuid())
+  gateEntryId String
+  status      GateEntryStatus
+  timestamp   DateTime        @default(now())
+  updatedBy   String?
+  remarks     String?
+  metadata    Json?
+
+  createdAt   DateTime        @default(now())
+
+  gateEntry   GateEntry       @relation(fields: [gateEntryId], references: [id], onDelete: Cascade)
+  user        User?           @relation("GateStatusLogger", fields: [updatedBy], references: [id], onDelete: SetNull)
+
+  @@index([gateEntryId])
+  @@index([gateEntryId, timestamp])
+  @@index([timestamp])
 }
 
 // ==========================================

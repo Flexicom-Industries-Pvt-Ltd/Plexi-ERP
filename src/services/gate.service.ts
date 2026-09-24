@@ -111,16 +111,63 @@ export class GateService {
     const entry = await findGateEntryByIdOrNumber(idOrNumber);
     if (!entry) return null;
 
-    return db.gateEntry.findUnique({
+    const record = await db.gateEntry.findUnique({
       where: { id: entry.id },
       include: {
         stockDetails: true,
         documents: {
           include: { verifier: { select: { name: true, email: true } } },
         },
+        statusLogs: {
+          include: { user: { select: { name: true, email: true } } },
+          orderBy: { timestamp: "asc" },
+        },
         user: { select: { name: true, email: true } },
       },
     });
+
+    if (!record) return null;
+
+    // Self-healing / backwards compatibility: synthesize logs if empty
+    let statusLogs = record.statusLogs || [];
+    if (statusLogs.length === 0) {
+      const fallbackLogs: any[] = [
+        {
+          id: `synth_${record.id}_arr`,
+          gateEntryId: record.id,
+          status: GateEntryStatus.ARRIVED,
+          timestamp: record.arrivalTime,
+          updatedBy: record.createdBy,
+          remarks: "Initial truck arrival registered at gate",
+          user: record.user ? { name: record.user.name, email: record.user.email } : null,
+          createdAt: record.createdAt,
+        },
+      ];
+
+      if (record.status !== GateEntryStatus.ARRIVED) {
+        fallbackLogs.push({
+          id: `synth_${record.id}_curr`,
+          gateEntryId: record.id,
+          status: record.status,
+          timestamp: record.exitTime || record.updatedAt,
+          updatedBy: record.updatedBy,
+          remarks:
+            record.status === GateEntryStatus.GATE_OUT
+              ? record.finalRemarks || "Vehicle gated out and departed"
+              : record.parkingLocation
+              ? `Parking bay allocated: ${record.parkingLocation}`
+              : `Status transition to ${String(record.status).replace(/_/g, " ")}`,
+          user: null,
+          createdAt: record.updatedAt,
+        });
+      }
+      statusLogs = fallbackLogs;
+    }
+
+    return {
+      ...record,
+      statusLogs,
+    };
   }
 
   /**
@@ -258,6 +305,17 @@ export class GateService {
           },
         });
 
+        // Record initial status log for Arrival
+        await tx.gateStatusLog.create({
+          data: {
+            gateEntryId: entry.id,
+            status: GateEntryStatus.ARRIVED,
+            timestamp: entry.arrivalTime,
+            updatedBy: userId || null,
+            remarks: "Initial truck arrival registered at gate",
+          },
+        });
+
         // Process each consignment stock item
         for (const item of rawStockItems) {
           if (!item.materialName || item.quantity === undefined || item.quantity === "") continue;
@@ -328,7 +386,13 @@ export class GateService {
 
         return tx.gateEntry.findUnique({
           where: { id: entry.id },
-          include: { stockDetails: true },
+          include: {
+            stockDetails: true,
+            statusLogs: {
+              include: { user: { select: { name: true, email: true } } },
+              orderBy: { timestamp: "asc" },
+            },
+          },
         });
       },
       { maxWait: 15000, timeout: 30000 }
@@ -367,6 +431,30 @@ export class GateService {
       where: { id: existing.id },
       data: updatedData,
     });
+
+    // Record status transition log if status is modified or updated
+    if (data.status) {
+      const statusRemark =
+        data.statusRemarks ||
+        data.remarks ||
+        (data.status === GateEntryStatus.GATE_OUT
+          ? data.finalRemarks || "Vehicle gated out and departed"
+          : data.parkingLocation
+          ? `Parking location updated: ${data.parkingLocation}`
+          : data.waitingReason
+          ? `Waiting reason: ${data.waitingReason}`
+          : `Status transition to ${String(data.status).replace(/_/g, " ")}`);
+
+      await db.gateStatusLog.create({
+        data: {
+          gateEntryId: existing.id,
+          status: data.status as GateEntryStatus,
+          timestamp: new Date(),
+          updatedBy: userId || null,
+          remarks: statusRemark,
+        },
+      }).catch((err) => console.error("Failed to record GateStatusLog:", err));
+    }
 
     await logDiff({
       userId: userId || undefined,
