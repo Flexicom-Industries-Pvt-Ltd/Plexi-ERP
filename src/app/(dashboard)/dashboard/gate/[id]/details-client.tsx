@@ -26,8 +26,12 @@ import {
   ShieldCheck,
   Check,
   AlertCircle,
+  Printer,
+  History,
+  Calendar,
 } from "lucide-react";
 import { GateEntryStatus } from "@/generated/prisma";
+import { TransportSlipModal } from "@/components/gate/TransportSlipModal";
 
 const LIFECYCLE_STEPS = [
   { id: "ARRIVED", label: "Arrived" },
@@ -63,6 +67,11 @@ const EMPTY_STOCK_FORM = {
   expectedQuantity: "",
 };
 
+function formatStatus(status: string | null | undefined): string {
+  if (!status) return "—";
+  return status.replace(/_/g, " ");
+}
+
 export function GateDetailsClient({ entryId }: { entryId: string }) {
   const router = useRouter();
   const [entry, setEntry] = useState<any>(null);
@@ -73,6 +82,7 @@ export function GateDetailsClient({ entryId }: { entryId: string }) {
   // Modals & Menus state
   const [showStockModal, setShowStockModal] = useState(false);
   const [showDocModal, setShowDocModal] = useState(false);
+  const [showSlipModal, setShowSlipModal] = useState(false);
   const [showStatusMenu, setShowStatusMenu] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -317,11 +327,20 @@ export function GateDetailsClient({ entryId }: { entryId: string }) {
           </div>
         </div>
         <div className="relative flex items-center gap-2">
+          <button
+            onClick={() => setShowSlipModal(true)}
+            className="px-3.5 py-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 rounded-lg flex items-center gap-1.5 text-sm font-semibold shadow-sm transition-all cursor-pointer"
+            title="Export Transport Slip / Gate Pass (A4 PDF)"
+          >
+            <Printer className="h-4 w-4 text-emerald-600" />
+            <span>Transport Slip (PDF)</span>
+          </button>
+
           {nextStatus && entry.status !== "GATE_OUT" && entry.status !== "CANCELLED" && (
             <button 
               onClick={() => updateStatus(nextStatus)}
               disabled={updating}
-              className="px-4 py-2 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary/90 shadow-sm disabled:opacity-50 transition-colors"
+              className="px-4 py-2 bg-primary text-white text-sm font-medium rounded-lg hover:bg-primary/90 shadow-sm disabled:opacity-50 transition-colors cursor-pointer"
             >
               Advance to {nextStatus.replace("_", " ")}
             </button>
@@ -479,6 +498,17 @@ export function GateDetailsClient({ entryId }: { entryId: string }) {
               )}
             </div>
           )}
+
+          {/* Mobile Transport Slip PDF Action */}
+          <div className="pt-2 border-t border-slate-100">
+            <button
+              onClick={() => setShowSlipModal(true)}
+              className="w-full py-2.5 px-3 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-bold text-xs rounded-xl shadow-xs flex items-center justify-center gap-2 active:bg-slate-100 transition-all cursor-pointer"
+            >
+              <Printer className="h-4 w-4 text-emerald-600" />
+              <span>Export Transport Slip (PDF)</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -592,32 +622,38 @@ export function GateDetailsClient({ entryId }: { entryId: string }) {
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
         {/* Desktop Tab Bar */}
         <div className="hidden md:flex items-center border-b border-slate-100 px-2 overflow-x-auto">
-          {["overview", "stock", "documents"].map((tab) => (
+          {[
+            { id: "overview", label: "Overview" },
+            { id: "stock", label: `Stock Items (${entry.stockDetails?.length || 0})` },
+            { id: "documents", label: `Documents (${entry.documents?.length || 0})` },
+            { id: "statuses", label: `Statuses (${entry.statusLogs?.length || 0})` },
+          ].map((tab) => (
             <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`px-5 py-3 text-sm font-semibold capitalize whitespace-nowrap border-b-2 transition-all ${
-                activeTab === tab
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`px-5 py-3 text-sm font-semibold capitalize whitespace-nowrap border-b-2 transition-all cursor-pointer ${
+                activeTab === tab.id
                   ? "border-primary text-primary"
                   : "border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-200"
               }`}
             >
-              {tab}
+              {tab.label}
             </button>
           ))}
         </div>
 
         {/* Mobile Segmented Tab Bar */}
-        <div className="grid grid-cols-3 gap-1 p-1.5 bg-slate-100 md:hidden m-3 rounded-xl border border-slate-200">
+        <div className="grid grid-cols-4 gap-1 p-1.5 bg-slate-100 md:hidden m-3 rounded-xl border border-slate-200">
           {[
             { id: "overview", label: "Overview" },
             { id: "stock", label: `Stock (${entry.stockDetails?.length || 0})` },
             { id: "documents", label: `Docs (${entry.documents?.length || 0})` },
+            { id: "statuses", label: `Status (${entry.statusLogs?.length || 0})` },
           ].map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`py-2 px-1 text-xs font-bold rounded-lg transition-all text-center ${
+              className={`py-2 px-1 text-[11px] font-bold rounded-lg transition-all text-center truncate cursor-pointer ${
                 activeTab === tab.id
                   ? "bg-white text-primary shadow-sm"
                   : "text-slate-600 hover:text-slate-900"
@@ -889,6 +925,172 @@ export function GateDetailsClient({ entryId }: { entryId: string }) {
               )}
             </div>
           )}
+
+          {/* TAB 4: STATUSES TIMELINE */}
+          {activeTab === "statuses" && (
+            <div className="space-y-6">
+              {/* Header KPI Summary Card */}
+              <div className="bg-slate-900 text-white rounded-xl p-4 sm:p-5 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4 border border-slate-800">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs uppercase font-bold tracking-wider text-slate-400">
+                      Lifecycle Audit Trail
+                    </span>
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                      {formatStatus(entry.status)}
+                    </span>
+                    <span className="text-xs text-slate-400">
+                      • {entry.statusLogs?.length || 1} Total Updates
+                    </span>
+                  </div>
+                  <h3 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <History className="h-5 w-5 text-emerald-400" />
+                    Status Transition History & Timestamps
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Chronological audit log of all vehicle lifecycle transitions, operators, and timestamps
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    onClick={() => setShowSlipModal(true)}
+                    className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg transition-all shadow-sm active:scale-95 cursor-pointer"
+                  >
+                    <Printer className="h-4 w-4" />
+                    <span>Transport Slip (PDF)</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Status Timeline Container */}
+              <div className="bg-slate-50/50 border border-slate-200 rounded-xl p-4 sm:p-6">
+                <div className="relative pl-6 sm:pl-8 border-l-2 border-slate-200 space-y-6 ml-2 sm:ml-4">
+                  {(entry.statusLogs && entry.statusLogs.length > 0
+                    ? entry.statusLogs
+                    : [
+                        {
+                          id: "synth-arr",
+                          status: "ARRIVED",
+                          timestamp: entry.arrivalTime,
+                          remarks: "Initial truck arrival registered at gate",
+                          user: entry.user,
+                        },
+                        ...(entry.status !== "ARRIVED"
+                          ? [
+                              {
+                                id: "synth-curr",
+                                status: entry.status,
+                                timestamp: entry.exitTime || entry.updatedAt,
+                                remarks:
+                                  entry.status === "GATE_OUT"
+                                    ? entry.finalRemarks || "Vehicle gated out and departed"
+                                    : entry.parkingLocation
+                                    ? `Parking bay allocated: ${entry.parkingLocation}`
+                                    : `Status transition to ${formatStatus(entry.status)}`,
+                                user: null,
+                              },
+                            ]
+                          : []),
+                      ]
+                  ).map((log: any, idx: number, arr: any[]) => {
+                    const isLatest = idx === arr.length - 1;
+                    const logDate = new Date(log.timestamp);
+                    const formattedDate = !isNaN(logDate.getTime())
+                      ? logDate.toLocaleDateString("en-IN", {
+                          day: "2-digit",
+                          month: "short",
+                          year: "numeric",
+                        })
+                      : "—";
+                    const formattedTime = !isNaN(logDate.getTime())
+                      ? logDate.toLocaleTimeString("en-IN", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                          second: "2-digit",
+                          hour12: true,
+                        })
+                      : "—";
+
+                    return (
+                      <div key={log.id || idx} className="relative group">
+                        {/* Timeline Step Circle */}
+                        <div
+                          className={`absolute -left-[31px] sm:-left-[39px] top-0 h-7 w-7 sm:h-8 sm:w-8 rounded-full flex items-center justify-center font-bold text-xs shadow-sm transition-all ${
+                            isLatest
+                              ? "bg-primary text-white ring-4 ring-primary/20 scale-105"
+                              : "bg-white border-2 border-slate-300 text-slate-700"
+                          }`}
+                        >
+                          {idx + 1}
+                        </div>
+
+                        {/* Status Card */}
+                        <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs space-y-3 transition-all hover:border-slate-300">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span
+                                className={`text-xs font-extrabold px-2.5 py-1 rounded-md uppercase tracking-wider ${
+                                  log.status === "ARRIVED"
+                                    ? "bg-blue-50 text-blue-700 border border-blue-200"
+                                    : log.status === "GATE_OUT"
+                                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                    : log.status === "ON_HOLD" || log.status === "REJECTED" || log.status === "CANCELLED"
+                                    ? "bg-rose-50 text-rose-700 border border-rose-200"
+                                    : "bg-slate-100 text-slate-800 border border-slate-200"
+                                }`}
+                              >
+                                {formatStatus(log.status)}
+                              </span>
+                              {isLatest && (
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                  Current Status
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Timestamp with Date & Time */}
+                            <div className="flex items-center gap-2 text-xs font-mono text-slate-600 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200 self-start sm:self-auto">
+                              <div className="flex items-center gap-1">
+                                <Calendar className="h-3.5 w-3.5 text-slate-400" />
+                                <span className="font-semibold text-slate-800">{formattedDate}</span>
+                              </div>
+                              <span className="text-slate-300">•</span>
+                              <div className="flex items-center gap-1">
+                                <Clock className="h-3.5 w-3.5 text-slate-400" />
+                                <span className="font-bold text-slate-950">{formattedTime}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Operator & Remarks details */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                            <div>
+                              <span className="text-slate-400 block font-medium">Updated / Logged By:</span>
+                              <span className="font-semibold text-slate-800 flex items-center gap-1 mt-0.5">
+                                <User className="h-3.5 w-3.5 text-slate-400" />
+                                {log.user?.name || log.updatedBy || entry.user?.name || "System"}
+                                {log.user?.email && (
+                                  <span className="text-slate-400 text-[11px] font-normal">({log.user.email})</span>
+                                )}
+                              </span>
+                            </div>
+
+                            <div>
+                              <span className="text-slate-400 block font-medium">Remarks / Movement Notes:</span>
+                              <span className="text-slate-700 font-medium block mt-0.5">
+                                {log.remarks || "Status transition recorded"}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -1080,6 +1282,15 @@ export function GateDetailsClient({ entryId }: { entryId: string }) {
           </div>
         </div>
       )}
+
+      {/* ========================================================================= */}
+      {/* TRANSPORT SLIP / GATE PASS PRINT PREVIEW MODAL                            */}
+      {/* ========================================================================= */}
+      <TransportSlipModal
+        open={showSlipModal}
+        onClose={() => setShowSlipModal(false)}
+        entry={entry}
+      />
 
     </div>
   );
