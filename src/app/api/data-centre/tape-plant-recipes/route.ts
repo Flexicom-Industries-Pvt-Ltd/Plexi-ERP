@@ -189,6 +189,38 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    // Automatically sync/upsert into Loom Machine Mapping
+    try {
+      await db.loomMachineMapping.upsert({
+        where: { qualityCode: recipe.code },
+        update: {
+          tapePlantRecipeId: recipe.id,
+          colorGroup: recipe.colorGroup,
+          colour: recipe.colour,
+          denier: recipe.denier,
+          tapeWidth: recipe.tapeWidth,
+          bobbinMarking: recipe.bobbinMarking,
+          remarks: recipe.remarks,
+          isActive: recipe.isActive,
+        },
+        create: {
+          qualityCode: recipe.code,
+          tapePlantRecipeId: recipe.id,
+          colorGroup: recipe.colorGroup,
+          colour: recipe.colour,
+          denier: recipe.denier,
+          tapeWidth: recipe.tapeWidth,
+          bobbinMarking: recipe.bobbinMarking,
+          loomNumbers: [],
+          totalLooms: 0,
+          remarks: recipe.remarks,
+          isActive: recipe.isActive,
+        },
+      });
+    } catch (syncErr) {
+      console.warn("Auto-sync to LoomMachineMapping warning:", syncErr);
+    }
+
     await logEvent({
       action: "CREATE_RECIPE",
       module: "DATA_CENTRE",
