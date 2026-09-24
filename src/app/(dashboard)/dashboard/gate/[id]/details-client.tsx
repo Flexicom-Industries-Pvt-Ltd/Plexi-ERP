@@ -32,6 +32,7 @@ import {
 } from "lucide-react";
 import { GateEntryStatus } from "@/generated/prisma";
 import { TransportSlipModal } from "@/components/gate/TransportSlipModal";
+import { printTransportSlip } from "@/lib/gate/print-transport-slip";
 
 const LIFECYCLE_STEPS = [
   { id: "ARRIVED", label: "Arrived" },
@@ -928,37 +929,44 @@ export function GateDetailsClient({ entryId }: { entryId: string }) {
 
           {/* TAB 4: STATUSES TIMELINE */}
           {activeTab === "statuses" && (
-            <div className="space-y-6">
-              {/* Header KPI Summary Card */}
-              <div className="bg-slate-900 text-white rounded-xl p-4 sm:p-5 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4 border border-slate-800">
+            <div className="space-y-5">
+              {/* Header KPI Summary Card (Minimalist & Professional) */}
+              <div className="bg-white border border-slate-200 rounded-xl p-4 sm:p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs uppercase font-bold tracking-wider text-slate-400">
-                      Lifecycle Audit Trail
+                    <span className="text-xs uppercase font-bold tracking-wider text-slate-500">
+                      Lifecycle Movement Trail
                     </span>
-                    <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-800 border border-slate-200">
                       {formatStatus(entry.status)}
                     </span>
                     <span className="text-xs text-slate-400">
                       • {entry.statusLogs?.length || 1} Total Updates
                     </span>
                   </div>
-                  <h3 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
-                    <History className="h-5 w-5 text-emerald-400" />
+                  <h3 className="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-2">
+                    <History className="h-5 w-5 text-slate-700" />
                     Status Transition History & Timestamps
                   </h3>
-                  <p className="text-xs text-slate-400">
-                    Chronological audit log of all vehicle lifecycle transitions, operators, and timestamps
+                  <p className="text-xs text-slate-500">
+                    Chronological audit trail of all gate status changes with exact timestamps and operators
                   </p>
                 </div>
 
                 <div className="flex items-center gap-2 shrink-0">
                   <button
-                    onClick={() => setShowSlipModal(true)}
-                    className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg transition-all shadow-sm active:scale-95 cursor-pointer"
+                    onClick={() => printTransportSlip(entry)}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-lg transition-all shadow-xs active:scale-95 cursor-pointer"
                   >
-                    <Printer className="h-4 w-4" />
-                    <span>Transport Slip (PDF)</span>
+                    <Printer className="h-4 w-4 text-emerald-400" />
+                    <span>Print Transport Slip</span>
+                  </button>
+                  <button
+                    onClick={() => setShowSlipModal(true)}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition-all shadow-xs cursor-pointer"
+                  >
+                    <FileText className="h-4 w-4 text-slate-500" />
+                    <span>Preview</span>
                   </button>
                 </div>
               </div>
