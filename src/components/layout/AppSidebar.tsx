@@ -13,6 +13,7 @@ import {
   ChevronDown,
   Database,
   Layers,
+  Grid,
 } from "lucide-react";
 
 import {
@@ -47,6 +48,10 @@ const tapePlantItems = [
   { title: "Report", url: "/dashboard/production/tape-plant?tab=reports" },
 ];
 
+const loomItems = [
+  { title: "Loom Summary", url: "/dashboard/production/loom?tab=summary" },
+];
+
 const settingsItems = [
   { title: "General Settings", url: "/dashboard/settings/organization" },
   { title: "Users", url: "/dashboard/settings/users" },
@@ -77,6 +82,7 @@ export function AppSidebar({ user, allowedModules, ...props }: AppSidebarProps) 
   const pathname = usePathname();
   const router = useRouter();
   const [tapePlantOpen, setTapePlantOpen] = useState(pathname.startsWith("/dashboard/production/tape-plant"));
+  const [loomOpen, setLoomOpen] = useState(pathname.startsWith("/dashboard/production/loom"));
   const [settingsOpen, setSettingsOpen] = useState(pathname.startsWith("/dashboard/settings"));
   const [dataCentreOpen, setDataCentreOpen] = useState(pathname.startsWith("/dashboard/data-centre"));
 
@@ -94,6 +100,7 @@ export function AppSidebar({ user, allowedModules, ...props }: AppSidebarProps) 
   const hasSettingsAccess = isSuperAdmin || allowedModules["SETTINGS"];
   const hasDataCentreAccess = isSuperAdmin || allowedModules["DATA_CENTRE"];
   const hasTapePlantAccess = isSuperAdmin || allowedModules["TAPE_PLANT"] || allowedModules["PRODUCTION"];
+  const hasLoomAccess = isSuperAdmin || allowedModules["LOOM"] || allowedModules["PRODUCTION"] || allowedModules["TAPE_PLANT"];
 
   const visibleNavItems = navItems.filter(
     (item) => (!item.module || isSuperAdmin || allowedModules[item.module]),
@@ -144,6 +151,35 @@ export function AppSidebar({ user, allowedModules, ...props }: AppSidebarProps) 
                         <SidebarMenuSubItem key={subItem.url}>
                           <SidebarMenuSubButton
                             render={<Link href={subItem.url} onClick={() => setCurrentSearch(`?tab=${subTab}`)} />}
+                            isActive={isSubActive}
+                          >
+                            <span>{subItem.title}</span>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      );
+                    })}
+                  </SidebarMenuSub>
+                </CollapsibleContent>
+              </SidebarMenuItem>
+            </Collapsible>
+          )}
+
+          {hasLoomAccess && (
+            <Collapsible open={loomOpen} onOpenChange={setLoomOpen} className="group/collapsible">
+              <SidebarMenuItem>
+                <CollapsibleTrigger render={<SidebarMenuButton tooltip="Loom Section" />}>
+                    <Grid className="h-4 w-4" />
+                    <span>Loom Section</span>
+                    <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180" />
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <SidebarMenuSub>
+                    {loomItems.map((subItem) => {
+                      const isSubActive = pathname.startsWith("/dashboard/production/loom");
+                      return (
+                        <SidebarMenuSubItem key={subItem.url}>
+                          <SidebarMenuSubButton
+                            render={<Link href={subItem.url} />}
                             isActive={isSubActive}
                           >
                             <span>{subItem.title}</span>
