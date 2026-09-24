@@ -51,6 +51,50 @@ export async function GET(request: NextRequest) {
       ];
     }
 
+    // Self-healing auto-sync: Ensure every active Tape Plant Recipe has a corresponding LoomMachineMapping
+    try {
+      const activeRecipes = await db.tapePlantRecipe.findMany({
+        where: { isActive: true },
+        select: {
+          id: true,
+          code: true,
+          colorGroup: true,
+          colour: true,
+          denier: true,
+          tapeWidth: true,
+          bobbinMarking: true,
+          remarks: true,
+        },
+      });
+
+      const existingCodes = new Set(
+        (await db.loomMachineMapping.findMany({ select: { qualityCode: true } })).map((m) => m.qualityCode.toLowerCase())
+      );
+
+      const missing = activeRecipes.filter((r) => !existingCodes.has(r.code.toLowerCase()));
+      if (missing.length > 0) {
+        for (const r of missing) {
+          await db.loomMachineMapping.create({
+            data: {
+              qualityCode: r.code,
+              tapePlantRecipeId: r.id,
+              colorGroup: r.colorGroup,
+              colour: r.colour,
+              denier: r.denier,
+              tapeWidth: r.tapeWidth,
+              bobbinMarking: r.bobbinMarking,
+              loomNumbers: [],
+              totalLooms: 0,
+              remarks: r.remarks,
+              isActive: true,
+            },
+          });
+        }
+      }
+    } catch (e) {
+      console.warn("Self-healing auto-sync warning:", e);
+    }
+
     const mappings = await db.loomMachineMapping.findMany({
       where,
       orderBy: [{ totalLooms: "desc" }, { colorGroup: "asc" }, { qualityCode: "asc" }],

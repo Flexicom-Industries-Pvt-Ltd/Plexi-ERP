@@ -134,6 +134,57 @@ export async function PUT(
       },
     });
 
+    // Automatically cascade updates to LoomMachineMapping
+    try {
+      const oldCode = existing.code;
+      const newCode = updated.code;
+
+      const existingMapping = await db.loomMachineMapping.findFirst({
+        where: {
+          OR: [
+            { tapePlantRecipeId: updated.id },
+            { qualityCode: oldCode },
+            { qualityCode: newCode },
+          ],
+        },
+      });
+
+      if (existingMapping) {
+        await db.loomMachineMapping.update({
+          where: { id: existingMapping.id },
+          data: {
+            qualityCode: newCode,
+            tapePlantRecipeId: updated.id,
+            colorGroup: updated.colorGroup,
+            colour: updated.colour,
+            denier: updated.denier,
+            tapeWidth: updated.tapeWidth,
+            bobbinMarking: updated.bobbinMarking,
+            remarks: updated.remarks,
+            isActive: updated.isActive,
+          },
+        });
+      } else {
+        await db.loomMachineMapping.create({
+          data: {
+            qualityCode: newCode,
+            tapePlantRecipeId: updated.id,
+            colorGroup: updated.colorGroup,
+            colour: updated.colour,
+            denier: updated.denier,
+            tapeWidth: updated.tapeWidth,
+            bobbinMarking: updated.bobbinMarking,
+            loomNumbers: [],
+            totalLooms: 0,
+            remarks: updated.remarks,
+            isActive: updated.isActive,
+          },
+        });
+      }
+    } catch (syncErr) {
+      console.warn("Auto-sync update to LoomMachineMapping warning:", syncErr);
+    }
+
     await logEvent({
       action: "UPDATE_RECIPE",
       module: "DATA_CENTRE",
@@ -172,6 +223,23 @@ export async function DELETE(
 
     if (!existing) {
       return NextResponse.json({ error: "Recipe not found" }, { status: 404 });
+    }
+
+    // Deactivate / update corresponding LoomMachineMapping
+    try {
+      await db.loomMachineMapping.updateMany({
+        where: {
+          OR: [
+            { tapePlantRecipeId: id },
+            { qualityCode: existing.code },
+          ],
+        },
+        data: {
+          isActive: false,
+        },
+      });
+    } catch (delSyncErr) {
+      console.warn("Auto-sync delete to LoomMachineMapping warning:", delSyncErr);
     }
 
     await db.tapePlantRecipe.delete({
