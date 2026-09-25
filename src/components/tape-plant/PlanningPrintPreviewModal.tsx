@@ -33,10 +33,13 @@ export function PlanningPrintPreviewModal({
 }: PlanningPrintPreviewModalProps) {
   if (!open) return null;
 
-  const totalPlannedKg = plans.reduce(
-    (acc, p) => acc + (Number(p.plannedQtyKg) || 0),
-    0
-  );
+  const totalShiftPlannedKg = plans
+    .filter((p) => !p.isDayNight)
+    .reduce((acc, p) => acc + (Number(p.plannedQtyKg) || 0), 0);
+
+  const totalDayNightPlannedKg = plans
+    .filter((p) => p.isDayNight)
+    .reduce((acc, p) => acc + (Number(p.plannedQtyKg) || 0), 0);
 
   // Material aggregates across all recipe runs
   const materialTotals: Record<string, { qty: number; count: number }> = {};
@@ -107,8 +110,13 @@ export function PlanningPrintPreviewModal({
               <p className="text-xs text-slate-400">
                 {shiftName} • {date} • {plans.length} Recipe Run(s) •{" "}
                 <span className="font-mono text-white font-bold">
-                  {totalPlannedKg.toLocaleString()} KG
+                  {totalShiftPlannedKg.toLocaleString()} KG Shift Plan
                 </span>
+                {totalDayNightPlannedKg > 0 && (
+                  <span className="text-amber-400 font-bold ml-1.5 font-mono text-[11px]">
+                    (+ {totalDayNightPlannedKg.toLocaleString()} KG 24h Day+Night Batch)
+                  </span>
+                )}
               </p>
             </div>
           </div>
@@ -177,11 +185,16 @@ export function PlanningPrintPreviewModal({
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-slate-50 p-2.5 rounded border border-slate-300 text-xs">
               <div className="border-r border-slate-200 last:border-0 pr-2">
                 <span className="text-slate-500 block text-[10px] uppercase font-bold tracking-wider">
-                  Total Planned Output
+                  Shift Planned Output
                 </span>
                 <span className="text-base font-black font-mono text-slate-900">
-                  {totalPlannedKg.toLocaleString()} <span className="text-xs font-normal">KG</span>
+                  {totalShiftPlannedKg.toLocaleString()} <span className="text-xs font-normal">KG</span>
                 </span>
+                {totalDayNightPlannedKg > 0 && (
+                  <span className="text-[10px] text-amber-700 font-bold block mt-0.5 font-mono">
+                    + {totalDayNightPlannedKg.toLocaleString()} KG (24h Batch)
+                  </span>
+                )}
               </div>
               <div className="border-r border-slate-200 last:border-0 pr-2">
                 <span className="text-slate-500 block text-[10px] uppercase font-bold tracking-wider">
@@ -292,12 +305,22 @@ export function PlanningPrintPreviewModal({
                   <tfoot>
                     <tr className="bg-slate-100 font-bold border-t-2 border-slate-300">
                       <td colSpan={12} className="p-2 text-right uppercase tracking-wider text-[10px]">
-                        Total Shift Planned Output:
+                        Total Shift Planned Output{totalDayNightPlannedKg > 0 ? " (Single-Shift Runs)" : ""}:
                       </td>
                       <td className="p-2 text-right font-mono font-black text-slate-900 bg-slate-200">
-                        {totalPlannedKg.toLocaleString()} KG
+                        {totalShiftPlannedKg.toLocaleString()} KG
                       </td>
                     </tr>
+                    {totalDayNightPlannedKg > 0 && (
+                      <tr className="bg-amber-50 font-bold border-t border-amber-200 text-amber-900">
+                        <td colSpan={12} className="p-2 text-right uppercase tracking-wider text-[10px] text-amber-800">
+                          + 24-Hour Continuous Batch (Day+Night Run):
+                        </td>
+                        <td className="p-2 text-right font-mono font-black text-amber-950 bg-amber-100">
+                          {totalDayNightPlannedKg.toLocaleString()} KG
+                        </td>
+                      </tr>
+                    )}
                   </tfoot>
                 </table>
               </div>
