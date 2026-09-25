@@ -44,6 +44,67 @@ const TABS = [
   { id: "reports" as TapePlantTab, label: "7. Reports", icon: BarChart3 },
 ];
 
+const TAB_META: Record<
+  TapePlantTab,
+  {
+    title: string;
+    subtitle: string;
+    badge: string;
+    icon: React.ComponentType<{ className?: string }>;
+    showRootDateShift: boolean;
+  }
+> = {
+  planning: {
+    title: "Tape Plant Planning",
+    subtitle: "Excel-like spreadsheet workspace for Tape Plant shift planning, telemetry, material consumption, output, and reports.",
+    badge: "v1.1 Tabular",
+    icon: ClipboardList,
+    showRootDateShift: true,
+  },
+  temperature: {
+    title: "Process Temperature",
+    subtitle: "Real-time extruder zones, adaptor, die, water bath, and godet temperature tracking.",
+    badge: "Telemetry",
+    icon: Thermometer,
+    showRootDateShift: true,
+  },
+  drive: {
+    title: "Process Drive Parameters",
+    subtitle: "Extruder speed, godet ratio, winder tension, line speed, and telemetry parameters.",
+    badge: "Drive Sync",
+    icon: Gauge,
+    showRootDateShift: true,
+  },
+  "raw-material": {
+    title: "Raw Material Consumption",
+    subtitle: "Live batch mixing, polymer resin, calcium carbonate, and masterbatch material tracking.",
+    badge: "Formulation",
+    icon: FlaskConical,
+    showRootDateShift: true,
+  },
+  "post-production": {
+    title: "Post Production Entry & QC",
+    subtitle: "Per-recipe shift output entry, net production, quality inspection, and shift wastage records.",
+    badge: "Auto-Save",
+    icon: PackageCheck,
+    showRootDateShift: true,
+  },
+  "bobbin-stock": {
+    title: "Bobbin Stock Summary",
+    subtitle: "Cumulative finished bobbin stock and crate inventory derived from Post-Production Net Output.",
+    badge: "Inventory Stock",
+    icon: Boxes,
+    showRootDateShift: false,
+  },
+  reports: {
+    title: "Tape Plant Reports",
+    subtitle: "Comprehensive shift logs, operator performance, wastage trends, and consolidated exports.",
+    badge: "Analytics",
+    icon: BarChart3,
+    showRootDateShift: false,
+  },
+};
+
 export function TapePlantClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -109,6 +170,9 @@ export function TapePlantClient() {
   const currentShift = shifts.find((s) => s.id === selectedShiftId);
   const shiftName = isAllShifts ? "All Shifts (Day + Night)" : (currentShift?.name || "Shift A");
 
+  const currentTabMeta = TAB_META[activeTab] || TAB_META.planning;
+  const HeaderIcon = currentTabMeta.icon;
+
   return (
     <div className="space-y-6 w-full min-w-0 max-w-full">
       {/* Module Title & Shift/Date Selector Bar */}
@@ -117,74 +181,78 @@ export function TapePlantClient() {
           <div className="min-w-0">
             <div className="flex items-center gap-2.5 min-w-0">
               <div className="p-2 bg-primary/10 text-primary rounded-xl shrink-0">
-                <Layers className="h-6 w-6" />
+                <HeaderIcon className="h-6 w-6" />
               </div>
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <h1 className="text-xl font-extrabold text-slate-900 tracking-tight">Tape Plant</h1>
+                  <h1 className="text-xl font-extrabold text-slate-900 tracking-tight">
+                    {currentTabMeta.title}
+                  </h1>
                   <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 shrink-0">
-                    v1.1 Tabular
+                    {currentTabMeta.badge}
                   </span>
                 </div>
                 <p className="text-xs text-slate-500 mt-0.5 truncate">
-                  Excel-like spreadsheet workspace for Tape Plant shift planning, telemetry, material consumption, output, and reports.
+                  {currentTabMeta.subtitle}
                 </p>
               </div>
             </div>
           </div>
 
-          {/* Date & Shift Context Control */}
-          <div className="flex flex-wrap items-center gap-3 bg-slate-50 p-2.5 rounded-xl border border-slate-200 shrink-0">
-            {/* Date Navigator */}
-            <div className="flex items-center gap-1 bg-white rounded-lg border border-slate-200 p-1 shadow-sm">
-              <button
-                type="button"
-                onClick={handlePrevDay}
-                title="Previous Day"
-                className="p-1 hover:bg-slate-100 rounded text-slate-600 transition-colors"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </button>
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                className="px-2 py-1 text-xs font-bold text-slate-800 bg-transparent outline-none cursor-pointer"
-              />
-              <button
-                type="button"
-                onClick={handleNextDay}
-                title="Next Day"
-                className="p-1 hover:bg-slate-100 rounded text-slate-600 transition-colors"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                onClick={handleToday}
-                className="px-2 py-0.5 text-[11px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded transition-colors"
-              >
-                Today
-              </button>
-            </div>
+          {/* Date & Shift Context Control (Hidden on tabs with their own dedicated range/filter systems like Bobbin Stock) */}
+          {currentTabMeta.showRootDateShift && (
+            <div className="flex flex-wrap items-center gap-3 bg-slate-50 p-2.5 rounded-xl border border-slate-200 shrink-0">
+              {/* Date Navigator */}
+              <div className="flex items-center gap-1 bg-white rounded-lg border border-slate-200 p-1 shadow-sm">
+                <button
+                  type="button"
+                  onClick={handlePrevDay}
+                  title="Previous Day"
+                  className="p-1 hover:bg-slate-100 rounded text-slate-600 transition-colors"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                <input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  className="px-2 py-1 text-xs font-bold text-slate-800 bg-transparent outline-none cursor-pointer"
+                />
+                <button
+                  type="button"
+                  onClick={handleNextDay}
+                  title="Next Day"
+                  className="p-1 hover:bg-slate-100 rounded text-slate-600 transition-colors"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={handleToday}
+                  className="px-2 py-0.5 text-[11px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded transition-colors"
+                >
+                  Today
+                </button>
+              </div>
 
-            {/* Shift Picker */}
-            <div className="flex items-center gap-2 bg-white rounded-lg border border-slate-200 px-3 py-1 shadow-sm">
-              <Clock className="h-4 w-4 text-slate-400" />
-              <select
-                value={selectedShiftId}
-                onChange={(e) => setSelectedShiftId(e.target.value)}
-                className="text-xs font-bold text-slate-800 bg-transparent outline-none cursor-pointer pr-1"
-              >
-                <option value="ALL">ALL (All Shifts)</option>
-                {shifts.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
+              {/* Shift Picker */}
+              <div className="flex items-center gap-2 bg-white rounded-lg border border-slate-200 px-3 py-1 shadow-sm">
+                <Clock className="h-4 w-4 text-slate-400" />
+                <select
+                  value={selectedShiftId}
+                  onChange={(e) => setSelectedShiftId(e.target.value)}
+                  className="text-xs font-bold text-slate-800 bg-transparent outline-none cursor-pointer pr-1"
+                >
+                  <option value="ALL">ALL (All Shifts)</option>
+                  {shifts.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
 
