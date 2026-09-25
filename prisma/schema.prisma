@@ -1960,3 +1960,39 @@ model LoomMachineMapping {
   @@index([isActive])
 }
 
+model LoomChangeover {
+  id                String   @id @default(cuid())
+  loomNumber        Int      @unique // Circular Loom Machine number 1-91
+  currentQuality    String?
+  currentColor      String?
+  currentColorGroup String?
+  currentDenier     Float?
+  currentReedSpace  Float?
+  currentBobbinMark String?
+  currentMesh       String?
+
+  nextQualityCode   String?
+  nextColor         String?
+  nextColorGroup    String?
+  nextDenier        Float?
+  nextReedSpace     Float?
+  nextBobbinMark    String?
+  nextMesh          String?
+
+  sequence          Int      @default(0) // 1, 2, 3...
+  status            String   @default("PENDING") // PENDING, SCHEDULED, IN_PROGRESS, COMPLETED, CANCELLED
+  targetDate        String?  // YYYY-MM-DD
+  targetShiftId     String?
+  targetShiftName   String?
+  remarks           String?
+  updatedBy         String?
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([loomNumber])
+  @@index([status])
+  @@index([sequence])
+}
+
+

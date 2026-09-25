@@ -2,13 +2,15 @@
 
 import React, { useState, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { LayoutGrid, Factory, Boxes, Sparkles } from "lucide-react";
+import { LayoutGrid, Factory, Boxes, Sparkles, ArrowRightLeft } from "lucide-react";
 import { LoomSummarySection } from "@/components/loom/LoomSummarySection";
+import { LoomChangeoverSection } from "@/components/loom/LoomChangeoverSection";
 
-export type LoomTab = "summary";
+export type LoomTab = "summary" | "changeover";
 
 const LOOM_TABS: { id: LoomTab; label: string; icon: React.ElementType }[] = [
   { id: "summary", label: "1. Loom Summary", icon: LayoutGrid },
+  { id: "changeover", label: "2. Change Over Sheet", icon: ArrowRightLeft },
 ];
 
 export function LoomClient() {
@@ -58,6 +60,7 @@ export function LoomClient() {
 
       {/* Active Tab Content */}
       {activeTab === "summary" && <LoomSummarySection />}
+      {activeTab === "changeover" && <LoomChangeoverSection />}
     </div>
   );
 }

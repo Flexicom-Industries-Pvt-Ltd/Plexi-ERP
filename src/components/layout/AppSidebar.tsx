@@ -50,6 +50,7 @@ const tapePlantItems = [
 
 const loomItems = [
   { title: "Loom Summary", url: "/dashboard/production/loom?tab=summary" },
+  { title: "Change Over Sheet", url: "/dashboard/production/loom?tab=changeover" },
 ];
 
 const settingsItems = [
@@ -182,11 +183,12 @@ export function AppSidebar({ user, allowedModules, ...props }: AppSidebarProps) 
                 <CollapsibleContent>
                   <SidebarMenuSub>
                     {loomItems.map((subItem) => {
-                      const isSubActive = pathname.startsWith("/dashboard/production/loom");
+                      const subTab = subItem.url.split("tab=")[1];
+                      const isSubActive = pathname === "/dashboard/production/loom" && activeTabInUrl === subTab;
                       return (
                         <SidebarMenuSubItem key={subItem.url}>
                           <SidebarMenuSubButton
-                            render={<Link href={subItem.url} />}
+                            render={<Link href={subItem.url} onClick={() => setCurrentSearch(`?tab=${subTab}`)} />}
                             isActive={isSubActive}
                           >
                             <span>{subItem.title}</span>
