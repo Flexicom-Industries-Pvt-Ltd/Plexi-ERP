@@ -69,6 +69,8 @@ export interface RecipePlanItem {
   materials: MaterialRow[];
   isDayNight?: boolean;
   carriedOverFromShift?: string;
+  shiftId?: string;
+  shiftName?: string;
 }
 
 export const createEmptyRecipePlan = (index: number = 1): RecipePlanItem => {
@@ -153,6 +155,8 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
         if (data && Array.isArray(data.plans) && data.plans.length > 0) {
           const loaded = data.plans.map((p: any) => ({
             id: p.id,
+            shiftId: p.shiftId || undefined,
+            shiftName: p.shiftName || (p.shift?.name) || undefined,
             recipeQuality: p.recipeQuality || DEFAULT_RECIPE_STRING,
             tapeType: p.tapeType || "LPP",
             denier: p.denier ?? "",
@@ -179,6 +183,8 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
           // Backward compatibility with single record
           const single: RecipePlanItem = {
             id: data.id || `temp-${Date.now()}`,
+            shiftId: data.shiftId || undefined,
+            shiftName: data.shiftName || (data.shift?.name) || undefined,
             recipeQuality: data.recipeQuality || DEFAULT_RECIPE_STRING,
             tapeType: data.tapeType || "LPP",
             denier: data.denier ?? "",
@@ -599,6 +605,20 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
                   <span className="font-mono font-bold text-xs sm:text-sm tracking-tight truncate">
                     {plan.recipeQuality || `Quality #${index + 1}`}
                   </span>
+                  {/* Shift Badge */}
+                  {plan.shiftName || plan.shiftId || shiftId === "ALL" ? (
+                    <span
+                      className={`text-[9px] font-bold px-1.5 py-0.2 rounded border uppercase shrink-0 ${
+                        isSelected
+                          ? "bg-white/20 text-white border-white/30"
+                          : (plan.shiftName || plan.shiftId || "").toLowerCase().includes("night")
+                          ? "bg-purple-50 text-purple-700 border-purple-200"
+                          : "bg-blue-50 text-blue-700 border-blue-200"
+                      }`}
+                    >
+                      {(plan.shiftName || (plan.shiftId === "shift_night" ? "Night" : "Day")).replace(/Shift/i, "").trim()}
+                    </span>
+                  ) : null}
                   {plan.isDayNight && (
                     <span
                       className={`text-[9px] font-bold px-1.5 py-0.2 rounded border shrink-0 ${

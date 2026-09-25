@@ -33,12 +33,32 @@ function formatKg(val: number | string | undefined | null): string {
     ? num.toLocaleString()
     : num.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 });
 }
-
 function formatPct(val: number | string | undefined | null): string {
   if (val === undefined || val === null || val === "" || val === 0) return "—";
   const num = Number(val);
   if (isNaN(num)) return `${val}%`;
   return Number.isInteger(num) ? `${num}%` : `${num.toFixed(1)}%`;
+}
+
+function getShiftLabel(p: RecipePlanItem, defaultShiftName?: string): string {
+  if (p.isDayNight) return "DAY+NIGHT";
+  if (p.shiftName) {
+    const s = p.shiftName.toUpperCase();
+    if (s.includes("NIGHT")) return "NIGHT";
+    if (s.includes("DAY")) return "DAY";
+    return p.shiftName.replace(/Shift/i, "").trim().toUpperCase();
+  }
+  if (p.shiftId) {
+    if (p.shiftId.toLowerCase().includes("night")) return "NIGHT";
+    if (p.shiftId.toLowerCase().includes("day")) return "DAY";
+    return p.shiftId.toUpperCase();
+  }
+  if (defaultShiftName && defaultShiftName.toUpperCase() !== "ALL" && !defaultShiftName.toUpperCase().includes("ALL")) {
+    if (defaultShiftName.toUpperCase().includes("NIGHT")) return "NIGHT";
+    if (defaultShiftName.toUpperCase().includes("DAY")) return "DAY";
+    return defaultShiftName.replace(/Shift/i, "").trim().toUpperCase();
+  }
+  return "DAY";
 }
 
 export function generatePlanningSheetHtml(data: TapePlanningPrintData): string {
@@ -87,10 +107,13 @@ export function generatePlanningSheetHtml(data: TapePlanningPrintData): string {
   const recipeParamRows = plans.length > 0
     ? plans.map((p, idx) => `
       <tr>
-        <td style="text-align: center; font-weight: 700; width: 26px;">${idx + 1}</td>
-        <td style="font-weight: 700; font-family: monospace; font-size: 8.5pt;">
+        <td style="text-align: center; font-weight: 700; width: 22px;">${idx + 1}</td>
+        <td style="font-weight: 700; font-family: monospace; font-size: 7.5pt;">
           ${p.recipeQuality || "—"}
-          ${p.isDayNight ? `<span style="border: 1px solid #d97706; background: #fef3c7; color: #92400e; font-size: 6.5pt; padding: 1px 4px; border-radius: 3px; margin-left: 4px; display: inline-block;">Day+Night (24h)</span>` : ""}
+          ${p.isDayNight ? `<span style="border: 1px solid #d97706; background: #fef3c7; color: #92400e; font-size: 6pt; padding: 1px 3px; border-radius: 2px; margin-left: 3px; display: inline-block;">Day+Night (24h)</span>` : ""}
+        </td>
+        <td style="text-align: center; font-weight: 700; font-family: monospace; font-size: 6.5pt; text-transform: uppercase;">
+          ${getShiftLabel(p, shiftName)}
         </td>
         <td style="text-align: center; font-weight: 600;">${p.tapeType || "LPP"}</td>
         <td style="text-align: right; font-family: monospace;">${p.denier !== "" && p.denier !== undefined ? p.denier : "—"}</td>
@@ -109,7 +132,7 @@ export function generatePlanningSheetHtml(data: TapePlanningPrintData): string {
     `).join("")
     : `
       <tr>
-        <td colspan="13" style="text-align: center; color: #64748b; font-style: italic; padding: 10px;">
+        <td colspan="14" style="text-align: center; color: #64748b; font-style: italic; padding: 8px;">
           No recipe plan runs defined for this shift.
         </td>
       </tr>
@@ -155,29 +178,30 @@ export function generatePlanningSheetHtml(data: TapePlanningPrintData): string {
 
         return `
           <tr>
-            <td style="text-align: center; font-weight: 700; width: 24px;">${idx + 1}</td>
-            <td style="font-weight: 700; font-family: monospace; font-size: 8pt; white-space: nowrap;">${p.recipeQuality || "—"}</td>
+            <td style="text-align: center; font-weight: 700; width: 20px;">${idx + 1}</td>
+            <td style="font-weight: 700; font-family: monospace; font-size: 7.5pt; white-space: nowrap;">${p.recipeQuality || "—"}</td>
+            <td style="text-align: center; font-weight: 700; font-family: monospace; font-size: 6.5pt; text-transform: uppercase;">${getShiftLabel(p, shiftName)}</td>
             <!-- PP -->
             <td style="text-align: right; font-family: monospace; font-weight: 600;">${formatKg(pp.qty)}</td>
-            <td style="text-align: right; font-family: monospace; color: #475569; font-size: 7pt; background-color: #f8fafc;">${formatPct(pp.pct)}</td>
+            <td style="text-align: right; font-family: monospace; color: #475569; font-size: 6.5pt; background-color: #f8fafc;">${formatPct(pp.pct)}</td>
             <!-- CC -->
             <td style="text-align: right; font-family: monospace; font-weight: 600;">${formatKg(cc.qty)}</td>
-            <td style="text-align: right; font-family: monospace; color: #475569; font-size: 7pt; background-color: #f8fafc;">${formatPct(cc.pct)}</td>
+            <td style="text-align: right; font-family: monospace; color: #475569; font-size: 6.5pt; background-color: #f8fafc;">${formatPct(cc.pct)}</td>
             <!-- MB -->
             <td style="text-align: right; font-family: monospace; font-weight: 600;">${formatKg(mb.qty)}</td>
-            <td style="text-align: right; font-family: monospace; color: #475569; font-size: 7pt; background-color: #f8fafc;">${formatPct(mb.pct)}</td>
+            <td style="text-align: right; font-family: monospace; color: #475569; font-size: 6.5pt; background-color: #f8fafc;">${formatPct(mb.pct)}</td>
             <!-- RP1 -->
             <td style="text-align: right; font-family: monospace; font-weight: 600;">${formatKg(rp1.qty)}</td>
-            <td style="text-align: right; font-family: monospace; color: #475569; font-size: 7pt; background-color: #f8fafc;">${formatPct(rp1.pct)}</td>
+            <td style="text-align: right; font-family: monospace; color: #475569; font-size: 6.5pt; background-color: #f8fafc;">${formatPct(rp1.pct)}</td>
             <!-- RP2 -->
             <td style="text-align: right; font-family: monospace; font-weight: 600;">${formatKg(rp2.qty)}</td>
-            <td style="text-align: right; font-family: monospace; color: #475569; font-size: 7pt; background-color: #f8fafc;">${formatPct(rp2.pct)}</td>
+            <td style="text-align: right; font-family: monospace; color: #475569; font-size: 6.5pt; background-color: #f8fafc;">${formatPct(rp2.pct)}</td>
             <!-- HD RP -->
             <td style="text-align: right; font-family: monospace; font-weight: 600;">${formatKg(hdrp.qty)}</td>
-            <td style="text-align: right; font-family: monospace; color: #475569; font-size: 7pt; background-color: #f8fafc;">${formatPct(hdrp.pct)}</td>
+            <td style="text-align: right; font-family: monospace; color: #475569; font-size: 6.5pt; background-color: #f8fafc;">${formatPct(hdrp.pct)}</td>
             <!-- TPT -->
             <td style="text-align: right; font-family: monospace; font-weight: 600;">${formatKg(tpt.qty)}</td>
-            <td style="text-align: right; font-family: monospace; color: #475569; font-size: 7pt; background-color: #f8fafc;">${formatPct(tpt.pct)}</td>
+            <td style="text-align: right; font-family: monospace; color: #475569; font-size: 6.5pt; background-color: #f8fafc;">${formatPct(tpt.pct)}</td>
             <!-- Other -->
             <td style="text-align: right; font-family: monospace;">${formatKg(otherQty)}</td>
             <!-- Total Batch -->
@@ -185,7 +209,7 @@ export function generatePlanningSheetHtml(data: TapePlanningPrintData): string {
               ${formatKg(rowBatchTotal)}
             </td>
             <!-- Blend % -->
-            <td style="text-align: right; font-family: monospace; font-weight: 700; width: 42px;">
+            <td style="text-align: right; font-family: monospace; font-weight: 700; width: 36px;">
               ${totalBlendPct > 0 ? `${totalBlendPct.toFixed(1)}%` : "100%"}
             </td>
           </tr>
@@ -193,7 +217,7 @@ export function generatePlanningSheetHtml(data: TapePlanningPrintData): string {
       }).join("")
     : `
       <tr>
-        <td colspan="19" style="text-align: center; color: #64748b; font-style: italic; padding: 10px;">
+        <td colspan="20" style="text-align: center; color: #64748b; font-style: italic; padding: 8px;">
           No formulation blend defined.
         </td>
       </tr>
@@ -213,11 +237,11 @@ export function generatePlanningSheetHtml(data: TapePlanningPrintData): string {
     summaryMats.push({ name: "OTHER", qty: totalOtherSum });
   }
 
-  const summaryHeadersHtml = summaryMats.map((m) => `<th style="text-align: center; border: 1px solid #94a3b8; padding: 4px 6px; font-weight: 700; font-size: 7.5pt;">${m.name}</th>`).join("");
-  const summaryQtyRowHtml = summaryMats.map((m) => `<td style="text-align: center; font-family: monospace; font-weight: 800; padding: 4px 6px; border: 1px solid #cbd5e1; font-size: 8.5pt;">${m.qty ? `${formatKg(m.qty)} KG` : "—"}</td>`).join("");
+  const summaryHeadersHtml = summaryMats.map((m) => `<th style="text-align: center; border: 1px solid #94a3b8; padding: 3px 5px; font-weight: 700; font-size: 7pt;">${m.name}</th>`).join("");
+  const summaryQtyRowHtml = summaryMats.map((m) => `<td style="text-align: center; font-family: monospace; font-weight: 800; padding: 3px 5px; border: 1px solid #cbd5e1; font-size: 8pt;">${m.qty ? `${formatKg(m.qty)} KG` : "—"}</td>`).join("");
   const summaryPctRowHtml = summaryMats.map((m) => {
     const pct = totalBatchSum > 0 ? ((m.qty / totalBatchSum) * 100).toFixed(1) : "0.0";
-    return `<td style="text-align: center; font-family: monospace; color: #0f766e; font-weight: 700; padding: 3px 6px; border: 1px solid #cbd5e1; font-size: 7.5pt; background-color: #f8fafc;">${m.qty ? `${pct}%` : "—"}</td>`;
+    return `<td style="text-align: center; font-family: monospace; color: #0f766e; font-weight: 700; padding: 2.5px 5px; border: 1px solid #cbd5e1; font-size: 7pt; background-color: #f8fafc;">${m.qty ? `${pct}%` : "—"}</td>`;
   }).join("");
 
   const docDate = date || new Date().toISOString().split("T")[0];
@@ -239,7 +263,7 @@ export function generatePlanningSheetHtml(data: TapePlanningPrintData): string {
   <style>
     @page {
       size: A4 landscape;
-      margin: 6mm 8mm;
+      margin: 4mm 5mm;
     }
     * {
       box-sizing: border-box;
@@ -248,35 +272,37 @@ export function generatePlanningSheetHtml(data: TapePlanningPrintData): string {
     }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      font-size: 8pt;
-      line-height: 1.25;
+      font-size: 7.5pt;
+      line-height: 1.2;
       color: #0f172a;
       background: #ffffff;
       padding: 0;
+      width: 100%;
     }
     .sheet-container {
       width: 100%;
-      max-width: 285mm;
+      max-width: 100%;
       margin: 0 auto;
+      box-sizing: border-box;
     }
 
     /* Minimalist Centered Header */
     .header-container {
       text-align: center;
       border-bottom: 2px solid #0f172a;
-      padding-bottom: 6px;
-      margin-bottom: 6px;
+      padding-bottom: 4px;
+      margin-bottom: 4px;
     }
     .company-title {
-      font-size: 14pt;
+      font-size: 13pt;
       font-weight: 900;
-      letter-spacing: 0.8px;
+      letter-spacing: 0.6px;
       color: #000000;
       text-transform: uppercase;
       text-align: center;
     }
     .company-sub {
-      font-size: 7.5pt;
+      font-size: 7pt;
       color: #475569;
       margin-top: 1px;
       text-align: center;
@@ -285,13 +311,13 @@ export function generatePlanningSheetHtml(data: TapePlanningPrintData): string {
       display: inline-block;
       border: 1.5px solid #0f172a;
       background: #f8fafc;
-      padding: 3px 14px;
-      font-size: 9pt;
+      padding: 2px 12px;
+      font-size: 8.5pt;
       font-weight: 900;
       text-transform: uppercase;
-      letter-spacing: 1px;
-      margin-top: 4px;
-      margin-bottom: 3px;
+      letter-spacing: 0.8px;
+      margin-top: 3px;
+      margin-bottom: 2px;
       text-align: center;
     }
     .doc-meta-strip {
@@ -299,8 +325,8 @@ export function generatePlanningSheetHtml(data: TapePlanningPrintData): string {
       flex-wrap: wrap;
       justify-content: center;
       align-items: center;
-      gap: 12px;
-      font-size: 7.5pt;
+      gap: 10px;
+      font-size: 7pt;
       color: #334155;
       margin-top: 2px;
       text-align: center;
@@ -313,25 +339,25 @@ export function generatePlanningSheetHtml(data: TapePlanningPrintData): string {
     .kpi-table {
       width: 100%;
       border-collapse: collapse;
-      margin-bottom: 6px;
+      margin-bottom: 4px;
       background-color: #f8fafc;
       border: 1px solid #94a3b8;
     }
     .kpi-table td {
-      padding: 3px 6px;
+      padding: 2.5px 5px;
       border: 1px solid #cbd5e1;
       vertical-align: middle;
       text-align: center;
     }
     .kpi-label {
-      font-size: 6.5pt;
+      font-size: 6pt;
       font-weight: 700;
       text-transform: uppercase;
       color: #475569;
       letter-spacing: 0.3px;
     }
     .kpi-val {
-      font-size: 9pt;
+      font-size: 8.5pt;
       font-weight: 800;
       font-family: monospace;
       color: #0f172a;
@@ -339,16 +365,16 @@ export function generatePlanningSheetHtml(data: TapePlanningPrintData): string {
 
     /* Centered Section Titles */
     .section-title {
-      font-size: 8pt;
+      font-size: 7.5pt;
       font-weight: 900;
       text-transform: uppercase;
-      letter-spacing: 0.8px;
+      letter-spacing: 0.6px;
       text-align: center;
       background-color: #e2e8f0;
       border: 1px solid #94a3b8;
       border-bottom: none;
-      padding: 3px 6px;
-      margin-top: 6px;
+      padding: 2.5px 5px;
+      margin-top: 4px;
       color: #0f172a;
     }
 
@@ -356,64 +382,65 @@ export function generatePlanningSheetHtml(data: TapePlanningPrintData): string {
     .data-table {
       width: 100%;
       border-collapse: collapse;
-      margin-bottom: 6px;
-      font-size: 7.5pt;
+      margin-bottom: 4px;
+      font-size: 7pt;
+      table-layout: auto;
     }
     .data-table th {
       background-color: #f1f5f9;
       border: 1px solid #94a3b8;
-      padding: 2.5px 3.5px;
+      padding: 2px 3px;
       font-weight: 700;
-      font-size: 7pt;
+      font-size: 6.5pt;
       text-transform: uppercase;
       text-align: center;
       color: #0f172a;
     }
     .data-table td {
       border: 1px solid #cbd5e1;
-      padding: 2.5px 3.5px;
-      font-size: 7.5pt;
+      padding: 2px 3px;
+      font-size: 7pt;
       color: #0f172a;
     }
     .data-table tfoot td {
       background-color: #f1f5f9;
       border: 1px solid #94a3b8;
       font-weight: 700;
-      padding: 3px 4px;
+      padding: 2.5px 3.5px;
     }
 
     /* Sign-off section */
     .sign-table {
       width: 100%;
       border-collapse: collapse;
-      margin-top: 6px;
+      margin-top: 4px;
       border: 1px solid #94a3b8;
     }
     .sign-table td {
       width: 33.33%;
       border: 1px solid #94a3b8;
-      padding: 4px 6px;
+      padding: 3px 5px;
       text-align: center;
       vertical-align: top;
     }
     .sign-title {
       font-weight: 700;
-      font-size: 7pt;
+      font-size: 6.5pt;
       text-transform: uppercase;
-      margin-bottom: 18px;
+      margin-bottom: 14px;
       color: #334155;
     }
     .sign-line {
       border-top: 1px dotted #64748b;
       padding-top: 2px;
-      font-size: 6.5pt;
+      font-size: 6pt;
       color: #64748b;
     }
 
     /* Footer */
     .footer-note {
-      margin-top: 3px;
-      font-size: 6.5pt;
+      margin-top: 2px;
+      font-size: 6pt;
       color: #64748b;
       display: flex;
       justify-content: space-between;
@@ -451,20 +478,20 @@ export function generatePlanningSheetHtml(data: TapePlanningPrintData): string {
       <tr>
         <td style="width: 25%;">
           <div class="kpi-label">Shift Planned Output</div>
-          <div class="kpi-val">${totalShiftPlannedKg.toLocaleString()} <span style="font-size: 7pt; font-weight: normal;">KG</span></div>
-          ${totalDayNightPlannedKg > 0 ? `<div style="font-size: 6.5pt; color: #b45309; font-weight: 700; margin-top: 2px;">+ ${totalDayNightPlannedKg.toLocaleString()} KG (24h Batch)</div>` : ""}
+          <div class="kpi-val">${totalShiftPlannedKg.toLocaleString()} <span style="font-size: 6.5pt; font-weight: normal;">KG</span></div>
+          ${totalDayNightPlannedKg > 0 ? `<div style="font-size: 6pt; color: #b45309; font-weight: 700; margin-top: 1px;">+ ${totalDayNightPlannedKg.toLocaleString()} KG (24h Batch)</div>` : ""}
         </td>
         <td style="width: 25%;">
           <div class="kpi-label">Total Qualities / Runs</div>
-          <div class="kpi-val">${plans.length} <span style="font-size: 7pt; font-weight: normal;">Qualities</span></div>
+          <div class="kpi-val">${plans.length} <span style="font-size: 6.5pt; font-weight: normal;">Qualities</span></div>
         </td>
         <td style="width: 25%;">
           <div class="kpi-label">Total Raw Material Demand</div>
-          <div class="kpi-val">${totalAllMaterialsKg.toLocaleString()} <span style="font-size: 7pt; font-weight: normal;">KG</span></div>
+          <div class="kpi-val">${totalAllMaterialsKg.toLocaleString()} <span style="font-size: 6.5pt; font-weight: normal;">KG</span></div>
         </td>
         <td style="width: 25%;">
           <div class="kpi-label">Approval State</div>
-          <div class="kpi-val" style="font-size: 8pt;">${status}</div>
+          <div class="kpi-val" style="font-size: 7.5pt;">${status}</div>
         </td>
       </tr>
     </table>
@@ -474,19 +501,20 @@ export function generatePlanningSheetHtml(data: TapePlanningPrintData): string {
     <table class="data-table">
       <thead>
         <tr>
-          <th style="text-align: center; width: 26px;">#</th>
+          <th style="text-align: center; width: 22px;">#</th>
           <th style="text-align: left;">Quality Name / Recipe Code</th>
-          <th style="text-align: center; width: 38px;">Type</th>
-          <th style="text-align: right; width: 44px;">Denier</th>
-          <th style="text-align: right; width: 48px;">Width (mm)</th>
-          <th style="text-align: right; width: 46px;">Strength</th>
-          <th style="text-align: right; width: 42px;">ELO %</th>
-          <th style="text-align: left; width: 80px;">Colour</th>
-          <th style="text-align: left; width: 80px;">Bobbin Mark</th>
-          <th style="text-align: left; width: 65px;">Spacer</th>
-          <th style="text-align: right; width: 40px;">Ash %</th>
-          <th style="text-align: left; width: 55px;">Omega</th>
-          <th style="text-align: right; width: 75px;">Planned (KG)</th>
+          <th style="text-align: center; width: 36px;">Shift</th>
+          <th style="text-align: center; width: 32px;">Type</th>
+          <th style="text-align: right; width: 38px;">Denier</th>
+          <th style="text-align: right; width: 42px;">Width (mm)</th>
+          <th style="text-align: right; width: 40px;">Strength</th>
+          <th style="text-align: right; width: 36px;">ELO %</th>
+          <th style="text-align: left; width: 65px;">Colour</th>
+          <th style="text-align: left; width: 65px;">Bobbin Mark</th>
+          <th style="text-align: left; width: 55px;">Spacer</th>
+          <th style="text-align: right; width: 36px;">Ash %</th>
+          <th style="text-align: left; width: 45px;">Omega</th>
+          <th style="text-align: right; width: 65px;">Planned (KG)</th>
         </tr>
       </thead>
       <tbody>
@@ -494,19 +522,19 @@ export function generatePlanningSheetHtml(data: TapePlanningPrintData): string {
       </tbody>
       <tfoot>
         <tr>
-          <td colspan="12" style="text-align: right; text-transform: uppercase; font-size: 7pt; letter-spacing: 0.5px;">
+          <td colspan="13" style="text-align: right; text-transform: uppercase; font-size: 6.5pt; letter-spacing: 0.5px;">
             Total Shift Planned Output${totalDayNightPlannedKg > 0 ? " (Single-Shift Runs)" : ""}:
           </td>
-          <td style="text-align: right; font-family: monospace; font-size: 8pt; font-weight: 800; background-color: #f1f5f9;">
+          <td style="text-align: right; font-family: monospace; font-size: 7.5pt; font-weight: 800; background-color: #f1f5f9;">
             ${totalShiftPlannedKg.toLocaleString()} KG
           </td>
         </tr>
         ${totalDayNightPlannedKg > 0 ? `
         <tr>
-          <td colspan="12" style="text-align: right; text-transform: uppercase; font-size: 7pt; letter-spacing: 0.5px; color: #92400e; background-color: #fef3c7; font-weight: 700;">
+          <td colspan="13" style="text-align: right; text-transform: uppercase; font-size: 6.5pt; letter-spacing: 0.5px; color: #92400e; background-color: #fef3c7; font-weight: 700;">
             + Day+Night 24-Hour Continuous Batch (Running across 2 shifts):
           </td>
-          <td style="text-align: right; font-family: monospace; font-size: 8pt; font-weight: 800; background-color: #fde68a; color: #78350f;">
+          <td style="text-align: right; font-family: monospace; font-size: 7.5pt; font-weight: 800; background-color: #fde68a; color: #78350f;">
             ${totalDayNightPlannedKg.toLocaleString()} KG
           </td>
         </tr>
@@ -519,8 +547,9 @@ export function generatePlanningSheetHtml(data: TapePlanningPrintData): string {
     <table class="data-table avoid-break">
       <thead>
         <tr>
-          <th rowspan="2" style="text-align: center; width: 24px;">#</th>
-          <th rowspan="2" style="text-align: left; min-width: 130px;">Quality Name</th>
+          <th rowspan="2" style="text-align: center; width: 20px;">#</th>
+          <th rowspan="2" style="text-align: left; min-width: 100px;">Quality Name</th>
+          <th rowspan="2" style="text-align: center; width: 36px;">Shift</th>
           <th colspan="2" style="text-align: center;">PP</th>
           <th colspan="2" style="text-align: center;">CC</th>
           <th colspan="2" style="text-align: center;">MB</th>
@@ -528,25 +557,25 @@ export function generatePlanningSheetHtml(data: TapePlanningPrintData): string {
           <th colspan="2" style="text-align: center;">RP2</th>
           <th colspan="2" style="text-align: center;">HD RP</th>
           <th colspan="2" style="text-align: center;">TPT</th>
-          <th rowspan="2" style="text-align: right; width: 50px;">Other (KG)</th>
-          <th rowspan="2" style="text-align: right; width: 75px;">Batch Total</th>
-          <th rowspan="2" style="text-align: right; width: 42px;">Total %</th>
+          <th rowspan="2" style="text-align: right; width: 40px;">Other (KG)</th>
+          <th rowspan="2" style="text-align: right; width: 62px;">Batch Total</th>
+          <th rowspan="2" style="text-align: right; width: 36px;">Total %</th>
         </tr>
         <tr>
-          <th style="text-align: right; width: 42px; font-size: 6.5pt;">KG</th>
-          <th style="text-align: right; width: 28px; font-size: 6.5pt; color: #475569;">%</th>
-          <th style="text-align: right; width: 40px; font-size: 6.5pt;">KG</th>
-          <th style="text-align: right; width: 28px; font-size: 6.5pt; color: #475569;">%</th>
-          <th style="text-align: right; width: 38px; font-size: 6.5pt;">KG</th>
-          <th style="text-align: right; width: 28px; font-size: 6.5pt; color: #475569;">%</th>
-          <th style="text-align: right; width: 40px; font-size: 6.5pt;">KG</th>
-          <th style="text-align: right; width: 28px; font-size: 6.5pt; color: #475569;">%</th>
-          <th style="text-align: right; width: 40px; font-size: 6.5pt;">KG</th>
-          <th style="text-align: right; width: 28px; font-size: 6.5pt; color: #475569;">%</th>
-          <th style="text-align: right; width: 42px; font-size: 6.5pt;">KG</th>
-          <th style="text-align: right; width: 28px; font-size: 6.5pt; color: #475569;">%</th>
-          <th style="text-align: right; width: 40px; font-size: 6.5pt;">KG</th>
-          <th style="text-align: right; width: 28px; font-size: 6.5pt; color: #475569;">%</th>
+          <th style="text-align: right; width: 34px; font-size: 6pt;">KG</th>
+          <th style="text-align: right; width: 24px; font-size: 6pt; color: #475569;">%</th>
+          <th style="text-align: right; width: 34px; font-size: 6pt;">KG</th>
+          <th style="text-align: right; width: 24px; font-size: 6pt; color: #475569;">%</th>
+          <th style="text-align: right; width: 34px; font-size: 6pt;">KG</th>
+          <th style="text-align: right; width: 24px; font-size: 6pt; color: #475569;">%</th>
+          <th style="text-align: right; width: 34px; font-size: 6pt;">KG</th>
+          <th style="text-align: right; width: 24px; font-size: 6pt; color: #475569;">%</th>
+          <th style="text-align: right; width: 34px; font-size: 6pt;">KG</th>
+          <th style="text-align: right; width: 24px; font-size: 6pt; color: #475569;">%</th>
+          <th style="text-align: right; width: 34px; font-size: 6pt;">KG</th>
+          <th style="text-align: right; width: 24px; font-size: 6pt; color: #475569;">%</th>
+          <th style="text-align: right; width: 34px; font-size: 6pt;">KG</th>
+          <th style="text-align: right; width: 24px; font-size: 6pt; color: #475569;">%</th>
         </tr>
       </thead>
       <tbody>
@@ -554,38 +583,38 @@ export function generatePlanningSheetHtml(data: TapePlanningPrintData): string {
       </tbody>
       <tfoot>
         <tr>
-          <td colspan="2" style="text-align: right; text-transform: uppercase; font-size: 7pt; letter-spacing: 0.5px; font-weight: 800;">
+          <td colspan="3" style="text-align: right; text-transform: uppercase; font-size: 6.5pt; letter-spacing: 0.5px; font-weight: 800;">
             Total Formulations:
           </td>
           <!-- PP -->
           <td style="text-align: right; font-family: monospace; font-weight: 800;">${formatKg(totalPPSum)}</td>
-          <td style="text-align: right; font-family: monospace; font-size: 6.5pt; color: #64748b;">${totalBatchSum > 0 && totalPPSum > 0 ? `${((totalPPSum / totalBatchSum) * 100).toFixed(1)}%` : "—"}</td>
+          <td style="text-align: right; font-family: monospace; font-size: 6pt; color: #64748b;">${totalBatchSum > 0 && totalPPSum > 0 ? `${((totalPPSum / totalBatchSum) * 100).toFixed(1)}%` : "—"}</td>
           <!-- CC -->
           <td style="text-align: right; font-family: monospace; font-weight: 800;">${formatKg(totalCCSum)}</td>
-          <td style="text-align: right; font-family: monospace; font-size: 6.5pt; color: #64748b;">${totalBatchSum > 0 && totalCCSum > 0 ? `${((totalCCSum / totalBatchSum) * 100).toFixed(1)}%` : "—"}</td>
+          <td style="text-align: right; font-family: monospace; font-size: 6pt; color: #64748b;">${totalBatchSum > 0 && totalCCSum > 0 ? `${((totalCCSum / totalBatchSum) * 100).toFixed(1)}%` : "—"}</td>
           <!-- MB -->
           <td style="text-align: right; font-family: monospace; font-weight: 800;">${formatKg(totalMBSum)}</td>
-          <td style="text-align: right; font-family: monospace; font-size: 6.5pt; color: #64748b;">${totalBatchSum > 0 && totalMBSum > 0 ? `${((totalMBSum / totalBatchSum) * 100).toFixed(1)}%` : "—"}</td>
+          <td style="text-align: right; font-family: monospace; font-size: 6pt; color: #64748b;">${totalBatchSum > 0 && totalMBSum > 0 ? `${((totalMBSum / totalBatchSum) * 100).toFixed(1)}%` : "—"}</td>
           <!-- RP1 -->
           <td style="text-align: right; font-family: monospace; font-weight: 800;">${formatKg(totalRP1Sum)}</td>
-          <td style="text-align: right; font-family: monospace; font-size: 6.5pt; color: #64748b;">${totalBatchSum > 0 && totalRP1Sum > 0 ? `${((totalRP1Sum / totalBatchSum) * 100).toFixed(1)}%` : "—"}</td>
+          <td style="text-align: right; font-family: monospace; font-size: 6pt; color: #64748b;">${totalBatchSum > 0 && totalRP1Sum > 0 ? `${((totalRP1Sum / totalBatchSum) * 100).toFixed(1)}%` : "—"}</td>
           <!-- RP2 -->
           <td style="text-align: right; font-family: monospace; font-weight: 800;">${formatKg(totalRP2Sum)}</td>
-          <td style="text-align: right; font-family: monospace; font-size: 6.5pt; color: #64748b;">${totalBatchSum > 0 && totalRP2Sum > 0 ? `${((totalRP2Sum / totalBatchSum) * 100).toFixed(1)}%` : "—"}</td>
+          <td style="text-align: right; font-family: monospace; font-size: 6pt; color: #64748b;">${totalBatchSum > 0 && totalRP2Sum > 0 ? `${((totalRP2Sum / totalBatchSum) * 100).toFixed(1)}%` : "—"}</td>
           <!-- HD RP -->
           <td style="text-align: right; font-family: monospace; font-weight: 800;">${formatKg(totalHDRPSum)}</td>
-          <td style="text-align: right; font-family: monospace; font-size: 6.5pt; color: #64748b;">${totalBatchSum > 0 && totalHDRPSum > 0 ? `${((totalHDRPSum / totalBatchSum) * 100).toFixed(1)}%` : "—"}</td>
+          <td style="text-align: right; font-family: monospace; font-size: 6pt; color: #64748b;">${totalBatchSum > 0 && totalHDRPSum > 0 ? `${((totalHDRPSum / totalBatchSum) * 100).toFixed(1)}%` : "—"}</td>
           <!-- TPT -->
           <td style="text-align: right; font-family: monospace; font-weight: 800;">${formatKg(totalTPTSum)}</td>
-          <td style="text-align: right; font-family: monospace; font-size: 6.5pt; color: #64748b;">${totalBatchSum > 0 && totalTPTSum > 0 ? `${((totalTPTSum / totalBatchSum) * 100).toFixed(1)}%` : "—"}</td>
+          <td style="text-align: right; font-family: monospace; font-size: 6pt; color: #64748b;">${totalBatchSum > 0 && totalTPTSum > 0 ? `${((totalTPTSum / totalBatchSum) * 100).toFixed(1)}%` : "—"}</td>
           <!-- Other -->
           <td style="text-align: right; font-family: monospace;">${formatKg(totalOtherSum)}</td>
           <!-- Batch Total -->
-          <td style="text-align: right; font-family: monospace; font-size: 8pt; font-weight: 800; background-color: #f1f5f9;">
+          <td style="text-align: right; font-family: monospace; font-size: 7.5pt; font-weight: 800; background-color: #f1f5f9;">
             ${formatKg(totalBatchSum)} KG
           </td>
           <!-- 100% -->
-          <td style="text-align: right; font-family: monospace; font-size: 7pt; font-weight: 700;">100%</td>
+          <td style="text-align: right; font-family: monospace; font-size: 6.5pt; font-weight: 700;">100%</td>
         </tr>
       </tfoot>
     </table>
@@ -593,24 +622,24 @@ export function generatePlanningSheetHtml(data: TapePlanningPrintData): string {
     <!-- 3. RAW MATERIAL SUMMARY -->
     <div class="avoid-break">
       <div class="section-title">3. RAW MATERIAL SUMMARY</div>
-      <table class="data-table" style="margin-bottom: 6px;">
+      <table class="data-table" style="margin-bottom: 4px;">
         <thead>
           <tr>
-            <th style="text-align: left; width: 140px;">Raw Material / Metric</th>
+            <th style="text-align: left; width: 130px;">Raw Material / Metric</th>
             ${summaryHeadersHtml}
-            <th style="text-align: center; border: 1px solid #94a3b8; padding: 4px 6px; font-weight: 800; background-color: #e2e8f0;">TOTAL BATCH</th>
+            <th style="text-align: center; border: 1px solid #94a3b8; padding: 3px 5px; font-weight: 800; background-color: #e2e8f0;">TOTAL BATCH</th>
           </tr>
         </thead>
         <tbody>
           <tr>
-            <td style="font-weight: 700; text-transform: uppercase; font-size: 7pt; background-color: #f8fafc;">Total Planned Qty (KG)</td>
+            <td style="font-weight: 700; text-transform: uppercase; font-size: 6.5pt; background-color: #f8fafc;">Total Planned Qty (KG)</td>
             ${summaryQtyRowHtml}
-            <td style="text-align: center; font-family: monospace; font-weight: 900; font-size: 9pt; background-color: #f1f5f9;">${totalBatchSum.toLocaleString()} KG</td>
+            <td style="text-align: center; font-family: monospace; font-weight: 900; font-size: 8.5pt; background-color: #f1f5f9;">${totalBatchSum.toLocaleString()} KG</td>
           </tr>
           <tr>
-            <td style="font-weight: 700; text-transform: uppercase; font-size: 7pt; background-color: #f8fafc;">Overall Composition (%)</td>
+            <td style="font-weight: 700; text-transform: uppercase; font-size: 6.5pt; background-color: #f8fafc;">Overall Composition (%)</td>
             ${summaryPctRowHtml}
-            <td style="text-align: center; font-family: monospace; font-weight: 800; font-size: 8pt; background-color: #f1f5f9; color: #0f766e;">100.0%</td>
+            <td style="text-align: center; font-family: monospace; font-weight: 800; font-size: 7.5pt; background-color: #f1f5f9; color: #0f766e;">100.0%</td>
           </tr>
         </tbody>
       </table>
