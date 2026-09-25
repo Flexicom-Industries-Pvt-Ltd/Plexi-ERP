@@ -29,17 +29,36 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    // Fetch all planned recipe runs for this shift (including multi-shift Day+Night runs)
-    const plans = await db.tapePlantPlan.findMany({
+    // Fetch planned recipe runs specifically for this shift
+    const shiftPlans = await db.tapePlantPlan.findMany({
       where: {
         date,
-        OR: [
-          { shiftId },
-          { isDayNight: true },
-        ],
+        shiftId,
       },
       orderBy: { createdAt: "asc" },
     });
+
+    // Also fetch continuous Day+Night runs on that date from other shifts (if not already planned under shiftId)
+    const otherContinuousPlans = await db.tapePlantPlan.findMany({
+      where: {
+        date,
+        isDayNight: true,
+        shiftId: { not: shiftId },
+      },
+      orderBy: { createdAt: "asc" },
+    });
+
+    const existingQualities = new Set(shiftPlans.map((p) => (p.recipeQuality || "").trim()));
+    const seenContinuous = new Set<string>();
+    const unlistedContinuous = otherContinuousPlans.filter((cp) => {
+      const key = (cp.recipeQuality || "").trim();
+      if (!key || existingQualities.has(key) || seenContinuous.has(key)) return false;
+      seenContinuous.add(key);
+      return true;
+    });
+
+    // Final deduplicated list of plans for this shift
+    const plans = [...shiftPlans, ...unlistedContinuous];
 
     // Build per-recipe post-production entries by aligning with planned recipes
     const savedEntries = Array.isArray(record?.entries) ? (record.entries as any[]) : [];
@@ -47,7 +66,15 @@ export async function GET(request: NextRequest) {
     let entries: any[] = [];
 
     if (plans.length > 0) {
-      entries = plans.map((plan, idx) => {
+      const mappedQualities = new Set<string>();
+      entries = plans
+        .filter((plan) => {
+          const key = (plan.recipeQuality || "").trim();
+          if (!key || mappedQualities.has(key)) return false;
+          mappedQualities.add(key);
+          return true;
+        })
+        .map((plan, idx) => {
         const matchingEntry =
           savedEntries.find((e) => e.planId === plan.id || e.id === plan.id) ||
           savedEntries.find((e) => e.recipeQuality === plan.recipeQuality) ||
