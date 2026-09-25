@@ -96,11 +96,18 @@ export function AppSidebar({ user, allowedModules, ...props }: AppSidebarProps) 
   const activeTabInUrl = (currentSearch ? new URLSearchParams(currentSearch).get("tab") : null) || "planning";
 
   // Super Admin bypass
-  const isSuperAdmin = user?.role?.name === "Super Admin";
-  const hasSettingsAccess = isSuperAdmin || allowedModules["SETTINGS"];
-  const hasDataCentreAccess = isSuperAdmin || allowedModules["DATA_CENTRE"];
-  const hasTapePlantAccess = isSuperAdmin || allowedModules["TAPE_PLANT"] || allowedModules["PRODUCTION"];
-  const hasLoomAccess = isSuperAdmin || allowedModules["LOOM"] || allowedModules["PRODUCTION"] || allowedModules["TAPE_PLANT"];
+  const roleName = user?.role?.name || user?.role;
+  const isSuperAdmin = Boolean(
+    roleName &&
+    (roleName === "Super Admin" ||
+      roleName === "SuperAdmin" ||
+      roleName === "SUPER_ADMIN" ||
+      roleName === "SUPERADMIN")
+  );
+  const hasSettingsAccess = isSuperAdmin || Boolean(allowedModules["SETTINGS"]);
+  const hasDataCentreAccess = isSuperAdmin || Boolean(allowedModules["DATA_CENTRE"]);
+  const hasTapePlantAccess = isSuperAdmin || Boolean(allowedModules["TAPE_PLANT"]);
+  const hasLoomAccess = isSuperAdmin || Boolean(allowedModules["LOOM"]);
 
   const visibleNavItems = navItems.filter(
     (item) => (!item.module || isSuperAdmin || allowedModules[item.module]),
