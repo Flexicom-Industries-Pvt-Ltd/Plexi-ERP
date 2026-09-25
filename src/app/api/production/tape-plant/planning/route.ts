@@ -46,7 +46,15 @@ export async function GET(request: NextRequest) {
     if (plans.length === 0) {
       // If current shift has no plans yet, pre-populate active Day+Night continuous runs
       if (otherContinuousPlans.length > 0) {
-        effectivePlans = otherContinuousPlans.map((cp) => ({
+        const seen = new Set<string>();
+        const uniqueContinuous = otherContinuousPlans.filter((cp) => {
+          const key = (cp.recipeQuality || "").trim();
+          if (!key || seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+
+        effectivePlans = uniqueContinuous.map((cp) => ({
           ...cp,
           id: `temp-carry-${cp.id}`,
           shiftId,
@@ -57,10 +65,14 @@ export async function GET(request: NextRequest) {
       }
     } else if (otherContinuousPlans.length > 0) {
       // If current shift already has plans, include any continuous recipe from earlier shift that is not yet in the list
-      const existingQualities = new Set(plans.map((p) => p.recipeQuality));
-      const unlistedContinuous = otherContinuousPlans.filter(
-        (cp) => !existingQualities.has(cp.recipeQuality)
-      );
+      const existingQualities = new Set(plans.map((p) => (p.recipeQuality || "").trim()));
+      const seen = new Set<string>();
+      const unlistedContinuous = otherContinuousPlans.filter((cp) => {
+        const key = (cp.recipeQuality || "").trim();
+        if (!key || existingQualities.has(key) || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
       if (unlistedContinuous.length > 0) {
         effectivePlans = [
           ...plans,
