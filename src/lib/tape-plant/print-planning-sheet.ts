@@ -52,7 +52,10 @@ export function generatePlanningSheetHtml(data: TapePlanningPrintData): string {
     ? plans.map((p, idx) => `
       <tr>
         <td style="text-align: center; font-weight: 700; width: 26px;">${idx + 1}</td>
-        <td style="font-weight: 700; font-family: monospace; font-size: 8.5pt;">${p.recipeQuality || "—"}</td>
+        <td style="font-weight: 700; font-family: monospace; font-size: 8.5pt;">
+          ${p.recipeQuality || "—"}
+          ${p.isDayNight ? `<span style="border: 1px solid #d97706; background: #fef3c7; color: #92400e; font-size: 6.5pt; padding: 1px 4px; border-radius: 3px; margin-left: 4px; display: inline-block;">Day+Night (24h)</span>` : ""}
+        </td>
         <td style="text-align: center; font-weight: 600;">${p.tapeType || "LPP"}</td>
         <td style="text-align: right; font-family: monospace;">${p.denier !== "" && p.denier !== undefined ? p.denier : "—"}</td>
         <td style="text-align: right; font-family: monospace;">${p.tapeWidth !== "" && p.tapeWidth !== undefined ? p.tapeWidth : "—"}</td>

@@ -162,7 +162,7 @@ export function generateTapePlantPlanningExcel({
       otherQty || "",
       totalBatchQty || plannedQty,
       `${totalBlendPct.toFixed(1)}%`,
-      plan.remarks || "",
+      [plan.isDayNight ? "[Day+Night 24h Continuous Run]" : "", plan.remarks || ""].filter(Boolean).join(" "),
     ]);
   });
 

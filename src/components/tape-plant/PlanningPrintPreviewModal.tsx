@@ -247,6 +247,11 @@ export function PlanningPrintPreviewModal({
                         </td>
                         <td className="p-2 border-r border-slate-200 font-mono font-bold text-slate-900">
                           {p.recipeQuality}
+                          {p.isDayNight && (
+                            <span className="ml-2 px-1.5 py-0.5 rounded text-[9px] font-black bg-amber-100 text-amber-900 border border-amber-300">
+                              Day+Night (24h)
+                            </span>
+                          )}
                         </td>
                         <td className="p-2 border-r border-slate-200 text-center font-medium">
                           {p.tapeType}

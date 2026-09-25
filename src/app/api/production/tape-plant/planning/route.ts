@@ -98,6 +98,7 @@ export async function POST(request: NextRequest) {
           vistPercent: item.vistPercent !== undefined && item.vistPercent !== null && item.vistPercent !== "" ? Number(item.vistPercent) : null,
           remarks: item.remarks || null,
           materials: Array.isArray(item.materials) ? item.materials : [],
+          isDayNight: Boolean(item.isDayNight),
           status: item.status || status || "DRAFT",
         };
 
