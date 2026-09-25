@@ -50,7 +50,7 @@ describe("Bobbin Stock Summary calculations", () => {
     expect(computeCrateStockCount(0)).toBe(0);
   });
 
-  it("aggregates totals properly across multiple qualities", () => {
+  it("aggregates totals properly across multiple qualities without shift/remarks dependencies", () => {
     const items: BobbinStockItem[] = [
       {
         slNo: 1,
@@ -70,14 +70,23 @@ describe("Bobbin Stock Summary calculations", () => {
         bobbinStock: 400,  // 640 / 1.6
         crateStock: 50,    // 640 / 12.8
       },
+      {
+        slNo: 3,
+        recipeQuality: "1000D White Standard", // Duplicate quality aggregated
+        productionDoneKg: 320,
+        wasteKg: 0,
+        netProductionKg: 320,
+        bobbinStock: 200,  // 320 / 1.6
+        crateStock: 25,    // 320 / 12.8
+      },
     ];
 
     const totals = computeBobbinStockTotals(items);
-    expect(totals.totalGrossDoneKg).toBe(2250);
+    expect(totals.totalGrossDoneKg).toBe(2570);
     expect(totals.totalWasteKg).toBe(10);
-    expect(totals.totalNetProductionKg).toBe(2240);
-    expect(totals.totalBobbinStock).toBe(1400);
-    expect(totals.totalCrateStock).toBe(175);
+    expect(totals.totalNetProductionKg).toBe(2560);
+    expect(totals.totalBobbinStock).toBe(1600);
+    expect(totals.totalCrateStock).toBe(200);
     expect(totals.uniqueQualitiesCount).toBe(2);
   });
 });

@@ -18,7 +18,9 @@ import {
   Info,
   Calendar,
   Clock,
-  TrendingUp,
+  Filter,
+  RotateCcw,
+  CheckCircle2,
 } from "lucide-react";
 import { RecipeQualityBadge } from "./RecipeQualityBadge";
 import {
@@ -34,135 +36,179 @@ import {
   printBobbinStockSummary,
 } from "@/lib/tape-plant/bobbin-stock";
 
+interface ShiftOption {
+  id: string;
+  name: string;
+}
+
 interface BobbinStockSummarySectionProps {
-  date: string;
-  shiftId: string;
-  shiftName: string;
+  date?: string;
+  shiftId?: string;
+  shiftName?: string;
   onNavigateToPostProduction?: () => void;
 }
 
 export function BobbinStockSummarySection({
-  date,
-  shiftId,
-  shiftName,
   onNavigateToPostProduction,
 }: BobbinStockSummarySectionProps) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [rawEntries, setRawEntries] = useState<any[]>([]);
-  const [postProductionStatus, setPostProductionStatus] = useState<string>("SAVED");
-  const [operatorName, setOperatorName] = useState<string>("");
 
-  const fetchData = useCallback(
-    async (isManualRefresh = false) => {
-      if (!date || !shiftId) return;
-      if (isManualRefresh) setRefreshing(true);
+  // Optional Filters: Default to All Till Date (Cumulative)
+  const [dateFilterMode, setDateFilterMode] = useState<"all" | "single" | "range">("all");
+  const [selectedSingleDate, setSelectedSingleDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [dateFrom, setDateFrom] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 30);
+    return d.toISOString().slice(0, 10);
+  });
+  const [dateTo, setDateTo] = useState(() => new Date().toISOString().slice(0, 10));
+
+  const [shifts, setShifts] = useState<ShiftOption[]>([]);
+  const [selectedShiftId, setSelectedShiftId] = useState<string>("ALL");
+
+  const [items, setItems] = useState<BobbinStockItem[]>([]);
+
+  // Fetch available shifts master list
+  useEffect(() => {
+    fetch("/api/settings/master-data/shift")
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) {
+          setShifts(data);
+        } else {
+          setShifts([
+            { id: "shift_day", name: "Day Shift (08:00 - 20:00)" },
+            { id: "shift_night", name: "Night Shift (20:00 - 08:00)" },
+            { id: "shift-a", name: "Shift A (06:00 - 14:00)" },
+            { id: "shift-b", name: "Shift B (14:00 - 22:00)" },
+            { id: "shift-c", name: "Shift C (22:00 - 06:00)" },
+          ]);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  // Fetch Bobbin Stock data from dedicated API
+  const fetchBobbinStock = useCallback(
+    async (isManual = false) => {
+      if (isManual) setRefreshing(true);
       else setLoading(true);
 
       try {
-        const res = await fetch(
-          `/api/production/tape-plant/post-production?date=${date}&shiftId=${shiftId}&_t=${Date.now()}`,
-          {
-            cache: "no-store",
-            headers: {
-              Pragma: "no-cache",
-              "Cache-Control": "no-cache",
-            },
-          }
-        );
+        const params = new URLSearchParams();
+        params.set("scope", dateFilterMode === "all" ? "all" : dateFilterMode);
 
-        if (!res.ok) throw new Error("Failed to fetch post-production records");
+        if (dateFilterMode === "single" && selectedSingleDate) {
+          params.set("date", selectedSingleDate);
+        } else if (dateFilterMode === "range") {
+          if (dateFrom) params.set("dateFrom", dateFrom);
+          if (dateTo) params.set("dateTo", dateTo);
+        }
+
+        if (selectedShiftId && selectedShiftId.toUpperCase() !== "ALL") {
+          params.set("shiftId", selectedShiftId);
+        }
+
+        params.set("_t", String(Date.now()));
+
+        const res = await fetch(`/api/production/tape-plant/bobbin-stock?${params.toString()}`, {
+          cache: "no-store",
+          headers: {
+            Pragma: "no-cache",
+            "Cache-Control": "no-cache",
+          },
+        });
+
+        if (!res.ok) throw new Error("Failed to load bobbin stock");
         const data = await res.json();
 
-        const postProd = data.postProduction;
-        setPostProductionStatus(postProd?.status === "SUBMITTED" ? "SUBMITTED" : "SAVED");
-        setOperatorName(postProd?.operatorName || "");
+        setItems(Array.isArray(data.items) ? data.items : []);
 
-        const entries = Array.isArray(data.entries) ? data.entries : [];
-        setRawEntries(entries);
-
-        if (isManualRefresh) {
-          toast.success("Bobbin stock summary refreshed successfully");
+        if (isManual) {
+          toast.success("Bobbin stock refreshed successfully");
         }
       } catch (err) {
-        console.error("Error fetching bobbin stock summary data:", err);
-        toast.error("Failed to load bobbin stock summary data");
+        console.error("Error fetching bobbin stock data:", err);
+        toast.error("Failed to load bobbin stock summary");
       } finally {
         setLoading(false);
         setRefreshing(false);
       }
     },
-    [date, shiftId]
+    [dateFilterMode, selectedSingleDate, dateFrom, dateTo, selectedShiftId]
   );
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    fetchBobbinStock();
+  }, [fetchBobbinStock]);
 
-  // Convert raw post-production entries into BobbinStockItems
-  const processedItems: BobbinStockItem[] = useMemo(() => {
-    return rawEntries
-      .map((entry, idx) => {
-        const quality = entry.recipeQuality || `Recipe ${idx + 1}`;
-        const grossDone = Number(entry.productionDoneKg) || 0;
-        const waste = Number(entry.wasteKg) || 0;
-        const netKg = computeNetProductionKg(grossDone, waste);
-        const bobbinStock = computeBobbinStockCount(netKg);
-        const crateStock = computeCrateStockCount(netKg);
+  const handleResetFilters = () => {
+    setDateFilterMode("all");
+    setSelectedShiftId("ALL");
+    setSearchTerm("");
+    toast.info("Reset to All Till Date (Cumulative)");
+  };
 
-        return {
-          slNo: idx + 1,
-          id: entry.id || entry.planId || String(idx),
-          recipeQuality: quality,
-          productionDoneKg: grossDone,
-          wasteKg: waste,
-          netProductionKg: netKg,
-          bobbinStock,
-          crateStock,
-          shiftName: entry.shiftName || shiftName,
-          remarks: entry.remarks || "",
-        };
-      })
-      .filter((item) => {
-        if (!searchTerm.trim()) return true;
-        const q = searchTerm.toLowerCase();
-        return (
-          item.recipeQuality.toLowerCase().includes(q) ||
-          (item.shiftName && item.shiftName.toLowerCase().includes(q)) ||
-          (item.remarks && item.remarks.toLowerCase().includes(q))
-        );
-      });
-  }, [rawEntries, shiftName, searchTerm]);
+  const isFilterActive = dateFilterMode !== "all" || selectedShiftId !== "ALL" || searchTerm !== "";
 
-  // Totals for all items (or filtered)
+  // Filter items by live search term
+  const filteredItems = useMemo(() => {
+    if (!searchTerm.trim()) {
+      return items.map((item, idx) => ({ ...item, slNo: idx + 1 }));
+    }
+    const q = searchTerm.toLowerCase();
+    return items
+      .filter((i) => i.recipeQuality.toLowerCase().includes(q))
+      .map((item, idx) => ({ ...item, slNo: idx + 1 }));
+  }, [items, searchTerm]);
+
+  // Compute live summary totals
   const totals = useMemo(() => {
-    return computeBobbinStockTotals(processedItems);
-  }, [processedItems]);
+    return computeBobbinStockTotals(filteredItems);
+  }, [filteredItems]);
+
+  // Description for Exports & Prints
+  const periodDescription = useMemo(() => {
+    if (dateFilterMode === "all") {
+      return `All Time (Till ${new Date().toISOString().slice(0, 10)})`;
+    }
+    if (dateFilterMode === "single") {
+      return `Date: ${selectedSingleDate}`;
+    }
+    return `Range: ${dateFrom} to ${dateTo}`;
+  }, [dateFilterMode, selectedSingleDate, dateFrom, dateTo]);
+
+  const shiftDescription = useMemo(() => {
+    if (selectedShiftId === "ALL") return "All Shifts";
+    const found = shifts.find((s) => s.id === selectedShiftId);
+    return found ? found.name : selectedShiftId;
+  }, [selectedShiftId, shifts]);
 
   const handleExportExcel = () => {
-    if (processedItems.length === 0) {
+    if (filteredItems.length === 0) {
       toast.error("No bobbin stock entries to export");
       return;
     }
     exportBobbinStockExcel({
-      date,
-      shiftName,
-      items: processedItems,
+      dateDescription: periodDescription,
+      shiftDescription,
+      items: filteredItems,
       totals,
     });
-    toast.success("Excel report generated & downloaded");
+    toast.success("Excel report exported successfully");
   };
 
   const handlePrint = () => {
-    if (processedItems.length === 0) {
+    if (filteredItems.length === 0) {
       toast.error("No bobbin stock entries to print");
       return;
     }
     printBobbinStockSummary({
-      date,
-      shiftName,
-      items: processedItems,
+      dateDescription: periodDescription,
+      shiftDescription,
+      items: filteredItems,
       totals,
     });
   };
@@ -258,7 +304,7 @@ export function BobbinStockSummarySection({
         <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-transparent border border-amber-500/20 p-5 shadow-sm transition-all hover:shadow-md">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-amber-800 uppercase tracking-wider">
-              Active Qualities
+              Total Qualities
             </span>
             <div className="p-2.5 bg-amber-500/10 text-amber-600 rounded-xl">
               <Layers className="h-5 w-5" />
@@ -273,7 +319,7 @@ export function BobbinStockSummarySection({
               )}
             </div>
             <p className="text-[11px] font-medium text-slate-500 mt-1">
-              Operator: <span className="font-semibold text-slate-700">{operatorName || "General / Shift Operator"}</span>
+              Scope: <span className="font-semibold text-slate-700">{periodDescription}</span>
             </p>
           </div>
         </div>
@@ -281,106 +327,211 @@ export function BobbinStockSummarySection({
 
       {/* Main Table Card */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        {/* Table Control Header */}
-        <div className="p-5 border-b border-slate-200 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 bg-slate-50/50">
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-base font-bold text-slate-900">Bobbin & Crate Stock Summary Table</h2>
-              <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 border border-blue-200">
-                Post-Production Linked
-              </span>
+        {/* Table Control Header & Optional Filter Bar */}
+        <div className="p-5 border-b border-slate-200 flex flex-col gap-4 bg-slate-50/60">
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-bold text-slate-900">Bobbin & Crate Stock Summary Table</h2>
+                <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                  {dateFilterMode === "all" ? "All Till Date (Cumulative)" : "Filtered Scope"}
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Calculates cumulative bobbin and crate inventory per recipe quality directly from Net Output (Gross Production − Wastage).
+              </p>
             </div>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Calculates bobbin and crate inventory per recipe quality directly from Net Output (Gross Production − Wastage).
-            </p>
+
+            {/* Global Actions */}
+            <div className="flex items-center gap-2 self-end md:self-auto">
+              {/* Refresh */}
+              <button
+                type="button"
+                onClick={() => fetchBobbinStock(true)}
+                disabled={refreshing || loading}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 active:bg-slate-100 shadow-sm transition-colors disabled:opacity-50"
+                title="Refresh Data"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin text-primary" : "text-slate-500"}`} />
+                <span className="hidden sm:inline">Refresh</span>
+              </button>
+
+              {/* Print */}
+              <button
+                type="button"
+                onClick={handlePrint}
+                disabled={filteredItems.length === 0}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 active:bg-slate-100 shadow-sm transition-colors disabled:opacity-50"
+                title="Print Summary Sheet"
+              >
+                <Printer className="h-3.5 w-3.5 text-slate-600" />
+                <span className="hidden sm:inline">Print</span>
+              </button>
+
+              {/* Export Excel */}
+              <button
+                type="button"
+                onClick={handleExportExcel}
+                disabled={filteredItems.length === 0}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 rounded-lg shadow-sm transition-colors disabled:opacity-50"
+                title="Export to Excel"
+              >
+                <FileSpreadsheet className="h-3.5 w-3.5" />
+                <span>Export Excel</span>
+              </button>
+            </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
+          {/* Optional Filters Bar */}
+          <div className="pt-3 border-t border-slate-200/80 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2.5">
+              {/* Date Scope Selector Pills */}
+              <div className="inline-flex rounded-lg bg-slate-200/70 p-0.5 text-xs font-semibold">
+                <button
+                  type="button"
+                  onClick={() => setDateFilterMode("all")}
+                  className={`px-3 py-1 rounded-md transition-all ${
+                    dateFilterMode === "all"
+                      ? "bg-white text-slate-900 shadow-xs font-bold"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  All (Till Today)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDateFilterMode("single")}
+                  className={`px-3 py-1 rounded-md transition-all ${
+                    dateFilterMode === "single"
+                      ? "bg-white text-slate-900 shadow-xs font-bold"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  Single Date
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDateFilterMode("range")}
+                  className={`px-3 py-1 rounded-md transition-all ${
+                    dateFilterMode === "range"
+                      ? "bg-white text-slate-900 shadow-xs font-bold"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  Date Range
+                </button>
+              </div>
+
+              {/* Conditional Date Pickers */}
+              {dateFilterMode === "single" && (
+                <div className="flex items-center gap-1.5 bg-white rounded-lg border border-slate-200 px-2.5 py-1 shadow-xs">
+                  <Calendar className="h-3.5 w-3.5 text-slate-400" />
+                  <input
+                    type="date"
+                    value={selectedSingleDate}
+                    onChange={(e) => setSelectedSingleDate(e.target.value)}
+                    className="text-xs font-bold text-slate-800 bg-transparent outline-none cursor-pointer"
+                  />
+                </div>
+              )}
+
+              {dateFilterMode === "range" && (
+                <div className="flex items-center gap-2 bg-white rounded-lg border border-slate-200 px-2.5 py-1 shadow-xs">
+                  <Calendar className="h-3.5 w-3.5 text-slate-400" />
+                  <input
+                    type="date"
+                    value={dateFrom}
+                    onChange={(e) => setDateFrom(e.target.value)}
+                    className="text-xs font-bold text-slate-800 bg-transparent outline-none cursor-pointer"
+                  />
+                  <span className="text-xs text-slate-400 font-semibold">to</span>
+                  <input
+                    type="date"
+                    value={dateTo}
+                    onChange={(e) => setDateTo(e.target.value)}
+                    className="text-xs font-bold text-slate-800 bg-transparent outline-none cursor-pointer"
+                  />
+                </div>
+              )}
+
+              {/* Optional Shift Selector */}
+              <div className="flex items-center gap-1.5 bg-white rounded-lg border border-slate-200 px-2.5 py-1 shadow-xs">
+                <Clock className="h-3.5 w-3.5 text-slate-400" />
+                <select
+                  value={selectedShiftId}
+                  onChange={(e) => setSelectedShiftId(e.target.value)}
+                  className="text-xs font-bold text-slate-800 bg-transparent outline-none cursor-pointer pr-1"
+                >
+                  <option value="ALL">All Shifts (Optional)</option>
+                  {shifts.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Reset filter button if active */}
+              {isFilterActive && (
+                <button
+                  type="button"
+                  onClick={handleResetFilters}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-slate-500 hover:text-slate-800 hover:bg-slate-200/60 rounded-lg transition-colors"
+                  title="Reset all filters to default"
+                >
+                  <RotateCcw className="h-3 w-3" />
+                  <span>Reset to All</span>
+                </button>
+              )}
+            </div>
+
             {/* Live Search Input */}
-            <div className="relative flex-1 md:w-60">
+            <div className="relative w-full sm:w-64">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
               <input
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Filter by quality..."
-                className="w-full pl-8 pr-3 py-1.5 text-xs font-medium bg-white border border-slate-200 rounded-lg outline-none focus:border-primary focus:ring-1 focus:ring-primary shadow-sm"
+                placeholder="Search quality name..."
+                className="w-full pl-8 pr-3 py-1 text-xs font-medium bg-white border border-slate-200 rounded-lg outline-none focus:border-primary focus:ring-1 focus:ring-primary shadow-xs"
               />
             </div>
-
-            {/* Refresh */}
-            <button
-              type="button"
-              onClick={() => fetchData(true)}
-              disabled={refreshing || loading}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 active:bg-slate-100 shadow-sm transition-colors disabled:opacity-50"
-              title="Refresh Data"
-            >
-              <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin text-primary" : "text-slate-500"}`} />
-              <span className="hidden sm:inline">Refresh</span>
-            </button>
-
-            {/* Print */}
-            <button
-              type="button"
-              onClick={handlePrint}
-              disabled={processedItems.length === 0}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 active:bg-slate-100 shadow-sm transition-colors disabled:opacity-50"
-              title="Print Summary Sheet"
-            >
-              <Printer className="h-3.5 w-3.5 text-slate-600" />
-              <span className="hidden sm:inline">Print</span>
-            </button>
-
-            {/* Export Excel */}
-            <button
-              type="button"
-              onClick={handleExportExcel}
-              disabled={processedItems.length === 0}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 rounded-lg shadow-sm transition-colors disabled:opacity-50"
-              title="Export Bobbin Stock to Excel"
-            >
-              <FileSpreadsheet className="h-3.5 w-3.5" />
-              <span>Export Excel</span>
-            </button>
           </div>
         </div>
 
-        {/* Table Content */}
+        {/* Table Content (Clean Columns: #, Quality, Gross, Waste, Net Output, Bobbin Stock, Crate Stock) */}
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[760px]">
+          <table className="w-full text-left border-collapse min-w-[720px]">
             <thead>
-              <tr className="bg-slate-100/75 border-b border-slate-200 text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+              <tr className="bg-slate-100/80 border-b border-slate-200 text-[11px] font-bold text-slate-700 uppercase tracking-wider">
                 <th className="py-3 px-4 w-14 text-center">#</th>
                 <th className="py-3 px-4">Quality Name</th>
                 <th className="py-3 px-4 text-right">Gross Prod (kg)</th>
                 <th className="py-3 px-4 text-right">Wastage (kg)</th>
-                <th className="py-3 px-4 text-right bg-emerald-50/50 text-emerald-900 border-x border-emerald-100/80">
+                <th className="py-3 px-4 text-right bg-emerald-50/60 text-emerald-900 border-x border-emerald-100">
                   Production Done in KG <span className="text-[9px] font-medium text-emerald-700 block normal-case">(Net Output)</span>
                 </th>
-                <th className="py-3 px-4 text-right bg-blue-50/50 text-blue-900 border-r border-blue-100/80">
+                <th className="py-3 px-4 text-right bg-blue-50/60 text-blue-900 border-r border-blue-100">
                   Stock of Bobbins <span className="text-[9px] font-medium text-blue-700 block normal-case">(Net kg ÷ 1.6 kg)</span>
                 </th>
-                <th className="py-3 px-4 text-right bg-purple-50/50 text-purple-900 border-r border-purple-100/80">
+                <th className="py-3 px-4 text-right bg-purple-50/60 text-purple-900">
                   Stock of Crates <span className="text-[9px] font-medium text-purple-700 block normal-case">(Net kg ÷ 12.8 kg)</span>
                 </th>
-                <th className="py-3 px-4 text-center">Shift</th>
-                <th className="py-3 px-4">Remarks</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs text-slate-700">
               {loading ? (
                 <tr>
-                  <td colSpan={9} className="py-12 text-center text-slate-500">
+                  <td colSpan={7} className="py-12 text-center text-slate-500">
                     <div className="inline-flex items-center gap-2">
                       <RefreshCw className="h-5 w-5 animate-spin text-primary" />
                       <span className="font-semibold">Loading Bobbin Stock summary...</span>
                     </div>
                   </td>
                 </tr>
-              ) : processedItems.length === 0 ? (
+              ) : filteredItems.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="py-12 text-center">
+                  <td colSpan={7} className="py-12 text-center">
                     <div className="max-w-md mx-auto flex flex-col items-center justify-center p-4">
                       <div className="p-3 bg-slate-100 text-slate-400 rounded-full mb-3">
                         <Boxes className="h-8 w-8" />
@@ -389,7 +540,7 @@ export function BobbinStockSummarySection({
                       <p className="text-xs text-slate-500 mt-1 text-center">
                         {searchTerm
                           ? `No recipes match "${searchTerm}". Try clearing your search.`
-                          : "No recipe outputs have been recorded in Post Production for this shift & date yet."}
+                          : "No recipe production records exist for the selected period."}
                       </p>
                       {onNavigateToPostProduction && !searchTerm && (
                         <button
@@ -405,7 +556,7 @@ export function BobbinStockSummarySection({
                   </td>
                 </tr>
               ) : (
-                processedItems.map((item) => (
+                filteredItems.map((item) => (
                   <tr
                     key={item.id || item.slNo}
                     className="hover:bg-slate-50/80 transition-colors group font-medium"
@@ -443,7 +594,7 @@ export function BobbinStockSummarySection({
                     </td>
 
                     {/* Net Production Done in KG */}
-                    <td className="py-3.5 px-4 text-right font-extrabold text-emerald-800 bg-emerald-50/30 border-x border-emerald-100/60">
+                    <td className="py-3.5 px-4 text-right font-extrabold text-emerald-800 bg-emerald-50/30 border-x border-emerald-100/70">
                       {item.netProductionKg.toLocaleString(undefined, {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2,
@@ -452,7 +603,7 @@ export function BobbinStockSummarySection({
                     </td>
 
                     {/* Stock of Bobbins (Net Output / 1.6) */}
-                    <td className="py-3.5 px-4 text-right font-extrabold text-blue-900 bg-blue-50/30 border-r border-blue-100/60">
+                    <td className="py-3.5 px-4 text-right font-extrabold text-blue-900 bg-blue-50/30 border-r border-blue-100/70">
                       {item.bobbinStock.toLocaleString(undefined, {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2,
@@ -461,24 +612,12 @@ export function BobbinStockSummarySection({
                     </td>
 
                     {/* Stock of Crates (Net Output / 12.8) */}
-                    <td className="py-3.5 px-4 text-right font-extrabold text-purple-900 bg-purple-50/30 border-r border-purple-100/60">
+                    <td className="py-3.5 px-4 text-right font-extrabold text-purple-900 bg-purple-50/30">
                       {item.crateStock.toLocaleString(undefined, {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2,
                       })}{" "}
                       <span className="text-[10px] font-semibold text-purple-600">crates</span>
-                    </td>
-
-                    {/* Shift */}
-                    <td className="py-3.5 px-4 text-center">
-                      <span className="inline-block px-2 py-0.5 text-[10px] font-bold rounded-md bg-slate-100 text-slate-700 border border-slate-200">
-                        {item.shiftName}
-                      </span>
-                    </td>
-
-                    {/* Remarks */}
-                    <td className="py-3.5 px-4 text-xs text-slate-500 max-w-xs truncate">
-                      {item.remarks || <span className="text-slate-300">-</span>}
                     </td>
                   </tr>
                 ))
@@ -486,7 +625,7 @@ export function BobbinStockSummarySection({
             </tbody>
 
             {/* Table Footer with Grand Totals */}
-            {processedItems.length > 0 && (
+            {filteredItems.length > 0 && (
               <tfoot>
                 <tr className="bg-slate-100 border-t-2 border-slate-300 font-extrabold text-xs text-slate-900">
                   <td colSpan={2} className="py-3.5 px-4 text-right uppercase tracking-wider">
@@ -504,29 +643,26 @@ export function BobbinStockSummarySection({
                       maximumFractionDigits: 2,
                     })}
                   </td>
-                  <td className="py-3.5 px-4 text-right text-emerald-800 bg-emerald-100/70 border-x border-emerald-200">
+                  <td className="py-3.5 px-4 text-right text-emerald-800 bg-emerald-100/80 border-x border-emerald-200">
                     {totals.totalNetProductionKg.toLocaleString(undefined, {
                       minimumFractionDigits: 2,
                       maximumFractionDigits: 2,
                     })}{" "}
                     <span className="text-[10px] font-bold text-emerald-700">kg</span>
                   </td>
-                  <td className="py-3.5 px-4 text-right text-blue-900 bg-blue-100/70 border-r border-blue-200">
+                  <td className="py-3.5 px-4 text-right text-blue-900 bg-blue-100/80 border-r border-blue-200">
                     {totals.totalBobbinStock.toLocaleString(undefined, {
                       minimumFractionDigits: 2,
                       maximumFractionDigits: 2,
                     })}{" "}
                     <span className="text-[10px] font-bold text-blue-700">pcs</span>
                   </td>
-                  <td className="py-3.5 px-4 text-right text-purple-900 bg-purple-100/70 border-r border-purple-200">
+                  <td className="py-3.5 px-4 text-right text-purple-900 bg-purple-100/80">
                     {totals.totalCrateStock.toLocaleString(undefined, {
                       minimumFractionDigits: 2,
                       maximumFractionDigits: 2,
                     })}{" "}
                     <span className="text-[10px] font-bold text-purple-700">crates</span>
-                  </td>
-                  <td colSpan={2} className="py-3.5 px-4 text-center text-slate-400 font-normal">
-                    —
                   </td>
                 </tr>
               </tfoot>
@@ -543,7 +679,7 @@ export function BobbinStockSummarySection({
             </span>
           </div>
           <div className="text-[11px] text-slate-400">
-            Auto-synchronized with Tape Plant Post-Production Sheet
+            Auto-calculated across all recorded Post-Production outputs
           </div>
         </div>
       </div>
