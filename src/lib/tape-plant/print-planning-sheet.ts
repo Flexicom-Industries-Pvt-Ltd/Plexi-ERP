@@ -455,10 +455,15 @@ export function generatePlanningSheetHtml(data: TapePlanningPrintData): string {
 </head>
 <body>
   <div class="sheet-container">
-    <!-- CENTERED MAIN HEADER -->
+    <!-- CENTERED MAIN HEADER WITH FLEXICOM LOGO -->
     <div class="header-container">
-      <div class="company-title">Flexicom Industries Pvt. Ltd.</div>
-      <div class="company-sub">Tape Plant Extrusion & Winding Division • Kathua Industrial Complex, Phase-II, Kathua (J&K)</div>
+      <div style="display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 2px;">
+        <img src="/logo.png" alt="Flexicom Logo" style="height: 26px; width: auto; object-fit: contain;" onerror="this.style.display='none'" />
+        <div>
+          <div class="company-title">Flexicom Industries Pvt. Ltd.</div>
+          <div class="company-sub">Tape Plant Extrusion & Winding Division • Kathua Industrial Complex, Phase-II, Kathua (J&K)</div>
+        </div>
+      </div>
       <div class="doc-main-heading">TAPE PLANT PRODUCTION PLAN</div>
       <div class="doc-meta-strip">
         <span>Doc Ref: <strong>${docRef}</strong></span>
