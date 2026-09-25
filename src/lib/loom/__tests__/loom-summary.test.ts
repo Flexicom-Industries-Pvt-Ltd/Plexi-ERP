@@ -155,3 +155,67 @@ describe("Loom Summary Export & Print Engine", () => {
     expect(html).toContain("Approved By (Plant Supervisor / GM)");
   });
 });
+
+vi.mock("@/auth", () => ({
+  auth: vi.fn(),
+}));
+
+import { requireLoomApiPermission } from "../permissions";
+import { auth } from "@/auth";
+
+describe("Loom RBAC Permission Guard", () => {
+  it("should deny access when user is not logged in", async () => {
+    vi.mocked(auth).mockResolvedValueOnce(null as any);
+    const result = await requireLoomApiPermission("canRead");
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.status).toBe(401);
+    }
+  });
+
+  it("should deny access when user has PRODUCTION permission but NOT LOOM permission", async () => {
+    vi.mocked(auth).mockResolvedValueOnce({
+      user: {
+        id: "u-1",
+        role: "Operator",
+        permissions: [
+          { module: "PRODUCTION", canRead: true },
+          { module: "TAPE_PLANT", canRead: true },
+        ],
+      },
+    } as any);
+
+    const result = await requireLoomApiPermission("canRead");
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.status).toBe(403);
+    }
+  });
+
+  it("should grant access when user has explicit LOOM permission", async () => {
+    vi.mocked(auth).mockResolvedValueOnce({
+      user: {
+        id: "u-2",
+        role: "Loom Master",
+        permissions: [{ module: "LOOM", canRead: true }],
+      },
+    } as any);
+
+    const result = await requireLoomApiPermission("canRead");
+    expect(result.ok).toBe(true);
+  });
+
+  it("should grant access when user has Super Admin role", async () => {
+    vi.mocked(auth).mockResolvedValueOnce({
+      user: {
+        id: "u-3",
+        role: "Super Admin",
+        permissions: [],
+      },
+    } as any);
+
+    const result = await requireLoomApiPermission("canRead");
+    expect(result.ok).toBe(true);
+  });
+});
+
