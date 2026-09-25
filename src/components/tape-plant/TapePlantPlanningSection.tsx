@@ -431,7 +431,12 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
   };
 
   // Shift Aggregates
-  const totalShiftPlannedKg = recipePlans.reduce((sum, p) => sum + (Number(p.plannedQtyKg) || 0), 0);
+  const totalShiftPlannedKg = recipePlans
+    .filter((p) => !p.isDayNight)
+    .reduce((sum, p) => sum + (Number(p.plannedQtyKg) || 0), 0);
+  const totalDayNightPlannedKg = recipePlans
+    .filter((p) => p.isDayNight)
+    .reduce((sum, p) => sum + (Number(p.plannedQtyKg) || 0), 0);
   const totalActiveMaterialQty = currentPlan.materials.reduce((sum, m) => sum + (Number(m.quantity) || 0), 0);
   const totalActivePercentage = currentPlan.materials.reduce((sum, m) => sum + (Number(m.percentage) || 0), 0);
 
@@ -478,11 +483,23 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
 
         {/* Aggregate Stats & Submit Controls */}
         <div className="flex items-center gap-3">
-          <div className="hidden sm:flex flex-col text-right border-r border-slate-200 pr-3">
-            <span className="text-[10px] uppercase font-bold text-slate-400">Total Shift Planned</span>
-            <span className="text-sm font-black font-mono text-slate-900">
-              {totalShiftPlannedKg.toLocaleString()} <span className="text-xs font-normal text-slate-400">KG</span>
-            </span>
+          <div className="hidden sm:flex items-center gap-3 border-r border-slate-200 pr-3">
+            <div className="flex flex-col text-right">
+              <span className="text-[10px] uppercase font-bold text-slate-400">Shift Planned Output</span>
+              <span className="text-sm font-black font-mono text-slate-900">
+                {totalShiftPlannedKg.toLocaleString()} <span className="text-xs font-normal text-slate-400">KG</span>
+              </span>
+            </div>
+            {totalDayNightPlannedKg > 0 && (
+              <div className="flex flex-col text-right pl-2 border-l border-slate-200">
+                <span className="text-[10px] uppercase font-bold text-amber-600 flex items-center justify-end gap-1">
+                  <SunMedium className="h-3 w-3" /> Day+Night 24h Batch
+                </span>
+                <span className="text-sm font-black font-mono text-amber-700">
+                  {totalDayNightPlannedKg.toLocaleString()} <span className="text-xs font-normal text-amber-600/70">KG</span>
+                </span>
+              </div>
+            )}
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
