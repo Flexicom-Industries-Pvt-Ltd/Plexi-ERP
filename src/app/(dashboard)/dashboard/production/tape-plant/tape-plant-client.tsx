@@ -102,8 +102,9 @@ export function TapePlantClient() {
     setSelectedDate(new Date().toISOString().slice(0, 10));
   };
 
+  const isAllShifts = selectedShiftId === "ALL";
   const currentShift = shifts.find((s) => s.id === selectedShiftId);
-  const shiftName = currentShift?.name || "Shift A";
+  const shiftName = isAllShifts ? "All Shifts (Day + Night)" : (currentShift?.name || "Shift A");
 
   return (
     <div className="space-y-6 w-full min-w-0 max-w-full">
@@ -172,6 +173,7 @@ export function TapePlantClient() {
                 onChange={(e) => setSelectedShiftId(e.target.value)}
                 className="text-xs font-bold text-slate-800 bg-transparent outline-none cursor-pointer pr-1"
               >
+                <option value="ALL">ALL (All Shifts)</option>
                 {shifts.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.name}
