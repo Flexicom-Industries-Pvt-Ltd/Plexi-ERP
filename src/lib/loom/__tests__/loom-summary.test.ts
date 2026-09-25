@@ -115,9 +115,37 @@ describe("Loom Summary Export & Print Engine", () => {
         activeLooms: 0,
       },
     ],
+    shiftSummaryList: [
+      {
+        shiftId: "s-1",
+        shiftName: "Shift A",
+        startTime: "06:00",
+        endTime: "14:00",
+        qualitiesCount: 1,
+        activeLoomsCount: 5,
+        producedKg: 1180,
+        plannedKg: 1200,
+        operators: ["Rajesh Kumar"],
+        qualityCodes: ["wOND/LPP/WH/500/67/S1"],
+      },
+      {
+        shiftId: "s-2",
+        shiftName: "Shift B",
+        startTime: "14:00",
+        endTime: "22:00",
+        qualitiesCount: 1,
+        activeLoomsCount: 5,
+        producedKg: 0,
+        plannedKg: 800,
+        operators: [],
+        qualityCodes: ["AMB/PP/YL/74/500/S1"],
+      },
+    ],
+    selectedDate: "2026-09-24",
+    selectedShiftName: "Shift A",
   };
 
-  it("should export full 3-sheet Excel workbook for Loom Summary", () => {
+  it("should export full multi-sheet Excel workbook with Shift Operations for Loom Summary", () => {
     exportLoomSummaryExcel(mockDataset);
 
     expect(XLSX.writeFile).toHaveBeenCalled();
@@ -126,18 +154,21 @@ describe("Loom Summary Export & Print Engine", () => {
     const wb = lastCall[0];
     const filename = lastCall[1];
 
-    expect(filename).toContain("Loom_Section_Summary_Allocations_");
+    expect(filename).toContain("Loom_Summary_Allocations_2026-09-24.xlsx");
     expect(wb.SheetNames).toContain("Loom Allocations");
     expect(wb.SheetNames).toContain("1-91 Loom Matrix");
+    expect(wb.SheetNames).toContain("Shift Operations");
     expect(wb.SheetNames).toContain("KPI Scorecard");
   });
 
-  it("should generate valid A4 landscape printable HTML document", () => {
+  it("should generate valid A4 landscape printable HTML document with Date and Shift context", () => {
     const html = generateLoomSummaryHtml(mockDataset);
 
     expect(html).toContain("<!DOCTYPE html>");
     expect(html).toContain("Flexicom Industries Pvt. Ltd.");
     expect(html).toContain("Loom Machine Master Allocations & Running Qualities");
+    expect(html).toContain("Date: <strong>2026-09-24</strong>");
+    expect(html).toContain("Shift: <strong>Shift A</strong>");
     expect(html).toContain("size: A4 landscape;");
     expect(html).toContain("margin: 8mm;");
     expect(html).toContain("wOND/LPP/WH/500/67/S1");
@@ -145,6 +176,7 @@ describe("Loom Summary Export & Print Engine", () => {
     expect(html).toContain("RUNNING IN TAPE");
     expect(html).toContain("PLANNED IN TAPE");
     expect(html).toContain("#6, #7, #8, #9, #10");
+    expect(html).toContain("Shift-Wise Tape Output & Active Loom Machine Deployments");
   });
 
   it("should render 3 official sign-offs on printed audit sheet", () => {
