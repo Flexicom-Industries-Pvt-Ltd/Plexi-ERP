@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
           plans: effectivePlans,
           count: effectivePlans.length,
           totalPlannedKg,
-          status: effectivePlans[0]?.status || "DRAFT",
+          status: effectivePlans[0]?.status || "SAVED",
         },
         {
           headers: {
@@ -113,7 +113,7 @@ export async function GET(request: NextRequest) {
           shiftId,
           isDayNight: true,
           carriedOverFromShift: cp.shift?.name || "Day Shift",
-          status: "DRAFT",
+          status: "SAVED",
         }));
       }
     } else if (otherContinuousPlans.length > 0) {
@@ -135,7 +135,7 @@ export async function GET(request: NextRequest) {
             shiftId,
             isDayNight: true,
             carriedOverFromShift: cp.shift?.name || "Day Shift",
-            status: plans[0]?.status || "DRAFT",
+            status: plans[0]?.status || "SAVED",
           })),
         ];
       }
@@ -219,7 +219,7 @@ export async function POST(request: NextRequest) {
           remarks: item.remarks || null,
           materials: Array.isArray(item.materials) ? item.materials : [],
           isDayNight: Boolean(item.isDayNight),
-          status: item.status || status || "DRAFT",
+          status: item.status || status || "SAVED",
         };
 
         let record;

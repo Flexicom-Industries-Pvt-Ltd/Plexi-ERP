@@ -348,7 +348,7 @@ export async function POST(request: NextRequest) {
             netProductionKg: totalNet,
             entries: processed,
             qualityChecks: [],
-            status: status || "DRAFT",
+            status: status || "SAVED",
           },
           update: {
             operatorName: operatorName !== undefined ? (operatorName ? String(operatorName).trim() : null) : undefined,
@@ -361,7 +361,7 @@ export async function POST(request: NextRequest) {
             wastePercent: totalWastePct,
             netProductionKg: totalNet,
             entries: processed,
-            status: status || "DRAFT",
+            status: status || "SAVED",
           },
         });
         results.push(record);
@@ -447,7 +447,7 @@ export async function POST(request: NextRequest) {
         netProductionKg: totalNet,
         entries: processedEntries,
         qualityChecks: [],
-        status: status || "DRAFT",
+        status: status || "SAVED",
       },
       update: {
         operatorName: operatorName !== undefined ? (operatorName ? String(operatorName).trim() : null) : undefined,
@@ -460,7 +460,7 @@ export async function POST(request: NextRequest) {
         wastePercent: totalWastePct,
         netProductionKg: totalNet,
         entries: processedEntries,
-        status: status || "DRAFT",
+        status: status || "SAVED",
       },
     });
 
