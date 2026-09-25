@@ -68,6 +68,7 @@ export interface RecipePlanItem {
   remarks: string;
   materials: MaterialRow[];
   isDayNight?: boolean;
+  carriedOverFromShift?: string;
 }
 
 export const createEmptyRecipePlan = (index: number = 1): RecipePlanItem => {
@@ -169,6 +170,7 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
             remarks: p.remarks || "",
             materials: Array.isArray(p.materials) && p.materials.length > 0 ? p.materials : DEFAULT_MATERIALS,
             isDayNight: Boolean(p.isDayNight),
+            carriedOverFromShift: p.carriedOverFromShift || undefined,
           }));
           setRecipePlans(loaded);
           setStatus(data.plans[0]?.status || "DRAFT");
@@ -194,6 +196,7 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
             remarks: data.remarks || "",
             materials: Array.isArray(data.materials) && data.materials.length > 0 ? data.materials : DEFAULT_MATERIALS,
             isDayNight: Boolean(data.isDayNight),
+            carriedOverFromShift: data.carriedOverFromShift || undefined,
           };
           setRecipePlans([single]);
           setStatus(data.status || "DRAFT");
@@ -634,7 +637,7 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
               <SunMedium className="h-4 w-4" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <span className="text-xs font-bold text-slate-900">
                   2-Shift Continuous Run (Day + Night)
                 </span>
@@ -643,9 +646,18 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
                     24-Hour Continuous Batch
                   </span>
                 )}
+                {currentPlan.carriedOverFromShift && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
+                    Carried over from {currentPlan.carriedOverFromShift}
+                  </span>
+                )}
               </div>
               <p className="text-[11px] text-slate-500 mt-0.5">
-                Enable for high-volume qualities running across both Day and Night shifts. Both shift operators will see and log against this recipe.
+                {currentPlan.carriedOverFromShift
+                  ? `Continuous quality active from ${currentPlan.carriedOverFromShift}. Both Day & Night shift operators record output against this quality. You can also add more shift recipes below.`
+                  : currentPlan.isDayNight
+                  ? "Running across Day & Night shifts. Both shift operators will see and log against this recipe."
+                  : "Enable for high-volume qualities running across both Day and Night shifts. Both shift operators will see and log against this recipe."}
               </p>
             </div>
           </div>

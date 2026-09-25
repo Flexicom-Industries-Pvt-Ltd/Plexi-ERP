@@ -109,5 +109,56 @@ describe("Tape Plant Multi-Shift (Day + Night) Planning & Execution", () => {
       expect(dayNightPlans.length).toBe(1);
       expect(dayNightPlans[0].plannedQtyKg).toBe(5000);
     });
+
+    it("should support continuous run carryover to Night Shift alongside Night-specific recipes", () => {
+      // Suppose Night Shift inherits the Day+Night quality and adds a Night-specific quality
+      const nightPlans: RecipePlanItem[] = [
+        {
+          ...mockPlans[0],
+          id: "temp-carry-plan-1",
+          carriedOverFromShift: "Day Shift",
+        },
+        {
+          id: "plan-night-extra",
+          recipeQuality: "HDPE/NAT/450/50/S2",
+          tapeType: "PP",
+          denier: 700,
+          tapeWidth: 450,
+          strength: 4.2,
+          eloPercent: 19,
+          bobbinMarking: "BLUE",
+          colour: "NATURAL",
+          spacerSize: "2.0",
+          requiredAsh: 12,
+          ashPercent: 12.0,
+          plannedQtyKg: 1500,
+          omega: "1.0",
+          vistPercent: 0.2,
+          remarks: "Night shift short run",
+          isDayNight: false,
+          materials: [
+            { material: "PP", quantity: 1300, percentage: 86.7 },
+            { material: "CC", quantity: 200, percentage: 13.3 },
+          ],
+        },
+      ];
+
+      expect(nightPlans.length).toBe(2);
+      expect(nightPlans[0].isDayNight).toBe(true);
+      expect(nightPlans[0].carriedOverFromShift).toBe("Day Shift");
+      expect(nightPlans[1].isDayNight).toBe(false);
+
+      const html = generatePlanningSheetHtml({
+        date: "2026-09-25",
+        shiftName: "Night Shift",
+        status: "DRAFT",
+        plans: nightPlans,
+      });
+
+      expect(html).toContain("wOND/LPP/WH/500/67/S1");
+      expect(html).toContain("Day+Night (24h)");
+      expect(html).toContain("HDPE/NAT/450/50/S2");
+    });
   });
 });
+
