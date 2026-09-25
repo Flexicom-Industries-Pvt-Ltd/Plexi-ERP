@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { toast } from "sonner";
-import { Save, Loader2, FlaskConical, Plus } from "lucide-react";
+import { Save, Loader2, FlaskConical, Plus, CheckCircle } from "lucide-react";
 import { SpreadsheetTable, ColumnDef } from "./SpreadsheetTable";
 import { OperatorSelect } from "./OperatorSelect";
 
@@ -78,43 +78,109 @@ interface RawMaterialSectionProps {
 export function RawMaterialSection({ date, shiftId, shiftName }: RawMaterialSectionProps) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [autoSaving, setAutoSaving] = useState(false);
+  const [lastAutoSavedAt, setLastAutoSavedAt] = useState<Date | null>(null);
+  const isInitialLoadedRef = useRef(false);
+  const lastSavedPayloadRef = useRef("");
   const [operatorName, setOperatorName] = useState("");
   const [operatorId, setOperatorId] = useState("");
   const [records, setRecords] = useState<RawMaterialRow[]>(DEFAULT_MATERIALS);
 
   useEffect(() => {
     if (!date || !shiftId) return;
+    isInitialLoadedRef.current = false;
     setLoading(true);
     fetch(`/api/production/tape-plant/raw-material?date=${date}&shiftId=${shiftId}`)
       .then((r) => (r.ok ? r.json() : []))
       .then((data: any[]) => {
         if (data && data.length > 0) {
-          if (data[0]?.operatorName) setOperatorName(data[0].operatorName);
-          if (data[0]?.operatorId) setOperatorId(data[0].operatorId);
+          const opName = data[0]?.operatorName || "";
+          const opId = data[0]?.operatorId || "";
+          setOperatorName(opName);
+          setOperatorId(opId);
           setRecords(data);
+          lastSavedPayloadRef.current = JSON.stringify({
+            date,
+            shiftId,
+            operatorName: opName,
+            operatorId: opId,
+            records: data,
+          });
         } else {
           setOperatorName("");
           setOperatorId("");
           setRecords(DEFAULT_MATERIALS);
+          lastSavedPayloadRef.current = JSON.stringify({
+            date,
+            shiftId,
+            operatorName: "",
+            operatorId: "",
+            records: DEFAULT_MATERIALS,
+          });
         }
       })
       .catch(() => toast.error("Failed to load raw materials"))
-      .finally(() => setLoading(false));
+      .finally(() => {
+        setLoading(false);
+        isInitialLoadedRef.current = true;
+      });
   }, [date, shiftId]);
+
+  // Debounced Auto-Save
+  useEffect(() => {
+    if (!isInitialLoadedRef.current || !date || !shiftId) return;
+
+    const hasData = records.some((r) => r.material && r.material.trim() !== "");
+    if (!hasData) return;
+
+    const payload = {
+      date,
+      shiftId,
+      operatorName,
+      operatorId,
+      records,
+    };
+
+    const serialized = JSON.stringify(payload);
+    if (serialized === lastSavedPayloadRef.current) return;
+
+    const timer = setTimeout(async () => {
+      setAutoSaving(true);
+      try {
+        const res = await fetch("/api/production/tape-plant/raw-material", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: serialized,
+        });
+        if (res.ok) {
+          lastSavedPayloadRef.current = serialized;
+          setLastAutoSavedAt(new Date());
+        }
+      } catch (err) {
+        console.error("Auto-save error:", err);
+      } finally {
+        setAutoSaving(false);
+      }
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [records, operatorName, operatorId, date, shiftId]);
 
   const handleSave = async () => {
     setSaving(true);
     try {
+      const payload = {
+        date,
+        shiftId,
+        operatorName,
+        operatorId,
+        records,
+      };
+
       const res = await fetch("/api/production/tape-plant/raw-material", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          date,
-          shiftId,
-          operatorName,
-          operatorId,
-          records,
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
@@ -122,6 +188,8 @@ export function RawMaterialSection({ date, shiftId, shiftName }: RawMaterialSect
         throw new Error(err.error || "Failed to save raw materials");
       }
 
+      lastSavedPayloadRef.current = JSON.stringify(payload);
+      setLastAutoSavedAt(new Date());
       toast.success("Raw material position & consumption saved");
     } catch (err: any) {
       toast.error(err.message || "Failed to save raw materials");
@@ -185,14 +253,27 @@ export function RawMaterialSection({ date, shiftId, shiftName }: RawMaterialSect
             section="TAPE_PLANT"
           />
 
+          {/* Auto-save Status Indicator */}
+          {autoSaving ? (
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 text-slate-600 border border-slate-200 text-xs font-medium rounded-lg h-8">
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+              <span className="hidden sm:inline">Auto-saving...</span>
+            </div>
+          ) : lastAutoSavedAt ? (
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-medium rounded-lg h-8">
+              <CheckCircle className="h-3.5 w-3.5 text-emerald-600" />
+              <span className="hidden sm:inline">Auto-saved {lastAutoSavedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</span>
+            </div>
+          ) : null}
+
           <button
             type="button"
             disabled={saving}
             onClick={handleSave}
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary hover:bg-primary/90 text-white text-xs font-semibold rounded-lg shadow-sm transition-all active:scale-95 disabled:opacity-50 h-8"
+            className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary hover:bg-primary/90 text-white text-xs font-semibold rounded-lg shadow-sm transition-all active:scale-95 disabled:opacity-50 h-8 cursor-pointer"
           >
             {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
-            Save Raw Material Log
+            Save Log
           </button>
         </div>
       </div>
