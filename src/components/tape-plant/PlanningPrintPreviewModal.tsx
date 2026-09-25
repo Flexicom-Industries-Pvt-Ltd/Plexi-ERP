@@ -154,35 +154,30 @@ export function PlanningPrintPreviewModal({
         {/* Scrollable Preview Canvas */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-slate-100">
           <div className="max-w-5xl mx-auto bg-white p-6 sm:p-8 rounded-lg shadow-sm border border-slate-300 text-slate-900 space-y-5">
-            {/* Header / Letterhead */}
-            <div className="border-b-2 border-slate-900 pb-3 flex flex-wrap items-start justify-between gap-4">
-              <div>
-                <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight uppercase">
-                  Flexicom Industries Pvt. Ltd.
-                </h1>
-                <p className="text-xs font-semibold text-slate-600 mt-0.5">
-                  Tape Plant Extrusion & Winding Division • Kathua Industrial Complex, Phase-II, Kathua (J&K)
-                </p>
-                <div className="inline-block mt-2 px-2.5 py-1 bg-slate-100 text-slate-900 font-bold text-xs uppercase tracking-wide border border-slate-400">
-                  Shift Production & Material Formulation Plan
-                </div>
+            {/* Centered Main Header */}
+            <div className="border-b-2 border-slate-900 pb-3 text-center space-y-1">
+              <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight uppercase">
+                Flexicom Industries Pvt. Ltd.
+              </h1>
+              <p className="text-xs font-semibold text-slate-600">
+                Tape Plant Extrusion & Winding Division • Kathua Industrial Complex, Phase-II, Kathua (J&K)
+              </p>
+              <div className="inline-block my-1 px-3 py-1 bg-slate-100 text-slate-900 font-extrabold text-xs uppercase tracking-wider border border-slate-400">
+                Tape Plant Production Plan
               </div>
-
-              <div className="text-right text-xs space-y-1">
-                <div className="font-mono text-slate-600">
-                  Doc Ref: <strong className="text-slate-900">{docRef}</strong>
-                </div>
-                <div className="text-slate-600">
-                  Date: <strong className="text-slate-900">{date}</strong> &nbsp;|&nbsp; Shift: <strong className="text-slate-900">{shiftName}</strong>
-                </div>
-                <div className="text-slate-600">
-                  Status: <strong className="text-slate-900">{status}</strong>
-                </div>
+              <div className="flex flex-wrap items-center justify-center gap-3 text-xs text-slate-600 pt-1">
+                <span>Doc Ref: <strong className="text-slate-900 font-mono">{docRef}</strong></span>
+                <span>•</span>
+                <span>Date: <strong className="text-slate-900">{date}</strong></span>
+                <span>•</span>
+                <span>Shift: <strong className="text-slate-900">{shiftName}</strong></span>
+                <span>•</span>
+                <span>Status: <strong className="text-slate-900">{status}</strong></span>
               </div>
             </div>
 
             {/* Key Metrics Strip */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-slate-50 p-2.5 rounded border border-slate-300 text-xs">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-slate-50 p-2.5 rounded border border-slate-300 text-xs text-center">
               <div className="border-r border-slate-200 last:border-0 pr-2">
                 <span className="text-slate-500 block text-[10px] uppercase font-bold tracking-wider">
                   Shift Planned Output
@@ -198,10 +193,10 @@ export function PlanningPrintPreviewModal({
               </div>
               <div className="border-r border-slate-200 last:border-0 pr-2">
                 <span className="text-slate-500 block text-[10px] uppercase font-bold tracking-wider">
-                  Total Recipe Runs
+                  Total Qualities / Runs
                 </span>
                 <span className="text-base font-black font-mono text-slate-900">
-                  {plans.length} <span className="text-xs font-normal">Runs</span>
+                  {plans.length} <span className="text-xs font-normal">Qualities</span>
                 </span>
               </div>
               <div className="border-r border-slate-200 last:border-0 pr-2">
@@ -222,21 +217,20 @@ export function PlanningPrintPreviewModal({
               </div>
             </div>
 
-            {/* Table 1: Recipe Machine Parameters & Specifications */}
+            {/* Box 1: QUALITY NAME AND SPECIFICATION */}
             <div className="space-y-1.5">
-              <div className="flex items-center gap-1.5">
-                <Layers className="h-4 w-4 text-slate-700" />
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">
-                  1. Recipe Run Specifications & Machine Parameters
+              <div className="bg-slate-200 border border-slate-300 border-b-0 py-1 px-3 text-center">
+                <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-900">
+                  1. QUALITY NAME AND SPECIFICATION
                 </h3>
               </div>
 
-              <div className="overflow-x-auto border border-slate-300 rounded">
+              <div className="overflow-x-auto border border-slate-300 rounded-b">
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
                     <tr className="bg-slate-100 text-slate-900 text-[10px] font-bold uppercase tracking-wider border-b border-slate-300">
                       <th className="p-2 border-r border-slate-300 text-center w-8">#</th>
-                      <th className="p-2 border-r border-slate-300">Recipe Quality Code</th>
+                      <th className="p-2 border-r border-slate-300">Quality Name / Recipe Code</th>
                       <th className="p-2 border-r border-slate-300 text-center">Type</th>
                       <th className="p-2 border-r border-slate-300 text-right">Denier</th>
                       <th className="p-2 border-r border-slate-300 text-right">Width (mm)</th>
@@ -326,45 +320,52 @@ export function PlanningPrintPreviewModal({
               </div>
             </div>
 
-            {/* Table 2: Material Formulation Matrix per Recipe */}
+            {/* Box 2: RAW MATERIAL RECIPE AND QUANTITY */}
             <div className="space-y-1.5">
-              <div className="flex items-center gap-1.5">
-                <FlaskConical className="h-4 w-4 text-slate-700" />
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">
-                  2. Raw Material Blend & Composition Breakdown per Run
+              <div className="bg-slate-200 border border-slate-300 border-b-0 py-1 px-3 text-center">
+                <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-900">
+                  2. RAW MATERIAL RECIPE AND QUANTITY
                 </h3>
               </div>
 
-              <div className="overflow-x-auto border border-slate-300 rounded">
+              <div className="overflow-x-auto border border-slate-300 rounded-b">
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
                     <tr className="bg-slate-100 text-slate-900 text-[10px] font-bold uppercase tracking-wider border-b border-slate-300">
-                      <th className="p-2 border-r border-slate-300 text-center w-8">#</th>
-                      <th className="p-2 border-r border-slate-300">Recipe Quality</th>
-                      <th className="p-2 border-r border-slate-300 text-right">PP (KG / %)</th>
-                      <th className="p-2 border-r border-slate-300 text-right">CC (KG / %)</th>
-                      <th className="p-2 border-r border-slate-300 text-right">MB (KG / %)</th>
-                      <th className="p-2 border-r border-slate-300 text-right">RP1 (KG / %)</th>
-                      <th className="p-2 border-r border-slate-300 text-right">RP2 (KG / %)</th>
-                      <th className="p-2 border-r border-slate-300 text-right">HD RP (KG / %)</th>
-                      <th className="p-2 border-r border-slate-300 text-right">TPT (KG / %)</th>
-                      <th className="p-2 border-r border-slate-300 text-right">Other (KG)</th>
-                      <th className="p-2 border-r border-slate-300 text-right font-bold bg-slate-50">
-                        Total Batch (KG)
+                      <th rowSpan={2} className="p-2 border-r border-slate-300 text-center w-8">#</th>
+                      <th rowSpan={2} className="p-2 border-r border-slate-300 min-w-[130px]">Quality Name</th>
+                      <th colSpan={2} className="p-1 border-r border-slate-300 text-center">PP</th>
+                      <th colSpan={2} className="p-1 border-r border-slate-300 text-center">CC</th>
+                      <th colSpan={2} className="p-1 border-r border-slate-300 text-center">MB</th>
+                      <th colSpan={2} className="p-1 border-r border-slate-300 text-center">RP1</th>
+                      <th colSpan={2} className="p-1 border-r border-slate-300 text-center">RP2</th>
+                      <th colSpan={2} className="p-1 border-r border-slate-300 text-center">HD RP</th>
+                      <th colSpan={2} className="p-1 border-r border-slate-300 text-center">TPT</th>
+                      <th rowSpan={2} className="p-2 border-r border-slate-300 text-right w-14">Other</th>
+                      <th rowSpan={2} className="p-2 border-r border-slate-300 text-right font-bold bg-slate-50 w-24">
+                        Batch Total
                       </th>
-                      <th className="p-2 border-r border-slate-300 text-right">Blend %</th>
+                      <th rowSpan={2} className="p-2 border-r border-slate-300 text-right w-14">Total %</th>
+                    </tr>
+                    <tr className="bg-slate-100/80 text-slate-700 text-[9px] font-bold border-b border-slate-300">
+                      <th className="p-1 border-r border-slate-300 text-right">KG</th>
+                      <th className="p-1 border-r border-slate-300 text-right text-slate-500">%</th>
+                      <th className="p-1 border-r border-slate-300 text-right">KG</th>
+                      <th className="p-1 border-r border-slate-300 text-right text-slate-500">%</th>
+                      <th className="p-1 border-r border-slate-300 text-right">KG</th>
+                      <th className="p-1 border-r border-slate-300 text-right text-slate-500">%</th>
+                      <th className="p-1 border-r border-slate-300 text-right">KG</th>
+                      <th className="p-1 border-r border-slate-300 text-right text-slate-500">%</th>
+                      <th className="p-1 border-r border-slate-300 text-right">KG</th>
+                      <th className="p-1 border-r border-slate-300 text-right text-slate-500">%</th>
+                      <th className="p-1 border-r border-slate-300 text-right">KG</th>
+                      <th className="p-1 border-r border-slate-300 text-right text-slate-500">%</th>
+                      <th className="p-1 border-r border-slate-300 text-right">KG</th>
+                      <th className="p-1 border-r border-slate-300 text-right text-slate-500">%</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200">
                     {plans.map((p, idx) => {
-                      const getMat = (name: string) => {
-                        const m = p.materials?.find(
-                          (x) => x.material.trim().toUpperCase() === name.toUpperCase()
-                        );
-                        if (!m || !Number(m.quantity)) return "—";
-                        return `${Number(m.quantity).toLocaleString()} (${m.percentage || 0}%)`;
-                      };
-
                       const getMatRaw = (name: string) => {
                         const match = (p.materials || []).find(
                           (m) => m.material.trim().toUpperCase() === name.toUpperCase()
@@ -397,36 +398,43 @@ export function PlanningPrintPreviewModal({
                         }
                       });
 
-                      totalPPSum += pp.qty;
-                      totalCCSum += cc.qty;
-                      totalMBSum += mb.qty;
-                      totalRP1Sum += rp1.qty;
-                      totalRP2Sum += rp2.qty;
-                      totalHDRPSum += hdrp.qty;
-                      totalTPTSum += tpt.qty;
-                      totalOtherSum += otherQty;
-                      totalBatchSum += (runBatchQty || Number(p.plannedQtyKg) || 0);
-
                       return (
                         <tr key={`mat-${p.id}`} className="hover:bg-slate-50">
                           <td className="p-2 border-r border-slate-200 text-center font-bold text-slate-500">
                             {idx + 1}
                           </td>
-                          <td className="p-2 border-r border-slate-200 font-mono font-bold text-slate-900">
+                          <td className="p-2 border-r border-slate-200 font-mono font-bold text-slate-900 whitespace-nowrap">
                             {p.recipeQuality}
                           </td>
-                          <td className="p-2 border-r border-slate-200 text-right font-mono">{getMat("PP")}</td>
-                          <td className="p-2 border-r border-slate-200 text-right font-mono">{getMat("CC")}</td>
-                          <td className="p-2 border-r border-slate-200 text-right font-mono">{getMat("MB")}</td>
-                          <td className="p-2 border-r border-slate-200 text-right font-mono">{getMat("RP1")}</td>
-                          <td className="p-2 border-r border-slate-200 text-right font-mono">{getMat("RP2")}</td>
-                          <td className="p-2 border-r border-slate-200 text-right font-mono">{getMat("HD RP")}</td>
-                          <td className="p-2 border-r border-slate-200 text-right font-mono">{getMat("TPT")}</td>
-                          <td className="p-2 border-r border-slate-200 text-right font-mono">{otherQty ? otherQty.toLocaleString() : "—"}</td>
-                          <td className="p-2 border-r border-slate-200 text-right font-mono font-bold text-slate-900 bg-slate-50/70">
+                          {/* PP */}
+                          <td className="p-1.5 border-r border-slate-200 text-right font-mono font-semibold">{pp.qty ? pp.qty.toLocaleString() : "—"}</td>
+                          <td className="p-1.5 border-r border-slate-200 text-right font-mono text-slate-500 bg-slate-50/50">{pp.pct ? `${pp.pct}%` : "—"}</td>
+                          {/* CC */}
+                          <td className="p-1.5 border-r border-slate-200 text-right font-mono font-semibold">{cc.qty ? cc.qty.toLocaleString() : "—"}</td>
+                          <td className="p-1.5 border-r border-slate-200 text-right font-mono text-slate-500 bg-slate-50/50">{cc.pct ? `${cc.pct}%` : "—"}</td>
+                          {/* MB */}
+                          <td className="p-1.5 border-r border-slate-200 text-right font-mono font-semibold">{mb.qty ? mb.qty.toLocaleString() : "—"}</td>
+                          <td className="p-1.5 border-r border-slate-200 text-right font-mono text-slate-500 bg-slate-50/50">{mb.pct ? `${mb.pct}%` : "—"}</td>
+                          {/* RP1 */}
+                          <td className="p-1.5 border-r border-slate-200 text-right font-mono font-semibold">{rp1.qty ? rp1.qty.toLocaleString() : "—"}</td>
+                          <td className="p-1.5 border-r border-slate-200 text-right font-mono text-slate-500 bg-slate-50/50">{rp1.pct ? `${rp1.pct}%` : "—"}</td>
+                          {/* RP2 */}
+                          <td className="p-1.5 border-r border-slate-200 text-right font-mono font-semibold">{rp2.qty ? rp2.qty.toLocaleString() : "—"}</td>
+                          <td className="p-1.5 border-r border-slate-200 text-right font-mono text-slate-500 bg-slate-50/50">{rp2.pct ? `${rp2.pct}%` : "—"}</td>
+                          {/* HD RP */}
+                          <td className="p-1.5 border-r border-slate-200 text-right font-mono font-semibold">{hdrp.qty ? hdrp.qty.toLocaleString() : "—"}</td>
+                          <td className="p-1.5 border-r border-slate-200 text-right font-mono text-slate-500 bg-slate-50/50">{hdrp.pct ? `${hdrp.pct}%` : "—"}</td>
+                          {/* TPT */}
+                          <td className="p-1.5 border-r border-slate-200 text-right font-mono font-semibold">{tpt.qty ? tpt.qty.toLocaleString() : "—"}</td>
+                          <td className="p-1.5 border-r border-slate-200 text-right font-mono text-slate-500 bg-slate-50/50">{tpt.pct ? `${tpt.pct}%` : "—"}</td>
+                          {/* Other */}
+                          <td className="p-1.5 border-r border-slate-200 text-right font-mono">{otherQty ? otherQty.toLocaleString() : "—"}</td>
+                          {/* Batch Total */}
+                          <td className="p-1.5 border-r border-slate-200 text-right font-mono font-bold text-slate-900 bg-slate-50/70">
                             {(runBatchQty || Number(p.plannedQtyKg) || 0).toLocaleString()} KG
                           </td>
-                          <td className="p-2 border-r border-slate-200 text-right font-mono text-[11px]">
+                          {/* Total % */}
+                          <td className="p-1.5 border-r border-slate-200 text-right font-mono text-[11px] font-bold">
                             {totalBlendPct > 0 ? `${totalBlendPct.toFixed(1)}%` : "100%"}
                           </td>
                         </tr>
@@ -438,50 +446,99 @@ export function PlanningPrintPreviewModal({
                       <td colSpan={2} className="p-2 text-right uppercase tracking-wider text-[10px]">
                         Total Formulations:
                       </td>
-                      <td className="p-2 text-right font-mono">{totalPPSum ? totalPPSum.toLocaleString() : "—"}</td>
-                      <td className="p-2 text-right font-mono">{totalCCSum ? totalCCSum.toLocaleString() : "—"}</td>
-                      <td className="p-2 text-right font-mono">{totalMBSum ? totalMBSum.toLocaleString() : "—"}</td>
-                      <td className="p-2 text-right font-mono">{totalRP1Sum ? totalRP1Sum.toLocaleString() : "—"}</td>
-                      <td className="p-2 text-right font-mono">{totalRP2Sum ? totalRP2Sum.toLocaleString() : "—"}</td>
-                      <td className="p-2 text-right font-mono">{totalHDRPSum ? totalHDRPSum.toLocaleString() : "—"}</td>
-                      <td className="p-2 text-right font-mono">{totalTPTSum ? totalTPTSum.toLocaleString() : "—"}</td>
-                      <td className="p-2 text-right font-mono">{totalOtherSum ? totalOtherSum.toLocaleString() : "—"}</td>
-                      <td className="p-2 text-right font-mono font-black text-slate-900 bg-slate-200">
+                      {/* PP */}
+                      <td className="p-1.5 text-right font-mono">{totalPPSum ? totalPPSum.toLocaleString() : "—"}</td>
+                      <td className="p-1.5 text-right font-mono text-[10px] text-slate-500">{totalBatchSum > 0 && totalPPSum > 0 ? `${((totalPPSum / totalBatchSum) * 100).toFixed(1)}%` : "—"}</td>
+                      {/* CC */}
+                      <td className="p-1.5 text-right font-mono">{totalCCSum ? totalCCSum.toLocaleString() : "—"}</td>
+                      <td className="p-1.5 text-right font-mono text-[10px] text-slate-500">{totalBatchSum > 0 && totalCCSum > 0 ? `${((totalCCSum / totalBatchSum) * 100).toFixed(1)}%` : "—"}</td>
+                      {/* MB */}
+                      <td className="p-1.5 text-right font-mono">{totalMBSum ? totalMBSum.toLocaleString() : "—"}</td>
+                      <td className="p-1.5 text-right font-mono text-[10px] text-slate-500">{totalBatchSum > 0 && totalMBSum > 0 ? `${((totalMBSum / totalBatchSum) * 100).toFixed(1)}%` : "—"}</td>
+                      {/* RP1 */}
+                      <td className="p-1.5 text-right font-mono">{totalRP1Sum ? totalRP1Sum.toLocaleString() : "—"}</td>
+                      <td className="p-1.5 text-right font-mono text-[10px] text-slate-500">{totalBatchSum > 0 && totalRP1Sum > 0 ? `${((totalRP1Sum / totalBatchSum) * 100).toFixed(1)}%` : "—"}</td>
+                      {/* RP2 */}
+                      <td className="p-1.5 text-right font-mono">{totalRP2Sum ? totalRP2Sum.toLocaleString() : "—"}</td>
+                      <td className="p-1.5 text-right font-mono text-[10px] text-slate-500">{totalBatchSum > 0 && totalRP2Sum > 0 ? `${((totalRP2Sum / totalBatchSum) * 100).toFixed(1)}%` : "—"}</td>
+                      {/* HD RP */}
+                      <td className="p-1.5 text-right font-mono">{totalHDRPSum ? totalHDRPSum.toLocaleString() : "—"}</td>
+                      <td className="p-1.5 text-right font-mono text-[10px] text-slate-500">{totalBatchSum > 0 && totalHDRPSum > 0 ? `${((totalHDRPSum / totalBatchSum) * 100).toFixed(1)}%` : "—"}</td>
+                      {/* TPT */}
+                      <td className="p-1.5 text-right font-mono">{totalTPTSum ? totalTPTSum.toLocaleString() : "—"}</td>
+                      <td className="p-1.5 text-right font-mono text-[10px] text-slate-500">{totalBatchSum > 0 && totalTPTSum > 0 ? `${((totalTPTSum / totalBatchSum) * 100).toFixed(1)}%` : "—"}</td>
+                      {/* Other */}
+                      <td className="p-1.5 text-right font-mono">{totalOtherSum ? totalOtherSum.toLocaleString() : "—"}</td>
+                      {/* Total */}
+                      <td className="p-1.5 text-right font-mono font-black text-slate-900 bg-slate-200">
                         {totalBatchSum.toLocaleString()} KG
                       </td>
-                      <td className="p-2 text-right font-mono text-[11px]">100%</td>
+                      <td className="p-1.5 text-right font-mono text-[11px]">100%</td>
                     </tr>
                   </tfoot>
                 </table>
               </div>
             </div>
 
-            {/* Table 3: Shift Consolidated Material Requirements */}
+            {/* Box 3: RAW MATERIAL SUMMARY */}
             <div className="space-y-1.5">
-              <div className="flex items-center gap-1.5">
-                <Boxes className="h-4 w-4 text-slate-700" />
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">
-                  3. Shift Aggregate Raw Material Demands & Store Requisitions
+              <div className="bg-slate-200 border border-slate-300 border-b-0 py-1 px-3 text-center">
+                <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-900">
+                  3. RAW MATERIAL SUMMARY
                 </h3>
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2">
-                {Object.entries(materialTotals).map(([mat, data]) => (
-                  <div
-                    key={mat}
-                    className="p-2 bg-slate-50 rounded border border-slate-300 flex flex-col justify-between"
-                  >
-                    <span className="text-[10px] font-bold text-slate-500 uppercase">{mat}</span>
-                    <div className="font-mono font-bold text-slate-900 text-xs mt-0.5">
-                      {data.qty.toLocaleString()} <span className="text-[10px] font-normal text-slate-500">KG</span>
-                    </div>
-                    <span className="text-[10px] font-semibold text-emerald-800 text-right mt-1">
-                      {totalAllMaterialsKg > 0
-                        ? `${((data.qty / totalAllMaterialsKg) * 100).toFixed(1)}%`
-                        : "0%"}
-                    </span>
-                  </div>
-                ))}
+              <div className="overflow-x-auto border border-slate-300 rounded-b">
+                <table className="w-full text-center text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-slate-100 text-slate-900 text-[10px] font-bold uppercase tracking-wider border-b border-slate-300">
+                      <th className="p-2 border-r border-slate-300 text-left min-w-[130px]">Metric / Material</th>
+                      <th className="p-2 border-r border-slate-300">PP</th>
+                      <th className="p-2 border-r border-slate-300">CC</th>
+                      <th className="p-2 border-r border-slate-300">MB</th>
+                      <th className="p-2 border-r border-slate-300">RP1</th>
+                      <th className="p-2 border-r border-slate-300">RP2</th>
+                      <th className="p-2 border-r border-slate-300">HD RP</th>
+                      <th className="p-2 border-r border-slate-300">TPT</th>
+                      {totalOtherSum > 0 && <th className="p-2 border-r border-slate-300">Other</th>}
+                      <th className="p-2 border-r border-slate-300 font-extrabold bg-slate-200">Total Batch</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200">
+                    <tr>
+                      <td className="p-2 border-r border-slate-200 font-bold text-left text-slate-700 bg-slate-50">
+                        Total Quantity (KG)
+                      </td>
+                      <td className="p-2 border-r border-slate-200 font-mono font-bold">{totalPPSum ? `${totalPPSum.toLocaleString()} KG` : "—"}</td>
+                      <td className="p-2 border-r border-slate-200 font-mono font-bold">{totalCCSum ? `${totalCCSum.toLocaleString()} KG` : "—"}</td>
+                      <td className="p-2 border-r border-slate-200 font-mono font-bold">{totalMBSum ? `${totalMBSum.toLocaleString()} KG` : "—"}</td>
+                      <td className="p-2 border-r border-slate-200 font-mono font-bold">{totalRP1Sum ? `${totalRP1Sum.toLocaleString()} KG` : "—"}</td>
+                      <td className="p-2 border-r border-slate-200 font-mono font-bold">{totalRP2Sum ? `${totalRP2Sum.toLocaleString()} KG` : "—"}</td>
+                      <td className="p-2 border-r border-slate-200 font-mono font-bold">{totalHDRPSum ? `${totalHDRPSum.toLocaleString()} KG` : "—"}</td>
+                      <td className="p-2 border-r border-slate-200 font-mono font-bold">{totalTPTSum ? `${totalTPTSum.toLocaleString()} KG` : "—"}</td>
+                      {totalOtherSum > 0 && <td className="p-2 border-r border-slate-200 font-mono font-bold">{totalOtherSum.toLocaleString()} KG</td>}
+                      <td className="p-2 border-r border-slate-200 font-mono font-black text-slate-900 bg-slate-100">
+                        {totalBatchSum.toLocaleString()} KG
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="p-2 border-r border-slate-200 font-bold text-left text-slate-700 bg-slate-50">
+                        Overall Percentage (%)
+                      </td>
+                      <td className="p-2 border-r border-slate-200 font-mono font-semibold text-emerald-800">{totalBatchSum > 0 && totalPPSum > 0 ? `${((totalPPSum / totalBatchSum) * 100).toFixed(1)}%` : "—"}</td>
+                      <td className="p-2 border-r border-slate-200 font-mono font-semibold text-emerald-800">{totalBatchSum > 0 && totalCCSum > 0 ? `${((totalCCSum / totalBatchSum) * 100).toFixed(1)}%` : "—"}</td>
+                      <td className="p-2 border-r border-slate-200 font-mono font-semibold text-emerald-800">{totalBatchSum > 0 && totalMBSum > 0 ? `${((totalMBSum / totalBatchSum) * 100).toFixed(1)}%` : "—"}</td>
+                      <td className="p-2 border-r border-slate-200 font-mono font-semibold text-emerald-800">{totalBatchSum > 0 && totalRP1Sum > 0 ? `${((totalRP1Sum / totalBatchSum) * 100).toFixed(1)}%` : "—"}</td>
+                      <td className="p-2 border-r border-slate-200 font-mono font-semibold text-emerald-800">{totalBatchSum > 0 && totalRP2Sum > 0 ? `${((totalRP2Sum / totalBatchSum) * 100).toFixed(1)}%` : "—"}</td>
+                      <td className="p-2 border-r border-slate-200 font-mono font-semibold text-emerald-800">{totalBatchSum > 0 && totalHDRPSum > 0 ? `${((totalHDRPSum / totalBatchSum) * 100).toFixed(1)}%` : "—"}</td>
+                      <td className="p-2 border-r border-slate-200 font-mono font-semibold text-emerald-800">{totalBatchSum > 0 && totalTPTSum > 0 ? `${((totalTPTSum / totalBatchSum) * 100).toFixed(1)}%` : "—"}</td>
+                      {totalOtherSum > 0 && <td className="p-2 border-r border-slate-200 font-mono font-semibold text-emerald-800">{totalBatchSum > 0 ? `${((totalOtherSum / totalBatchSum) * 100).toFixed(1)}%` : "—"}</td>}
+                      <td className="p-2 border-r border-slate-200 font-mono font-bold text-emerald-900 bg-slate-100">
+                        100.0%
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
             </div>
 
