@@ -61,19 +61,21 @@ describe("Tape Plant Minimalist Planning Sheet Print Engine", () => {
   it("should generate valid HTML document with standard DOCTYPE and title", () => {
     const html = generatePlanningSheetHtml(mockPlanningData);
     expect(html).toContain("<!DOCTYPE html>");
-    expect(html).toContain("<title>Tape Plant Planning Sheet - TP-PLN-20260924-SHIFTA(06:00-14:00)</title>");
+    expect(html).toContain("<title>Tape Plant Production Plan - TP-PLN-20260924-SHIFTA(06:00-14:00)</title>");
     expect(html).toContain("Flexicom Industries Pvt. Ltd.");
+    expect(html).toContain("TAPE PLANT PRODUCTION PLAN");
   });
 
   it("should enforce A4 landscape print styling and compact margins", () => {
     const html = generatePlanningSheetHtml(mockPlanningData);
     expect(html).toContain("size: A4 landscape;");
-    expect(html).toContain("margin: 8mm;");
+    expect(html).toContain("margin: 6mm 8mm;");
     expect(html).toContain(".avoid-break");
   });
 
-  it("should render all recipe specifications and machine parameters in Table 1", () => {
+  it("should render Box 1: 1. QUALITY NAME AND SPECIFICATION with machine parameters", () => {
     const html = generatePlanningSheetHtml(mockPlanningData);
+    expect(html).toContain("1. QUALITY NAME AND SPECIFICATION");
     expect(html).toContain("LPP-500-YL-01");
     expect(html).toContain("PP-700-NAT-02");
     expect(html).toContain("600");
@@ -83,23 +85,28 @@ describe("Tape Plant Minimalist Planning Sheet Print Engine", () => {
     expect(html).toContain("2,000 KG"); // Total planned output sum
   });
 
-  it("should calculate and render raw material formulations in Table 2", () => {
+  it("should render Box 2: 2. RAW MATERIAL RECIPE AND QUANTITY with separate KG and % columns", () => {
     const html = generatePlanningSheetHtml(mockPlanningData);
-    expect(html).toContain("PP (KG / %)");
-    expect(html).toContain("HD RP (KG / %)");
+    expect(html).toContain("2. RAW MATERIAL RECIPE AND QUANTITY");
+    expect(html).toContain(">PP<");
+    expect(html).toContain(">CC<");
+    expect(html).toContain(">HD RP<");
     expect(html).toContain("960");
+    expect(html).toContain("80%");
     expect(html).toContain("600");
+    expect(html).toContain("75%");
     expect(html).toContain("1,560"); // Total PP sum
   });
 
-  it("should render aggregate shift material demands in Table 3", () => {
+  it("should render Box 3: 3. RAW MATERIAL SUMMARY with columnar totals and composition percentages", () => {
     const html = generatePlanningSheetHtml(mockPlanningData);
-    expect(html).toContain("Shift Aggregate Raw Material Demands");
-    expect(html).toContain("PP");
-    expect(html).toContain("CC");
-    expect(html).toContain("MB");
-    expect(html).toContain("HD RP");
-    expect(html).toContain("TPT");
+    expect(html).toContain("3. RAW MATERIAL SUMMARY");
+    expect(html).toContain("Total Planned Qty (KG)");
+    expect(html).toContain("Overall Composition (%)");
+    expect(html).toContain("1,560 KG"); // PP aggregate
+    expect(html).toContain("200 KG"); // CC aggregate
+    expect(html).toContain("2,000 KG"); // Total batch
+    expect(html).toContain("100.0%");
   });
 
   it("should render sign-off authorization block with all 3 signatures", () => {
