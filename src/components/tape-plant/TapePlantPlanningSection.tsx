@@ -455,29 +455,31 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
   }
 
   return (
-    <div className="space-y-6 w-full min-w-0 max-w-full">
-      {/* Top Header & Status Banner */}
-      <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm min-w-0">
+    <div className="space-y-4 w-full min-w-0 max-w-full">
+      {/* Top Header & Status Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3.5 sm:p-4 rounded-xl border border-slate-200 shadow-2xs min-w-0">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl border border-blue-100">
-            <Sparkles className="h-5 w-5" />
+          <div className="p-2 bg-slate-100 text-slate-700 rounded-lg border border-slate-200 shrink-0">
+            <Layers className="h-4 w-4" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-base font-bold text-slate-900">1. Tape Plant Planning</h2>
+              <h2 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight">Tape Plant Planning</h2>
               <span
                 className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border ${
                   status === "SUBMITTED"
                     ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                    : "bg-amber-50 text-amber-700 border-amber-200"
+                    : "bg-slate-100 text-slate-700 border-slate-200"
                 }`}
               >
                 {status}
               </span>
             </div>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Production specifications and recipes planned for <span className="font-semibold text-slate-700">{shiftName}</span> ({date}).
-            </p>
+            <div className="flex items-center gap-2 text-xs text-slate-500 mt-0.5 font-mono">
+              <span className="font-sans font-semibold text-slate-700">{shiftName}</span>
+              <span className="text-slate-300">•</span>
+              <span>{date}</span>
+            </div>
           </div>
         </div>
 
@@ -485,38 +487,38 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
         <div className="flex items-center gap-3">
           <div className="hidden sm:flex items-center gap-3 border-r border-slate-200 pr-3">
             <div className="flex flex-col text-right">
-              <span className="text-[10px] uppercase font-bold text-slate-400">Shift Planned Output</span>
-              <span className="text-sm font-black font-mono text-slate-900">
+              <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Shift Planned</span>
+              <span className="text-sm font-bold font-mono text-slate-900">
                 {totalShiftPlannedKg.toLocaleString()} <span className="text-xs font-normal text-slate-400">KG</span>
               </span>
             </div>
             {totalDayNightPlannedKg > 0 && (
-              <div className="flex flex-col text-right pl-2 border-l border-slate-200">
-                <span className="text-[10px] uppercase font-bold text-amber-600 flex items-center justify-end gap-1">
-                  <SunMedium className="h-3 w-3" /> Day+Night 24h Batch
+              <div className="flex flex-col text-right pl-3 border-l border-slate-200">
+                <span className="text-[10px] uppercase font-bold text-amber-600 flex items-center justify-end gap-1 tracking-wider">
+                  <SunMedium className="h-3 w-3" /> Day+Night
                 </span>
-                <span className="text-sm font-black font-mono text-amber-700">
+                <span className="text-sm font-bold font-mono text-amber-700">
                   {totalDayNightPlannedKg.toLocaleString()} <span className="text-xs font-normal text-amber-600/70">KG</span>
                 </span>
               </div>
             )}
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
             <button
               type="button"
               onClick={() => setShowPrintModal(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition-all active:scale-95 h-8 cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold rounded-lg transition-all active:scale-95 h-8 cursor-pointer"
               title="Preview printable planning document and print"
             >
-              <Eye className="h-3.5 w-3.5 text-slate-600" />
+              <Eye className="h-3.5 w-3.5 text-slate-500" />
               <span>Preview & Print</span>
             </button>
 
             <button
               type="button"
               onClick={handleExportExcel}
-              className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-semibold rounded-lg transition-all active:scale-95 h-8 cursor-pointer shadow-2xs"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold rounded-lg transition-all active:scale-95 h-8 cursor-pointer"
               title="Download full multi-recipe planning Excel spreadsheet (.xlsx)"
             >
               <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600" />
@@ -527,16 +529,16 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
               type="button"
               disabled={saving}
               onClick={() => handleSave("DRAFT")}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition-all active:scale-95 disabled:opacity-50 h-8 cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold rounded-lg transition-all active:scale-95 disabled:opacity-50 h-8 cursor-pointer"
             >
-              {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+              {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5 text-slate-500" />}
               Save Draft
             </button>
             <button
               type="button"
               disabled={saving}
               onClick={() => handleSave("SUBMITTED")}
-              className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary hover:bg-primary/90 text-white text-xs font-semibold rounded-lg shadow-sm transition-all active:scale-95 disabled:opacity-50 h-8 cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-lg shadow-xs transition-all active:scale-95 disabled:opacity-50 h-8 cursor-pointer"
             >
               {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle className="h-3.5 w-3.5" />}
               Submit Plan
@@ -546,19 +548,18 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
       </div>
 
       {/* Qualities Vertical List & Actions */}
-      <div className="bg-white rounded-xl border border-slate-200 p-3.5 shadow-xs space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-slate-100">
+      <div className="bg-white rounded-xl border border-slate-200 p-3.5 shadow-2xs space-y-2.5">
+        <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-100">
           <div className="flex items-center gap-2">
-            <Layers className="h-4 w-4 text-primary" />
             <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
               Qualities ({recipePlans.length})
             </span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             <button
               type="button"
               onClick={handleDuplicateCurrentRecipe}
-              className="text-[11px] font-semibold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 px-2.5 py-1 rounded-lg transition-colors inline-flex items-center gap-1 cursor-pointer"
+              className="text-[11px] font-semibold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 px-2.5 py-1 rounded-md transition-colors inline-flex items-center gap-1 cursor-pointer"
               title="Duplicate current quality specs to a new entry"
             >
               <Copy className="h-3 w-3" /> Duplicate Quality
@@ -566,7 +567,7 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
             <button
               type="button"
               onClick={handleAddRecipe}
-              className="text-[11px] font-bold text-primary bg-primary/10 hover:bg-primary/20 px-3 py-1 rounded-lg transition-colors inline-flex items-center gap-1 cursor-pointer"
+              className="text-[11px] font-bold text-slate-900 bg-slate-100 hover:bg-slate-200 border border-slate-200 px-3 py-1 rounded-md transition-colors inline-flex items-center gap-1 cursor-pointer"
             >
               <Plus className="h-3.5 w-3.5" /> Add Quality
             </button>
@@ -574,36 +575,36 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
         </div>
 
         {/* Vertical List of Qualities (Down by Down) */}
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-1.5">
           {recipePlans.map((plan, index) => {
             const isSelected = activeRecipeIndex === index;
             return (
               <div
                 key={plan.id}
                 onClick={() => setActiveRecipeIndex(index)}
-                className={`group flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl text-xs font-medium cursor-pointer transition-all border ${
+                className={`group flex items-center justify-between gap-3 px-3 py-2 rounded-lg text-xs font-medium cursor-pointer transition-all border ${
                   isSelected
-                    ? "bg-slate-900 text-white border-slate-900 shadow-sm ring-1 ring-slate-800"
-                    : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100/80 hover:border-slate-300"
+                    ? "bg-slate-900 text-white border-slate-900 shadow-xs"
+                    : "bg-white text-slate-700 border-slate-200 hover:border-slate-300 hover:bg-slate-50/70"
                 }`}
               >
                 <div className="flex flex-wrap items-center gap-2.5 min-w-0">
                   <span
-                    className={`h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 ${
-                      isSelected ? "bg-primary text-white shadow-xs" : "bg-slate-200 text-slate-700"
+                    className={`h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
+                      isSelected ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600 border border-slate-200"
                     }`}
                   >
                     {index + 1}
                   </span>
-                  <span className="font-mono font-bold text-sm tracking-tight truncate">
+                  <span className="font-mono font-bold text-xs sm:text-sm tracking-tight truncate">
                     {plan.recipeQuality || `Quality #${index + 1}`}
                   </span>
                   {plan.isDayNight && (
                     <span
-                      className={`text-[9px] font-black px-2 py-0.5 rounded-full border shrink-0 ${
+                      className={`text-[9px] font-bold px-1.5 py-0.2 rounded border shrink-0 ${
                         isSelected
-                          ? "bg-amber-400 text-slate-950 border-amber-300"
-                          : "bg-amber-100 text-amber-900 border-amber-300"
+                          ? "bg-amber-400/20 text-amber-300 border-amber-400/30"
+                          : "bg-amber-50 text-amber-800 border-amber-200"
                       }`}
                     >
                       Day+Night
@@ -611,10 +612,10 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
                   )}
                   {plan.carriedOverFromShift && (
                     <span
-                      className={`text-[9px] font-semibold px-2 py-0.5 rounded-full border shrink-0 ${
+                      className={`text-[9px] font-medium px-1.5 py-0.2 rounded border shrink-0 ${
                         isSelected
-                          ? "bg-white/10 text-amber-200 border-white/20"
-                          : "bg-slate-200 text-slate-600 border-slate-300"
+                          ? "bg-white/10 text-slate-300 border-white/20"
+                          : "bg-slate-100 text-slate-600 border-slate-200"
                       }`}
                     >
                       From {plan.carriedOverFromShift}
@@ -622,10 +623,10 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
                   )}
                 </div>
 
-                <div className="flex items-center gap-3 shrink-0">
+                <div className="flex items-center gap-2.5 shrink-0">
                   <span
-                    className={`text-xs font-mono px-2.5 py-1 rounded-md font-bold ${
-                      isSelected ? "bg-white/20 text-cyan-200" : "bg-slate-200/80 text-slate-700"
+                    className={`text-xs font-mono px-2 py-0.5 rounded font-bold ${
+                      isSelected ? "text-slate-100" : "text-slate-700"
                     }`}
                   >
                     {Number(plan.plannedQtyKg) ? `${Number(plan.plannedQtyKg).toLocaleString()} KG` : "0 KG"}
@@ -638,9 +639,9 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
                         e.stopPropagation();
                         handleRemoveRecipe(index);
                       }}
-                      className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                      className={`p-1 rounded transition-colors cursor-pointer ${
                         isSelected
-                          ? "text-slate-400 hover:text-red-400 hover:bg-white/10"
+                          ? "text-slate-400 hover:text-red-300 hover:bg-white/10"
                           : "text-slate-400 hover:text-red-600 hover:bg-red-50"
                       }`}
                       title="Remove this quality"
@@ -656,44 +657,29 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
       </div>
 
       {/* Active Recipe Configuration Card */}
-      <div className="space-y-6 w-full min-w-0 max-w-full">
-        {/* Day + Night Multi-Shift 2-Shift Run Banner */}
-        <div className={`p-3.5 rounded-xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+      <div className="space-y-4 w-full min-w-0 max-w-full">
+        {/* Day + Night 2-Shift Run Minimalist Strip */}
+        <div className={`px-3.5 py-2 rounded-xl border transition-all flex flex-wrap items-center justify-between gap-2.5 ${
           currentPlan.isDayNight
-            ? "bg-amber-50/70 border-amber-300 ring-1 ring-amber-200"
-            : "bg-white border-slate-200 shadow-2xs"
+            ? "bg-amber-50/60 border-amber-200"
+            : "bg-white border-slate-200"
         }`}>
-          <div className="flex items-center gap-3">
-            <div className={`p-2.5 rounded-xl ${
-              currentPlan.isDayNight
-                ? "bg-amber-500 text-slate-950 shadow-xs"
-                : "bg-slate-100 text-slate-500"
-            }`}>
-              <SunMedium className="h-4 w-4" />
-            </div>
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs font-bold text-slate-900">
-                  2-Shift Continuous Run (Day + Night)
+          <div className="flex items-center gap-2.5 min-w-0">
+            <SunMedium className={`h-4 w-4 shrink-0 ${currentPlan.isDayNight ? "text-amber-600" : "text-slate-400"}`} />
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-semibold text-slate-800">
+                2-Shift Continuous Run (Day + Night)
+              </span>
+              {currentPlan.isDayNight && (
+                <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
+                  24h Continuous
                 </span>
-                {currentPlan.isDayNight && (
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-200 text-amber-950 border border-amber-400">
-                    24-Hour Continuous Batch
-                  </span>
-                )}
-                {currentPlan.carriedOverFromShift && (
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
-                    Carried over from {currentPlan.carriedOverFromShift}
-                  </span>
-                )}
-              </div>
-              <p className="text-[11px] text-slate-500 mt-0.5">
-                {currentPlan.carriedOverFromShift
-                  ? `Continuous quality active from ${currentPlan.carriedOverFromShift}. Both Day & Night shift operators record output against this quality. You can also add more shift recipes below.`
-                  : currentPlan.isDayNight
-                  ? "Running across Day & Night shifts. Both shift operators will see and log against this recipe."
-                  : "Enable for high-volume qualities running across both Day and Night shifts. Both shift operators will see and log against this recipe."}
-              </p>
+              )}
+              {currentPlan.carriedOverFromShift && (
+                <span className="px-1.5 py-0.2 rounded text-[10px] font-medium bg-slate-100 text-slate-600 border border-slate-200">
+                  From {currentPlan.carriedOverFromShift}
+                </span>
+              )}
             </div>
           </div>
 
@@ -703,37 +689,37 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
               const nextVal = !currentPlan.isDayNight;
               updateCurrentPlan({ isDayNight: nextVal });
             }}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shrink-0 ${
+            className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer shrink-0 border ${
               currentPlan.isDayNight
-                ? "bg-amber-500 hover:bg-amber-600 text-slate-950 shadow-xs font-black"
-                : "bg-white hover:bg-slate-100 text-slate-700 border border-slate-300"
+                ? "bg-amber-500 hover:bg-amber-600 text-slate-950 border-amber-500 font-bold shadow-2xs"
+                : "bg-white hover:bg-slate-50 text-slate-700 border-slate-200"
             }`}
           >
             {currentPlan.isDayNight ? (
               <>
-                <Check className="h-3.5 w-3.5" />
-                <span>Spanning Day + Night (Active)</span>
+                <Check className="h-3 w-3" />
+                <span>Active Across Shifts</span>
               </>
             ) : (
-              <span>Enable Day + Night Run</span>
+              <span>Enable Day + Night</span>
             )}
           </button>
         </div>
 
-        {/* 1. Recipe / Quality ID Input & Master Quick Pick */}
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 sm:p-5 space-y-3 min-w-0">
+        {/* 1. Recipe / Quality ID Selection & Master Quick Pick */}
+        <div className="bg-white rounded-xl border border-slate-200 p-3.5 sm:p-4 space-y-3 min-w-0">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex flex-wrap items-center gap-2 min-w-0">
+            <div className="flex items-center gap-2 min-w-0">
               <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                Recipe Selection for Run #{activeRecipeIndex + 1}
+                Quality ID — Run #{activeRecipeIndex + 1}
               </span>
               {matchingMaster ? (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full text-[10px] font-bold">
-                  <Check className="h-3 w-3" /> Auto-Mapped from Master Data
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded text-[10px] font-bold">
+                  <Check className="h-3 w-3" /> Master Synced
                 </span>
               ) : (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-100 text-slate-600 border border-slate-200 rounded-full text-[10px] font-medium">
-                  Custom / Manual Entry
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-100 text-slate-600 border border-slate-200 rounded text-[10px] font-medium">
+                  Custom
                 </span>
               )}
             </div>
@@ -741,16 +727,16 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
             {/* Quick Master Catalog Select */}
             {masterRecipes.length > 0 && (
               <div className="flex items-center gap-2 max-w-full">
-                <span className="text-[11px] font-semibold text-slate-500 shrink-0">Pick Master Recipe:</span>
+                <span className="text-[11px] font-medium text-slate-500 shrink-0">Master Recipe:</span>
                 <select
                   value={matchingMaster ? matchingMaster.code : ""}
                   onChange={(e) => {
                     const selected = masterRecipes.find((r) => r.code === e.target.value);
                     if (selected) applyRecipeMaster(selected);
                   }}
-                  className="h-8 px-2.5 text-xs font-mono font-bold text-primary bg-primary/5 border border-primary/20 rounded-lg hover:bg-primary/10 focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all cursor-pointer max-w-[240px] sm:max-w-xs md:max-w-sm truncate"
+                  className="h-7 px-2 text-xs font-mono font-semibold text-slate-800 bg-slate-50 border border-slate-200 rounded-lg hover:bg-white focus:outline-none focus:ring-1 focus:ring-slate-400 transition-all cursor-pointer max-w-[240px] sm:max-w-xs md:max-w-sm truncate"
                 >
-                  <option value="">— Select from {masterRecipes.length} Master Recipes —</option>
+                  <option value="">— Select Recipe Master —</option>
                   {masterRecipes.map((r) => (
                     <option key={r.code} value={r.code}>
                       {r.code} ({r.tapeType} • {r.colour || ""} • {r.bobbinMarking || ""})
@@ -768,7 +754,7 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
               code: r.code,
               label: `${r.tapeType} • ${r.colour || ""} • ${r.bobbinMarking || ""}`,
             }))}
-            label={`Recipe Run #${activeRecipeIndex + 1} Quality ID (Standard Format)`}
+            label="Standard Code"
             required
             onSyncSpecifications={({ tapeType: synType, colour: synColour, tapeWidth: synWidth }) => {
               updateCurrentPlan({
@@ -782,27 +768,27 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
         </div>
 
         {/* 2. Shift Specifications & Parameters Table */}
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden min-w-0">
-          <div className="px-5 py-3.5 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
+        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden min-w-0">
+          <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
             <div className="flex flex-wrap items-center gap-2 min-w-0">
               <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                Run #{activeRecipeIndex + 1} Specifications & Parameters
+                Specifications & Parameters
               </h3>
               <RecipeQualityBadge value={currentPlan.recipeQuality} />
             </div>
-            <span className="text-[11px] font-semibold text-slate-500 shrink-0">
-              Planned Qty: <strong className="text-slate-800 font-mono">{Number(currentPlan.plannedQtyKg).toLocaleString() || 0} KG</strong>
+            <span className="text-xs text-slate-500 font-mono">
+              Planned: <strong className="text-slate-900 font-bold">{Number(currentPlan.plannedQtyKg).toLocaleString() || 0} KG</strong>
             </span>
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 divide-x divide-y divide-slate-200 border-b border-slate-200 text-xs min-w-0">
             {/* PP / LPP */}
-            <div className="p-3 bg-white">
-              <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">PP / LPP</label>
+            <div className="p-2.5 bg-white">
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">PP / LPP</label>
               <select
                 value={currentPlan.tapeType}
                 onChange={(e) => updateCurrentPlan({ tapeType: e.target.value })}
-                className="w-full h-8 px-2 text-xs font-semibold text-slate-800 bg-slate-50 border border-slate-200 rounded focus:bg-white focus:ring-1 focus:ring-primary outline-none cursor-pointer"
+                className="w-full h-8 px-2 text-xs font-semibold text-slate-800 bg-slate-50/50 border border-slate-200 rounded focus:bg-white focus:ring-1 focus:ring-slate-400 outline-none cursor-pointer"
               >
                 <option value="PP">PP</option>
                 <option value="LPP">LPP</option>
@@ -810,197 +796,192 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
             </div>
 
             {/* Denier */}
-            <div className="p-3 bg-white">
-              <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Denier</label>
+            <div className="p-2.5 bg-white">
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Denier</label>
               <input
                 type="number"
                 value={currentPlan.denier}
                 placeholder="e.g. 800"
                 onChange={(e) => updateCurrentPlan({ denier: e.target.value })}
-                className="w-full h-8 px-2.5 text-xs font-semibold text-slate-800 bg-slate-50 border border-slate-200 rounded focus:bg-white focus:ring-1 focus:ring-primary outline-none text-right"
+                className="w-full h-8 px-2.5 text-xs font-mono font-semibold text-slate-800 bg-slate-50/50 border border-slate-200 rounded focus:bg-white focus:ring-1 focus:ring-slate-400 outline-none text-right"
               />
             </div>
 
             {/* Tape Width */}
-            <div className="p-3 bg-white">
-              <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Tape Width (mm)</label>
+            <div className="p-2.5 bg-white">
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Tape Width (mm)</label>
               <input
                 type="number"
                 step="0.01"
                 value={currentPlan.tapeWidth}
                 placeholder="e.g. 2.5"
                 onChange={(e) => updateCurrentPlan({ tapeWidth: e.target.value })}
-                className="w-full h-8 px-2.5 text-xs font-semibold text-slate-800 bg-slate-50 border border-slate-200 rounded focus:bg-white focus:ring-1 focus:ring-primary outline-none text-right"
+                className="w-full h-8 px-2.5 text-xs font-mono font-semibold text-slate-800 bg-slate-50/50 border border-slate-200 rounded focus:bg-white focus:ring-1 focus:ring-slate-400 outline-none text-right"
               />
             </div>
 
             {/* Strength */}
-            <div className="p-3 bg-white">
-              <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Strength (gpd)</label>
+            <div className="p-2.5 bg-white">
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Strength (gpd)</label>
               <input
                 type="number"
                 step="0.01"
                 value={currentPlan.strength}
                 placeholder="e.g. 4.8"
                 onChange={(e) => updateCurrentPlan({ strength: e.target.value })}
-                className="w-full h-8 px-2.5 text-xs font-semibold text-slate-800 bg-slate-50 border border-slate-200 rounded focus:bg-white focus:ring-1 focus:ring-primary outline-none text-right"
+                className="w-full h-8 px-2.5 text-xs font-mono font-semibold text-slate-800 bg-slate-50/50 border border-slate-200 rounded focus:bg-white focus:ring-1 focus:ring-slate-400 outline-none text-right"
               />
             </div>
 
             {/* ELO % */}
-            <div className="p-3 bg-white">
-              <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">ELO %</label>
+            <div className="p-2.5 bg-white">
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">ELO %</label>
               <input
                 type="number"
                 step="0.01"
                 value={currentPlan.eloPercent}
                 placeholder="e.g. 22.5"
                 onChange={(e) => updateCurrentPlan({ eloPercent: e.target.value })}
-                className="w-full h-8 px-2.5 text-xs font-semibold text-slate-800 bg-slate-50 border border-slate-200 rounded focus:bg-white focus:ring-1 focus:ring-primary outline-none text-right"
+                className="w-full h-8 px-2.5 text-xs font-mono font-semibold text-slate-800 bg-slate-50/50 border border-slate-200 rounded focus:bg-white focus:ring-1 focus:ring-slate-400 outline-none text-right"
               />
             </div>
 
             {/* Bobbin Marking */}
-            <div className="p-3 bg-white">
-              <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Bobbin Marking</label>
+            <div className="p-2.5 bg-white">
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Bobbin Marking</label>
               <input
                 type="text"
                 value={currentPlan.bobbinMarking}
                 placeholder="e.g. Red Strip"
                 onChange={(e) => updateCurrentPlan({ bobbinMarking: e.target.value })}
-                className="w-full h-8 px-2.5 text-xs font-semibold text-slate-800 bg-slate-50 border border-slate-200 rounded focus:bg-white focus:ring-1 focus:ring-primary outline-none"
+                className="w-full h-8 px-2.5 text-xs font-semibold text-slate-800 bg-slate-50/50 border border-slate-200 rounded focus:bg-white focus:ring-1 focus:ring-slate-400 outline-none"
               />
             </div>
 
             {/* Colour */}
-            <div className="p-3 bg-white">
-              <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Colour</label>
+            <div className="p-2.5 bg-white">
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Colour</label>
               <input
                 type="text"
                 value={currentPlan.colour}
-                placeholder="e.g. Yellow, Natural"
+                placeholder="e.g. Yellow"
                 onChange={(e) => updateCurrentPlan({ colour: e.target.value })}
-                className="w-full h-8 px-2.5 text-xs font-semibold text-slate-800 bg-slate-50 border border-slate-200 rounded focus:bg-white focus:ring-1 focus:ring-primary outline-none"
+                className="w-full h-8 px-2.5 text-xs font-semibold text-slate-800 bg-slate-50/50 border border-slate-200 rounded focus:bg-white focus:ring-1 focus:ring-slate-400 outline-none"
               />
             </div>
 
             {/* Spacer Size */}
-            <div className="p-3 bg-white">
-              <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Spacer Size</label>
+            <div className="p-2.5 bg-white">
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Spacer Size</label>
               <input
                 type="text"
                 value={currentPlan.spacerSize}
                 placeholder="e.g. 3.0 mm"
                 onChange={(e) => updateCurrentPlan({ spacerSize: e.target.value })}
-                className="w-full h-8 px-2.5 text-xs font-semibold text-slate-800 bg-slate-50 border border-slate-200 rounded focus:bg-white focus:ring-1 focus:ring-primary outline-none"
+                className="w-full h-8 px-2.5 text-xs font-semibold text-slate-800 bg-slate-50/50 border border-slate-200 rounded focus:bg-white focus:ring-1 focus:ring-slate-400 outline-none"
               />
             </div>
 
             {/* Required Ash */}
-            <div className="p-3 bg-white">
-              <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Required Ash</label>
+            <div className="p-2.5 bg-white">
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Required Ash</label>
               <input
                 type="number"
                 step="0.01"
                 value={currentPlan.requiredAsh}
                 placeholder="e.g. 1.2"
                 onChange={(e) => updateCurrentPlan({ requiredAsh: e.target.value })}
-                className="w-full h-8 px-2.5 text-xs font-semibold text-slate-800 bg-slate-50 border border-slate-200 rounded focus:bg-white focus:ring-1 focus:ring-primary outline-none text-right"
+                className="w-full h-8 px-2.5 text-xs font-mono font-semibold text-slate-800 bg-slate-50/50 border border-slate-200 rounded focus:bg-white focus:ring-1 focus:ring-slate-400 outline-none text-right"
               />
             </div>
 
             {/* Ash % */}
-            <div className="p-3 bg-white">
-              <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Ash %</label>
+            <div className="p-2.5 bg-white">
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Ash %</label>
               <input
                 type="number"
                 step="0.01"
                 value={currentPlan.ashPercent}
                 placeholder="e.g. 1.15"
                 onChange={(e) => updateCurrentPlan({ ashPercent: e.target.value })}
-                className="w-full h-8 px-2.5 text-xs font-semibold text-slate-800 bg-slate-50 border border-slate-200 rounded focus:bg-white focus:ring-1 focus:ring-primary outline-none text-right"
+                className="w-full h-8 px-2.5 text-xs font-mono font-semibold text-slate-800 bg-slate-50/50 border border-slate-200 rounded focus:bg-white focus:ring-1 focus:ring-slate-400 outline-none text-right"
               />
             </div>
 
             {/* Planned QTY (KG) */}
-            <div className="p-3 bg-blue-50/40">
-              <label className="block text-[11px] font-extrabold text-blue-700 uppercase mb-1">
+            <div className="p-2.5 bg-slate-50/70 border-2 border-slate-800/10">
+              <label className="block text-[10px] font-bold text-slate-900 uppercase tracking-wider mb-1">
                 Planned Qty (KG) <span className="text-red-500">*</span>
               </label>
               <input
                 type="number"
                 value={currentPlan.plannedQtyKg}
-                placeholder="e.g. 5000"
+                placeholder="0"
                 onChange={(e) => handlePlannedQtyChange(e.target.value)}
-                className="w-full h-8 px-2.5 text-xs font-extrabold text-blue-900 bg-white border border-blue-200 rounded focus:ring-2 focus:ring-primary outline-none text-right shadow-xs"
+                className="w-full h-8 px-2.5 text-xs font-mono font-bold text-slate-900 bg-white border border-slate-300 rounded focus:ring-1 focus:ring-slate-900 outline-none text-right shadow-2xs"
               />
             </div>
 
             {/* Omega */}
-            <div className="p-3 bg-white">
-              <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Omega</label>
+            <div className="p-2.5 bg-white">
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Omega</label>
               <input
                 type="text"
                 value={currentPlan.omega}
-                placeholder="Omega code"
+                placeholder="Code"
                 onChange={(e) => updateCurrentPlan({ omega: e.target.value })}
-                className="w-full h-8 px-2.5 text-xs font-semibold text-slate-800 bg-slate-50 border border-slate-200 rounded focus:bg-white focus:ring-1 focus:ring-primary outline-none"
+                className="w-full h-8 px-2.5 text-xs font-semibold text-slate-800 bg-slate-50/50 border border-slate-200 rounded focus:bg-white focus:ring-1 focus:ring-slate-400 outline-none"
               />
             </div>
 
             {/* Vist % */}
-            <div className="p-3 bg-white">
-              <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Vist... %</label>
+            <div className="p-2.5 bg-white">
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Vist... %</label>
               <input
                 type="number"
                 step="0.01"
                 value={currentPlan.vistPercent}
                 placeholder="%"
                 onChange={(e) => updateCurrentPlan({ vistPercent: e.target.value })}
-                className="w-full h-8 px-2.5 text-xs font-semibold text-slate-800 bg-slate-50 border border-slate-200 rounded focus:bg-white focus:ring-1 focus:ring-primary outline-none text-right"
+                className="w-full h-8 px-2.5 text-xs font-mono font-semibold text-slate-800 bg-slate-50/50 border border-slate-200 rounded focus:bg-white focus:ring-1 focus:ring-slate-400 outline-none text-right"
               />
             </div>
           </div>
 
           {/* Remarks Row */}
-          <div className="p-3 bg-slate-50/50">
-            <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Remarks</label>
+          <div className="p-2.5 bg-slate-50/50 flex items-center gap-3">
+            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider shrink-0">Remarks</label>
             <input
               type="text"
               value={currentPlan.remarks}
-              placeholder="Shift notes or special instructions for this recipe run"
+              placeholder="Optional notes or shift instructions"
               onChange={(e) => updateCurrentPlan({ remarks: e.target.value })}
-              className="w-full h-8 px-2.5 text-xs text-slate-800 bg-white border border-slate-200 rounded focus:ring-1 focus:ring-primary outline-none"
+              className="flex-1 h-7 px-2.5 text-xs text-slate-800 bg-white border border-slate-200 rounded focus:ring-1 focus:ring-slate-400 outline-none"
             />
           </div>
         </div>
 
         {/* 3. Material Composition Formula Spreadsheet */}
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 sm:p-5">
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                <FlaskConical className="h-4 w-4 text-primary" />
-                Material Composition (Formula for Run #{activeRecipeIndex + 1})
-              </h3>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Specify raw material blend percentages and planned kilograms for this specific recipe run.
-              </p>
-            </div>
+        <div className="bg-white rounded-xl border border-slate-200 p-3.5 sm:p-4 space-y-2.5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+              <FlaskConical className="h-3.5 w-3.5 text-slate-600" />
+              Material Composition (Formula #{activeRecipeIndex + 1})
+            </h3>
             <div className="flex items-center gap-3 text-xs">
-              <span className="font-semibold text-slate-600">
-                Total Qty: <strong className="font-mono text-slate-900">{totalActiveMaterialQty.toLocaleString()} KG</strong>
+              <span className="text-slate-500 font-medium">
+                Total Qty: <strong className="font-mono text-slate-900 font-bold">{totalActiveMaterialQty.toLocaleString()} KG</strong>
               </span>
               <span
-                className={`font-semibold px-2 py-0.5 rounded ${
+                className={`font-mono text-xs px-2 py-0.5 rounded font-bold border ${
                   totalActivePercentage === 100
-                    ? "bg-emerald-50 text-emerald-700 font-bold"
+                    ? "bg-emerald-50 text-emerald-800 border-emerald-200"
                     : totalActivePercentage > 100
-                    ? "bg-red-50 text-red-700 font-bold"
-                    : "bg-slate-100 text-slate-700"
+                    ? "bg-red-50 text-red-700 border-red-200"
+                    : "bg-slate-100 text-slate-700 border-slate-200"
                 }`}
               >
-                Total %: {totalActivePercentage.toFixed(1)}%
+                {totalActivePercentage.toFixed(1)}%
               </span>
             </div>
           </div>
@@ -1021,7 +1002,6 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
                 materials: currentPlan.materials.filter((_, i) => i !== idx),
               })
             }
-            title="Material Formula"
           />
         </div>
       </div>
