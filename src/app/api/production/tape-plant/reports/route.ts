@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
 
     // 1. Granular Production Summary records
     const summary = postProductions.map((p: any) => {
-      const shiftPlans = plans.filter((pl: any) => pl.date === p.date && pl.shiftId === p.shiftId);
+      const shiftPlans = plans.filter((pl: any) => pl.date === p.date && (pl.shiftId === p.shiftId || pl.isDayNight));
       const plannedKg = p.plannedProductionKg || shiftPlans.reduce((sum, pl) => sum + (pl.plannedQtyKg || 0), 0);
       const doneKg = p.productionDoneKg || 0;
       const gapKg = plannedKg - doneKg;

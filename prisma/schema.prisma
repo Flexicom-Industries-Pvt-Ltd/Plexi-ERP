@@ -1671,6 +1671,7 @@ model TapePlantPlan {
   vistPercent     Float?
   remarks         String?
   materials       Json     @default("[]") // Array of { material, quantity, percentage }
+  isDayNight      Boolean  @default(false) // Whether this plan entry spans across Day + Night (2 shifts)
   status          String   @default("DRAFT") // DRAFT | SUBMITTED
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -1680,6 +1681,7 @@ model TapePlantPlan {
   @@index([date, shiftId])
   @@index([date])
   @@index([shiftId])
+  @@index([isDayNight])
 }
 
 model TapePlantTemperatureReading {
