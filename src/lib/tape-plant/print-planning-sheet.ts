@@ -455,16 +455,19 @@ export function generatePlanningSheetHtml(data: TapePlanningPrintData): string {
 </head>
 <body>
   <div class="sheet-container">
-    <!-- CENTERED MAIN HEADER WITH FLEXICOM LOGO -->
+    <!-- MAIN HEADER WITH TOP-LEFT VIVID FLEXICOM LOGO -->
     <div class="header-container">
-      <div style="display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 2px;">
-        <img src="/logo.png" alt="Flexicom Logo" style="height: 26px; width: auto; object-fit: contain;" onerror="this.style.display='none'" />
-        <div>
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px;">
+        <div style="width: 60px; text-align: left; display: flex; align-items: center;">
+          <img src="/logo.png" alt="Flexicom Logo" style="height: 44px; width: auto; object-fit: contain; filter: contrast(1.25) saturate(1.25);" onerror="this.style.display='none'" />
+        </div>
+        <div style="flex: 1; text-align: center;">
           <div class="company-title">Flexicom Industries Pvt. Ltd.</div>
           <div class="company-sub">Tape Plant Extrusion & Winding Division • Kathua Industrial Complex, Phase-II, Kathua (J&K)</div>
+          <div class="doc-main-heading">TAPE PLANT PRODUCTION PLAN</div>
         </div>
+        <div style="width: 60px;" aria-hidden="true"></div>
       </div>
-      <div class="doc-main-heading">TAPE PLANT PRODUCTION PLAN</div>
       <div class="doc-meta-strip">
         <span>Doc Ref: <strong>${docRef}</strong></span>
         <span>•</span>

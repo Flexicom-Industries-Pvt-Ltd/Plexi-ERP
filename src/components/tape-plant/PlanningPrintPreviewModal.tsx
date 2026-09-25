@@ -203,29 +203,39 @@ export function PlanningPrintPreviewModal({
         {/* Scrollable Preview Canvas */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-slate-100">
           <div className="max-w-5xl mx-auto bg-white p-6 sm:p-8 rounded-lg shadow-sm border border-slate-300 text-slate-900 space-y-5">
-            {/* Centered Main Header with Flexicom Logo */}
-            <div className="border-b-2 border-slate-900 pb-3 text-center space-y-1.5">
-              <div className="flex items-center justify-center gap-3">
-                <img
-                  src="/logo.png"
-                  alt="Flexicom Logo"
-                  className="h-9 w-auto object-contain shrink-0"
-                />
-                <div className="text-left sm:text-center">
+            {/* Main Header with Top-Left Corner Vivid Flexicom Logo */}
+            <div className="border-b-2 border-slate-900 pb-3 text-center">
+              <div className="flex items-center justify-between gap-2 sm:gap-4">
+                {/* Top-Left Corner Logo - Bigger and Vivid */}
+                <div className="w-16 sm:w-24 text-left shrink-0 flex items-center">
+                  <img
+                    src="/logo.png"
+                    alt="Flexicom Logo"
+                    className="h-12 sm:h-16 w-auto object-contain shrink-0 filter contrast-125 saturate-125 drop-shadow-sm"
+                  />
+                </div>
+
+                {/* Centered Document Header */}
+                <div className="flex-1 text-center space-y-1">
                   <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight uppercase">
                     Flexicom Industries Pvt. Ltd.
                   </h1>
                   <p className="text-[11px] sm:text-xs font-semibold text-slate-600">
                     Tape Plant Extrusion & Winding Division • Kathua Industrial Complex, Phase-II, Kathua (J&K)
                   </p>
+                  <div>
+                    <div className="inline-block my-0.5 px-3 py-0.5 bg-slate-100 text-slate-900 font-extrabold text-xs uppercase tracking-wider border border-slate-400">
+                      Tape Plant Production Plan
+                    </div>
+                  </div>
                 </div>
+
+                {/* Right Balance Spacer */}
+                <div className="w-16 sm:w-24 shrink-0 hidden sm:block" aria-hidden="true" />
               </div>
-              <div>
-                <div className="inline-block my-0.5 px-3 py-0.5 bg-slate-100 text-slate-900 font-extrabold text-xs uppercase tracking-wider border border-slate-400">
-                  Tape Plant Production Plan
-                </div>
-              </div>
-              <div className="flex flex-wrap items-center justify-center gap-3 text-xs text-slate-600 pt-0.5">
+
+              {/* Meta strip */}
+              <div className="flex flex-wrap items-center justify-center gap-3 text-xs text-slate-600 pt-1">
                 <span>Doc Ref: <strong className="text-slate-900 font-mono">{docRef}</strong></span>
                 <span>•</span>
                 <span>Date: <strong className="text-slate-900">{date}</strong></span>
