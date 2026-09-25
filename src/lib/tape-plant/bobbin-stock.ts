@@ -78,16 +78,16 @@ export function computeBobbinStockTotals(items: BobbinStockItem[]): BobbinStockT
 }
 
 /**
- * Exports Bobbin Stock Summary to Excel (.xlsx)
+ * Exports Bobbin Stock Summary to Excel (.xlsx) without Shift and Remarks
  */
 export function exportBobbinStockExcel({
-  date,
-  shiftName,
+  dateDescription,
+  shiftDescription,
   items,
   totals,
 }: {
-  date: string;
-  shiftName: string;
+  dateDescription?: string;
+  shiftDescription?: string;
   items: BobbinStockItem[];
   totals: BobbinStockTotals;
 }) {
@@ -95,9 +95,9 @@ export function exportBobbinStockExcel({
 
   const titleRow = ["FLEXICOM INDUSTRIES PVT. LTD. - TAPE PLANT BOBBIN STOCK SUMMARY"];
   const metaRow1 = [
-    `Date: ${date}`,
-    `Shift: ${shiftName}`,
-    `Total Qualities: ${items.length}`,
+    `Period / Date: ${dateDescription || "All Time (Till Date)"}`,
+    `Shift: ${shiftDescription || "All Shifts"}`,
+    `Total Active Qualities: ${items.length}`,
     `Standard Bobbin Weight: ${BOBBIN_WEIGHT_KG} kg`,
     `Standard Crate Weight: ${CRATE_WEIGHT_KG} kg (${BOBBINS_PER_CRATE} bobbins/crate)`,
     `Generated: ${new Date().toLocaleString()}`,
@@ -112,8 +112,6 @@ export function exportBobbinStockExcel({
     "Production Done in KG (Net Output)",
     "Stock of Bobbins (@ 1.6 kg)",
     "Stock of Crates (@ 12.8 kg)",
-    "Shift",
-    "Remarks",
   ];
 
   const dataRows = items.map((item) => [
@@ -124,8 +122,6 @@ export function exportBobbinStockExcel({
     item.netProductionKg,
     item.bobbinStock,
     item.crateStock,
-    item.shiftName || shiftName,
-    item.remarks || "-",
   ]);
 
   const totalsRow = [
@@ -136,8 +132,6 @@ export function exportBobbinStockExcel({
     totals.totalNetProductionKg,
     totals.totalBobbinStock,
     totals.totalCrateStock,
-    "-",
-    "-",
   ];
 
   const wsData = [
@@ -154,36 +148,33 @@ export function exportBobbinStockExcel({
 
   ws["!cols"] = [
     { wch: 8 },  // Sl No
-    { wch: 28 }, // Quality Name
+    { wch: 32 }, // Quality Name
     { wch: 22 }, // Gross Production (kg)
     { wch: 16 }, // Wastage (kg)
     { wch: 34 }, // Production Done in KG (Net Output)
     { wch: 26 }, // Stock of Bobbins (@ 1.6 kg)
     { wch: 26 }, // Stock of Crates (@ 12.8 kg)
-    { wch: 20 }, // Shift
-    { wch: 24 }, // Remarks
   ];
 
   XLSX.utils.book_append_sheet(wb, ws, "Bobbin Stock Summary");
 
-  const sanitizedDate = date.replace(/[^0-9-]/g, "_");
-  const sanitizedShift = shiftName.replace(/[^a-zA-Z0-9_-]/g, "_");
-  const filename = `Bobbin_Stock_Summary_${sanitizedDate}_${sanitizedShift}.xlsx`;
+  const sanitizedDate = (dateDescription || "All_Till_Date").replace(/[^0-9a-zA-Z_-]/g, "_");
+  const filename = `Bobbin_Stock_Summary_${sanitizedDate}.xlsx`;
 
   XLSX.writeFile(wb, filename);
 }
 
 /**
- * Triggers clean print view for Bobbin Stock Summary
+ * Triggers clean print view for Bobbin Stock Summary without Shift and Remarks
  */
 export function printBobbinStockSummary({
-  date,
-  shiftName,
+  dateDescription,
+  shiftDescription,
   items,
   totals,
 }: {
-  date: string;
-  shiftName: string;
+  dateDescription?: string;
+  shiftDescription?: string;
   items: BobbinStockItem[];
   totals: BobbinStockTotals;
 }) {
@@ -204,7 +195,6 @@ export function printBobbinStockSummary({
         <td style="text-align: right; font-weight: bold; color: #047857; background-color: #f0fdf4;">${item.netProductionKg.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
         <td style="text-align: right; font-weight: bold; color: #1e40af; background-color: #eff6ff;">${item.bobbinStock.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
         <td style="text-align: right; font-weight: bold; color: #6b21a8; background-color: #faf5ff;">${item.crateStock.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-        <td style="text-align: center; font-size: 11px; color: #64748b;">${item.shiftName || shiftName}</td>
       </tr>`
     )
     .join("");
@@ -212,7 +202,7 @@ export function printBobbinStockSummary({
   const html = `<!DOCTYPE html>
 <html>
 <head>
-  <title>Tape Plant - Bobbin Stock Summary (${date})</title>
+  <title>Tape Plant - Bobbin Stock Summary</title>
   <style>
     @page {
       size: A4 portrait;
@@ -342,8 +332,8 @@ export function printBobbinStockSummary({
       <div class="sheet-title">Tape Plant - Bobbin Stock Summary Report</div>
     </div>
     <div class="meta-box">
-      <div><strong>Date:</strong> ${date}</div>
-      <div><strong>Shift:</strong> ${shiftName}</div>
+      <div><strong>Period:</strong> ${dateDescription || "All Time (Till Date)"}</div>
+      <div><strong>Shift:</strong> ${shiftDescription || "All Shifts"}</div>
       <div><strong>Generated:</strong> ${new Date().toLocaleString()}</div>
     </div>
   </div>
@@ -377,7 +367,6 @@ export function printBobbinStockSummary({
         <th style="text-align: right; background-color: #e2fbe8; color: #047857;">Net Output (kg)</th>
         <th style="text-align: right; background-color: #dbeafe; color: #1e40af;">Bobbin Stock (@ 1.6 kg)</th>
         <th style="text-align: right; background-color: #f3e8ff; color: #6b21a8;">Crate Stock (@ 12.8 kg)</th>
-        <th style="text-align: center; width: 80px;">Shift</th>
       </tr>
     </thead>
     <tbody>
@@ -391,7 +380,6 @@ export function printBobbinStockSummary({
         <td style="text-align: right; color: #047857;">${totals.totalNetProductionKg.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
         <td style="text-align: right; color: #1e40af;">${totals.totalBobbinStock.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
         <td style="text-align: right; color: #6b21a8;">${totals.totalCrateStock.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-        <td style="text-align: center;">-</td>
       </tr>
     </tfoot>
   </table>
