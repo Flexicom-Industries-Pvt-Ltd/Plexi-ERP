@@ -116,6 +116,111 @@ describe("Tape Plant Minimalist Planning Sheet Print Engine", () => {
     expect(html).toContain("Approved By (Plant Supervisor / Manager)");
   });
 
+  it("should accurately calculate decimal formulation totals and summary percentages matching complex production plans", () => {
+    const multiRecipeData: TapePlanningPrintData = {
+      date: "2026-09-25",
+      shiftName: "Day Shift (08:00 - 20:00)",
+      status: "APPROVED",
+      plans: [
+        {
+          id: "p1",
+          recipeQuality: "UTCL/PP/YL/75.5/495/S1",
+          tapeType: "PP",
+          denier: 75.5,
+          tapeWidth: 495,
+          strength: 4.5,
+          eloPercent: 20,
+          bobbinMarking: "YL",
+          colour: "YL",
+          spacerSize: "1.2mm",
+          requiredAsh: 1.5,
+          ashPercent: 1.5,
+          plannedQtyKg: 4000,
+          omega: "W-1",
+          vistPercent: 0,
+          remarks: "",
+          materials: [
+            { material: "PP", quantity: 3560, percentage: 89 },
+            { material: "CC", quantity: 200, percentage: 5 },
+            { material: "MB", quantity: 40, percentage: 1 },
+            { material: "RP1", quantity: 120, percentage: 3 },
+            { material: "RP2", quantity: 80, percentage: 2 },
+          ],
+        },
+        {
+          id: "p2",
+          recipeQuality: "BVCL/PP/YL/75.5/495/HC",
+          tapeType: "PP",
+          denier: 75.5,
+          tapeWidth: 495,
+          strength: 4.8,
+          eloPercent: 22,
+          bobbinMarking: "YL-HC",
+          colour: "YL",
+          spacerSize: "1.2mm",
+          requiredAsh: 1.8,
+          ashPercent: 1.8,
+          plannedQtyKg: 1500,
+          omega: "W-2",
+          vistPercent: 0,
+          remarks: "",
+          materials: [
+            { material: "PP", quantity: 847.5, percentage: 56.5 },
+            { material: "CC", quantity: 330, percentage: 22 },
+            { material: "MB", quantity: 37.5, percentage: 2.5 },
+            { material: "RP1", quantity: 75, percentage: 5 },
+            { material: "RP2", quantity: 195, percentage: 13 },
+            { material: "TPT", quantity: 15, percentage: 1 },
+          ],
+        },
+        {
+          id: "p3",
+          recipeQuality: "WOND/LPP/WHT/69/500/S1",
+          tapeType: "LPP",
+          denier: 69,
+          tapeWidth: 500,
+          strength: 5.0,
+          eloPercent: 24,
+          bobbinMarking: "WHT",
+          colour: "WHT",
+          spacerSize: "1.0mm",
+          requiredAsh: 1.2,
+          ashPercent: 1.2,
+          plannedQtyKg: 9500,
+          omega: "W-3",
+          vistPercent: 0,
+          remarks: "",
+          materials: [
+            { material: "PP", quantity: 8550, percentage: 90 },
+            { material: "CC", quantity: 475, percentage: 5 },
+            { material: "RP1", quantity: 475, percentage: 5 },
+          ],
+        },
+      ],
+    };
+
+    const html = generatePlanningSheetHtml(multiRecipeData);
+    // Table 2 footer sums
+    expect(html).toContain("12,957.5"); // PP total sum
+    expect(html).toContain("1,005"); // CC total sum
+    expect(html).toContain("77.5"); // MB total sum
+    expect(html).toContain("670"); // RP1 total sum
+    expect(html).toContain("275"); // RP2 total sum
+    expect(html).toContain("15"); // TPT total sum
+    expect(html).toContain("15,000 KG"); // Batch Total sum
+
+    // Table 3 Raw Material Summary rows
+    expect(html).toContain("12,957.5 KG");
+    expect(html).toContain("1,005 KG");
+    expect(html).toContain("77.5 KG");
+    expect(html).toContain("670 KG");
+    expect(html).toContain("275 KG");
+    expect(html).toContain("15 KG");
+    expect(html).toContain("86.4%"); // PP composition
+    expect(html).toContain("6.7%"); // CC composition
+    expect(html).toContain("100.0%"); // Total composition
+  });
+
   it("should handle empty recipe plan gracefully", () => {
     const emptyData: TapePlanningPrintData = {
       date: "2026-09-24",

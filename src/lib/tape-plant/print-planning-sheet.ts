@@ -13,11 +13,32 @@ export interface TapePlanningPrintData {
   plans: RecipePlanItem[];
 }
 
-function formatNumber(val: number | string | undefined | null): string {
-  if (val === undefined || val === null || val === "") return "—";
+function normalizeMaterialKey(mat: string): string {
+  const clean = (mat || "").trim().toUpperCase().replace(/[\s\-_]/g, "");
+  if (clean === "PP") return "PP";
+  if (clean === "CC") return "CC";
+  if (clean === "MB") return "MB";
+  if (clean === "RP1") return "RP1";
+  if (clean === "RP2") return "RP2";
+  if (clean === "HDRP") return "HD RP";
+  if (clean === "TPT") return "TPT";
+  return (mat || "").trim().toUpperCase();
+}
+
+function formatKg(val: number | string | undefined | null): string {
+  if (val === undefined || val === null || val === "" || val === 0) return "—";
   const num = Number(val);
   if (isNaN(num)) return String(val);
-  return num.toLocaleString();
+  return Number.isInteger(num)
+    ? num.toLocaleString()
+    : num.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 });
+}
+
+function formatPct(val: number | string | undefined | null): string {
+  if (val === undefined || val === null || val === "" || val === 0) return "—";
+  const num = Number(val);
+  if (isNaN(num)) return `${val}%`;
+  return Number.isInteger(num) ? `${num}%` : `${num.toFixed(1)}%`;
 }
 
 export function generatePlanningSheetHtml(data: TapePlanningPrintData): string {
@@ -31,24 +52,36 @@ export function generatePlanningSheetHtml(data: TapePlanningPrintData): string {
     .filter((p) => p.isDayNight)
     .reduce((acc, p) => acc + (Number(p.plannedQtyKg) || 0), 0);
 
-  // Material aggregates across all recipe runs
-  const materialTotals: Record<string, { qty: number; count: number }> = {};
+  // Pre-calculate aggregate raw material sums across all recipe runs
+  let totalPPSum = 0;
+  let totalCCSum = 0;
+  let totalMBSum = 0;
+  let totalRP1Sum = 0;
+  let totalRP2Sum = 0;
+  let totalHDRPSum = 0;
+  let totalTPTSum = 0;
+  let totalOtherSum = 0;
+  let totalBatchSum = 0;
+
   plans.forEach((p) => {
+    let runMatQty = 0;
     (p.materials || []).forEach((m) => {
-      const name = m.material.trim().toUpperCase() || "UNKNOWN";
+      const key = normalizeMaterialKey(m.material);
       const q = Number(m.quantity) || 0;
-      if (!materialTotals[name]) {
-        materialTotals[name] = { qty: 0, count: 0 };
-      }
-      materialTotals[name].qty += q;
-      materialTotals[name].count += 1;
+      runMatQty += q;
+      if (key === "PP") totalPPSum += q;
+      else if (key === "CC") totalCCSum += q;
+      else if (key === "MB") totalMBSum += q;
+      else if (key === "RP1") totalRP1Sum += q;
+      else if (key === "RP2") totalRP2Sum += q;
+      else if (key === "HD RP") totalHDRPSum += q;
+      else if (key === "TPT") totalTPTSum += q;
+      else totalOtherSum += q;
     });
+    totalBatchSum += (runMatQty || Number(p.plannedQtyKg) || 0);
   });
 
-  const totalAllMaterialsKg = Object.values(materialTotals).reduce(
-    (a, b) => a + b.qty,
-    0
-  );
+  const totalAllMaterialsKg = totalBatchSum;
 
   // Table 1: Recipe Machine Parameters Rows
   const recipeParamRows = plans.length > 0
@@ -70,7 +103,7 @@ export function generatePlanningSheetHtml(data: TapePlanningPrintData): string {
         <td style="text-align: right; font-family: monospace;">${p.ashPercent !== "" && p.ashPercent !== undefined ? `${p.ashPercent}%` : "—"}</td>
         <td style="font-family: monospace;">${p.omega || "—"}</td>
         <td style="text-align: right; font-weight: 800; font-family: monospace; background-color: #f8fafc;">
-          ${Number(p.plannedQtyKg) ? Number(p.plannedQtyKg).toLocaleString() : "0"}
+          ${formatKg(p.plannedQtyKg)}
         </td>
       </tr>
     `).join("")
@@ -82,25 +115,12 @@ export function generatePlanningSheetHtml(data: TapePlanningPrintData): string {
       </tr>
     `;
 
-  // Standard material columns for formulation matrix
-  const KNOWN_MATS = ["PP", "CC", "MB", "RP1", "RP2", "HD RP", "TPT"];
-
   // Table 2: Material Formulation Matrix Rows with separate KG and % columns
-  let totalPPSum = 0;
-  let totalCCSum = 0;
-  let totalMBSum = 0;
-  let totalRP1Sum = 0;
-  let totalRP2Sum = 0;
-  let totalHDRPSum = 0;
-  let totalTPTSum = 0;
-  let totalOtherSum = 0;
-  let totalBatchSum = 0;
-
   const formulationRows = plans.length > 0
     ? plans.map((p, idx) => {
         const getMat = (name: string): { qty: number; pct: number } => {
           const match = (p.materials || []).find(
-            (m) => m.material.trim().toUpperCase() === name.toUpperCase()
+            (m) => normalizeMaterialKey(m.material) === name
           );
           return {
             qty: match && Number(match.quantity) ? Number(match.quantity) : 0,
@@ -125,58 +145,44 @@ export function generatePlanningSheetHtml(data: TapePlanningPrintData): string {
           const pct = Number(m.percentage) || 0;
           runBatchQty += q;
           totalBlendPct += pct;
-          if (!KNOWN_MATS.includes(m.material.trim().toUpperCase())) {
+          const key = normalizeMaterialKey(m.material);
+          if (!["PP", "CC", "MB", "RP1", "RP2", "HD RP", "TPT"].includes(key)) {
             otherQty += q;
           }
         });
 
-        totalPPSum += pp.qty;
-        totalCCSum += cc.qty;
-        totalMBSum += mb.qty;
-        totalRP1Sum += rp1.qty;
-        totalRP2Sum += rp2.qty;
-        totalHDRPSum += hdrp.qty;
-        totalTPTSum += tpt.qty;
-        totalOtherSum += otherQty;
-        totalBatchSum += (runBatchQty || Number(p.plannedQtyKg) || 0);
-
-        const formatQty = (item: { qty: number; pct: number }) => {
-          return item.qty ? item.qty.toLocaleString() : "—";
-        };
-        const formatPct = (item: { qty: number; pct: number }) => {
-          return item.pct ? `${item.pct}%` : "—";
-        };
+        const rowBatchTotal = runBatchQty || Number(p.plannedQtyKg) || 0;
 
         return `
           <tr>
             <td style="text-align: center; font-weight: 700; width: 24px;">${idx + 1}</td>
             <td style="font-weight: 700; font-family: monospace; font-size: 8pt; white-space: nowrap;">${p.recipeQuality || "—"}</td>
             <!-- PP -->
-            <td style="text-align: right; font-family: monospace; font-weight: 600;">${formatQty(pp)}</td>
-            <td style="text-align: right; font-family: monospace; color: #475569; font-size: 7pt; background-color: #f8fafc;">${formatPct(pp)}</td>
+            <td style="text-align: right; font-family: monospace; font-weight: 600;">${formatKg(pp.qty)}</td>
+            <td style="text-align: right; font-family: monospace; color: #475569; font-size: 7pt; background-color: #f8fafc;">${formatPct(pp.pct)}</td>
             <!-- CC -->
-            <td style="text-align: right; font-family: monospace; font-weight: 600;">${formatQty(cc)}</td>
-            <td style="text-align: right; font-family: monospace; color: #475569; font-size: 7pt; background-color: #f8fafc;">${formatPct(cc)}</td>
+            <td style="text-align: right; font-family: monospace; font-weight: 600;">${formatKg(cc.qty)}</td>
+            <td style="text-align: right; font-family: monospace; color: #475569; font-size: 7pt; background-color: #f8fafc;">${formatPct(cc.pct)}</td>
             <!-- MB -->
-            <td style="text-align: right; font-family: monospace; font-weight: 600;">${formatQty(mb)}</td>
-            <td style="text-align: right; font-family: monospace; color: #475569; font-size: 7pt; background-color: #f8fafc;">${formatPct(mb)}</td>
+            <td style="text-align: right; font-family: monospace; font-weight: 600;">${formatKg(mb.qty)}</td>
+            <td style="text-align: right; font-family: monospace; color: #475569; font-size: 7pt; background-color: #f8fafc;">${formatPct(mb.pct)}</td>
             <!-- RP1 -->
-            <td style="text-align: right; font-family: monospace; font-weight: 600;">${formatQty(rp1)}</td>
-            <td style="text-align: right; font-family: monospace; color: #475569; font-size: 7pt; background-color: #f8fafc;">${formatPct(rp1)}</td>
+            <td style="text-align: right; font-family: monospace; font-weight: 600;">${formatKg(rp1.qty)}</td>
+            <td style="text-align: right; font-family: monospace; color: #475569; font-size: 7pt; background-color: #f8fafc;">${formatPct(rp1.pct)}</td>
             <!-- RP2 -->
-            <td style="text-align: right; font-family: monospace; font-weight: 600;">${formatQty(rp2)}</td>
-            <td style="text-align: right; font-family: monospace; color: #475569; font-size: 7pt; background-color: #f8fafc;">${formatPct(rp2)}</td>
+            <td style="text-align: right; font-family: monospace; font-weight: 600;">${formatKg(rp2.qty)}</td>
+            <td style="text-align: right; font-family: monospace; color: #475569; font-size: 7pt; background-color: #f8fafc;">${formatPct(rp2.pct)}</td>
             <!-- HD RP -->
-            <td style="text-align: right; font-family: monospace; font-weight: 600;">${formatQty(hdrp)}</td>
-            <td style="text-align: right; font-family: monospace; color: #475569; font-size: 7pt; background-color: #f8fafc;">${formatPct(hdrp)}</td>
+            <td style="text-align: right; font-family: monospace; font-weight: 600;">${formatKg(hdrp.qty)}</td>
+            <td style="text-align: right; font-family: monospace; color: #475569; font-size: 7pt; background-color: #f8fafc;">${formatPct(hdrp.pct)}</td>
             <!-- TPT -->
-            <td style="text-align: right; font-family: monospace; font-weight: 600;">${formatQty(tpt)}</td>
-            <td style="text-align: right; font-family: monospace; color: #475569; font-size: 7pt; background-color: #f8fafc;">${formatPct(tpt)}</td>
+            <td style="text-align: right; font-family: monospace; font-weight: 600;">${formatKg(tpt.qty)}</td>
+            <td style="text-align: right; font-family: monospace; color: #475569; font-size: 7pt; background-color: #f8fafc;">${formatPct(tpt.pct)}</td>
             <!-- Other -->
-            <td style="text-align: right; font-family: monospace;">${otherQty ? otherQty.toLocaleString() : "—"}</td>
+            <td style="text-align: right; font-family: monospace;">${formatKg(otherQty)}</td>
             <!-- Total Batch -->
             <td style="text-align: right; font-weight: 800; font-family: monospace; background-color: #f1f5f9;">
-              ${(runBatchQty || Number(p.plannedQtyKg) || 0).toLocaleString()}
+              ${formatKg(rowBatchTotal)}
             </td>
             <!-- Blend % -->
             <td style="text-align: right; font-family: monospace; font-weight: 700; width: 42px;">
@@ -208,7 +214,7 @@ export function generatePlanningSheetHtml(data: TapePlanningPrintData): string {
   }
 
   const summaryHeadersHtml = summaryMats.map((m) => `<th style="text-align: center; border: 1px solid #94a3b8; padding: 4px 6px; font-weight: 700; font-size: 7.5pt;">${m.name}</th>`).join("");
-  const summaryQtyRowHtml = summaryMats.map((m) => `<td style="text-align: center; font-family: monospace; font-weight: 800; padding: 4px 6px; border: 1px solid #cbd5e1; font-size: 8.5pt;">${m.qty ? `${m.qty.toLocaleString()} KG` : "—"}</td>`).join("");
+  const summaryQtyRowHtml = summaryMats.map((m) => `<td style="text-align: center; font-family: monospace; font-weight: 800; padding: 4px 6px; border: 1px solid #cbd5e1; font-size: 8.5pt;">${m.qty ? `${formatKg(m.qty)} KG` : "—"}</td>`).join("");
   const summaryPctRowHtml = summaryMats.map((m) => {
     const pct = totalBatchSum > 0 ? ((m.qty / totalBatchSum) * 100).toFixed(1) : "0.0";
     return `<td style="text-align: center; font-family: monospace; color: #0f766e; font-weight: 700; padding: 3px 6px; border: 1px solid #cbd5e1; font-size: 7.5pt; background-color: #f8fafc;">${m.qty ? `${pct}%` : "—"}</td>`;
@@ -552,31 +558,31 @@ export function generatePlanningSheetHtml(data: TapePlanningPrintData): string {
             Total Formulations:
           </td>
           <!-- PP -->
-          <td style="text-align: right; font-family: monospace; font-weight: 800;">${totalPPSum ? totalPPSum.toLocaleString() : "—"}</td>
+          <td style="text-align: right; font-family: monospace; font-weight: 800;">${formatKg(totalPPSum)}</td>
           <td style="text-align: right; font-family: monospace; font-size: 6.5pt; color: #64748b;">${totalBatchSum > 0 && totalPPSum > 0 ? `${((totalPPSum / totalBatchSum) * 100).toFixed(1)}%` : "—"}</td>
           <!-- CC -->
-          <td style="text-align: right; font-family: monospace; font-weight: 800;">${totalCCSum ? totalCCSum.toLocaleString() : "—"}</td>
+          <td style="text-align: right; font-family: monospace; font-weight: 800;">${formatKg(totalCCSum)}</td>
           <td style="text-align: right; font-family: monospace; font-size: 6.5pt; color: #64748b;">${totalBatchSum > 0 && totalCCSum > 0 ? `${((totalCCSum / totalBatchSum) * 100).toFixed(1)}%` : "—"}</td>
           <!-- MB -->
-          <td style="text-align: right; font-family: monospace; font-weight: 800;">${totalMBSum ? totalMBSum.toLocaleString() : "—"}</td>
+          <td style="text-align: right; font-family: monospace; font-weight: 800;">${formatKg(totalMBSum)}</td>
           <td style="text-align: right; font-family: monospace; font-size: 6.5pt; color: #64748b;">${totalBatchSum > 0 && totalMBSum > 0 ? `${((totalMBSum / totalBatchSum) * 100).toFixed(1)}%` : "—"}</td>
           <!-- RP1 -->
-          <td style="text-align: right; font-family: monospace; font-weight: 800;">${totalRP1Sum ? totalRP1Sum.toLocaleString() : "—"}</td>
+          <td style="text-align: right; font-family: monospace; font-weight: 800;">${formatKg(totalRP1Sum)}</td>
           <td style="text-align: right; font-family: monospace; font-size: 6.5pt; color: #64748b;">${totalBatchSum > 0 && totalRP1Sum > 0 ? `${((totalRP1Sum / totalBatchSum) * 100).toFixed(1)}%` : "—"}</td>
           <!-- RP2 -->
-          <td style="text-align: right; font-family: monospace; font-weight: 800;">${totalRP2Sum ? totalRP2Sum.toLocaleString() : "—"}</td>
+          <td style="text-align: right; font-family: monospace; font-weight: 800;">${formatKg(totalRP2Sum)}</td>
           <td style="text-align: right; font-family: monospace; font-size: 6.5pt; color: #64748b;">${totalBatchSum > 0 && totalRP2Sum > 0 ? `${((totalRP2Sum / totalBatchSum) * 100).toFixed(1)}%` : "—"}</td>
           <!-- HD RP -->
-          <td style="text-align: right; font-family: monospace; font-weight: 800;">${totalHDRPSum ? totalHDRPSum.toLocaleString() : "—"}</td>
+          <td style="text-align: right; font-family: monospace; font-weight: 800;">${formatKg(totalHDRPSum)}</td>
           <td style="text-align: right; font-family: monospace; font-size: 6.5pt; color: #64748b;">${totalBatchSum > 0 && totalHDRPSum > 0 ? `${((totalHDRPSum / totalBatchSum) * 100).toFixed(1)}%` : "—"}</td>
           <!-- TPT -->
-          <td style="text-align: right; font-family: monospace; font-weight: 800;">${totalTPTSum ? totalTPTSum.toLocaleString() : "—"}</td>
+          <td style="text-align: right; font-family: monospace; font-weight: 800;">${formatKg(totalTPTSum)}</td>
           <td style="text-align: right; font-family: monospace; font-size: 6.5pt; color: #64748b;">${totalBatchSum > 0 && totalTPTSum > 0 ? `${((totalTPTSum / totalBatchSum) * 100).toFixed(1)}%` : "—"}</td>
           <!-- Other -->
-          <td style="text-align: right; font-family: monospace;">${totalOtherSum ? totalOtherSum.toLocaleString() : "—"}</td>
+          <td style="text-align: right; font-family: monospace;">${formatKg(totalOtherSum)}</td>
           <!-- Batch Total -->
           <td style="text-align: right; font-family: monospace; font-size: 8pt; font-weight: 800; background-color: #f1f5f9;">
-            ${totalBatchSum.toLocaleString()} KG
+            ${formatKg(totalBatchSum)} KG
           </td>
           <!-- 100% -->
           <td style="text-align: right; font-family: monospace; font-size: 7pt; font-weight: 700;">100%</td>
