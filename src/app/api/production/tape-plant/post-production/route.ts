@@ -29,9 +29,15 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    // Fetch all planned recipe runs for this shift
+    // Fetch all planned recipe runs for this shift (including multi-shift Day+Night runs)
     const plans = await db.tapePlantPlan.findMany({
-      where: { date, shiftId },
+      where: {
+        date,
+        OR: [
+          { shiftId },
+          { isDayNight: true },
+        ],
+      },
       orderBy: { createdAt: "asc" },
     });
 
