@@ -29,16 +29,29 @@ export async function GET(request: NextRequest) {
         },
       });
 
-      const effectivePlans = allPlans.map((p) => {
-        let sName = p.shift?.name || (p.shiftId === "shift_night" ? "Night Shift" : "Day Shift");
+      const seenContinuousQualities = new Set<string>();
+      const effectivePlans: any[] = [];
+
+      for (const p of allPlans) {
+        const qualityKey = (p.recipeQuality || "").trim().toUpperCase();
         if (p.isDayNight) {
-          sName = `${sName} (24h Day+Night)`;
+          if (seenContinuousQualities.has(qualityKey)) {
+            // Already included this 24h continuous batch for this date, skip duplicate carry-over row
+            continue;
+          }
+          seenContinuousQualities.add(qualityKey);
+          effectivePlans.push({
+            ...p,
+            shiftName: "Day + Night (24h)",
+          });
+        } else {
+          const sName = p.shift?.name || (p.shiftId === "shift_night" ? "Night Shift" : "Day Shift");
+          effectivePlans.push({
+            ...p,
+            shiftName: sName,
+          });
         }
-        return {
-          ...p,
-          shiftName: sName,
-        };
-      });
+      }
 
       const totalPlannedKg = effectivePlans.reduce((acc, p) => acc + (p.plannedQtyKg || 0), 0);
 
@@ -165,6 +178,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Date and Shift are required" }, { status: 400 });
     }
 
+    // Resolve fallback shift dynamically if shiftId is ALL
+    let defaultFirstShiftId = shiftId;
+    if (shiftId.toUpperCase() === "ALL") {
+      const firstShift = await db.shift.findFirst({ where: { isActive: true }, orderBy: { name: "asc" } });
+      defaultFirstShiftId = firstShift?.id || "shift_day";
+    }
+
     // Support both multi-plan array and single plan object
     const plansToSave: any[] = Array.isArray(rawPlans) && rawPlans.length > 0
       ? rawPlans
@@ -177,7 +197,7 @@ export async function POST(request: NextRequest) {
       const submittedIds: string[] = [];
 
       for (const item of plansToSave) {
-        const targetShiftId = (item.shiftId && item.shiftId !== "ALL") ? item.shiftId : (shiftId === "ALL" ? "shift_day" : shiftId);
+        const targetShiftId = (item.shiftId && item.shiftId !== "ALL") ? item.shiftId : defaultFirstShiftId;
 
         const payload = {
           date,

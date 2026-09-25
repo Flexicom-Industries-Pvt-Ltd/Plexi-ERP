@@ -210,7 +210,81 @@ describe("Tape Plant Multi-Shift (Day + Night) Planning & Execution", () => {
         "HDPE/NAT/450/50/S2",
       ]);
     });
+
+    it("should deduplicate continuous Day+Night runs in ALL filter so it appears once without double-counting", () => {
+      const allRawPlans = [
+        {
+          id: "plan-day-1",
+          shiftId: "shift_day",
+          shift: { name: "Day Shift" },
+          recipeQuality: "wOND/LPP/WH/500/67/S1",
+          isDayNight: true,
+          plannedQtyKg: 5000,
+        },
+        {
+          id: "plan-day-2",
+          shiftId: "shift_day",
+          shift: { name: "Day Shift" },
+          recipeQuality: "AMB/PP/YL/74/500/S1",
+          isDayNight: false,
+          plannedQtyKg: 1200,
+        },
+        {
+          id: "plan-night-1",
+          shiftId: "shift_night",
+          shift: { name: "Night Shift" },
+          recipeQuality: "wOND/LPP/WH/500/67/S1",
+          isDayNight: true,
+          plannedQtyKg: 5000,
+        },
+        {
+          id: "plan-night-2",
+          shiftId: "shift_night",
+          shift: { name: "Night Shift" },
+          recipeQuality: "HDPE/NAT/450/50/S2",
+          isDayNight: false,
+          plannedQtyKg: 1500,
+        },
+      ];
+
+      const seenContinuousQualities = new Set<string>();
+      const effectivePlans: any[] = [];
+
+      for (const p of allRawPlans) {
+        const qualityKey = (p.recipeQuality || "").trim().toUpperCase();
+        if (p.isDayNight) {
+          if (seenContinuousQualities.has(qualityKey)) {
+            continue;
+          }
+          seenContinuousQualities.add(qualityKey);
+          effectivePlans.push({
+            ...p,
+            shiftName: "Day + Night (24h)",
+          });
+        } else {
+          const sName = p.shift?.name || "Day Shift";
+          effectivePlans.push({
+            ...p,
+            shiftName: sName,
+          });
+        }
+      }
+
+      expect(effectivePlans.length).toBe(3);
+      expect(effectivePlans.map((p) => p.recipeQuality)).toEqual([
+        "wOND/LPP/WH/500/67/S1",
+        "AMB/PP/YL/74/500/S1",
+        "HDPE/NAT/450/50/S2",
+      ]);
+      expect(effectivePlans[0].shiftName).toBe("Day + Night (24h)");
+      expect(effectivePlans[1].shiftName).toBe("Day Shift");
+      expect(effectivePlans[2].shiftName).toBe("Night Shift");
+
+      const totalPlanned = effectivePlans.reduce((sum, p) => sum + p.plannedQtyKg, 0);
+      expect(totalPlanned).toBe(5000 + 1200 + 1500); // 7,700 KG, exactly counted once
+    });
   });
 });
+
 
 

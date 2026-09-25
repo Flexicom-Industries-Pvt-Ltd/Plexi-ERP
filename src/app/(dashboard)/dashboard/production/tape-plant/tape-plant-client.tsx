@@ -76,7 +76,6 @@ export function TapePlantClient() {
           const fallback = [
             { id: "shift_day", name: "Day Shift (08:00 - 20:00)" },
             { id: "shift_night", name: "Night Shift (20:00 - 08:00)" },
-            { id: "shift_day_night", name: "Day + Night (24 Hours)" },
             { id: "shift-a", name: "Shift A (06:00 - 14:00)" },
             { id: "shift-b", name: "Shift B (14:00 - 22:00)" },
             { id: "shift-c", name: "Shift C (22:00 - 06:00)" },
