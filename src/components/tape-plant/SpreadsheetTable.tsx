@@ -72,7 +72,16 @@ export function SpreadsheetTable<T extends Record<string, any>>({
     [data, columns, onChange]
   );
 
-  const focusCell = (row: number, col: number) => {
+  const isColEditable = useCallback(
+    (cIdx: number) => {
+      const col = columns[cIdx];
+      if (!col) return false;
+      return col.type !== "readonly" && !col.calculate;
+    },
+    [columns]
+  );
+
+  const focusCell = useCallback((row: number, col: number) => {
     setActiveCell({ row, col });
     const cellId = `cell-${row}-${col}`;
     const element = document.getElementById(cellId);
@@ -82,52 +91,135 @@ export function SpreadsheetTable<T extends Record<string, any>>({
         element.select();
       }
     }
-  };
+  }, []);
 
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent, rowIndex: number, colIndex: number) => {
+  const findHorizontalEditableCell = useCallback(
+    (startRow: number, startCol: number, forward: boolean) => {
+      let r = startRow;
+      let c = startCol;
       const totalRows = data.length;
       const totalCols = columns.length;
 
-      if (e.key === "Tab") {
-        e.preventDefault();
-        if (e.shiftKey) {
-          if (colIndex > 0) {
-            focusCell(rowIndex, colIndex - 1);
-          } else if (rowIndex > 0) {
-            focusCell(rowIndex - 1, totalCols - 1);
+      while (r >= 0 && r < totalRows) {
+        if (forward) {
+          c++;
+          if (c >= totalCols) {
+            c = 0;
+            r++;
           }
         } else {
-          if (colIndex < totalCols - 1) {
-            focusCell(rowIndex, colIndex + 1);
-          } else if (rowIndex < totalRows - 1) {
-            focusCell(rowIndex + 1, 0);
-          } else if (allowAddRow && onAddRow) {
-            onAddRow();
-            setTimeout(() => focusCell(totalRows, 0), 50);
+          c--;
+          if (c < 0) {
+            c = totalCols - 1;
+            r--;
           }
+        }
+        if (r >= 0 && r < totalRows && isColEditable(c)) {
+          return { row: r, col: c };
+        }
+      }
+      return null;
+    },
+    [data.length, columns.length, isColEditable]
+  );
+
+  const findVerticalEditableCell = useCallback(
+    (startRow: number, colIndex: number, delta: number) => {
+      const targetRow = startRow + delta;
+      if (targetRow >= 0 && targetRow < data.length) {
+        if (isColEditable(colIndex)) {
+          return { row: targetRow, col: colIndex };
+        }
+        // If current column isn't editable, search nearest editable column in target row
+        for (let offset = 1; offset < columns.length; offset++) {
+          if (colIndex + offset < columns.length && isColEditable(colIndex + offset)) {
+            return { row: targetRow, col: colIndex + offset };
+          }
+          if (colIndex - offset >= 0 && isColEditable(colIndex - offset)) {
+            return { row: targetRow, col: colIndex - offset };
+          }
+        }
+      }
+      return null;
+    },
+    [data.length, columns.length, isColEditable]
+  );
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent, rowIndex: number, colIndex: number) => {
+      const target = e.target as HTMLInputElement | HTMLSelectElement;
+      const isInput = target instanceof HTMLInputElement;
+      const totalRows = data.length;
+
+      if (e.key === "Tab") {
+        e.preventDefault();
+        const next = findHorizontalEditableCell(rowIndex, colIndex, !e.shiftKey);
+        if (next) {
+          focusCell(next.row, next.col);
+        } else if (!e.shiftKey && allowAddRow && onAddRow) {
+          onAddRow();
+          setTimeout(() => {
+            const firstEditable = columns.findIndex((_, idx) => isColEditable(idx));
+            focusCell(totalRows, firstEditable >= 0 ? firstEditable : 0);
+          }, 50);
         }
       } else if (e.key === "Enter") {
         e.preventDefault();
-        if (rowIndex < totalRows - 1) {
-          focusCell(rowIndex + 1, colIndex);
+        const next = findVerticalEditableCell(rowIndex, colIndex, 1);
+        if (next) {
+          focusCell(next.row, next.col);
         } else if (allowAddRow && onAddRow) {
           onAddRow();
           setTimeout(() => focusCell(totalRows, colIndex), 50);
         }
       } else if (e.key === "ArrowUp") {
-        if (rowIndex > 0) {
-          e.preventDefault();
-          focusCell(rowIndex - 1, colIndex);
+        e.preventDefault();
+        const next = findVerticalEditableCell(rowIndex, colIndex, -1);
+        if (next) {
+          focusCell(next.row, next.col);
         }
       } else if (e.key === "ArrowDown") {
-        if (rowIndex < totalRows - 1) {
-          e.preventDefault();
-          focusCell(rowIndex + 1, colIndex);
+        e.preventDefault();
+        const next = findVerticalEditableCell(rowIndex, colIndex, 1);
+        if (next) {
+          focusCell(next.row, next.col);
+        }
+      } else if (e.key === "ArrowLeft") {
+        const isAllSelected = isInput && target.selectionStart === 0 && target.selectionEnd === target.value.length;
+        const isAtStart = isInput && target.selectionStart === 0;
+        const isSelect = target instanceof HTMLSelectElement;
+
+        if (isAllSelected || isAtStart || isSelect) {
+          const next = findHorizontalEditableCell(rowIndex, colIndex, false);
+          if (next) {
+            e.preventDefault();
+            focusCell(next.row, next.col);
+          }
+        }
+      } else if (e.key === "ArrowRight") {
+        const isAllSelected = isInput && target.selectionStart === 0 && target.selectionEnd === target.value.length;
+        const isAtEnd = isInput && target.selectionEnd === target.value.length;
+        const isSelect = target instanceof HTMLSelectElement;
+
+        if (isAllSelected || isAtEnd || isSelect) {
+          const next = findHorizontalEditableCell(rowIndex, colIndex, true);
+          if (next) {
+            e.preventDefault();
+            focusCell(next.row, next.col);
+          }
         }
       }
     },
-    [data.length, columns.length, allowAddRow, onAddRow]
+    [
+      data.length,
+      columns,
+      allowAddRow,
+      onAddRow,
+      isColEditable,
+      findHorizontalEditableCell,
+      findVerticalEditableCell,
+      focusCell,
+    ]
   );
 
   const handleClearRow = (index: number) => {
