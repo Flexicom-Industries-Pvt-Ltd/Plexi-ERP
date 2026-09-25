@@ -9,6 +9,7 @@ import {
   Gauge,
   FlaskConical,
   PackageCheck,
+  Boxes,
   BarChart3,
   Calendar,
   Clock,
@@ -21,6 +22,7 @@ import { ProcessTemperatureSection } from "@/components/tape-plant/ProcessTemper
 import { ProcessDriveParameterSection } from "@/components/tape-plant/ProcessDriveParameterSection";
 import { RawMaterialSection } from "@/components/tape-plant/RawMaterialSection";
 import { PostProductionSection } from "@/components/tape-plant/PostProductionSection";
+import { BobbinStockSummarySection } from "@/components/tape-plant/BobbinStockSummarySection";
 import { TapePlantReportSection } from "@/components/tape-plant/TapePlantReportSection";
 
 export type TapePlantTab =
@@ -29,6 +31,7 @@ export type TapePlantTab =
   | "drive"
   | "raw-material"
   | "post-production"
+  | "bobbin-stock"
   | "reports";
 
 const TABS = [
@@ -37,7 +40,8 @@ const TABS = [
   { id: "drive" as TapePlantTab, label: "3. Drive Parameters", icon: Gauge },
   { id: "raw-material" as TapePlantTab, label: "4. Raw Material", icon: FlaskConical },
   { id: "post-production" as TapePlantTab, label: "5. Post Production & QC", icon: PackageCheck },
-  { id: "reports" as TapePlantTab, label: "6. Reports", icon: BarChart3 },
+  { id: "bobbin-stock" as TapePlantTab, label: "6. Bobbin Stock Summary", icon: Boxes },
+  { id: "reports" as TapePlantTab, label: "7. Reports", icon: BarChart3 },
 ];
 
 export function TapePlantClient() {
@@ -200,6 +204,14 @@ export function TapePlantClient() {
         )}
         {activeTab === "post-production" && (
           <PostProductionSection date={selectedDate} shiftId={selectedShiftId} shiftName={shiftName} />
+        )}
+        {activeTab === "bobbin-stock" && (
+          <BobbinStockSummarySection
+            date={selectedDate}
+            shiftId={selectedShiftId}
+            shiftName={shiftName}
+            onNavigateToPostProduction={() => handleTabChange("post-production")}
+          />
         )}
         {activeTab === "reports" && <TapePlantReportSection shifts={shifts} />}
       </div>
