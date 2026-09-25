@@ -23,6 +23,34 @@ interface PlanningPrintPreviewModalProps {
   plans: RecipePlanItem[];
 }
 
+function normalizeMaterialKey(mat: string): string {
+  const clean = (mat || "").trim().toUpperCase().replace(/[\s\-_]/g, "");
+  if (clean === "PP") return "PP";
+  if (clean === "CC") return "CC";
+  if (clean === "MB") return "MB";
+  if (clean === "RP1") return "RP1";
+  if (clean === "RP2") return "RP2";
+  if (clean === "HDRP") return "HD RP";
+  if (clean === "TPT") return "TPT";
+  return (mat || "").trim().toUpperCase();
+}
+
+function formatKg(val: number | string | undefined | null): string {
+  if (val === undefined || val === null || val === "" || val === 0) return "—";
+  const num = Number(val);
+  if (isNaN(num)) return String(val);
+  return Number.isInteger(num)
+    ? num.toLocaleString()
+    : num.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 });
+}
+
+function formatPct(val: number | string | undefined | null): string {
+  if (val === undefined || val === null || val === "" || val === 0) return "—";
+  const num = Number(val);
+  if (isNaN(num)) return `${val}%`;
+  return Number.isInteger(num) ? `${num}%` : `${num.toFixed(1)}%`;
+}
+
 export function PlanningPrintPreviewModal({
   open,
   onClose,
@@ -41,35 +69,7 @@ export function PlanningPrintPreviewModal({
     .filter((p) => p.isDayNight)
     .reduce((acc, p) => acc + (Number(p.plannedQtyKg) || 0), 0);
 
-  // Material aggregates across all recipe runs
-  const materialTotals: Record<string, { qty: number; count: number }> = {};
-  plans.forEach((p) => {
-    (p.materials || []).forEach((m) => {
-      const name = m.material.trim().toUpperCase() || "UNKNOWN";
-      const q = Number(m.quantity) || 0;
-      if (!materialTotals[name]) {
-        materialTotals[name] = { qty: 0, count: 0 };
-      }
-      materialTotals[name].qty += q;
-      materialTotals[name].count += 1;
-    });
-  });
-
-  const totalAllMaterialsKg = Object.values(materialTotals).reduce(
-    (a, b) => a + b.qty,
-    0
-  );
-
-  const handleDirectPrint = () => {
-    printTapePlantPlanningSheet({ date, shiftName, status, plans });
-  };
-
-  const handleExportExcel = () => {
-    generateTapePlantPlanningExcel({ date, shiftName, status, plans });
-  };
-
-  const KNOWN_MATS = ["PP", "CC", "MB", "RP1", "RP2", "HD RP", "TPT"];
-
+  // Pre-calculate aggregate raw material sums across all recipe plans
   let totalPPSum = 0;
   let totalCCSum = 0;
   let totalMBSum = 0;
@@ -79,6 +79,34 @@ export function PlanningPrintPreviewModal({
   let totalTPTSum = 0;
   let totalOtherSum = 0;
   let totalBatchSum = 0;
+
+  plans.forEach((p) => {
+    let runMatQty = 0;
+    (p.materials || []).forEach((m) => {
+      const key = normalizeMaterialKey(m.material);
+      const q = Number(m.quantity) || 0;
+      runMatQty += q;
+      if (key === "PP") totalPPSum += q;
+      else if (key === "CC") totalCCSum += q;
+      else if (key === "MB") totalMBSum += q;
+      else if (key === "RP1") totalRP1Sum += q;
+      else if (key === "RP2") totalRP2Sum += q;
+      else if (key === "HD RP") totalHDRPSum += q;
+      else if (key === "TPT") totalTPTSum += q;
+      else totalOtherSum += q;
+    });
+    totalBatchSum += (runMatQty || Number(p.plannedQtyKg) || 0);
+  });
+
+  const totalAllMaterialsKg = totalBatchSum;
+
+  const handleDirectPrint = () => {
+    printTapePlantPlanningSheet({ date, shiftName, status, plans });
+  };
+
+  const handleExportExcel = () => {
+    generateTapePlantPlanningExcel({ date, shiftName, status, plans });
+  };
 
   const docDate = date || new Date().toISOString().split("T")[0];
   const docRef = `TP-PLN-${docDate.replace(/-/g, "")}-${(shiftName || "SHIFT").toUpperCase().replace(/\s+/g, "")}`;
@@ -204,7 +232,7 @@ export function PlanningPrintPreviewModal({
                   Total Material Demand
                 </span>
                 <span className="text-base font-black font-mono text-slate-900">
-                  {totalAllMaterialsKg.toLocaleString()} <span className="text-xs font-normal">KG</span>
+                  {formatKg(totalAllMaterialsKg)} <span className="text-xs font-normal">KG</span>
                 </span>
               </div>
               <div>
@@ -291,7 +319,7 @@ export function PlanningPrintPreviewModal({
                           {p.omega || "—"}
                         </td>
                         <td className="p-2 border-r border-slate-200 text-right font-mono font-bold text-slate-900 bg-slate-50/70">
-                          {Number(p.plannedQtyKg) ? Number(p.plannedQtyKg).toLocaleString() : "0"}
+                          {formatKg(p.plannedQtyKg)}
                         </td>
                       </tr>
                     ))}
@@ -368,7 +396,7 @@ export function PlanningPrintPreviewModal({
                     {plans.map((p, idx) => {
                       const getMatRaw = (name: string) => {
                         const match = (p.materials || []).find(
-                          (m) => m.material.trim().toUpperCase() === name.toUpperCase()
+                          (m) => normalizeMaterialKey(m.material) === name
                         );
                         return {
                           qty: match && Number(match.quantity) ? Number(match.quantity) : 0,
@@ -393,10 +421,13 @@ export function PlanningPrintPreviewModal({
                         const pct = Number(m.percentage) || 0;
                         runBatchQty += q;
                         totalBlendPct += pct;
-                        if (!KNOWN_MATS.includes(m.material.trim().toUpperCase())) {
+                        const key = normalizeMaterialKey(m.material);
+                        if (!["PP", "CC", "MB", "RP1", "RP2", "HD RP", "TPT"].includes(key)) {
                           otherQty += q;
                         }
                       });
+
+                      const rowBatchTotal = runBatchQty || Number(p.plannedQtyKg) || 0;
 
                       return (
                         <tr key={`mat-${p.id}`} className="hover:bg-slate-50">
@@ -407,31 +438,31 @@ export function PlanningPrintPreviewModal({
                             {p.recipeQuality}
                           </td>
                           {/* PP */}
-                          <td className="p-1.5 border-r border-slate-200 text-right font-mono font-semibold">{pp.qty ? pp.qty.toLocaleString() : "—"}</td>
-                          <td className="p-1.5 border-r border-slate-200 text-right font-mono text-slate-500 bg-slate-50/50">{pp.pct ? `${pp.pct}%` : "—"}</td>
+                          <td className="p-1.5 border-r border-slate-200 text-right font-mono font-semibold">{formatKg(pp.qty)}</td>
+                          <td className="p-1.5 border-r border-slate-200 text-right font-mono text-slate-500 bg-slate-50/50">{formatPct(pp.pct)}</td>
                           {/* CC */}
-                          <td className="p-1.5 border-r border-slate-200 text-right font-mono font-semibold">{cc.qty ? cc.qty.toLocaleString() : "—"}</td>
-                          <td className="p-1.5 border-r border-slate-200 text-right font-mono text-slate-500 bg-slate-50/50">{cc.pct ? `${cc.pct}%` : "—"}</td>
+                          <td className="p-1.5 border-r border-slate-200 text-right font-mono font-semibold">{formatKg(cc.qty)}</td>
+                          <td className="p-1.5 border-r border-slate-200 text-right font-mono text-slate-500 bg-slate-50/50">{formatPct(cc.pct)}</td>
                           {/* MB */}
-                          <td className="p-1.5 border-r border-slate-200 text-right font-mono font-semibold">{mb.qty ? mb.qty.toLocaleString() : "—"}</td>
-                          <td className="p-1.5 border-r border-slate-200 text-right font-mono text-slate-500 bg-slate-50/50">{mb.pct ? `${mb.pct}%` : "—"}</td>
+                          <td className="p-1.5 border-r border-slate-200 text-right font-mono font-semibold">{formatKg(mb.qty)}</td>
+                          <td className="p-1.5 border-r border-slate-200 text-right font-mono text-slate-500 bg-slate-50/50">{formatPct(mb.pct)}</td>
                           {/* RP1 */}
-                          <td className="p-1.5 border-r border-slate-200 text-right font-mono font-semibold">{rp1.qty ? rp1.qty.toLocaleString() : "—"}</td>
-                          <td className="p-1.5 border-r border-slate-200 text-right font-mono text-slate-500 bg-slate-50/50">{rp1.pct ? `${rp1.pct}%` : "—"}</td>
+                          <td className="p-1.5 border-r border-slate-200 text-right font-mono font-semibold">{formatKg(rp1.qty)}</td>
+                          <td className="p-1.5 border-r border-slate-200 text-right font-mono text-slate-500 bg-slate-50/50">{formatPct(rp1.pct)}</td>
                           {/* RP2 */}
-                          <td className="p-1.5 border-r border-slate-200 text-right font-mono font-semibold">{rp2.qty ? rp2.qty.toLocaleString() : "—"}</td>
-                          <td className="p-1.5 border-r border-slate-200 text-right font-mono text-slate-500 bg-slate-50/50">{rp2.pct ? `${rp2.pct}%` : "—"}</td>
+                          <td className="p-1.5 border-r border-slate-200 text-right font-mono font-semibold">{formatKg(rp2.qty)}</td>
+                          <td className="p-1.5 border-r border-slate-200 text-right font-mono text-slate-500 bg-slate-50/50">{formatPct(rp2.pct)}</td>
                           {/* HD RP */}
-                          <td className="p-1.5 border-r border-slate-200 text-right font-mono font-semibold">{hdrp.qty ? hdrp.qty.toLocaleString() : "—"}</td>
-                          <td className="p-1.5 border-r border-slate-200 text-right font-mono text-slate-500 bg-slate-50/50">{hdrp.pct ? `${hdrp.pct}%` : "—"}</td>
+                          <td className="p-1.5 border-r border-slate-200 text-right font-mono font-semibold">{formatKg(hdrp.qty)}</td>
+                          <td className="p-1.5 border-r border-slate-200 text-right font-mono text-slate-500 bg-slate-50/50">{formatPct(hdrp.pct)}</td>
                           {/* TPT */}
-                          <td className="p-1.5 border-r border-slate-200 text-right font-mono font-semibold">{tpt.qty ? tpt.qty.toLocaleString() : "—"}</td>
-                          <td className="p-1.5 border-r border-slate-200 text-right font-mono text-slate-500 bg-slate-50/50">{tpt.pct ? `${tpt.pct}%` : "—"}</td>
+                          <td className="p-1.5 border-r border-slate-200 text-right font-mono font-semibold">{formatKg(tpt.qty)}</td>
+                          <td className="p-1.5 border-r border-slate-200 text-right font-mono text-slate-500 bg-slate-50/50">{formatPct(tpt.pct)}</td>
                           {/* Other */}
-                          <td className="p-1.5 border-r border-slate-200 text-right font-mono">{otherQty ? otherQty.toLocaleString() : "—"}</td>
+                          <td className="p-1.5 border-r border-slate-200 text-right font-mono">{formatKg(otherQty)}</td>
                           {/* Batch Total */}
                           <td className="p-1.5 border-r border-slate-200 text-right font-mono font-bold text-slate-900 bg-slate-50/70">
-                            {(runBatchQty || Number(p.plannedQtyKg) || 0).toLocaleString()} KG
+                            {formatKg(rowBatchTotal)} KG
                           </td>
                           {/* Total % */}
                           <td className="p-1.5 border-r border-slate-200 text-right font-mono text-[11px] font-bold">
@@ -447,31 +478,31 @@ export function PlanningPrintPreviewModal({
                         Total Formulations:
                       </td>
                       {/* PP */}
-                      <td className="p-1.5 text-right font-mono">{totalPPSum ? totalPPSum.toLocaleString() : "—"}</td>
+                      <td className="p-1.5 text-right font-mono">{formatKg(totalPPSum)}</td>
                       <td className="p-1.5 text-right font-mono text-[10px] text-slate-500">{totalBatchSum > 0 && totalPPSum > 0 ? `${((totalPPSum / totalBatchSum) * 100).toFixed(1)}%` : "—"}</td>
                       {/* CC */}
-                      <td className="p-1.5 text-right font-mono">{totalCCSum ? totalCCSum.toLocaleString() : "—"}</td>
+                      <td className="p-1.5 text-right font-mono">{formatKg(totalCCSum)}</td>
                       <td className="p-1.5 text-right font-mono text-[10px] text-slate-500">{totalBatchSum > 0 && totalCCSum > 0 ? `${((totalCCSum / totalBatchSum) * 100).toFixed(1)}%` : "—"}</td>
                       {/* MB */}
-                      <td className="p-1.5 text-right font-mono">{totalMBSum ? totalMBSum.toLocaleString() : "—"}</td>
+                      <td className="p-1.5 text-right font-mono">{formatKg(totalMBSum)}</td>
                       <td className="p-1.5 text-right font-mono text-[10px] text-slate-500">{totalBatchSum > 0 && totalMBSum > 0 ? `${((totalMBSum / totalBatchSum) * 100).toFixed(1)}%` : "—"}</td>
                       {/* RP1 */}
-                      <td className="p-1.5 text-right font-mono">{totalRP1Sum ? totalRP1Sum.toLocaleString() : "—"}</td>
+                      <td className="p-1.5 text-right font-mono">{formatKg(totalRP1Sum)}</td>
                       <td className="p-1.5 text-right font-mono text-[10px] text-slate-500">{totalBatchSum > 0 && totalRP1Sum > 0 ? `${((totalRP1Sum / totalBatchSum) * 100).toFixed(1)}%` : "—"}</td>
                       {/* RP2 */}
-                      <td className="p-1.5 text-right font-mono">{totalRP2Sum ? totalRP2Sum.toLocaleString() : "—"}</td>
+                      <td className="p-1.5 text-right font-mono">{formatKg(totalRP2Sum)}</td>
                       <td className="p-1.5 text-right font-mono text-[10px] text-slate-500">{totalBatchSum > 0 && totalRP2Sum > 0 ? `${((totalRP2Sum / totalBatchSum) * 100).toFixed(1)}%` : "—"}</td>
                       {/* HD RP */}
-                      <td className="p-1.5 text-right font-mono">{totalHDRPSum ? totalHDRPSum.toLocaleString() : "—"}</td>
+                      <td className="p-1.5 text-right font-mono">{formatKg(totalHDRPSum)}</td>
                       <td className="p-1.5 text-right font-mono text-[10px] text-slate-500">{totalBatchSum > 0 && totalHDRPSum > 0 ? `${((totalHDRPSum / totalBatchSum) * 100).toFixed(1)}%` : "—"}</td>
                       {/* TPT */}
-                      <td className="p-1.5 text-right font-mono">{totalTPTSum ? totalTPTSum.toLocaleString() : "—"}</td>
+                      <td className="p-1.5 text-right font-mono">{formatKg(totalTPTSum)}</td>
                       <td className="p-1.5 text-right font-mono text-[10px] text-slate-500">{totalBatchSum > 0 && totalTPTSum > 0 ? `${((totalTPTSum / totalBatchSum) * 100).toFixed(1)}%` : "—"}</td>
                       {/* Other */}
-                      <td className="p-1.5 text-right font-mono">{totalOtherSum ? totalOtherSum.toLocaleString() : "—"}</td>
+                      <td className="p-1.5 text-right font-mono">{formatKg(totalOtherSum)}</td>
                       {/* Total */}
                       <td className="p-1.5 text-right font-mono font-black text-slate-900 bg-slate-200">
-                        {totalBatchSum.toLocaleString()} KG
+                        {formatKg(totalBatchSum)} KG
                       </td>
                       <td className="p-1.5 text-right font-mono text-[11px]">100%</td>
                     </tr>
@@ -509,16 +540,16 @@ export function PlanningPrintPreviewModal({
                       <td className="p-2 border-r border-slate-200 font-bold text-left text-slate-700 bg-slate-50">
                         Total Quantity (KG)
                       </td>
-                      <td className="p-2 border-r border-slate-200 font-mono font-bold">{totalPPSum ? `${totalPPSum.toLocaleString()} KG` : "—"}</td>
-                      <td className="p-2 border-r border-slate-200 font-mono font-bold">{totalCCSum ? `${totalCCSum.toLocaleString()} KG` : "—"}</td>
-                      <td className="p-2 border-r border-slate-200 font-mono font-bold">{totalMBSum ? `${totalMBSum.toLocaleString()} KG` : "—"}</td>
-                      <td className="p-2 border-r border-slate-200 font-mono font-bold">{totalRP1Sum ? `${totalRP1Sum.toLocaleString()} KG` : "—"}</td>
-                      <td className="p-2 border-r border-slate-200 font-mono font-bold">{totalRP2Sum ? `${totalRP2Sum.toLocaleString()} KG` : "—"}</td>
-                      <td className="p-2 border-r border-slate-200 font-mono font-bold">{totalHDRPSum ? `${totalHDRPSum.toLocaleString()} KG` : "—"}</td>
-                      <td className="p-2 border-r border-slate-200 font-mono font-bold">{totalTPTSum ? `${totalTPTSum.toLocaleString()} KG` : "—"}</td>
-                      {totalOtherSum > 0 && <td className="p-2 border-r border-slate-200 font-mono font-bold">{totalOtherSum.toLocaleString()} KG</td>}
+                      <td className="p-2 border-r border-slate-200 font-mono font-bold">{totalPPSum ? `${formatKg(totalPPSum)} KG` : "—"}</td>
+                      <td className="p-2 border-r border-slate-200 font-mono font-bold">{totalCCSum ? `${formatKg(totalCCSum)} KG` : "—"}</td>
+                      <td className="p-2 border-r border-slate-200 font-mono font-bold">{totalMBSum ? `${formatKg(totalMBSum)} KG` : "—"}</td>
+                      <td className="p-2 border-r border-slate-200 font-mono font-bold">{totalRP1Sum ? `${formatKg(totalRP1Sum)} KG` : "—"}</td>
+                      <td className="p-2 border-r border-slate-200 font-mono font-bold">{totalRP2Sum ? `${formatKg(totalRP2Sum)} KG` : "—"}</td>
+                      <td className="p-2 border-r border-slate-200 font-mono font-bold">{totalHDRPSum ? `${formatKg(totalHDRPSum)} KG` : "—"}</td>
+                      <td className="p-2 border-r border-slate-200 font-mono font-bold">{totalTPTSum ? `${formatKg(totalTPTSum)} KG` : "—"}</td>
+                      {totalOtherSum > 0 && <td className="p-2 border-r border-slate-200 font-mono font-bold">{formatKg(totalOtherSum)} KG</td>}
                       <td className="p-2 border-r border-slate-200 font-mono font-black text-slate-900 bg-slate-100">
-                        {totalBatchSum.toLocaleString()} KG
+                        {formatKg(totalBatchSum)} KG
                       </td>
                     </tr>
                     <tr>
