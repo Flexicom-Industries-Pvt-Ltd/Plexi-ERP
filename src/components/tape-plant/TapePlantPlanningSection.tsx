@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { toast } from "sonner";
 import {
   Save,
@@ -106,7 +106,11 @@ interface TapePlantPlanningSectionProps {
 export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlantPlanningSectionProps) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [status, setStatus] = useState("DRAFT");
+  const [autoSaving, setAutoSaving] = useState(false);
+  const [lastAutoSavedAt, setLastAutoSavedAt] = useState<Date | null>(null);
+  const isInitialLoadedRef = useRef(false);
+  const lastSavedPayloadRef = useRef("");
+  const [status, setStatus] = useState("SAVED");
   const [showPrintModal, setShowPrintModal] = useState(false);
 
   // Multi-recipe state
@@ -142,6 +146,7 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
   // Load plans for the shift
   useEffect(() => {
     if (!date || !shiftId) return;
+    isInitialLoadedRef.current = false;
     setLoading(true);
     fetch(`/api/production/tape-plant/planning?date=${date}&shiftId=${shiftId}&_t=${Date.now()}`, {
       cache: "no-store",
@@ -177,8 +182,36 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
             carriedOverFromShift: p.carriedOverFromShift || undefined,
           }));
           setRecipePlans(loaded);
-          setStatus(data.plans[0]?.status || "DRAFT");
+          const currentStatus = data.plans[0]?.status === "SUBMITTED" ? "SUBMITTED" : "SAVED";
+          setStatus(currentStatus);
           setActiveRecipeIndex(0);
+          lastSavedPayloadRef.current = JSON.stringify({
+            date,
+            shiftId,
+            status: currentStatus,
+            plans: loaded.map((p: any) => ({
+              id: p.id,
+              recipeQuality: (p.recipeQuality || "").trim(),
+              tapeType: p.tapeType,
+              denier: p.denier !== "" ? Number(p.denier) : null,
+              tapeWidth: p.tapeWidth !== "" ? Number(p.tapeWidth) : null,
+              strength: p.strength !== "" ? Number(p.strength) : null,
+              eloPercent: p.eloPercent !== "" ? Number(p.eloPercent) : null,
+              bobbinMarking: p.bobbinMarking,
+              colour: p.colour,
+              spacerSize: p.spacerSize,
+              requiredAsh: p.requiredAsh !== "" ? Number(p.requiredAsh) : null,
+              ashPercent: p.ashPercent !== "" ? Number(p.ashPercent) : null,
+              plannedQtyKg: p.plannedQtyKg !== "" ? Number(p.plannedQtyKg) : 0,
+              omega: p.omega,
+              vistPercent: p.vistPercent !== "" ? Number(p.vistPercent) : null,
+              remarks: p.remarks,
+              materials: p.materials,
+              isDayNight: Boolean(p.isDayNight),
+              shiftId: p.shiftId || (shiftId !== "ALL" ? shiftId : undefined),
+              status: currentStatus,
+            })),
+          });
         } else if (data && data.recipeQuality) {
           // Backward compatibility with single record
           const single: RecipePlanItem = {
@@ -205,16 +238,49 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
             carriedOverFromShift: data.carriedOverFromShift || undefined,
           };
           setRecipePlans([single]);
-          setStatus(data.status || "DRAFT");
+          const currentStatus = data.status === "SUBMITTED" ? "SUBMITTED" : "SAVED";
+          setStatus(currentStatus);
           setActiveRecipeIndex(0);
+          lastSavedPayloadRef.current = JSON.stringify({
+            date,
+            shiftId,
+            status: currentStatus,
+            plans: [{
+              id: single.id,
+              recipeQuality: (single.recipeQuality || "").trim(),
+              tapeType: single.tapeType,
+              denier: single.denier !== "" ? Number(single.denier) : null,
+              tapeWidth: single.tapeWidth !== "" ? Number(single.tapeWidth) : null,
+              strength: single.strength !== "" ? Number(single.strength) : null,
+              eloPercent: single.eloPercent !== "" ? Number(single.eloPercent) : null,
+              bobbinMarking: single.bobbinMarking,
+              colour: single.colour,
+              spacerSize: single.spacerSize,
+              requiredAsh: single.requiredAsh !== "" ? Number(single.requiredAsh) : null,
+              ashPercent: single.ashPercent !== "" ? Number(single.ashPercent) : null,
+              plannedQtyKg: single.plannedQtyKg !== "" ? Number(single.plannedQtyKg) : 0,
+              omega: single.omega,
+              vistPercent: single.vistPercent !== "" ? Number(single.vistPercent) : null,
+              remarks: single.remarks,
+              materials: single.materials,
+              isDayNight: Boolean(single.isDayNight),
+              shiftId: single.shiftId || (shiftId !== "ALL" ? shiftId : undefined),
+              status: currentStatus,
+            }],
+          });
         } else {
-          setRecipePlans([createEmptyRecipePlan(1)]);
-          setStatus("DRAFT");
+          const empty = [createEmptyRecipePlan(1)];
+          setRecipePlans(empty);
+          setStatus("SAVED");
           setActiveRecipeIndex(0);
+          lastSavedPayloadRef.current = "";
         }
       })
       .catch(() => toast.error("Failed to load Tape Plant plan"))
-      .finally(() => setLoading(false));
+      .finally(() => {
+        setLoading(false);
+        isInitialLoadedRef.current = true;
+      });
   }, [date, shiftId]);
 
   // Active plan helper
@@ -346,7 +412,76 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
     toast.info(`Removed recipe run from shift`);
   };
 
-  const handleSave = async (submitStatus: "DRAFT" | "SUBMITTED") => {
+  // Debounced Auto-Save
+  useEffect(() => {
+    if (!isInitialLoadedRef.current || !date || !shiftId) return;
+
+    const hasValidRecipe = recipePlans.some((p) => p.recipeQuality && p.recipeQuality.trim() !== "");
+    if (!hasValidRecipe) return;
+
+    const payload = {
+      date,
+      shiftId,
+      status: status === "SUBMITTED" ? "SUBMITTED" : "SAVED",
+      plans: recipePlans.map((p) => ({
+        id: p.id,
+        recipeQuality: (p.recipeQuality || "").trim(),
+        tapeType: p.tapeType,
+        denier: p.denier !== "" && p.denier !== null && p.denier !== undefined ? Number(p.denier) : null,
+        tapeWidth: p.tapeWidth !== "" && p.tapeWidth !== null && p.tapeWidth !== undefined ? Number(p.tapeWidth) : null,
+        strength: p.strength !== "" && p.strength !== null && p.strength !== undefined ? Number(p.strength) : null,
+        eloPercent: p.eloPercent !== "" && p.eloPercent !== null && p.eloPercent !== undefined ? Number(p.eloPercent) : null,
+        bobbinMarking: p.bobbinMarking,
+        colour: p.colour,
+        spacerSize: p.spacerSize,
+        requiredAsh: p.requiredAsh !== "" && p.requiredAsh !== null && p.requiredAsh !== undefined ? Number(p.requiredAsh) : null,
+        ashPercent: p.ashPercent !== "" && p.ashPercent !== null && p.ashPercent !== undefined ? Number(p.ashPercent) : null,
+        plannedQtyKg: p.plannedQtyKg !== "" && p.plannedQtyKg !== null && p.plannedQtyKg !== undefined ? Number(p.plannedQtyKg) : 0,
+        omega: p.omega,
+        vistPercent: p.vistPercent !== "" && p.vistPercent !== null && p.vistPercent !== undefined ? Number(p.vistPercent) : null,
+        remarks: p.remarks,
+        materials: p.materials,
+        isDayNight: Boolean(p.isDayNight),
+        shiftId: p.shiftId || (shiftId !== "ALL" ? shiftId : undefined),
+        status: status === "SUBMITTED" ? "SUBMITTED" : "SAVED",
+      })),
+    };
+
+    const serialized = JSON.stringify(payload);
+    if (serialized === lastSavedPayloadRef.current) return;
+
+    const timer = setTimeout(async () => {
+      setAutoSaving(true);
+      try {
+        const res = await fetch("/api/production/tape-plant/planning", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: serialized,
+        });
+        if (res.ok) {
+          const resData = await res.json();
+          lastSavedPayloadRef.current = serialized;
+          setLastAutoSavedAt(new Date());
+          if (Array.isArray(resData.plans)) {
+            setRecipePlans((prev) =>
+              prev.map((p, i) => {
+                const match = resData.plans[i];
+                return match && match.id ? { ...p, id: match.id } : p;
+              })
+            );
+          }
+        }
+      } catch (err) {
+        console.error("Auto-save error:", err);
+      } finally {
+        setAutoSaving(false);
+      }
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [recipePlans, date, shiftId, status]);
+
+  const handleSave = async (submitStatus: "SAVED" | "SUBMITTED") => {
     // Validate each recipe
     for (let i = 0; i < recipePlans.length; i++) {
       const p = recipePlans[i];
@@ -399,6 +534,9 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
       }
 
       const resData = await res.json();
+      lastSavedPayloadRef.current = JSON.stringify(payload);
+      setLastAutoSavedAt(new Date());
+
       if (Array.isArray(resData.plans)) {
         setRecipePlans(
           resData.plans.map((p: any) => ({
@@ -430,7 +568,7 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
       toast.success(
         submitStatus === "SUBMITTED"
           ? `Shift plan with ${recipePlans.length} recipe(s) submitted successfully`
-          : `Shift plan saved as draft (${recipePlans.length} recipes)`
+          : `Shift plan saved (${recipePlans.length} recipes)`
       );
     } catch (err: any) {
       toast.error(err.message || "Failed to save plan");
@@ -547,10 +685,10 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
                 className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border ${
                   status === "SUBMITTED"
                     ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                    : "bg-slate-100 text-slate-700 border-slate-200"
+                    : "bg-blue-50 text-blue-700 border-blue-200"
                 }`}
               >
-                {status}
+                {status === "SUBMITTED" ? "SUBMITTED" : "SAVED"}
               </span>
             </div>
             <div className="flex items-center gap-2 text-xs text-slate-500 mt-0.5 font-mono">
@@ -583,6 +721,19 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
           </div>
 
           <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+            {/* Auto-save Status Indicator */}
+            {autoSaving ? (
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 text-slate-600 border border-slate-200 text-xs font-medium rounded-lg h-8">
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+                <span className="hidden sm:inline">Auto-saving...</span>
+              </div>
+            ) : lastAutoSavedAt ? (
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-medium rounded-lg h-8">
+                <CheckCircle className="h-3.5 w-3.5 text-emerald-600" />
+                <span className="hidden sm:inline">Auto-saved {lastAutoSavedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</span>
+              </div>
+            ) : null}
+
             <button
               type="button"
               onClick={() => setShowPrintModal(true)}
@@ -603,15 +754,6 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
               <span>Export Excel</span>
             </button>
 
-            <button
-              type="button"
-              disabled={saving}
-              onClick={() => handleSave("DRAFT")}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold rounded-lg transition-all active:scale-95 disabled:opacity-50 h-8 cursor-pointer"
-            >
-              {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5 text-slate-500" />}
-              Save Draft
-            </button>
             <button
               type="button"
               disabled={saving}
