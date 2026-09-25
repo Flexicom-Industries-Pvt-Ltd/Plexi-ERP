@@ -174,7 +174,7 @@ export async function GET(request: NextRequest) {
         }
 
         matchedPlans.forEach((p) => {
-          const shiftName = p.shift?.name || "Shift A";
+          const shiftName = p.isDayNight ? "Day + Night (24h)" : (p.shift?.name || "Shift A");
           const shiftId = p.shiftId || "shift-unknown";
           const date = p.date;
           const planKg = p.plannedQtyKg || 0;
