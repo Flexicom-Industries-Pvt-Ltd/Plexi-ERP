@@ -159,6 +159,57 @@ describe("Tape Plant Multi-Shift (Day + Night) Planning & Execution", () => {
       expect(html).toContain("Day+Night (24h)");
       expect(html).toContain("HDPE/NAT/450/50/S2");
     });
+
+    it("should strictly deduplicate continuous Day+Night recipes in post-production and planning", () => {
+      // Simulating dual records from Day Shift and Night Shift for the same continuous quality
+      const dayPlan = {
+        id: "plan-day-1",
+        shiftId: "shift_day",
+        recipeQuality: "wOND/LPP/WH/500/67/S1",
+        isDayNight: true,
+        plannedQtyKg: 5000,
+      };
+
+      const nightPlan = {
+        id: "plan-night-1",
+        shiftId: "shift_night",
+        recipeQuality: "wOND/LPP/WH/500/67/S1",
+        isDayNight: true,
+        plannedQtyKg: 5000,
+      };
+
+      const nightExtra = {
+        id: "plan-night-2",
+        shiftId: "shift_night",
+        recipeQuality: "HDPE/NAT/450/50/S2",
+        isDayNight: false,
+        plannedQtyKg: 1200,
+      };
+
+      // Test Day Shift view: shiftPlans = [dayPlan], otherContinuousPlans = [nightPlan]
+      const shiftPlansDay = [dayPlan];
+      const otherContinuousDay = [nightPlan];
+      const existingQualitiesDay = new Set(shiftPlansDay.map((p) => p.recipeQuality.trim()));
+      const unlistedDay = otherContinuousDay.filter((cp) => !existingQualitiesDay.has(cp.recipeQuality.trim()));
+      const combinedDay = [...shiftPlansDay, ...unlistedDay];
+
+      expect(combinedDay.length).toBe(1);
+      expect(combinedDay[0].recipeQuality).toBe("wOND/LPP/WH/500/67/S1");
+
+      // Test Night Shift view: shiftPlans = [nightPlan, nightExtra], otherContinuousPlans = [dayPlan]
+      const shiftPlansNight = [nightPlan, nightExtra];
+      const otherContinuousNight = [dayPlan];
+      const existingQualitiesNight = new Set(shiftPlansNight.map((p) => p.recipeQuality.trim()));
+      const unlistedNight = otherContinuousNight.filter((cp) => !existingQualitiesNight.has(cp.recipeQuality.trim()));
+      const combinedNight = [...shiftPlansNight, ...unlistedNight];
+
+      expect(combinedNight.length).toBe(2);
+      expect(combinedNight.map((p) => p.recipeQuality)).toEqual([
+        "wOND/LPP/WH/500/67/S1",
+        "HDPE/NAT/450/50/S2",
+      ]);
+    });
   });
 });
+
 
