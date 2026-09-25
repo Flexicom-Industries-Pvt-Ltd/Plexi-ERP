@@ -15,13 +15,15 @@ export function generateLoomSummaryHtml(data: LoomSummaryDataset): string {
     hour12: true,
   });
 
-  const docDate = new Date().toISOString().slice(0, 10);
-  const docRef = `LM-SUM-${docDate.replace(/-/g, "")}`;
+  const dateLabel = data.selectedDate && data.selectedDate !== "ALL" ? data.selectedDate : "All Production Dates (Latest)";
+  const shiftLabel = data.selectedShiftName || (data.selectedShiftId && data.selectedShiftId !== "ALL" ? data.selectedShiftId : "All Shifts");
+  const docDate = (data.selectedDate && data.selectedDate !== "ALL" ? data.selectedDate : new Date().toISOString().slice(0, 10)).replace(/-/g, "");
+  const docRef = `LM-SUM-${docDate}`;
   const kpis = data.kpis;
 
   const qualityRows = data.qualities.map((q, idx) => `
     <tr>
-      <td style="text-align: center; font-weight: 700; width: 26px;">${idx + 1}</td>
+      <td style="text-align: center; font-weight: 700; width: 24px;">${idx + 1}</td>
       <td style="font-weight: 800; font-family: monospace; font-size: 8pt;">${q.qualityCode}</td>
       <td style="text-align: center; font-weight: 700; font-size: 6.5pt;">
         <span style="border: 1px solid ${q.status === 'RUNNING' ? '#059669' : q.status === 'PLANNED' ? '#2563eb' : '#64748b'}; padding: 1px 4px; border-radius: 2px;">
@@ -37,9 +39,23 @@ export function generateLoomSummaryHtml(data: LoomSummaryDataset): string {
       <td style="text-align: center; font-weight: 800; font-family: monospace; background-color: #f8fafc; font-size: 8.5pt;">
         ${q.totalLooms}
       </td>
-      <td style="font-family: monospace; font-size: 7.5pt; color: #0f172a;">
+      <td style="font-family: monospace; font-size: 7pt; color: #0f172a;">
         ${q.loomNumbers.map((n) => `#${n}`).join(", ") || "None"}
       </td>
+      <td style="text-align: right; font-family: monospace; font-weight: 700;">${q.actualOutputKg ? `${q.actualOutputKg} kg` : "—"}</td>
+      <td style="font-size: 6.5pt; color: #475569;">${(q.activeShifts || []).join(", ") || "—"}</td>
+    </tr>
+  `).join("");
+
+  const shiftRows = (data.shiftSummaryList || []).map((s) => `
+    <tr>
+      <td style="font-weight: 700;">${s.shiftName}</td>
+      <td style="font-family: monospace;">${s.startTime} - ${s.endTime}</td>
+      <td style="text-align: center; font-weight: 700;">${s.qualitiesCount} Qualities</td>
+      <td style="text-align: center; font-weight: 800; font-family: monospace;">${s.activeLoomsCount} Looms</td>
+      <td style="text-align: right; font-family: monospace; font-weight: 700;">${s.producedKg} Kg</td>
+      <td style="text-align: right; font-family: monospace;">${s.plannedKg} Kg</td>
+      <td style="font-size: 7pt;">${s.operators.join(", ") || "—"}</td>
     </tr>
   `).join("");
 
@@ -118,6 +134,19 @@ export function generateLoomSummaryHtml(data: LoomSummaryDataset): string {
       margin-top: 1px;
     }
 
+    /* Filter Indicator Banner */
+    .filter-banner {
+      display: flex;
+      justify-content: space-between;
+      background-color: #f1f5f9;
+      border: 1px solid #cbd5e1;
+      padding: 3px 6px;
+      margin-bottom: 5px;
+      font-size: 7pt;
+      font-weight: 700;
+      color: #1e293b;
+    }
+
     /* KPI Summary Row */
     .kpi-table {
       width: 100%;
@@ -170,7 +199,7 @@ export function generateLoomSummaryHtml(data: LoomSummaryDataset): string {
       border: 1px solid #94a3b8;
       padding: 3px 4px;
       font-weight: 700;
-      font-size: 7pt;
+      font-size: 6.8pt;
       text-transform: uppercase;
       text-align: left;
       color: #0f172a;
@@ -178,7 +207,7 @@ export function generateLoomSummaryHtml(data: LoomSummaryDataset): string {
     .data-table td {
       border: 1px solid #cbd5e1;
       padding: 2.5px 4px;
-      font-size: 7.5pt;
+      font-size: 7pt;
       color: #0f172a;
     }
     .data-table tfoot td {
@@ -279,11 +308,19 @@ export function generateLoomSummaryHtml(data: LoomSummaryDataset): string {
         </td>
         <td class="doc-meta-box">
           <div class="doc-ref-no">${docRef}</div>
+          <div class="doc-meta-item">Date: <strong>${dateLabel}</strong></div>
+          <div class="doc-meta-item">Shift: <strong>${shiftLabel}</strong></div>
           <div class="doc-meta-item">Generated: <strong>${genTimestamp}</strong></div>
-          <div class="doc-meta-item">Allocated: <strong>${kpis.totalAllocatedLooms} / ${kpis.totalFactoryLooms} Looms</strong></div>
         </td>
       </tr>
     </table>
+
+    <!-- FILTER BANNER -->
+    <div class="filter-banner">
+      <span>PRODUCTION DATE: <strong>${dateLabel}</strong></span>
+      <span>SHIFT CONTEXT: <strong>${shiftLabel}</strong></span>
+      <span>TOTAL LOOMS ALLOCATED: <strong>${kpis.totalAllocatedLooms} / ${kpis.totalFactoryLooms}</strong></span>
+    </div>
 
     <!-- KEY KPIS -->
     <table class="kpi-table">
@@ -311,43 +348,68 @@ export function generateLoomSummaryHtml(data: LoomSummaryDataset): string {
       </tr>
     </table>
 
+    <!-- SHIFT-WISE SUMMARY TABLE (IF AVAILABLE) -->
+    ${shiftRows ? `
+      <div class="section-title">Shift-Wise Tape Output & Active Loom Machine Deployments</div>
+      <table class="data-table" style="margin-bottom: 8px;">
+        <thead>
+          <tr>
+            <th style="width: 80px;">Shift</th>
+            <th style="width: 100px;">Timing</th>
+            <th style="text-align: center; width: 80px;">Qualities</th>
+            <th style="text-align: center; width: 90px;">Active Looms</th>
+            <th style="text-align: right; width: 90px;">Tape Produced</th>
+            <th style="text-align: right; width: 90px;">Tape Planned</th>
+            <th>Shift Operators</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${shiftRows}
+        </tbody>
+      </table>
+    ` : ""}
+
     <!-- SECTION 1: MASTER LOOM QUALITY ALLOCATIONS TABLE -->
-    <div class="section-title">1. Master Quality Formulations & Loom Machine Allocations</div>
+    <div class="section-title">Master Quality Formulations & Loom Machine Allocations</div>
     <table class="data-table">
       <thead>
         <tr>
-          <th style="text-align: center; width: 26px;">#</th>
+          <th style="text-align: center; width: 24px;">#</th>
           <th>Quality Formulation Code</th>
-          <th style="text-align: center; width: 90px;">Tape Status</th>
-          <th style="width: 70px;">Color Group</th>
-          <th style="width: 60px;">Colour</th>
-          <th style="text-align: right; width: 44px;">Denier</th>
-          <th style="text-align: right; width: 50px;">Width</th>
-          <th style="text-align: right; width: 50px;">Reed</th>
-          <th style="width: 70px;">Bobbin Mark</th>
-          <th style="text-align: center; width: 45px;">Looms</th>
+          <th style="text-align: center; width: 85px;">Tape Status</th>
+          <th style="width: 65px;">Color Group</th>
+          <th style="width: 55px;">Colour</th>
+          <th style="text-align: right; width: 40px;">Denier</th>
+          <th style="text-align: right; width: 45px;">Width</th>
+          <th style="text-align: right; width: 45px;">Reed</th>
+          <th style="width: 65px;">Bobbin</th>
+          <th style="text-align: center; width: 40px;">Looms</th>
           <th>Assigned Loom Numbers</th>
+          <th style="text-align: right; width: 65px;">Produced</th>
+          <th style="width: 70px;">Shifts</th>
         </tr>
       </thead>
       <tbody>
-        ${qualityRows || `<tr><td colspan="11" style="text-align: center; color: #64748b; padding: 6px;">No Loom Machine Mappings found.</td></tr>`}
+        ${qualityRows || `<tr><td colspan="13" style="text-align: center; color: #64748b; padding: 6px;">No Loom Machine Mappings found.</td></tr>`}
       </tbody>
       <tfoot>
         <tr>
-          <td colspan="2" style="text-align: right; text-transform: uppercase; font-size: 7pt;">Total Active Formulations:</td>
+          <td colspan="2" style="text-align: right; text-transform: uppercase; font-size: 7pt;">Total Formulations:</td>
           <td style="text-align: center; font-weight: 800;">${kpis.runningQualitiesCount} Running</td>
           <td colspan="6">—</td>
           <td style="text-align: center; font-family: monospace; font-weight: 800; background-color: #f1f5f9;">
             ${kpis.totalAllocatedLooms}
           </td>
           <td>Allocated across ${kpis.totalFactoryLooms} Factory Loom bays</td>
+          <td style="text-align: right; font-family: monospace; font-weight: 800;">${kpis.totalTapeProducedKg} Kg</td>
+          <td>—</td>
         </tr>
       </tfoot>
     </table>
 
     <!-- SECTION 2: 1-91 LOOM FLOOR MAP MATRIX -->
     <div class="avoid-break">
-      <div class="section-title">2. Factory Floor 1-91 Circular Loom Machine Status Matrix</div>
+      <div class="section-title">Factory Floor 1-91 Circular Loom Machine Status Matrix (${dateLabel} • ${shiftLabel})</div>
       <div class="floor-matrix-grid">
         ${data.loomMatrix.map((m) => `
           <div class="floor-loom-cell" style="background-color: ${m.status === 'RUNNING' ? '#ecfdf5' : m.status === 'PLANNED' ? '#eff6ff' : m.isAllocated ? '#ffffff' : '#f1f5f9'}; border-color: ${m.status === 'RUNNING' ? '#10b981' : m.status === 'PLANNED' ? '#60a5fa' : '#cbd5e1'};">
