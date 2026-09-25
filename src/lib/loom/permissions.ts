@@ -14,9 +14,10 @@ export async function requireLoomApiPermission(action: LoomAction) {
     isSuperAdminRole(session.user.role) ||
     permissions.some(
       (p: { module: string; [key: string]: unknown }) =>
-        (p.module === "LOOM" || p.module === "PRODUCTION" || p.module === "TAPE_PLANT" || p.module === "ALL") &&
+        (p.module === "LOOM" || p.module === "ALL") &&
         Boolean(p[action])
     );
+
 
   if (!hasAccess) {
     return { ok: false as const, status: 403, error: "Forbidden" };
