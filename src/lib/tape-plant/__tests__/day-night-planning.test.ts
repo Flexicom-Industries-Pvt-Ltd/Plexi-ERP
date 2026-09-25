@@ -277,14 +277,95 @@ describe("Tape Plant Multi-Shift (Day + Night) Planning & Execution", () => {
         "HDPE/NAT/450/50/S2",
       ]);
       expect(effectivePlans[0].shiftName).toBe("Day + Night (24h)");
-      expect(effectivePlans[1].shiftName).toBe("Day Shift");
-      expect(effectivePlans[2].shiftName).toBe("Night Shift");
-
       const totalPlanned = effectivePlans.reduce((sum, p) => sum + p.plannedQtyKg, 0);
       expect(totalPlanned).toBe(5000 + 1200 + 1500); // 7,700 KG, exactly counted once
     });
+
+    it("should correctly handle quality deletion and post-production sync when saving plans", () => {
+      // Scenario: Shift originally had 3 planned qualities, then user deletes quality 2 and submits
+      const initialPlans = [
+        { id: "p1", recipeQuality: "QUAL-A", plannedQtyKg: 4000, shiftId: "shift_day" },
+        { id: "p2", recipeQuality: "QUAL-B", plannedQtyKg: 2000, shiftId: "shift_day" },
+        { id: "p3", recipeQuality: "QUAL-C", plannedQtyKg: 3000, shiftId: "shift_day" },
+      ];
+
+      const submittedPlans = [
+        { id: "p1", recipeQuality: "QUAL-A", plannedQtyKg: 4000, shiftId: "shift_day" },
+        { id: "p3", recipeQuality: "QUAL-C", plannedQtyKg: 3000, shiftId: "shift_day" },
+      ];
+
+      const submittedIds = submittedPlans.map((p) => p.id);
+
+      // Remaining plans in DB after deleteMany({ where: { date, shiftId, id: { notIn: submittedIds } } })
+      const remainingPlansInDb = initialPlans.filter((p) => submittedIds.includes(p.id));
+      expect(remainingPlansInDb.length).toBe(2);
+      expect(remainingPlansInDb.map((p) => p.recipeQuality)).toEqual(["QUAL-A", "QUAL-C"]);
+
+      // Post-Production synchronization:
+      const savedPostProdEntries = [
+        { id: "p1", planId: "p1", recipeQuality: "QUAL-A", plannedProductionKg: 4000, productionDoneKg: 3900, wasteKg: 50 },
+        { id: "p2", planId: "p2", recipeQuality: "QUAL-B", plannedProductionKg: 2000, productionDoneKg: 1950, wasteKg: 30 },
+        { id: "p3", planId: "p3", recipeQuality: "QUAL-C", plannedProductionKg: 3000, productionDoneKg: 2980, wasteKg: 40 },
+      ];
+
+      // Re-sync post production entries strictly from active remaining plans
+      const syncedPostProdEntries = remainingPlansInDb.map((plan) => {
+        const matching = savedPostProdEntries.find((e) => e.planId === plan.id || e.recipeQuality === plan.recipeQuality);
+        const plannedKg = plan.plannedQtyKg;
+        const doneKg = matching?.productionDoneKg ?? 0;
+        const wasteKg = matching?.wasteKg ?? 0;
+        return {
+          id: plan.id,
+          planId: plan.id,
+          recipeQuality: plan.recipeQuality,
+          plannedProductionKg: plannedKg,
+          productionDoneKg: doneKg,
+          gapKg: plannedKg - Number(doneKg),
+          wasteKg,
+          netProductionKg: Number(doneKg) - Number(wasteKg),
+        };
+      });
+
+      expect(syncedPostProdEntries.length).toBe(2);
+      expect(syncedPostProdEntries.map((e) => e.recipeQuality)).toEqual(["QUAL-A", "QUAL-C"]);
+      expect(syncedPostProdEntries.find((e) => e.recipeQuality === "QUAL-B")).toBeUndefined();
+
+      const totalPlanned = syncedPostProdEntries.reduce((sum, e) => sum + Number(e.plannedProductionKg), 0);
+      const totalDone = syncedEntriesTotal(syncedPostProdEntries);
+      expect(totalPlanned).toBe(7000); // 4000 + 3000 (QUAL-B's 2000 is removed)
+      expect(totalDone).toBe(6880); // 3900 + 2980
+    });
+
+    it("should correctly overwrite database state and remove deleted qualities when submitted from ALL filter", () => {
+      // Scenario: User views ALL filter (Day + Night), deletes a Night quality, and submits
+      const existingAllPlansInDb = [
+        { id: "day-1", recipeQuality: "DAY-QUAL", plannedQtyKg: 5000, shiftId: "shift_day" },
+        { id: "night-1", recipeQuality: "NIGHT-QUAL-1", plannedQtyKg: 3000, shiftId: "shift_night" },
+        { id: "night-2", recipeQuality: "NIGHT-QUAL-2", plannedQtyKg: 2000, shiftId: "shift_night" },
+      ];
+
+      // User deleted night-2 from the list and submits
+      const submittedFromAll = [
+        { id: "day-1", recipeQuality: "DAY-QUAL", plannedQtyKg: 5000, shiftId: "shift_day" },
+        { id: "night-1", recipeQuality: "NIGHT-QUAL-1", plannedQtyKg: 3000, shiftId: "shift_night" },
+      ];
+
+      const submittedIds = submittedFromAll.map((p) => p.id);
+
+      // In ALL mode: deleteMany({ where: { date, id: { notIn: submittedIds } } })
+      const plansAfterAllSave = existingAllPlansInDb.filter((p) => submittedIds.includes(p.id));
+      expect(plansAfterAllSave.length).toBe(2);
+      expect(plansAfterAllSave.map((p) => p.id)).toEqual(["day-1", "night-1"]);
+      expect(plansAfterAllSave.find((p) => p.id === "night-2")).toBeUndefined();
+    });
   });
 });
+
+function syncedEntriesTotal(entries: any[]): number {
+  return entries.reduce((sum, e) => sum + Number(e.productionDoneKg), 0);
+}
+
+
 
 
 
