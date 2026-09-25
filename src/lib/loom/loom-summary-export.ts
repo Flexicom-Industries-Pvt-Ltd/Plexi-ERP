@@ -1,5 +1,15 @@
 import * as XLSX from "xlsx";
 
+export interface LoomQualityShiftEntry {
+  shiftId: string;
+  shiftName: string;
+  date: string;
+  operatorName: string | null;
+  plannedKg: number;
+  producedKg: number;
+  wasteKg: number;
+}
+
 export interface LoomQualityItem {
   id: string;
   qualityCode: string;
@@ -18,6 +28,7 @@ export interface LoomQualityItem {
   lastRunDate?: string | null;
   latestOperator?: string | null;
   activeShifts?: string[];
+  shiftBreakdown?: LoomQualityShiftEntry[];
   plannedOutputKg?: number;
   actualOutputKg?: number;
 }
@@ -35,10 +46,36 @@ export interface LoomMatrixNode {
   bobbinMarking: string;
   status: "RUNNING" | "PLANNED" | "STANDBY" | "UNALLOCATED";
   latestOperator?: string | null;
+  activeShifts?: string[];
+}
+
+export interface LoomShiftSummaryItem {
+  shiftId: string;
+  shiftName: string;
+  startTime: string;
+  endTime: string;
+  qualitiesCount: number;
+  activeLoomsCount: number;
+  producedKg: number;
+  plannedKg: number;
+  operators: string[];
+  qualityCodes: string[];
 }
 
 export interface LoomSummaryDataset {
+  selectedDate?: string;
+  selectedShiftId?: string;
+  selectedShiftName?: string;
+  availableDates?: string[];
+  availableShifts?: {
+    id: string;
+    name: string;
+    startTime: string;
+    endTime: string;
+  }[];
+  shiftSummaryList?: LoomShiftSummaryItem[];
   qualities: LoomQualityItem[];
+  allQualities?: LoomQualityItem[];
   loomMatrix: LoomMatrixNode[];
   kpis: {
     totalFactoryLooms: number;
@@ -66,6 +103,9 @@ export function exportLoomSummaryExcel(data: LoomSummaryDataset): void {
   const genTimestamp = new Date().toLocaleString();
   const emptyRow: any[] = [];
 
+  const dateLabel = data.selectedDate && data.selectedDate !== "ALL" ? data.selectedDate : "All Dates (Latest Live)";
+  const shiftLabel = data.selectedShiftName || (data.selectedShiftId && data.selectedShiftId !== "ALL" ? data.selectedShiftId : "All Shifts");
+
   // -------------------------------------------------------------
   // Sheet 1: Quality Formulation & Loom Allocations
   // -------------------------------------------------------------
@@ -83,8 +123,11 @@ export function exportLoomSummaryExcel(data: LoomSummaryDataset): void {
     "Target PPM",
     "Allocated Looms Count",
     "Assigned Loom Numbers",
+    "Tape Produced (Kg)",
+    "Tape Planned (Kg)",
     "Active Shifts",
     "Latest Operator",
+    "Last Date",
   ];
 
   const qualityRows = data.qualities.map((q, idx) => [
@@ -101,13 +144,17 @@ export function exportLoomSummaryExcel(data: LoomSummaryDataset): void {
     q.targetPpm || "—",
     q.totalLooms,
     q.loomNumbers.map((n) => `#${n}`).join(", "),
+    q.actualOutputKg || 0,
+    q.plannedOutputKg || 0,
     (q.activeShifts || []).join(", ") || "—",
     q.latestOperator || "—",
+    q.lastRunDate || "—",
   ]);
 
   const ws1 = XLSX.utils.aoa_to_sheet([
-    ["FLEXICOM INDUSTRIES PVT. LTD. - LOOM SECTION MASTER ALLOCATION & RUNNING QUALITIES"],
-    [`Generated On: ${genTimestamp}`, `Total Factory Looms: ${data.kpis.totalFactoryLooms}`, `Allocated: ${data.kpis.totalAllocatedLooms}`],
+    ["FLEXICOM INDUSTRIES PVT. LTD. - LOOM SECTION MASTER ALLOCATIONS & TAPE STATUS"],
+    [`Date Filter: ${dateLabel}`, `Shift Filter: ${shiftLabel}`, `Generated: ${genTimestamp}`],
+    [`Total Factory Looms: ${data.kpis.totalFactoryLooms}`, `Allocated: ${data.kpis.totalAllocatedLooms}`, `Running Looms: ${data.kpis.totalRunningLooms}`],
     emptyRow,
     qualityHeader,
     ...qualityRows,
@@ -125,6 +172,9 @@ export function exportLoomSummaryExcel(data: LoomSummaryDataset): void {
       "—",
       "—",
       data.kpis.totalAllocatedLooms,
+      "—",
+      data.kpis.totalTapeProducedKg,
+      data.kpis.totalTapePlannedKg,
       "—",
       "",
       "",
@@ -145,8 +195,11 @@ export function exportLoomSummaryExcel(data: LoomSummaryDataset): void {
     { wch: 12 }, // Target PPM
     { wch: 22 }, // Loom Count
     { wch: 45 }, // Loom Numbers
+    { wch: 18 }, // Produced Kg
+    { wch: 18 }, // Planned Kg
     { wch: 22 }, // Shifts
     { wch: 20 }, // Operator
+    { wch: 16 }, // Last Date
   ];
 
   XLSX.utils.book_append_sheet(wb, ws1, "Loom Allocations");
@@ -165,6 +218,8 @@ export function exportLoomSummaryExcel(data: LoomSummaryDataset): void {
     "Reed Space (cm)",
     "Bobbin Marking",
     "Tape Plant Status",
+    "Active Shifts",
+    "Operator",
   ];
 
   const matrixRows = data.loomMatrix.map((m) => [
@@ -178,11 +233,13 @@ export function exportLoomSummaryExcel(data: LoomSummaryDataset): void {
     m.reedSpaceCm || "—",
     m.bobbinMarking,
     m.status,
+    (m.activeShifts || []).join(", ") || "—",
+    m.latestOperator || "—",
   ]);
 
   const ws2 = XLSX.utils.aoa_to_sheet([
     ["FLEXICOM INDUSTRIES - FACTORY FLOOR 1-91 LOOM MACHINE STATUS MATRIX"],
-    [`Generated: ${genTimestamp}`, `Total Looms: ${data.kpis.totalFactoryLooms}`],
+    [`Date: ${dateLabel}`, `Shift: ${shiftLabel}`, `Generated: ${genTimestamp}`],
     emptyRow,
     matrixHeader,
     ...matrixRows,
@@ -199,12 +256,62 @@ export function exportLoomSummaryExcel(data: LoomSummaryDataset): void {
     { wch: 16 }, // Reed Space
     { wch: 18 }, // Bobbin
     { wch: 18 }, // Status
+    { wch: 20 }, // Shifts
+    { wch: 20 }, // Operator
   ];
 
   XLSX.utils.book_append_sheet(wb, ws2, "1-91 Loom Matrix");
 
   // -------------------------------------------------------------
-  // Sheet 3: Scorecard & Color Group Distribution
+  // Sheet 3: Shift-Wise Production & Loom Operations
+  // -------------------------------------------------------------
+  if (data.shiftSummaryList && data.shiftSummaryList.length > 0) {
+    const shiftHeader = [
+      "Shift Name",
+      "Timing",
+      "Active Qualities Count",
+      "Running Looms Count",
+      "Tape Produced (Kg)",
+      "Tape Planned (Kg)",
+      "Operators",
+      "Running Quality Codes",
+    ];
+
+    const shiftRows = data.shiftSummaryList.map((s) => [
+      s.shiftName,
+      `${s.startTime} - ${s.endTime}`,
+      s.qualitiesCount,
+      s.activeLoomsCount,
+      s.producedKg,
+      s.plannedKg,
+      s.operators.join(", ") || "—",
+      s.qualityCodes.join(", ") || "—",
+    ]);
+
+    const ws3 = XLSX.utils.aoa_to_sheet([
+      ["FLEXICOM INDUSTRIES - SHIFT-WISE TAPE OUTPUT & LOOM ALLOCATIONS"],
+      [`Date: ${dateLabel}`, `Generated: ${genTimestamp}`],
+      emptyRow,
+      shiftHeader,
+      ...shiftRows,
+    ]);
+
+    ws3["!cols"] = [
+      { wch: 16 },
+      { wch: 18 },
+      { wch: 22 },
+      { wch: 22 },
+      { wch: 20 },
+      { wch: 20 },
+      { wch: 30 },
+      { wch: 50 },
+    ];
+
+    XLSX.utils.book_append_sheet(wb, ws3, "Shift Operations");
+  }
+
+  // -------------------------------------------------------------
+  // Sheet 4: Scorecard & Color Group Distribution
   // -------------------------------------------------------------
   const cgHeader = ["Color Group", "Assigned Looms Count", "Active Qualities", "Running Looms"];
   const cgRows = data.colorGroupsSummary.map((cg) => [
@@ -214,9 +321,9 @@ export function exportLoomSummaryExcel(data: LoomSummaryDataset): void {
     cg.activeLooms,
   ]);
 
-  const ws3 = XLSX.utils.aoa_to_sheet([
+  const ws4 = XLSX.utils.aoa_to_sheet([
     ["FLEXICOM INDUSTRIES - LOOM SECTION EXECUTIVE SCORECARD"],
-    [`Generated: ${genTimestamp}`],
+    [`Date: ${dateLabel}`, `Shift: ${shiftLabel}`, `Generated: ${genTimestamp}`],
     emptyRow,
     ["KPI METRICS", "VALUE"],
     ["Total Factory Looms", data.kpis.totalFactoryLooms],
@@ -227,15 +334,18 @@ export function exportLoomSummaryExcel(data: LoomSummaryDataset): void {
     ["Unallocated / Idle Looms", data.kpis.totalUnallocatedLooms],
     ["Active Qualities In Production", data.kpis.runningQualitiesCount],
     ["Total Mapped Qualities", data.kpis.totalQualitiesCount],
+    ["Total Tape Produced (Kg)", data.kpis.totalTapeProducedKg],
+    ["Total Tape Planned (Kg)", data.kpis.totalTapePlannedKg],
     emptyRow,
     ["COLOR GROUP LOOM DISTRIBUTION", "", "", ""],
     cgHeader,
     ...cgRows,
   ]);
 
-  ws3["!cols"] = [{ wch: 32 }, { wch: 22 }, { wch: 18 }, { wch: 18 }];
-  XLSX.utils.book_append_sheet(wb, ws3, "KPI Scorecard");
+  ws4["!cols"] = [{ wch: 32 }, { wch: 22 }, { wch: 18 }, { wch: 18 }];
+  XLSX.utils.book_append_sheet(wb, ws4, "KPI Scorecard");
 
-  const filename = `Loom_Section_Summary_Allocations_${new Date().toISOString().slice(0, 10)}.xlsx`;
+  const dateFileTag = data.selectedDate && data.selectedDate !== "ALL" ? data.selectedDate : new Date().toISOString().slice(0, 10);
+  const filename = `Loom_Summary_Allocations_${dateFileTag}.xlsx`;
   XLSX.writeFile(wb, filename);
 }

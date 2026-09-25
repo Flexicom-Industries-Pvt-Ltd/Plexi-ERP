@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { toast } from "sonner";
 import {
   Search,
@@ -20,7 +20,9 @@ import {
   Loader2,
   ChevronRight,
   Sparkles,
-  Info,
+  Calendar,
+  Zap,
+  UserCheck,
 } from "lucide-react";
 import {
   LoomSummaryDataset,
@@ -43,6 +45,8 @@ export const COLOR_GROUP_STYLES: Record<string, { bg: string; text: string; bord
 export function LoomSummarySection() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<LoomSummaryDataset | null>(null);
+  const [selectedDate, setSelectedDate] = useState<string>("ALL");
+  const [selectedShiftId, setSelectedShiftId] = useState<string>("ALL");
   const [search, setSearch] = useState("");
   const [selectedColorGroup, setSelectedColorGroup] = useState<string>("ALL");
   const [selectedStatus, setSelectedStatus] = useState<string>("ALL");
@@ -53,6 +57,8 @@ export function LoomSummarySection() {
     setLoading(true);
     try {
       const params = new URLSearchParams();
+      if (selectedDate && selectedDate !== "ALL") params.set("date", selectedDate);
+      if (selectedShiftId && selectedShiftId !== "ALL") params.set("shiftId", selectedShiftId);
       if (search) params.set("search", search);
       if (selectedColorGroup !== "ALL") params.set("colorGroup", selectedColorGroup);
       if (selectedStatus !== "ALL") params.set("status", selectedStatus);
@@ -67,25 +73,36 @@ export function LoomSummarySection() {
       });
 
       if (!res.ok) throw new Error("Failed to load Loom Summary");
-      const json = await res.json();
+      const json: LoomSummaryDataset = await res.json();
       setData(json);
     } catch {
       toast.error("Failed to load Loom Summary");
     } finally {
       setLoading(false);
     }
-  }, [search, selectedColorGroup, selectedStatus]);
+  }, [selectedDate, selectedShiftId, search, selectedColorGroup, selectedStatus]);
 
   useEffect(() => {
     fetchSummary();
   }, [fetchSummary]);
+
+  const selectedShiftName = useMemo(() => {
+    if (!data?.availableShifts || selectedShiftId === "ALL") return "All Shifts";
+    const found = data.availableShifts.find((s) => s.id === selectedShiftId);
+    return found ? found.name : "All Shifts";
+  }, [data?.availableShifts, selectedShiftId]);
 
   const handleExportExcel = () => {
     if (!data || data.qualities.length === 0) {
       toast.error("No Loom summary data available to export");
       return;
     }
-    exportLoomSummaryExcel(data);
+    exportLoomSummaryExcel({
+      ...data,
+      selectedDate,
+      selectedShiftId,
+      selectedShiftName,
+    });
     toast.success("Loom Machine Allocations exported to Excel");
   };
 
@@ -94,7 +111,12 @@ export function LoomSummarySection() {
       toast.error("No Loom summary data available to print");
       return;
     }
-    printLoomSummary(data);
+    printLoomSummary({
+      ...data,
+      selectedDate,
+      selectedShiftId,
+      selectedShiftName,
+    });
   };
 
   const handleLoomClick = (loomNo: number) => {
@@ -102,8 +124,21 @@ export function LoomSummarySection() {
     setSearch(loomNo === highlightedLoom ? "" : String(loomNo));
   };
 
+  const setDatePreset = (preset: "ALL" | "TODAY" | "YESTERDAY") => {
+    if (preset === "ALL") {
+      setSelectedDate("ALL");
+    } else if (preset === "TODAY") {
+      const today = new Date().toISOString().slice(0, 10);
+      setSelectedDate(today);
+    } else if (preset === "YESTERDAY") {
+      const y = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+      setSelectedDate(y);
+    }
+  };
+
   const kpis = data?.kpis;
   const colorGroups = data?.colorGroupsSummary || [];
+  const shiftSummaries = data?.shiftSummaryList || [];
 
   return (
     <div className="space-y-5 w-full min-w-0 max-w-full">
@@ -123,7 +158,7 @@ export function LoomSummarySection() {
               </span>
             </div>
             <p className="text-xs text-slate-500 mt-0.5">
-              Real-time synchronization of active qualities running in Tape Plant mapped to assigned Loom machine numbers.
+              Real-time synchronization of active qualities running in Tape Plant mapped to assigned Loom machine numbers date & shift wise.
             </p>
           </div>
         </div>
@@ -160,6 +195,129 @@ export function LoomSummarySection() {
             <span>Export Excel (.xlsx)</span>
           </button>
         </div>
+      </div>
+
+      {/* Date & Shift Filter Bar */}
+      <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-slate-200 shadow-xs space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
+          <div className="flex flex-wrap items-center gap-2.5">
+            {/* Date Picker Input */}
+            <div className="flex items-center gap-1.5">
+              <Calendar className="h-4 w-4 text-slate-500" />
+              <span className="font-bold text-slate-700">Date:</span>
+              <input
+                type="date"
+                value={selectedDate === "ALL" ? "" : selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value || "ALL")}
+                className="px-2.5 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs text-slate-900 font-semibold outline-none focus:border-slate-800 cursor-pointer"
+              />
+            </div>
+
+            {/* Quick Date Presets */}
+            <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+              <button
+                type="button"
+                onClick={() => setDatePreset("ALL")}
+                className={`px-2 py-1 rounded text-[11px] font-bold transition-all cursor-pointer ${
+                  selectedDate === "ALL" ? "bg-white text-slate-900 shadow-2xs" : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                All Dates (Live)
+              </button>
+              <button
+                type="button"
+                onClick={() => setDatePreset("TODAY")}
+                className={`px-2 py-1 rounded text-[11px] font-bold transition-all cursor-pointer ${
+                  selectedDate === new Date().toISOString().slice(0, 10) ? "bg-white text-slate-900 shadow-2xs" : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                Today
+              </button>
+              <button
+                type="button"
+                onClick={() => setDatePreset("YESTERDAY")}
+                className={`px-2 py-1 rounded text-[11px] font-bold transition-all cursor-pointer ${
+                  selectedDate === new Date(Date.now() - 86400000).toISOString().slice(0, 10) ? "bg-white text-slate-900 shadow-2xs" : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                Yesterday
+              </button>
+            </div>
+
+            {/* Shift Selector */}
+            <div className="flex items-center gap-1.5 pl-2 border-l border-slate-200">
+              <Clock className="h-4 w-4 text-slate-500" />
+              <span className="font-bold text-slate-700">Shift:</span>
+              <select
+                value={selectedShiftId}
+                onChange={(e) => setSelectedShiftId(e.target.value)}
+                className="px-2.5 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs text-slate-900 font-bold outline-none focus:border-slate-800 cursor-pointer"
+              >
+                <option value="ALL">All Shifts</option>
+                {data?.availableShifts?.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name} ({s.startTime} - {s.endTime})
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Active Context Chip */}
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 text-slate-800 text-xs font-mono font-bold rounded-lg border border-slate-200">
+              <span className="h-2 w-2 rounded-full bg-emerald-500" />
+              Context: {selectedDate === "ALL" ? "All Dates" : selectedDate} • {selectedShiftName}
+            </span>
+          </div>
+        </div>
+
+        {/* Interactive Shift Summary Cards Row */}
+        {shiftSummaries.length > 0 && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5 pt-2 border-t border-slate-100">
+            {shiftSummaries.map((s) => {
+              const isSelected = selectedShiftId === s.shiftId;
+              return (
+                <div
+                  key={s.shiftId}
+                  onClick={() => setSelectedShiftId(isSelected ? "ALL" : s.shiftId)}
+                  className={`p-2.5 rounded-xl border text-xs cursor-pointer transition-all ${
+                    isSelected
+                      ? "bg-slate-900 text-white border-slate-900 shadow-sm ring-2 ring-slate-800"
+                      : "bg-slate-50/70 hover:bg-slate-100/80 border-slate-200 text-slate-800"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className={`font-black uppercase tracking-wider text-[11px] ${isSelected ? "text-cyan-300" : "text-slate-900"}`}>
+                      {s.shiftName}
+                    </span>
+                    <span className={`text-[10px] font-mono ${isSelected ? "text-slate-300" : "text-slate-500"}`}>
+                      {s.startTime} - {s.endTime}
+                    </span>
+                  </div>
+                  <div className="mt-1.5 flex items-baseline justify-between">
+                    <span className={`text-base font-black font-mono ${isSelected ? "text-white" : "text-slate-900"}`}>
+                      {s.producedKg ? `${s.producedKg.toLocaleString()} kg` : "0 kg"}
+                    </span>
+                    <span className={`text-[11px] font-bold ${isSelected ? "text-emerald-300" : "text-emerald-700"}`}>
+                      {s.activeLoomsCount} Looms Active
+                    </span>
+                  </div>
+                  <div className="mt-1 flex items-center justify-between text-[10px]">
+                    <span className={isSelected ? "text-slate-300" : "text-slate-500"}>
+                      {s.qualitiesCount} Qualities Running
+                    </span>
+                    {s.operators.length > 0 && (
+                      <span className={`truncate max-w-[120px] ${isSelected ? "text-slate-300" : "text-slate-600"}`} title={s.operators.join(", ")}>
+                        Op: {s.operators.join(", ")}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* KPI Overview Cards */}
@@ -205,13 +363,15 @@ export function LoomSummarySection() {
 
         <div className="bg-white rounded-xl border border-slate-200 p-3.5 shadow-2xs">
           <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">
-            Mapped Master Recipes
+            Tape Produced Output
           </span>
           <p className="text-xl font-black text-slate-900 font-mono mt-0.5">
-            {kpis?.totalQualitiesCount || 0}{" "}
-            <span className="text-[11px] font-normal text-slate-400">Formulations</span>
+            {kpis?.totalTapeProducedKg?.toLocaleString() || 0}{" "}
+            <span className="text-[11px] font-normal text-slate-400">Kg</span>
           </p>
-          <span className="text-[10px] text-slate-500">From Data Centre master</span>
+          <span className="text-[10px] text-slate-500">
+            {kpis?.totalTapePlannedKg ? `${kpis.totalTapePlannedKg.toLocaleString()} Kg Planned` : "In Selected Filter"}
+          </span>
         </div>
 
         <div className="bg-white rounded-xl border border-slate-200 p-3.5 shadow-2xs">
@@ -234,7 +394,7 @@ export function LoomSummarySection() {
             <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
             <input
               type="text"
-              placeholder="Search quality code (e.g. AMB), loom # (e.g. 14), colour, marking..."
+              placeholder="Search quality code (e.g. AMB), loom # (e.g. 14), shift, colour..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs text-slate-900 outline-none focus:border-slate-800 font-medium"
@@ -345,7 +505,7 @@ export function LoomSummarySection() {
       {loading ? (
         <div className="bg-white rounded-xl border border-slate-200 p-16 flex flex-col items-center justify-center text-center">
           <Loader2 className="h-7 w-7 animate-spin text-slate-700 mb-2" />
-          <p className="text-xs font-bold text-slate-800">Synchronizing Loom Allocations & Tape Plant Data...</p>
+          <p className="text-xs font-bold text-slate-800">Synchronizing Loom Allocations & Shift Data...</p>
           <p className="text-[11px] text-slate-400 mt-0.5">Fetching 91 factory loom mappings, active shift plans and batch logs</p>
         </div>
       ) : !data || data.qualities.length === 0 ? (
@@ -361,7 +521,7 @@ export function LoomSummarySection() {
                 <div className="flex items-center gap-2">
                   <Grid className="h-4 w-4 text-slate-700" />
                   <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                    Factory Floor 1-91 Loom Live Matrix
+                    Factory Floor 1-91 Loom Live Matrix ({selectedDate === "ALL" ? "All Dates" : selectedDate} • {selectedShiftName})
                   </h3>
                 </div>
                 <div className="flex items-center gap-3 text-[11px] font-semibold text-slate-600">
@@ -520,6 +680,19 @@ export function LoomSummarySection() {
                           <p className="font-mono font-semibold text-slate-800 text-xs">{item.mesh || "—"}</p>
                         </div>
                       </div>
+
+                      {/* Shift Output Highlights */}
+                      {(item.actualOutputKg || item.plannedOutputKg) ? (
+                        <div className="px-4 py-2 bg-emerald-50/50 border-b border-emerald-100/60 flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-1.5 text-emerald-900 font-bold">
+                            <Zap className="h-3.5 w-3.5 text-emerald-600" />
+                            <span>Output: {item.actualOutputKg ? `${item.actualOutputKg.toLocaleString()} kg` : "0 kg"}</span>
+                          </div>
+                          {item.plannedOutputKg ? (
+                            <span className="text-[11px] text-slate-600 font-mono">Plan: {item.plannedOutputKg.toLocaleString()} kg</span>
+                          ) : null}
+                        </div>
+                      ) : null}
                     </div>
 
                     {/* Assigned Looms Footer */}
@@ -572,7 +745,7 @@ export function LoomSummarySection() {
                 <div className="flex items-center gap-2">
                   <Table className="h-4 w-4 text-slate-700" />
                   <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                    Loom Machine Master Allocations Table
+                    Loom Machine Master Allocations Table ({selectedDate === "ALL" ? "All Dates" : selectedDate} • {selectedShiftName})
                   </h3>
                 </div>
                 <span className="text-xs font-semibold text-slate-500">
@@ -593,8 +766,10 @@ export function LoomSummarySection() {
                       <th className="px-3 py-2.5 text-right">Width (mm)</th>
                       <th className="px-3 py-2.5 text-right">Reed Space</th>
                       <th className="px-3 py-2.5">Bobbin Mark</th>
-                      <th className="px-3 py-2.5 text-center font-bold">Looms Count</th>
+                      <th className="px-3 py-2.5 text-center font-bold">Looms</th>
                       <th className="px-3 py-2.5">Assigned Loom Numbers</th>
+                      <th className="px-3 py-2.5 text-right">Produced (Kg)</th>
+                      <th className="px-3 py-2.5">Active Shifts</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200">
@@ -636,7 +811,7 @@ export function LoomSummarySection() {
                             {q.totalLooms}
                           </td>
                           <td className="px-3 py-2.5">
-                            <div className="flex flex-wrap gap-1 max-w-md">
+                            <div className="flex flex-wrap gap-1 max-w-xs">
                               {q.loomNumbers.map((num) => (
                                 <span
                                   key={num}
@@ -647,6 +822,12 @@ export function LoomSummarySection() {
                                 </span>
                               ))}
                             </div>
+                          </td>
+                          <td className="px-3 py-2.5 text-right font-mono font-bold text-slate-900">
+                            {q.actualOutputKg ? `${q.actualOutputKg.toLocaleString()} kg` : "—"}
+                          </td>
+                          <td className="px-3 py-2.5 text-[11px] text-slate-600">
+                            {(q.activeShifts || []).join(", ") || "—"}
                           </td>
                         </tr>
                       );
@@ -665,6 +846,10 @@ export function LoomSummarySection() {
                       <td className="px-3 py-2 text-slate-600">
                         Allocated across {kpis?.totalFactoryLooms} Loom bays
                       </td>
+                      <td className="px-3 py-2 text-right font-mono font-black text-slate-900">
+                        {kpis?.totalTapeProducedKg?.toLocaleString()} kg
+                      </td>
+                      <td>—</td>
                     </tr>
                   </tfoot>
                 </table>
