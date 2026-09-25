@@ -20,6 +20,46 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    if (shiftId.toUpperCase() === "ALL") {
+      const allPlans = await db.tapePlantPlan.findMany({
+        where: { date },
+        orderBy: [{ shiftId: "asc" }, { createdAt: "asc" }],
+        include: {
+          shift: true,
+        },
+      });
+
+      const effectivePlans = allPlans.map((p) => {
+        let sName = p.shift?.name || (p.shiftId === "shift_night" ? "Night Shift" : "Day Shift");
+        if (p.isDayNight) {
+          sName = `${sName} (24h Day+Night)`;
+        }
+        return {
+          ...p,
+          shiftName: sName,
+        };
+      });
+
+      const totalPlannedKg = effectivePlans.reduce((acc, p) => acc + (p.plannedQtyKg || 0), 0);
+
+      return NextResponse.json(
+        {
+          ...(effectivePlans[0] || {}),
+          plans: effectivePlans,
+          count: effectivePlans.length,
+          totalPlannedKg,
+          status: effectivePlans[0]?.status || "DRAFT",
+        },
+        {
+          headers: {
+            "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
+            Pragma: "no-cache",
+            Expires: "0",
+          },
+        }
+      );
+    }
+
     const plans = await db.tapePlantPlan.findMany({
       where: { date, shiftId },
       orderBy: { createdAt: "asc" },
@@ -137,11 +177,11 @@ export async function POST(request: NextRequest) {
       const submittedIds: string[] = [];
 
       for (const item of plansToSave) {
-        if (!item.recipeQuality || !String(item.recipeQuality).trim()) continue;
+        const targetShiftId = (item.shiftId && item.shiftId !== "ALL") ? item.shiftId : (shiftId === "ALL" ? "shift_day" : shiftId);
 
         const payload = {
           date,
-          shiftId,
+          shiftId: targetShiftId,
           recipeQuality: String(item.recipeQuality).trim(),
           tapeType: item.tapeType || "LPP",
           denier: item.denier !== undefined && item.denier !== null && item.denier !== "" ? Number(item.denier) : null,
