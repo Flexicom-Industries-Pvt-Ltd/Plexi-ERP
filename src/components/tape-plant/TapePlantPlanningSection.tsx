@@ -451,6 +451,75 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
     (r) => r.code?.toUpperCase() === currentPlan.recipeQuality?.trim().toUpperCase()
   );
 
+  const PARAM_FIELD_IDS = [
+    "param-tapeType",
+    "param-denier",
+    "param-tapeWidth",
+    "param-strength",
+    "param-eloPercent",
+    "param-bobbinMarking",
+    "param-colour",
+    "param-spacerSize",
+    "param-requiredAsh",
+    "param-ashPercent",
+    "param-plannedQtyKg",
+    "param-omega",
+    "param-vistPercent",
+    "param-remarks",
+  ];
+
+  const handleParamKeyDown = (e: React.KeyboardEvent, currentId: string) => {
+    const currentIndex = PARAM_FIELD_IDS.indexOf(currentId);
+    if (currentIndex === -1) return;
+
+    const target = e.target as HTMLInputElement | HTMLSelectElement;
+    const isInput = target instanceof HTMLInputElement;
+
+    const focusById = (id: string) => {
+      const el = document.getElementById(id);
+      if (el) {
+        el.focus();
+        if (el instanceof HTMLInputElement) {
+          el.select();
+        }
+      }
+    };
+
+    if (e.key === "Enter" || e.key === "ArrowDown") {
+      e.preventDefault();
+      if (currentIndex < PARAM_FIELD_IDS.length - 1) {
+        focusById(PARAM_FIELD_IDS[currentIndex + 1]);
+      }
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      if (currentIndex > 0) {
+        focusById(PARAM_FIELD_IDS[currentIndex - 1]);
+      }
+    } else if (e.key === "ArrowRight") {
+      const isAllSelected = isInput && target.selectionStart === 0 && target.selectionEnd === target.value.length;
+      const isAtEnd = isInput && target.selectionEnd === target.value.length;
+      const isSelect = target instanceof HTMLSelectElement;
+
+      if (isAllSelected || isAtEnd || isSelect) {
+        if (currentIndex < PARAM_FIELD_IDS.length - 1) {
+          e.preventDefault();
+          focusById(PARAM_FIELD_IDS[currentIndex + 1]);
+        }
+      }
+    } else if (e.key === "ArrowLeft") {
+      const isAllSelected = isInput && target.selectionStart === 0 && target.selectionEnd === target.value.length;
+      const isAtStart = isInput && target.selectionStart === 0;
+      const isSelect = target instanceof HTMLSelectElement;
+
+      if (isAllSelected || isAtStart || isSelect) {
+        if (currentIndex > 0) {
+          e.preventDefault();
+          focusById(PARAM_FIELD_IDS[currentIndex - 1]);
+        }
+      }
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center p-16 bg-white rounded-xl border border-slate-200">
@@ -588,30 +657,28 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
               <div
                 key={plan.id}
                 onClick={() => setActiveRecipeIndex(index)}
-                className={`group flex items-center justify-between gap-3 px-3 py-2 rounded-lg text-xs font-medium cursor-pointer transition-all border ${
+                className={`group flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl text-xs font-medium cursor-pointer transition-all border ${
                   isSelected
-                    ? "bg-slate-900 text-white border-slate-900 shadow-xs"
-                    : "bg-white text-slate-700 border-slate-200 hover:border-slate-300 hover:bg-slate-50/70"
+                    ? "bg-sky-50/70 border-sky-400 text-slate-900 border-l-4 border-l-sky-500 shadow-2xs"
+                    : "bg-white text-slate-700 border-slate-200 hover:border-slate-300 hover:bg-slate-50/70 border-l-4 border-l-transparent"
                 }`}
               >
                 <div className="flex flex-wrap items-center gap-2.5 min-w-0">
                   <span
-                    className={`h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
-                      isSelected ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600 border border-slate-200"
+                    className={`h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 transition-colors ${
+                      isSelected ? "bg-sky-500 text-white font-black shadow-2xs" : "bg-slate-100 text-slate-600 border border-slate-200"
                     }`}
                   >
                     {index + 1}
                   </span>
-                  <span className="font-mono font-bold text-xs sm:text-sm tracking-tight truncate">
+                  <span className={`font-mono text-xs sm:text-sm tracking-tight truncate ${isSelected ? "font-black text-sky-950" : "font-bold text-slate-800"}`}>
                     {plan.recipeQuality || `Quality #${index + 1}`}
                   </span>
                   {/* Shift Badge */}
                   {plan.shiftName || plan.shiftId || shiftId === "ALL" ? (
                     <span
                       className={`text-[9px] font-bold px-1.5 py-0.2 rounded border uppercase shrink-0 ${
-                        isSelected
-                          ? "bg-white/20 text-white border-white/30"
-                          : (plan.shiftName || plan.shiftId || "").toLowerCase().includes("night")
+                        (plan.shiftName || plan.shiftId || "").toLowerCase().includes("night")
                           ? "bg-purple-50 text-purple-700 border-purple-200"
                           : "bg-blue-50 text-blue-700 border-blue-200"
                       }`}
@@ -620,24 +687,12 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
                     </span>
                   ) : null}
                   {plan.isDayNight && (
-                    <span
-                      className={`text-[9px] font-bold px-1.5 py-0.2 rounded border shrink-0 ${
-                        isSelected
-                          ? "bg-amber-400/20 text-amber-300 border-amber-400/30"
-                          : "bg-amber-50 text-amber-800 border-amber-200"
-                      }`}
-                    >
+                    <span className="text-[9px] font-bold px-1.5 py-0.2 rounded border shrink-0 bg-amber-50 text-amber-800 border-amber-200">
                       Day+Night
                     </span>
                   )}
                   {plan.carriedOverFromShift && (
-                    <span
-                      className={`text-[9px] font-medium px-1.5 py-0.2 rounded border shrink-0 ${
-                        isSelected
-                          ? "bg-white/10 text-slate-300 border-white/20"
-                          : "bg-slate-100 text-slate-600 border-slate-200"
-                      }`}
-                    >
+                    <span className="text-[9px] font-medium px-1.5 py-0.2 rounded border shrink-0 bg-slate-100 text-slate-600 border-slate-200">
                       From {plan.carriedOverFromShift}
                     </span>
                   )}
@@ -645,8 +700,8 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
 
                 <div className="flex items-center gap-2.5 shrink-0">
                   <span
-                    className={`text-xs font-mono px-2 py-0.5 rounded font-bold ${
-                      isSelected ? "text-slate-100" : "text-slate-700"
+                    className={`text-xs font-mono px-2 py-0.5 rounded font-bold border ${
+                      isSelected ? "text-sky-950 bg-sky-100/70 border-sky-200" : "text-slate-700 bg-slate-50 border-slate-200"
                     }`}
                   >
                     {Number(plan.plannedQtyKg) ? `${Number(plan.plannedQtyKg).toLocaleString()} KG` : "0 KG"}
@@ -659,11 +714,7 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
                         e.stopPropagation();
                         handleRemoveRecipe(index);
                       }}
-                      className={`p-1 rounded transition-colors cursor-pointer ${
-                        isSelected
-                          ? "text-slate-400 hover:text-red-300 hover:bg-white/10"
-                          : "text-slate-400 hover:text-red-600 hover:bg-red-50"
-                      }`}
+                      className="p-1 rounded transition-colors cursor-pointer text-slate-400 hover:text-red-600 hover:bg-red-50"
                       title="Remove this quality"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
@@ -806,8 +857,10 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
             <div className="p-2.5 bg-white">
               <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">PP / LPP</label>
               <select
+                id="param-tapeType"
                 value={currentPlan.tapeType}
                 onChange={(e) => updateCurrentPlan({ tapeType: e.target.value })}
+                onKeyDown={(e) => handleParamKeyDown(e, "param-tapeType")}
                 className="w-full h-8 px-2 text-xs font-semibold text-slate-800 bg-slate-50/50 border border-slate-200 rounded focus:bg-white focus:ring-1 focus:ring-slate-400 outline-none cursor-pointer"
               >
                 <option value="PP">PP</option>
@@ -819,10 +872,12 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
             <div className="p-2.5 bg-white">
               <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Denier</label>
               <input
+                id="param-denier"
                 type="number"
                 value={currentPlan.denier}
                 placeholder="e.g. 800"
                 onChange={(e) => updateCurrentPlan({ denier: e.target.value })}
+                onKeyDown={(e) => handleParamKeyDown(e, "param-denier")}
                 className="w-full h-8 px-2.5 text-xs font-mono font-semibold text-slate-800 bg-slate-50/50 border border-slate-200 rounded focus:bg-white focus:ring-1 focus:ring-slate-400 outline-none text-right"
               />
             </div>
@@ -831,11 +886,13 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
             <div className="p-2.5 bg-white">
               <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Tape Width (mm)</label>
               <input
+                id="param-tapeWidth"
                 type="number"
                 step="0.01"
                 value={currentPlan.tapeWidth}
                 placeholder="e.g. 2.5"
                 onChange={(e) => updateCurrentPlan({ tapeWidth: e.target.value })}
+                onKeyDown={(e) => handleParamKeyDown(e, "param-tapeWidth")}
                 className="w-full h-8 px-2.5 text-xs font-mono font-semibold text-slate-800 bg-slate-50/50 border border-slate-200 rounded focus:bg-white focus:ring-1 focus:ring-slate-400 outline-none text-right"
               />
             </div>
@@ -844,11 +901,13 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
             <div className="p-2.5 bg-white">
               <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Strength (gpd)</label>
               <input
+                id="param-strength"
                 type="number"
                 step="0.01"
                 value={currentPlan.strength}
                 placeholder="e.g. 4.8"
                 onChange={(e) => updateCurrentPlan({ strength: e.target.value })}
+                onKeyDown={(e) => handleParamKeyDown(e, "param-strength")}
                 className="w-full h-8 px-2.5 text-xs font-mono font-semibold text-slate-800 bg-slate-50/50 border border-slate-200 rounded focus:bg-white focus:ring-1 focus:ring-slate-400 outline-none text-right"
               />
             </div>
@@ -857,11 +916,13 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
             <div className="p-2.5 bg-white">
               <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">ELO %</label>
               <input
+                id="param-eloPercent"
                 type="number"
                 step="0.01"
                 value={currentPlan.eloPercent}
                 placeholder="e.g. 22.5"
                 onChange={(e) => updateCurrentPlan({ eloPercent: e.target.value })}
+                onKeyDown={(e) => handleParamKeyDown(e, "param-eloPercent")}
                 className="w-full h-8 px-2.5 text-xs font-mono font-semibold text-slate-800 bg-slate-50/50 border border-slate-200 rounded focus:bg-white focus:ring-1 focus:ring-slate-400 outline-none text-right"
               />
             </div>
@@ -870,10 +931,12 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
             <div className="p-2.5 bg-white">
               <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Bobbin Marking</label>
               <input
+                id="param-bobbinMarking"
                 type="text"
                 value={currentPlan.bobbinMarking}
                 placeholder="e.g. Red Strip"
                 onChange={(e) => updateCurrentPlan({ bobbinMarking: e.target.value })}
+                onKeyDown={(e) => handleParamKeyDown(e, "param-bobbinMarking")}
                 className="w-full h-8 px-2.5 text-xs font-semibold text-slate-800 bg-slate-50/50 border border-slate-200 rounded focus:bg-white focus:ring-1 focus:ring-slate-400 outline-none"
               />
             </div>
@@ -882,10 +945,12 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
             <div className="p-2.5 bg-white">
               <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Colour</label>
               <input
+                id="param-colour"
                 type="text"
                 value={currentPlan.colour}
                 placeholder="e.g. Yellow"
                 onChange={(e) => updateCurrentPlan({ colour: e.target.value })}
+                onKeyDown={(e) => handleParamKeyDown(e, "param-colour")}
                 className="w-full h-8 px-2.5 text-xs font-semibold text-slate-800 bg-slate-50/50 border border-slate-200 rounded focus:bg-white focus:ring-1 focus:ring-slate-400 outline-none"
               />
             </div>
@@ -894,10 +959,12 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
             <div className="p-2.5 bg-white">
               <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Spacer Size</label>
               <input
+                id="param-spacerSize"
                 type="text"
                 value={currentPlan.spacerSize}
                 placeholder="e.g. 3.0 mm"
                 onChange={(e) => updateCurrentPlan({ spacerSize: e.target.value })}
+                onKeyDown={(e) => handleParamKeyDown(e, "param-spacerSize")}
                 className="w-full h-8 px-2.5 text-xs font-semibold text-slate-800 bg-slate-50/50 border border-slate-200 rounded focus:bg-white focus:ring-1 focus:ring-slate-400 outline-none"
               />
             </div>
@@ -906,11 +973,13 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
             <div className="p-2.5 bg-white">
               <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Required Ash</label>
               <input
+                id="param-requiredAsh"
                 type="number"
                 step="0.01"
                 value={currentPlan.requiredAsh}
                 placeholder="e.g. 1.2"
                 onChange={(e) => updateCurrentPlan({ requiredAsh: e.target.value })}
+                onKeyDown={(e) => handleParamKeyDown(e, "param-requiredAsh")}
                 className="w-full h-8 px-2.5 text-xs font-mono font-semibold text-slate-800 bg-slate-50/50 border border-slate-200 rounded focus:bg-white focus:ring-1 focus:ring-slate-400 outline-none text-right"
               />
             </div>
@@ -919,11 +988,13 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
             <div className="p-2.5 bg-white">
               <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Ash %</label>
               <input
+                id="param-ashPercent"
                 type="number"
                 step="0.01"
                 value={currentPlan.ashPercent}
                 placeholder="e.g. 1.15"
                 onChange={(e) => updateCurrentPlan({ ashPercent: e.target.value })}
+                onKeyDown={(e) => handleParamKeyDown(e, "param-ashPercent")}
                 className="w-full h-8 px-2.5 text-xs font-mono font-semibold text-slate-800 bg-slate-50/50 border border-slate-200 rounded focus:bg-white focus:ring-1 focus:ring-slate-400 outline-none text-right"
               />
             </div>
@@ -934,10 +1005,12 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
                 Planned Qty (KG) <span className="text-red-500">*</span>
               </label>
               <input
+                id="param-plannedQtyKg"
                 type="number"
                 value={currentPlan.plannedQtyKg}
                 placeholder="0"
                 onChange={(e) => handlePlannedQtyChange(e.target.value)}
+                onKeyDown={(e) => handleParamKeyDown(e, "param-plannedQtyKg")}
                 className="w-full h-8 px-2.5 text-xs font-mono font-bold text-slate-900 bg-white border border-slate-300 rounded focus:ring-1 focus:ring-slate-900 outline-none text-right shadow-2xs"
               />
             </div>
@@ -946,10 +1019,12 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
             <div className="p-2.5 bg-white">
               <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Omega</label>
               <input
+                id="param-omega"
                 type="text"
                 value={currentPlan.omega}
                 placeholder="Code"
                 onChange={(e) => updateCurrentPlan({ omega: e.target.value })}
+                onKeyDown={(e) => handleParamKeyDown(e, "param-omega")}
                 className="w-full h-8 px-2.5 text-xs font-semibold text-slate-800 bg-slate-50/50 border border-slate-200 rounded focus:bg-white focus:ring-1 focus:ring-slate-400 outline-none"
               />
             </div>
@@ -958,11 +1033,13 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
             <div className="p-2.5 bg-white">
               <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Vist... %</label>
               <input
+                id="param-vistPercent"
                 type="number"
                 step="0.01"
                 value={currentPlan.vistPercent}
                 placeholder="%"
                 onChange={(e) => updateCurrentPlan({ vistPercent: e.target.value })}
+                onKeyDown={(e) => handleParamKeyDown(e, "param-vistPercent")}
                 className="w-full h-8 px-2.5 text-xs font-mono font-semibold text-slate-800 bg-slate-50/50 border border-slate-200 rounded focus:bg-white focus:ring-1 focus:ring-slate-400 outline-none text-right"
               />
             </div>
@@ -972,10 +1049,12 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
           <div className="p-2.5 bg-slate-50/50 flex items-center gap-3">
             <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider shrink-0">Remarks</label>
             <input
+              id="param-remarks"
               type="text"
               value={currentPlan.remarks}
               placeholder="Optional notes or shift instructions"
               onChange={(e) => updateCurrentPlan({ remarks: e.target.value })}
+              onKeyDown={(e) => handleParamKeyDown(e, "param-remarks")}
               className="flex-1 h-7 px-2.5 text-xs text-slate-800 bg-white border border-slate-200 rounded focus:ring-1 focus:ring-slate-400 outline-none"
             />
           </div>

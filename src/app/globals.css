@@ -143,6 +143,17 @@
     scrollbar-width: thin;
     scrollbar-color: #94a3b8 #f1f5f9;
   }
+
+  /* Universal Minimalist Number Input (Remove spinner arrows & wheel-step) */
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type="number"] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
 }
 
 @layer utilities {
