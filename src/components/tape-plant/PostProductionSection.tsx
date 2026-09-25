@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import { toast } from "sonner";
 import {
   Save,
@@ -41,7 +41,11 @@ export function PostProductionSection({ date, shiftId, shiftName }: PostProducti
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [status, setStatus] = useState("DRAFT");
+  const [autoSaving, setAutoSaving] = useState(false);
+  const [lastAutoSavedAt, setLastAutoSavedAt] = useState<Date | null>(null);
+  const isInitialLoadedRef = useRef(false);
+  const lastSavedPayloadRef = useRef("");
+  const [status, setStatus] = useState("SAVED");
   const [operatorName, setOperatorName] = useState("");
   const [operatorId, setOperatorId] = useState("");
   const [entries, setEntries] = useState<RecipePostProductionEntry[]>([]);
@@ -49,6 +53,7 @@ export function PostProductionSection({ date, shiftId, shiftName }: PostProducti
   const fetchPostProductionData = useCallback(
     async (showSyncToast = false) => {
       if (!date || !shiftId) return;
+      isInitialLoadedRef.current = false;
       if (showSyncToast) setRefreshing(true);
       else setLoading(true);
 
@@ -68,17 +73,30 @@ export function PostProductionSection({ date, shiftId, shiftName }: PostProducti
         const data = await res.json();
 
         const postProd = data.postProduction;
-        setStatus(postProd?.status || "DRAFT");
-        setOperatorName(postProd?.operatorName || "");
-        setOperatorId(postProd?.operatorId || "");
+        const currentStatus = postProd?.status === "SUBMITTED" ? "SUBMITTED" : "SAVED";
+        setStatus(currentStatus);
+        const opName = postProd?.operatorName || "";
+        const opId = postProd?.operatorId || "";
+        setOperatorName(opName);
+        setOperatorId(opId);
 
-        if (Array.isArray(data.entries) && data.entries.length > 0) {
-          setEntries(data.entries);
+        const loadedEntries = Array.isArray(data.entries) ? data.entries : [];
+        setEntries(loadedEntries);
+
+        lastSavedPayloadRef.current = JSON.stringify({
+          date,
+          shiftId,
+          operatorName: opName,
+          operatorId: opId,
+          entries: loadedEntries,
+          status: currentStatus,
+        });
+
+        if (loadedEntries.length > 0) {
           if (showSyncToast) {
-            toast.success(`Synchronized ${data.entries.length} recipe(s) from planning`);
+            toast.success(`Synchronized ${loadedEntries.length} recipe(s) from planning`);
           }
         } else {
-          setEntries([]);
           if (showSyncToast) {
             toast.info("No planned recipes found for this shift in Planning");
           }
@@ -88,6 +106,7 @@ export function PostProductionSection({ date, shiftId, shiftName }: PostProducti
       } finally {
         setLoading(false);
         setRefreshing(false);
+        isInitialLoadedRef.current = true;
       }
     },
     [date, shiftId]
@@ -96,6 +115,44 @@ export function PostProductionSection({ date, shiftId, shiftName }: PostProducti
   useEffect(() => {
     fetchPostProductionData();
   }, [fetchPostProductionData]);
+
+  // Debounced Auto-Save
+  useEffect(() => {
+    if (!isInitialLoadedRef.current || !date || !shiftId || entries.length === 0) return;
+
+    const payload = {
+      date,
+      shiftId,
+      operatorName,
+      operatorId,
+      entries,
+      status: status === "SUBMITTED" ? "SUBMITTED" : "SAVED",
+    };
+
+    const serialized = JSON.stringify(payload);
+    if (serialized === lastSavedPayloadRef.current) return;
+
+    const timer = setTimeout(async () => {
+      setAutoSaving(true);
+      try {
+        const res = await fetch("/api/production/tape-plant/post-production", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: serialized,
+        });
+        if (res.ok) {
+          lastSavedPayloadRef.current = serialized;
+          setLastAutoSavedAt(new Date());
+        }
+      } catch (err) {
+        console.error("Auto-save error:", err);
+      } finally {
+        setAutoSaving(false);
+      }
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [entries, operatorName, operatorId, date, shiftId, status]);
 
   const updateEntryField = (index: number, field: keyof RecipePostProductionEntry, value: any) => {
     setEntries((prev) => {
@@ -126,7 +183,7 @@ export function PostProductionSection({ date, shiftId, shiftName }: PostProducti
   const totalNetKg = totalDoneKg - totalWasteKg;
   const overallEfficiency = totalPlannedKg > 0 ? ((totalDoneKg / totalPlannedKg) * 100).toFixed(1) : "0";
 
-  const handleSave = async (submitStatus: "DRAFT" | "SUBMITTED") => {
+  const handleSave = async (submitStatus: "SAVED" | "SUBMITTED") => {
     if (entries.length === 0) {
       toast.error("No recipe plans found for this shift. Please add plans first.");
       return;
@@ -154,11 +211,13 @@ export function PostProductionSection({ date, shiftId, shiftName }: PostProducti
         throw new Error(err.error || "Failed to save post-production");
       }
 
+      lastSavedPayloadRef.current = JSON.stringify(payload);
+      setLastAutoSavedAt(new Date());
       setStatus(submitStatus);
       toast.success(
         submitStatus === "SUBMITTED"
           ? "Post-production record submitted successfully"
-          : "Post-production saved as draft"
+          : "Post-production record saved"
       );
     } catch (err: any) {
       toast.error(err.message || "Failed to save post-production");
@@ -191,10 +250,10 @@ export function PostProductionSection({ date, shiftId, shiftName }: PostProducti
                 className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border ${
                   status === "SUBMITTED"
                     ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                    : "bg-amber-50 text-amber-700 border-amber-200"
+                    : "bg-blue-50 text-blue-700 border-blue-200"
                 }`}
               >
-                {status}
+                {status === "SUBMITTED" ? "SUBMITTED" : "SAVED"}
               </span>
             </div>
             <p className="text-xs text-slate-500 mt-0.5">
@@ -214,11 +273,24 @@ export function PostProductionSection({ date, shiftId, shiftName }: PostProducti
             section="TAPE_PLANT"
           />
 
+          {/* Auto-save Status Indicator */}
+          {autoSaving ? (
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 text-slate-600 border border-slate-200 text-xs font-medium rounded-lg h-8">
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+              <span className="hidden sm:inline">Auto-saving...</span>
+            </div>
+          ) : lastAutoSavedAt ? (
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-medium rounded-lg h-8">
+              <CheckCircle className="h-3.5 w-3.5 text-emerald-600" />
+              <span className="hidden sm:inline">Auto-saved {lastAutoSavedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</span>
+            </div>
+          ) : null}
+
           <button
             type="button"
             disabled={loading || refreshing || saving}
             onClick={() => fetchPostProductionData(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition-all active:scale-95 disabled:opacity-50 h-8"
+            className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition-all active:scale-95 disabled:opacity-50 h-8 cursor-pointer"
             title="Reload latest recipes from Planning"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin text-primary" : ""}`} />
@@ -227,17 +299,8 @@ export function PostProductionSection({ date, shiftId, shiftName }: PostProducti
           <button
             type="button"
             disabled={saving || entries.length === 0}
-            onClick={() => handleSave("DRAFT")}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition-all active:scale-95 disabled:opacity-50 h-8"
-          >
-            {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
-            Save Draft
-          </button>
-          <button
-            type="button"
-            disabled={saving || entries.length === 0}
             onClick={() => handleSave("SUBMITTED")}
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary hover:bg-primary/90 text-white text-xs font-semibold rounded-lg shadow-sm transition-all active:scale-95 disabled:opacity-50 h-8"
+            className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary hover:bg-primary/90 text-white text-xs font-semibold rounded-lg shadow-sm transition-all active:scale-95 disabled:opacity-50 h-8 cursor-pointer"
           >
             {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle className="h-3.5 w-3.5" />}
             Submit Output

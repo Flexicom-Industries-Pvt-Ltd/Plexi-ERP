@@ -89,7 +89,7 @@ export async function GET(request: NextRequest) {
         wastePercent: p.wastePercent !== null && p.wastePercent !== undefined ? p.wastePercent : wasteRate,
         netKg,
         efficiencyPercent: efficiency,
-        status: p.status || "DRAFT",
+        status: p.status || "SAVED",
       };
     });
 
