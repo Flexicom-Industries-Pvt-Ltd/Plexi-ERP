@@ -382,6 +382,7 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
           remarks: p.remarks,
           materials: p.materials,
           isDayNight: Boolean(p.isDayNight),
+          shiftId: p.shiftId || (shiftId !== "ALL" ? shiftId : undefined),
           status: submitStatus,
         })),
       };
@@ -419,6 +420,8 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
             remarks: p.remarks || "",
             materials: Array.isArray(p.materials) && p.materials.length > 0 ? p.materials : DEFAULT_MATERIALS,
             isDayNight: Boolean(p.isDayNight),
+            shiftId: p.shiftId,
+            shiftName: p.shiftName || p.shift?.name,
           }))
         );
       }

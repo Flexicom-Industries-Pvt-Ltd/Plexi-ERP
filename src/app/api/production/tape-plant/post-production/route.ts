@@ -20,6 +20,121 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    if (shiftId.toUpperCase() === "ALL") {
+      const allPlans = await db.tapePlantPlan.findMany({
+        where: { date },
+        orderBy: [{ shiftId: "asc" }, { createdAt: "asc" }],
+        include: {
+          shift: true,
+        },
+      });
+
+      const seenContinuousQualities = new Set<string>();
+      const effectivePlans: any[] = [];
+
+      for (const p of allPlans) {
+        const qualityKey = (p.recipeQuality || "").trim().toUpperCase();
+        if (p.isDayNight) {
+          if (seenContinuousQualities.has(qualityKey)) {
+            continue;
+          }
+          seenContinuousQualities.add(qualityKey);
+          effectivePlans.push({
+            ...p,
+            shiftName: "Day + Night (24h)",
+          });
+        } else {
+          const sName = p.shift?.name || (p.shiftId === "shift_night" ? "Night Shift" : "Day Shift");
+          effectivePlans.push({
+            ...p,
+            shiftName: sName,
+          });
+        }
+      }
+
+      const allPostProds = await db.tapePlantPostProduction.findMany({
+        where: { date },
+      });
+
+      const allSavedEntries = allPostProds.flatMap((pp) =>
+        Array.isArray(pp.entries) ? (pp.entries as any[]) : []
+      );
+
+      let entries: any[] = [];
+      if (effectivePlans.length > 0) {
+        const mappedQualities = new Set<string>();
+        entries = effectivePlans
+          .filter((plan) => {
+            const key = (plan.recipeQuality || "").trim();
+            if (!key || mappedQualities.has(key)) return false;
+            mappedQualities.add(key);
+            return true;
+          })
+          .map((plan, idx) => {
+            const matchingEntry =
+              allSavedEntries.find((e) => e.planId === plan.id || e.id === plan.id) ||
+              allSavedEntries.find((e) => e.recipeQuality === plan.recipeQuality) ||
+              allSavedEntries[idx];
+
+            const plannedKg = plan.plannedQtyKg ?? 0;
+            const doneKg =
+              matchingEntry?.productionDoneKg !== undefined &&
+              matchingEntry?.productionDoneKg !== null &&
+              matchingEntry?.productionDoneKg !== ""
+                ? Number(matchingEntry.productionDoneKg)
+                : "";
+            const wasteKg =
+              matchingEntry?.wasteKg !== undefined &&
+              matchingEntry?.wasteKg !== null &&
+              matchingEntry?.wasteKg !== ""
+                ? Number(matchingEntry.wasteKg)
+                : "";
+            const numDone = Number(doneKg) || 0;
+            const numWaste = Number(wasteKg) || 0;
+            const gapKg = plannedKg - numDone;
+            const netKg = numDone - numWaste;
+            const wastePercent =
+              matchingEntry?.wastePercent !== undefined &&
+              matchingEntry?.wastePercent !== null &&
+              matchingEntry?.wastePercent !== ""
+                ? matchingEntry.wastePercent
+                : numDone > 0
+                ? Number(((numWaste / numDone) * 100).toFixed(2))
+                : "";
+
+            return {
+              id: plan.id,
+              planId: plan.id,
+              recipeQuality: plan.recipeQuality,
+              plannedProductionKg: plannedKg,
+              productionDoneKg: doneKg,
+              gapKg,
+              wasteKg,
+              wastePercent,
+              netProductionKg: netKg,
+              remarks: matchingEntry?.remarks || "",
+              shiftId: plan.shiftId,
+              shiftName: plan.shiftName,
+            };
+          });
+      }
+
+      return NextResponse.json(
+        {
+          postProduction: allPostProds[0] || null,
+          plans: effectivePlans,
+          entries,
+        },
+        {
+          headers: {
+            "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
+            Pragma: "no-cache",
+            Expires: "0",
+          },
+        }
+      );
+    }
+
     const record = await db.tapePlantPostProduction.findUnique({
       where: {
         date_shiftId: { date, shiftId },
@@ -75,66 +190,50 @@ export async function GET(request: NextRequest) {
           return true;
         })
         .map((plan, idx) => {
-        const matchingEntry =
-          savedEntries.find((e) => e.planId === plan.id || e.id === plan.id) ||
-          savedEntries.find((e) => e.recipeQuality === plan.recipeQuality) ||
-          savedEntries[idx];
+          const matchingEntry =
+            savedEntries.find((e) => e.planId === plan.id || e.id === plan.id) ||
+            savedEntries.find((e) => e.recipeQuality === plan.recipeQuality) ||
+            savedEntries[idx];
 
-        const plannedKg = plan.plannedQtyKg ?? 0;
-        const doneKg =
-          matchingEntry?.productionDoneKg !== undefined &&
-          matchingEntry?.productionDoneKg !== null &&
-          matchingEntry?.productionDoneKg !== ""
-            ? Number(matchingEntry.productionDoneKg)
-            : "";
-        const wasteKg =
-          matchingEntry?.wasteKg !== undefined &&
-          matchingEntry?.wasteKg !== null &&
-          matchingEntry?.wasteKg !== ""
-            ? Number(matchingEntry.wasteKg)
-            : "";
-        const numDone = Number(doneKg) || 0;
-        const numWaste = Number(wasteKg) || 0;
-        const gapKg = plannedKg - numDone;
-        const netKg = numDone - numWaste;
-        const wastePercent =
-          matchingEntry?.wastePercent !== undefined && matchingEntry?.wastePercent !== null && matchingEntry?.wastePercent !== ""
-            ? matchingEntry.wastePercent
-            : numDone > 0
-            ? Number(((numWaste / numDone) * 100).toFixed(2))
-            : "";
+          const plannedKg = plan.plannedQtyKg ?? 0;
+          const doneKg =
+            matchingEntry?.productionDoneKg !== undefined &&
+            matchingEntry?.productionDoneKg !== null &&
+            matchingEntry?.productionDoneKg !== ""
+              ? Number(matchingEntry.productionDoneKg)
+              : "";
+          const wasteKg =
+            matchingEntry?.wasteKg !== undefined &&
+            matchingEntry?.wasteKg !== null &&
+            matchingEntry?.wasteKg !== ""
+              ? Number(matchingEntry.wasteKg)
+              : "";
+          const numDone = Number(doneKg) || 0;
+          const numWaste = Number(wasteKg) || 0;
+          const gapKg = plannedKg - numDone;
+          const netKg = numDone - numWaste;
+          const wastePercent =
+            matchingEntry?.wastePercent !== undefined &&
+            matchingEntry?.wastePercent !== null &&
+            matchingEntry?.wastePercent !== ""
+              ? matchingEntry.wastePercent
+              : numDone > 0
+              ? Number(((numWaste / numDone) * 100).toFixed(2))
+              : "";
 
-        return {
-          id: plan.id,
-          planId: plan.id,
-          recipeQuality: plan.recipeQuality,
-          plannedProductionKg: plannedKg,
-          productionDoneKg: doneKg,
-          gapKg,
-          wasteKg,
-          wastePercent,
-          netProductionKg: netKg,
-          remarks: matchingEntry?.remarks || "",
-        };
-      });
-    } else if (savedEntries.length > 0) {
-      entries = savedEntries;
-    } else if (record) {
-      // Legacy single-entry fallback
-      entries = [
-        {
-          id: record.id,
-          planId: undefined,
-          recipeQuality: record.recipeQuality || "—",
-          plannedProductionKg: record.plannedProductionKg,
-          productionDoneKg: record.productionDoneKg,
-          gapKg: record.gapKg,
-          wasteKg: record.wasteKg,
-          wastePercent: record.wastePercent ?? "",
-          netProductionKg: record.netProductionKg,
-          remarks: "",
-        },
-      ];
+          return {
+            id: plan.id,
+            planId: plan.id,
+            recipeQuality: plan.recipeQuality,
+            plannedProductionKg: plannedKg,
+            productionDoneKg: doneKg,
+            gapKg,
+            wasteKg,
+            wastePercent,
+            netProductionKg: netKg,
+            remarks: matchingEntry?.remarks || "",
+          };
+        });
     }
 
     return NextResponse.json(
@@ -169,6 +268,106 @@ export async function POST(request: NextRequest) {
 
     if (!date || !shiftId) {
       return NextResponse.json({ error: "Date and Shift are required" }, { status: 400 });
+    }
+
+    if (shiftId.toUpperCase() === "ALL" && Array.isArray(entries) && entries.length > 0) {
+      // Find all active plans on this date to resolve shiftId for each entry
+      const allPlans = await db.tapePlantPlan.findMany({
+        where: { date },
+      });
+
+      const defaultShift = await db.shift.findFirst({ where: { isActive: true }, orderBy: { name: "asc" } });
+      const fallbackShiftId = defaultShift?.id || "shift_day";
+
+      // Group entries by their shiftId
+      const entriesByShift = new Map<string, any[]>();
+      for (const e of entries) {
+        const matchingPlan = allPlans.find((p) => p.id === e.planId || p.id === e.id || p.recipeQuality === e.recipeQuality);
+        const targetShiftId = e.shiftId || matchingPlan?.shiftId || fallbackShiftId;
+        if (!entriesByShift.has(targetShiftId)) {
+          entriesByShift.set(targetShiftId, []);
+        }
+        entriesByShift.get(targetShiftId)!.push(e);
+      }
+
+      const results = [];
+      for (const [targetShiftId, shiftEntries] of entriesByShift.entries()) {
+        let totalPlanned = 0;
+        let totalDone = 0;
+        let totalWaste = 0;
+
+        const processed = shiftEntries.map((e, index) => {
+          const plannedKg = Number(e.plannedProductionKg) || 0;
+          const doneKg = e.productionDoneKg !== "" && e.productionDoneKg !== null && e.productionDoneKg !== undefined ? Number(e.productionDoneKg) : 0;
+          const waste = e.wasteKg !== "" && e.wasteKg !== null && e.wasteKg !== undefined ? Number(e.wasteKg) : 0;
+          const gap = plannedKg - doneKg;
+          const net = doneKg - waste;
+          const calculatedWastePct =
+            e.wastePercent !== "" && e.wastePercent !== null && e.wastePercent !== undefined
+              ? Number(e.wastePercent)
+              : doneKg > 0
+              ? Number(((waste / doneKg) * 100).toFixed(2))
+              : null;
+
+          totalPlanned += plannedKg;
+          totalDone += doneKg;
+          totalWaste += waste;
+
+          return {
+            id: e.id || `entry-${index + 1}`,
+            planId: e.planId || null,
+            recipeQuality: e.recipeQuality ? String(e.recipeQuality).trim() : "—",
+            plannedProductionKg: plannedKg,
+            productionDoneKg: e.productionDoneKg !== "" && e.productionDoneKg !== null ? Number(e.productionDoneKg) : "",
+            gapKg: gap,
+            wasteKg: e.wasteKg !== "" && e.wasteKg !== null ? Number(e.wasteKg) : "",
+            wastePercent: calculatedWastePct,
+            netProductionKg: net,
+            remarks: e.remarks ? String(e.remarks).trim() : "",
+          };
+        });
+
+        const totalGap = totalPlanned - totalDone;
+        const totalNet = totalDone - totalWaste;
+        const totalWastePct = totalDone > 0 ? Number(((totalWaste / totalDone) * 100).toFixed(2)) : null;
+        const combinedRecipeQuality = Array.from(new Set(processed.map((e) => e.recipeQuality).filter(Boolean))).join(", ");
+
+        const record = await db.tapePlantPostProduction.upsert({
+          where: { date_shiftId: { date, shiftId: targetShiftId } },
+          create: {
+            date,
+            shiftId: targetShiftId,
+            operatorName: operatorName ? String(operatorName).trim() : null,
+            operatorId: operatorId ? String(operatorId).trim() : null,
+            recipeQuality: combinedRecipeQuality || null,
+            plannedProductionKg: totalPlanned,
+            productionDoneKg: totalDone,
+            gapKg: totalGap,
+            wasteKg: totalWaste,
+            wastePercent: totalWastePct,
+            netProductionKg: totalNet,
+            entries: processed,
+            qualityChecks: [],
+            status: status || "DRAFT",
+          },
+          update: {
+            operatorName: operatorName !== undefined ? (operatorName ? String(operatorName).trim() : null) : undefined,
+            operatorId: operatorId !== undefined ? (operatorId ? String(operatorId).trim() : null) : undefined,
+            recipeQuality: combinedRecipeQuality || null,
+            plannedProductionKg: totalPlanned,
+            productionDoneKg: totalDone,
+            gapKg: totalGap,
+            wasteKg: totalWaste,
+            wastePercent: totalWastePct,
+            netProductionKg: totalNet,
+            entries: processed,
+            status: status || "DRAFT",
+          },
+        });
+        results.push(record);
+      }
+
+      return NextResponse.json({ success: true, count: results.length, records: results });
     }
 
     let processedEntries: any[] = [];
