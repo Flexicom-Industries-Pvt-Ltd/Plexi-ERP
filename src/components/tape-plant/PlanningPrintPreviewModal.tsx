@@ -51,6 +51,27 @@ function formatPct(val: number | string | undefined | null): string {
   return Number.isInteger(num) ? `${num}%` : `${num.toFixed(1)}%`;
 }
 
+function getShiftLabel(p: RecipePlanItem, defaultShiftName?: string): string {
+  if (p.isDayNight) return "DAY+NIGHT";
+  if (p.shiftName) {
+    const s = p.shiftName.toUpperCase();
+    if (s.includes("NIGHT")) return "NIGHT";
+    if (s.includes("DAY")) return "DAY";
+    return p.shiftName.replace(/Shift/i, "").trim().toUpperCase();
+  }
+  if (p.shiftId) {
+    if (p.shiftId.toLowerCase().includes("night")) return "NIGHT";
+    if (p.shiftId.toLowerCase().includes("day")) return "DAY";
+    return p.shiftId.toUpperCase();
+  }
+  if (defaultShiftName && defaultShiftName.toUpperCase() !== "ALL" && !defaultShiftName.toUpperCase().includes("ALL")) {
+    if (defaultShiftName.toUpperCase().includes("NIGHT")) return "NIGHT";
+    if (defaultShiftName.toUpperCase().includes("DAY")) return "DAY";
+    return defaultShiftName.replace(/Shift/i, "").trim().toUpperCase();
+  }
+  return "DAY";
+}
+
 export function PlanningPrintPreviewModal({
   open,
   onClose,
@@ -259,6 +280,7 @@ export function PlanningPrintPreviewModal({
                     <tr className="bg-slate-100 text-slate-900 text-[10px] font-bold uppercase tracking-wider border-b border-slate-300">
                       <th className="p-2 border-r border-slate-300 text-center w-8">#</th>
                       <th className="p-2 border-r border-slate-300">Quality Name / Recipe Code</th>
+                      <th className="p-2 border-r border-slate-300 text-center w-16">Shift</th>
                       <th className="p-2 border-r border-slate-300 text-center">Type</th>
                       <th className="p-2 border-r border-slate-300 text-right">Denier</th>
                       <th className="p-2 border-r border-slate-300 text-right">Width (mm)</th>
@@ -287,6 +309,9 @@ export function PlanningPrintPreviewModal({
                               Day+Night (24h)
                             </span>
                           )}
+                        </td>
+                        <td className="p-2 border-r border-slate-200 text-center font-mono font-bold text-[10px] uppercase text-slate-700">
+                          {getShiftLabel(p, shiftName)}
                         </td>
                         <td className="p-2 border-r border-slate-200 text-center font-medium">
                           {p.tapeType}
@@ -326,7 +351,7 @@ export function PlanningPrintPreviewModal({
                   </tbody>
                   <tfoot>
                     <tr className="bg-slate-100 font-bold border-t-2 border-slate-300">
-                      <td colSpan={12} className="p-2 text-right uppercase tracking-wider text-[10px]">
+                      <td colSpan={13} className="p-2 text-right uppercase tracking-wider text-[10px]">
                         Total Shift Planned Output{totalDayNightPlannedKg > 0 ? " (Single-Shift Runs)" : ""}:
                       </td>
                       <td className="p-2 text-right font-mono font-black text-slate-900 bg-slate-200">
@@ -335,7 +360,7 @@ export function PlanningPrintPreviewModal({
                     </tr>
                     {totalDayNightPlannedKg > 0 && (
                       <tr className="bg-amber-50 font-bold border-t border-amber-200 text-amber-900">
-                        <td colSpan={12} className="p-2 text-right uppercase tracking-wider text-[10px] text-amber-800">
+                        <td colSpan={13} className="p-2 text-right uppercase tracking-wider text-[10px] text-amber-800">
                           + 24-Hour Continuous Batch (Day+Night Run):
                         </td>
                         <td className="p-2 text-right font-mono font-black text-amber-950 bg-amber-100">
@@ -362,6 +387,7 @@ export function PlanningPrintPreviewModal({
                     <tr className="bg-slate-100 text-slate-900 text-[10px] font-bold uppercase tracking-wider border-b border-slate-300">
                       <th rowSpan={2} className="p-2 border-r border-slate-300 text-center w-8">#</th>
                       <th rowSpan={2} className="p-2 border-r border-slate-300 min-w-[130px]">Quality Name</th>
+                      <th rowSpan={2} className="p-2 border-r border-slate-300 text-center w-16">Shift</th>
                       <th colSpan={2} className="p-1 border-r border-slate-300 text-center">PP</th>
                       <th colSpan={2} className="p-1 border-r border-slate-300 text-center">CC</th>
                       <th colSpan={2} className="p-1 border-r border-slate-300 text-center">MB</th>
@@ -437,6 +463,9 @@ export function PlanningPrintPreviewModal({
                           <td className="p-2 border-r border-slate-200 font-mono font-bold text-slate-900 whitespace-nowrap">
                             {p.recipeQuality}
                           </td>
+                          <td className="p-2 border-r border-slate-200 text-center font-mono font-bold text-[10px] uppercase text-slate-700">
+                            {getShiftLabel(p, shiftName)}
+                          </td>
                           {/* PP */}
                           <td className="p-1.5 border-r border-slate-200 text-right font-mono font-semibold">{formatKg(pp.qty)}</td>
                           <td className="p-1.5 border-r border-slate-200 text-right font-mono text-slate-500 bg-slate-50/50">{formatPct(pp.pct)}</td>
@@ -474,7 +503,7 @@ export function PlanningPrintPreviewModal({
                   </tbody>
                   <tfoot>
                     <tr className="bg-slate-100 font-bold border-t-2 border-slate-300">
-                      <td colSpan={2} className="p-2 text-right uppercase tracking-wider text-[10px]">
+                      <td colSpan={3} className="p-2 text-right uppercase tracking-wider text-[10px]">
                         Total Formulations:
                       </td>
                       {/* PP */}

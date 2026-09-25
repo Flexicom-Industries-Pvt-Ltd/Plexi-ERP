@@ -8,6 +8,15 @@ export interface PlanningExportOptions {
   plans: RecipePlanItem[];
 }
 
+function getShiftLabel(plan: RecipePlanItem, fallbackShiftName?: string): string {
+  if (plan.isDayNight) return "Day+Night (24h)";
+  if (plan.carriedOverFromShift) return plan.carriedOverFromShift;
+  if (plan.shiftName) return plan.shiftName;
+  if (plan.shiftId === "shift_night" || plan.shiftId?.toLowerCase().includes("night")) return "Night Shift";
+  if (plan.shiftId === "shift_day" || plan.shiftId?.toLowerCase().includes("day")) return "Day Shift";
+  return fallbackShiftName || "Day Shift";
+}
+
 export function generateTapePlantPlanningExcel({
   date,
   shiftName,
@@ -20,7 +29,7 @@ export function generateTapePlantPlanningExcel({
   // Sheet 1: Master Shift Production & Formulation Plan (Long format)
   // -------------------------------------------------------------
   const titleRow = [
-    "FLEXICOM INDUSTRIES PVT. LTD. - TAPE PLANT SHIFT PRODUCTION & MATERIAL PLAN",
+    "FLEXICOM INDUSTRIES PVT. LTD. - TAPE PLANT PRODUCTION & MATERIAL PLAN",
   ];
   const metaRow1 = [
     `Date: ${date}`,
@@ -34,6 +43,7 @@ export function generateTapePlantPlanningExcel({
   const headerRow = [
     "Run #",
     "Recipe Quality Code",
+    "Shift",
     "Tape Type",
     "Denier",
     "Tape Width (mm)",
@@ -139,6 +149,7 @@ export function generateTapePlantPlanningExcel({
     dataRows.push([
       idx + 1,
       plan.recipeQuality || `Recipe #${idx + 1}`,
+      getShiftLabel(plan, shiftName),
       plan.tapeType || "LPP",
       plan.denier !== "" ? Number(plan.denier) : "",
       plan.tapeWidth !== "" ? Number(plan.tapeWidth) : "",
@@ -189,6 +200,7 @@ export function generateTapePlantPlanningExcel({
     "—",
     "—",
     "—",
+    "—",
     totalDayNightSum > 0 ? `${totalShiftPlannedSum} (+ ${totalDayNightSum} Day+Night)` : totalShiftPlannedSum,
     totalPPSum,
     "—",
@@ -226,6 +238,7 @@ export function generateTapePlantPlanningExcel({
   ws1["!cols"] = [
     { wch: 8 }, // Run #
     { wch: 28 }, // Recipe Quality
+    { wch: 16 }, // Shift
     { wch: 12 }, // Type
     { wch: 10 }, // Denier
     { wch: 16 }, // Tape Width
