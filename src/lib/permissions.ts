@@ -48,18 +48,19 @@ export async function requirePermission(
 
   // Fast-path: Super Admin bypass (0ms DB cost)
   const roleName = session.user.role || (session.user as any).roleName;
-  if (roleName === "Super Admin" || roleName === "SUPERADMIN") {
+  if (
+    roleName === "Super Admin" ||
+    roleName === "SuperAdmin" ||
+    roleName === "SUPERADMIN" ||
+    roleName === "SUPER_ADMIN"
+  ) {
     return true;
   }
 
   // Fast-path: Check session JWT permissions directly if available (0ms DB cost)
   const sessionPerms = (session.user as any).permissions as Array<{ module: string; canRead?: boolean; canCreate?: boolean; canUpdate?: boolean; canDelete?: boolean }> | undefined;
   if (sessionPerms && Array.isArray(sessionPerms) && sessionPerms.length > 0) {
-    const perm = sessionPerms.find((p) => 
-      p.module === module || 
-      p.module === "ALL" || 
-      ((module === Module.LOOM || module === Module.TAPE_PLANT) && p.module === Module.PRODUCTION)
-    );
+    const perm = sessionPerms.find((p) => p.module === module || p.module === "ALL");
     if (perm && perm[action]) {
       return true;
     }
@@ -71,7 +72,13 @@ export async function requirePermission(
     redirect("/auth/login?error=account_inactive");
   }
 
-  if (user.role?.name === "Super Admin") {
+  const userRoleName = user.role?.name;
+  if (
+    userRoleName === "Super Admin" ||
+    userRoleName === "SuperAdmin" ||
+    userRoleName === "SUPERADMIN" ||
+    userRoleName === "SUPER_ADMIN"
+  ) {
     return true;
   }
 
@@ -79,10 +86,7 @@ export async function requirePermission(
     redirect("/dashboard/unauthorized");
   }
 
-  const modulePerms = user.role.permissions.find((p) => 
-    p.module === module || 
-    ((module === Module.LOOM || module === Module.TAPE_PLANT) && p.module === Module.PRODUCTION)
-  );
+  const modulePerms = user.role.permissions.find((p) => p.module === module || p.module === ("ALL" as any));
   if (!modulePerms || !modulePerms[action]) {
     redirect("/dashboard/unauthorized");
   }
