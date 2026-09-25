@@ -69,13 +69,14 @@ describe("Tape Plant Minimalist Planning Sheet Print Engine", () => {
   it("should enforce A4 landscape print styling and compact margins", () => {
     const html = generatePlanningSheetHtml(mockPlanningData);
     expect(html).toContain("size: A4 landscape;");
-    expect(html).toContain("margin: 6mm 8mm;");
+    expect(html).toContain("margin: 4mm 5mm;");
     expect(html).toContain(".avoid-break");
   });
 
-  it("should render Box 1: 1. QUALITY NAME AND SPECIFICATION with machine parameters", () => {
+  it("should render Box 1: 1. QUALITY NAME AND SPECIFICATION with machine parameters and Shift column", () => {
     const html = generatePlanningSheetHtml(mockPlanningData);
     expect(html).toContain("1. QUALITY NAME AND SPECIFICATION");
+    expect(html).toContain(">Shift<");
     expect(html).toContain("LPP-500-YL-01");
     expect(html).toContain("PP-700-NAT-02");
     expect(html).toContain("600");
@@ -85,9 +86,11 @@ describe("Tape Plant Minimalist Planning Sheet Print Engine", () => {
     expect(html).toContain("2,000 KG"); // Total planned output sum
   });
 
-  it("should render Box 2: 2. RAW MATERIAL RECIPE AND QUANTITY with separate KG and % columns", () => {
+  it("should render Box 2: 2. RAW MATERIAL RECIPE AND QUANTITY with Shift column and separate KG and % columns", () => {
     const html = generatePlanningSheetHtml(mockPlanningData);
     expect(html).toContain("2. RAW MATERIAL RECIPE AND QUANTITY");
+    expect(html).toContain(">Quality Name<");
+    expect(html).toContain(">Shift<");
     expect(html).toContain(">PP<");
     expect(html).toContain(">CC<");
     expect(html).toContain(">HD RP<");
