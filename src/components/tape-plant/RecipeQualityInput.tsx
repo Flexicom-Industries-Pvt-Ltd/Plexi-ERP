@@ -242,10 +242,9 @@ export function RecipeQualityInput({
 
         {/* Real-time Autocomplete Suggestions Dropdown on Typing */}
         {showAutocomplete && matchingSuggestions.length > 0 && (
-          <div className="absolute top-full left-0 right-0 mt-1 z-50 bg-white border border-slate-200 rounded-xl shadow-2xl p-1.5 max-h-72 overflow-y-auto animate-in fade-in zoom-in-95 duration-100 divide-y divide-slate-100">
+          <div className="absolute top-full left-0 right-0 mt-1 z-50 bg-white border border-slate-200 rounded-xl shadow-xl p-1.5 max-h-72 overflow-y-auto animate-in fade-in zoom-in-95 duration-100 divide-y divide-slate-100">
             <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center justify-between">
-              <span>Matching Formulations ({matchingSuggestions.length})</span>
-              <span className="text-[9px] font-normal text-slate-400">Use ↑↓ keys & Enter</span>
+              <span>Suggestions ({matchingSuggestions.length})</span>
             </div>
             <div className="space-y-0.5 pt-1">
               {matchingSuggestions.map((s, idx) => {
@@ -261,7 +260,7 @@ export function RecipeQualityInput({
                     onMouseEnter={() => setHighlightedIndex(idx)}
                     className={`px-3 py-2 rounded-lg cursor-pointer flex items-center justify-between transition-colors ${
                       isHighlighted
-                        ? "bg-primary/10 text-slate-900"
+                        ? "bg-slate-100 text-slate-900"
                         : "hover:bg-slate-50 text-slate-700"
                     }`}
                   >
@@ -269,11 +268,11 @@ export function RecipeQualityInput({
                       <div className="flex items-center gap-2">
                         <span className="font-mono font-bold text-xs text-slate-900">{s.code}</span>
                         {s.isMaster ? (
-                          <span className="px-1.5 py-0.2 bg-emerald-100 text-emerald-800 rounded text-[9px] font-bold tracking-tight">
-                            DATA CENTRE MASTER
+                          <span className="px-1.5 py-0.2 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded text-[9px] font-bold tracking-tight">
+                            MASTER
                           </span>
                         ) : (
-                          <span className="px-1.5 py-0.2 bg-slate-100 text-slate-600 rounded text-[9px] font-semibold tracking-tight">
+                          <span className="px-1.5 py-0.2 bg-slate-100 text-slate-600 border border-slate-200 rounded text-[9px] font-medium tracking-tight">
                             PRESET
                           </span>
                         )}
@@ -292,10 +291,10 @@ export function RecipeQualityInput({
 
         {/* All Presets Full Dropdown */}
         {showPresets && (
-          <div className="absolute top-full left-0 right-0 mt-1 z-50 bg-white border border-slate-200 rounded-xl shadow-2xl p-2 divide-y divide-slate-100 max-h-72 overflow-y-auto animate-in fade-in zoom-in-95 duration-150">
+          <div className="absolute top-full left-0 right-0 mt-1 z-50 bg-white border border-slate-200 rounded-xl shadow-xl p-2 divide-y divide-slate-100 max-h-72 overflow-y-auto animate-in fade-in zoom-in-95 duration-150">
             {masterPresets && masterPresets.length > 0 && (
               <div className="pb-2">
-                <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-primary">
+                <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-600">
                   Data Centre Master Recipes ({masterPresets.length})
                 </div>
                 <div className="space-y-0.5">
@@ -307,9 +306,9 @@ export function RecipeQualityInput({
                         e.preventDefault();
                         handleSelectPreset(p.code);
                       }}
-                      className={`w-full text-left px-3 py-1.5 rounded-lg text-xs font-mono flex items-center justify-between hover:bg-primary/5 transition-colors ${
+                      className={`w-full text-left px-3 py-1.5 rounded-lg text-xs font-mono flex items-center justify-between hover:bg-slate-50 transition-colors ${
                         value?.toUpperCase() === p.code?.toUpperCase()
-                          ? "bg-primary/10 text-primary font-bold"
+                          ? "bg-slate-100 text-slate-900 font-bold"
                           : "text-slate-800"
                       }`}
                     >
@@ -318,7 +317,7 @@ export function RecipeQualityInput({
                         {p.label && <span className="text-[11px] text-slate-400 font-sans">{p.label}</span>}
                       </div>
                       {value?.toUpperCase() === p.code?.toUpperCase() && (
-                        <Check className="h-4 w-4 text-primary shrink-0" />
+                        <Check className="h-4 w-4 text-slate-800 shrink-0" />
                       )}
                     </button>
                   ))}
@@ -340,14 +339,14 @@ export function RecipeQualityInput({
                       handleSelectPreset(p.code);
                     }}
                     className={`w-full text-left px-3 py-1.5 rounded-lg text-xs font-mono flex items-center justify-between hover:bg-slate-50 transition-colors ${
-                      value === p.code ? "bg-primary/10 text-primary font-bold" : "text-slate-700"
+                      value === p.code ? "bg-slate-100 text-slate-900 font-bold" : "text-slate-700"
                     }`}
                   >
                     <div>
                       <span className="block font-bold">{p.code}</span>
                       <span className="text-[11px] text-slate-400 font-sans">{p.label}</span>
                     </div>
-                    {value === p.code && <Check className="h-4 w-4 text-primary shrink-0" />}
+                    {value === p.code && <Check className="h-4 w-4 text-slate-800 shrink-0" />}
                   </button>
                 ))}
               </div>
@@ -356,28 +355,18 @@ export function RecipeQualityInput({
         )}
       </div>
 
-      {/* Format Legend Subtitle */}
+      {/* Format Legend & Sync Bar */}
       <div className="flex flex-wrap items-center justify-between text-[10px] text-slate-400 px-0.5 gap-1">
-        <div className="flex items-center gap-1 font-mono">
-          <span className="text-blue-600 font-semibold">Company</span>
-          <span>/</span>
-          <span className="text-emerald-600 font-semibold">PP|LPP</span>
-          <span>/</span>
-          <span className="text-amber-600 font-semibold">Colour</span>
-          <span>/</span>
-          <span className="text-purple-600 font-semibold">Size(mm)</span>
-          <span>/</span>
-          <span className="text-pink-600 font-semibold">Wt/m</span>
-          <span>/</span>
-          <span className="text-cyan-600 font-semibold">HC|S1</span>
-        </div>
+        <span className="font-mono text-slate-400">
+          Format: Company/Type/Colour/Size/Weight/Grade
+        </span>
         {onSyncSpecifications && (
           <button
             type="button"
             onClick={handleSync}
-            className="text-[11px] font-bold text-primary hover:text-primary/80 transition-colors inline-flex items-center gap-1"
+            className="text-[11px] font-semibold text-slate-600 hover:text-slate-900 transition-colors inline-flex items-center gap-1 cursor-pointer"
           >
-            <Sparkles className="h-3 w-3" /> Sync with Specs
+            <Sparkles className="h-3 w-3 text-slate-500" /> Sync with Specs
           </button>
         )}
       </div>
