@@ -239,50 +239,86 @@ export async function POST(request: NextRequest) {
         results.push(record);
       }
 
-      // If explicit plans array was sent, remove any existing plans for that shift not included in submittedIds
+      // If explicit plans array was sent, remove any existing plans not included in submittedIds
       if (Array.isArray(rawPlans) && submittedIds.length > 0) {
-        await tx.tapePlantPlan.deleteMany({
-          where: {
-            date,
-            shiftId,
-            id: { notIn: submittedIds },
-          },
-        });
+        if (shiftId.toUpperCase() === "ALL") {
+          await tx.tapePlantPlan.deleteMany({
+            where: {
+              date,
+              id: { notIn: submittedIds },
+            },
+          });
+        } else {
+          await tx.tapePlantPlan.deleteMany({
+            where: {
+              date,
+              shiftId,
+              id: { notIn: submittedIds },
+            },
+          });
+
+          // If a quality was previously continuous in other shifts on this date but is no longer in this shift
+          const activeContinuousKeys = new Set(
+            results.filter((r) => r.isDayNight).map((r) => (r.recipeQuality || "").trim().toUpperCase())
+          );
+          const otherShiftContinuous = await tx.tapePlantPlan.findMany({
+            where: {
+              date,
+              shiftId: { not: shiftId },
+              isDayNight: true,
+            },
+          });
+          for (const op of otherShiftContinuous) {
+            const opKey = (op.recipeQuality || "").trim().toUpperCase();
+            if (!activeContinuousKeys.has(opKey)) {
+              await tx.tapePlantPlan.delete({ where: { id: op.id } });
+            }
+          }
+        }
       }
 
       return results;
     });
 
     const totalPlannedKg = savedPlans.reduce((acc, p) => acc + (p.plannedQtyKg || 0), 0);
-    const uniqueRecipes = Array.from(new Set(savedPlans.map((p) => p.recipeQuality).filter(Boolean)));
-    const combinedRecipe = uniqueRecipes.join(", ");
 
-    // Synchronize existing PostProduction record for this shift if it exists
-    const existingPostProd = await db.tapePlantPostProduction.findUnique({
-      where: { date_shiftId: { date, shiftId } },
+    // Fetch all updated plans for this date to synchronize post-production across shifts
+    const allCurrentPlans = await db.tapePlantPlan.findMany({
+      where: { date },
+      orderBy: { createdAt: "asc" },
     });
 
-    if (existingPostProd) {
-      const existingEntries = Array.isArray(existingPostProd.entries) ? (existingPostProd.entries as any[]) : [];
+    // Synchronize all existing PostProduction records for this date
+    const existingPostProds = await db.tapePlantPostProduction.findMany({
+      where: { date },
+    });
+
+    for (const postProd of existingPostProds) {
+      const shiftPlansForPostProd = allCurrentPlans.filter((p) => p.shiftId === postProd.shiftId);
+      const existingEntries = Array.isArray(postProd.entries) ? (postProd.entries as any[]) : [];
+      let totalPlanned = 0;
       let totalDone = 0;
       let totalWaste = 0;
 
-      const syncedEntries = savedPlans.map((plan, idx) => {
+      const syncedEntries = shiftPlansForPostProd.map((plan, idx) => {
         const matching =
           existingEntries.find((e) => e.planId === plan.id || e.id === plan.id) ||
           existingEntries.find((e) => e.recipeQuality === plan.recipeQuality) ||
           existingEntries[idx];
 
         const plannedKg = plan.plannedQtyKg || 0;
-        const doneKg = matching?.productionDoneKg !== undefined && matching?.productionDoneKg !== null && matching?.productionDoneKg !== ""
-          ? Number(matching.productionDoneKg)
-          : "";
-        const wasteKg = matching?.wasteKg !== undefined && matching?.wasteKg !== null && matching?.wasteKg !== ""
-          ? Number(matching.wasteKg)
-          : "";
+        const doneKg =
+          matching?.productionDoneKg !== undefined && matching?.productionDoneKg !== null && matching?.productionDoneKg !== ""
+            ? Number(matching.productionDoneKg)
+            : "";
+        const wasteKg =
+          matching?.wasteKg !== undefined && matching?.wasteKg !== null && matching?.wasteKg !== ""
+            ? Number(matching.wasteKg)
+            : "";
         const numDone = Number(doneKg) || 0;
         const numWaste = Number(wasteKg) || 0;
 
+        totalPlanned += plannedKg;
         totalDone += numDone;
         totalWaste += numWaste;
 
@@ -300,12 +336,15 @@ export async function POST(request: NextRequest) {
         };
       });
 
+      const uniqueRecipes = Array.from(new Set(shiftPlansForPostProd.map((p) => p.recipeQuality).filter(Boolean)));
+      const combinedRecipe = uniqueRecipes.join(", ");
+
       await db.tapePlantPostProduction.update({
-        where: { date_shiftId: { date, shiftId } },
+        where: { id: postProd.id },
         data: {
-          plannedProductionKg: totalPlannedKg,
+          plannedProductionKg: totalPlanned,
           productionDoneKg: totalDone,
-          gapKg: totalPlannedKg - totalDone,
+          gapKg: totalPlanned - totalDone,
           wasteKg: totalWaste,
           netProductionKg: totalDone - totalWaste,
           recipeQuality: combinedRecipe || null,
@@ -341,9 +380,79 @@ export async function DELETE(request: NextRequest) {
   }
 
   try {
-    await db.tapePlantPlan.delete({
+    const existingPlan = await db.tapePlantPlan.findUnique({
       where: { id },
     });
+
+    if (existingPlan) {
+      await db.tapePlantPlan.delete({
+        where: { id },
+      });
+
+      // If continuous, clean up counterpart in other shifts on this date
+      if (existingPlan.isDayNight) {
+        await db.tapePlantPlan.deleteMany({
+          where: {
+            date: existingPlan.date,
+            recipeQuality: existingPlan.recipeQuality,
+            isDayNight: true,
+          },
+        });
+      }
+
+      // Synchronize Post-Production
+      const remainingPlans = await db.tapePlantPlan.findMany({
+        where: { date: existingPlan.date, shiftId: existingPlan.shiftId },
+      });
+      const postProd = await db.tapePlantPostProduction.findUnique({
+        where: { date_shiftId: { date: existingPlan.date, shiftId: existingPlan.shiftId } },
+      });
+
+      if (postProd) {
+        const existingEntries = Array.isArray(postProd.entries) ? (postProd.entries as any[]) : [];
+        const syncedEntries = remainingPlans.map((plan, idx) => {
+          const matching =
+            existingEntries.find((e) => e.planId === plan.id || e.id === plan.id) ||
+            existingEntries.find((e) => e.recipeQuality === plan.recipeQuality) ||
+            existingEntries[idx];
+          const plannedKg = plan.plannedQtyKg || 0;
+          const doneKg = matching?.productionDoneKg ? Number(matching.productionDoneKg) : "";
+          const wasteKg = matching?.wasteKg ? Number(matching.wasteKg) : "";
+          const numDone = Number(doneKg) || 0;
+          const numWaste = Number(wasteKg) || 0;
+          return {
+            id: plan.id,
+            planId: plan.id,
+            recipeQuality: plan.recipeQuality,
+            plannedProductionKg: plannedKg,
+            productionDoneKg: doneKg,
+            gapKg: plannedKg - numDone,
+            wasteKg,
+            wastePercent: matching?.wastePercent ?? (numDone > 0 ? Number(((numWaste / numDone) * 100).toFixed(2)) : null),
+            netProductionKg: numDone - numWaste,
+            remarks: matching?.remarks || "",
+          };
+        });
+
+        const totalPlanned = remainingPlans.reduce((sum, p) => sum + (p.plannedQtyKg || 0), 0);
+        const totalDone = syncedEntries.reduce((sum, e) => sum + (Number(e.productionDoneKg) || 0), 0);
+        const totalWaste = syncedEntries.reduce((sum, e) => sum + (Number(e.wasteKg) || 0), 0);
+
+        await db.tapePlantPostProduction.update({
+          where: { id: postProd.id },
+          data: {
+            plannedProductionKg: totalPlanned,
+            productionDoneKg: totalDone,
+            gapKg: totalPlanned - totalDone,
+            wasteKg: totalWaste,
+            netProductionKg: totalDone - totalWaste,
+            recipeQuality: remainingPlans.map((p) => p.recipeQuality).join(", ") || null,
+            entries: syncedEntries,
+          },
+        });
+      }
+    }
+
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Error deleting Tape Plant plan:", error);
