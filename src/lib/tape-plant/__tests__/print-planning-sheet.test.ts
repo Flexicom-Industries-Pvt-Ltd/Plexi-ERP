@@ -58,11 +58,12 @@ describe("Tape Plant Minimalist Planning Sheet Print Engine", () => {
     ],
   };
 
-  it("should generate valid HTML document with standard DOCTYPE and title", () => {
+  it("should generate valid HTML document with standard DOCTYPE, logo, and title", () => {
     const html = generatePlanningSheetHtml(mockPlanningData);
     expect(html).toContain("<!DOCTYPE html>");
     expect(html).toContain("<title>Tape Plant Production Plan - TP-PLN-20260924-SHIFTA(06:00-14:00)</title>");
     expect(html).toContain("Flexicom Industries Pvt. Ltd.");
+    expect(html).toContain('src="/logo.png"');
     expect(html).toContain("TAPE PLANT PRODUCTION PLAN");
   });
 
