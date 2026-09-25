@@ -545,92 +545,110 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
         </div>
       </div>
 
-      {/* Multi-Recipe Shift Navigation Tabs */}
-      <div className="bg-white rounded-xl border border-slate-200 p-3 shadow-xs space-y-2">
-        <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-100">
+      {/* Qualities Vertical List & Actions */}
+      <div className="bg-white rounded-xl border border-slate-200 p-3.5 shadow-xs space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-slate-100">
           <div className="flex items-center gap-2">
             <Layers className="h-4 w-4 text-primary" />
             <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-              Shift Recipe Runs ({recipePlans.length})
+              Qualities ({recipePlans.length})
             </span>
           </div>
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={handleDuplicateCurrentRecipe}
-              className="text-[11px] font-semibold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 px-2.5 py-1 rounded-lg transition-colors inline-flex items-center gap-1"
-              title="Duplicate current recipe specs to a new run"
+              className="text-[11px] font-semibold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 px-2.5 py-1 rounded-lg transition-colors inline-flex items-center gap-1 cursor-pointer"
+              title="Duplicate current quality specs to a new entry"
             >
-              <Copy className="h-3 w-3" /> Duplicate Run
+              <Copy className="h-3 w-3" /> Duplicate Quality
             </button>
             <button
               type="button"
               onClick={handleAddRecipe}
-              className="text-[11px] font-bold text-primary bg-primary/10 hover:bg-primary/20 px-3 py-1 rounded-lg transition-colors inline-flex items-center gap-1"
+              className="text-[11px] font-bold text-primary bg-primary/10 hover:bg-primary/20 px-3 py-1 rounded-lg transition-colors inline-flex items-center gap-1 cursor-pointer"
             >
-              <Plus className="h-3.5 w-3.5" /> Add Recipe to Shift
+              <Plus className="h-3.5 w-3.5" /> Add Quality
             </button>
           </div>
         </div>
 
-        {/* Tab Buttons */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-1 no-scrollbar">
+        {/* Vertical List of Qualities (Down by Down) */}
+        <div className="flex flex-col gap-2">
           {recipePlans.map((plan, index) => {
             const isSelected = activeRecipeIndex === index;
             return (
               <div
                 key={plan.id}
                 onClick={() => setActiveRecipeIndex(index)}
-                className={`group flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium cursor-pointer transition-all border shrink-0 ${
+                className={`group flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl text-xs font-medium cursor-pointer transition-all border ${
                   isSelected
-                    ? "bg-slate-900 text-white border-slate-900 shadow-sm"
-                    : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
+                    ? "bg-slate-900 text-white border-slate-900 shadow-sm ring-1 ring-slate-800"
+                    : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100/80 hover:border-slate-300"
                 }`}
               >
-                <div className="flex items-center gap-1.5">
+                <div className="flex flex-wrap items-center gap-2.5 min-w-0">
                   <span
-                    className={`h-4 w-4 rounded-full flex items-center justify-center text-[10px] font-bold ${
-                      isSelected ? "bg-primary text-white" : "bg-slate-200 text-slate-700"
+                    className={`h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 ${
+                      isSelected ? "bg-primary text-white shadow-xs" : "bg-slate-200 text-slate-700"
                     }`}
                   >
                     {index + 1}
                   </span>
-                  <span className="font-mono font-bold">{plan.recipeQuality || `Recipe #${index + 1}`}</span>
+                  <span className="font-mono font-bold text-sm tracking-tight truncate">
+                    {plan.recipeQuality || `Quality #${index + 1}`}
+                  </span>
                   {plan.isDayNight && (
-                    <span className={`text-[9px] font-black px-1.5 py-0.2 rounded-full border ${
-                      isSelected
-                        ? "bg-amber-400 text-slate-950 border-amber-300"
-                        : "bg-amber-100 text-amber-900 border-amber-300"
-                    }`}>
+                    <span
+                      className={`text-[9px] font-black px-2 py-0.5 rounded-full border shrink-0 ${
+                        isSelected
+                          ? "bg-amber-400 text-slate-950 border-amber-300"
+                          : "bg-amber-100 text-amber-900 border-amber-300"
+                      }`}
+                    >
                       Day+Night
                     </span>
                   )}
+                  {plan.carriedOverFromShift && (
+                    <span
+                      className={`text-[9px] font-semibold px-2 py-0.5 rounded-full border shrink-0 ${
+                        isSelected
+                          ? "bg-white/10 text-amber-200 border-white/20"
+                          : "bg-slate-200 text-slate-600 border-slate-300"
+                      }`}
+                    >
+                      From {plan.carriedOverFromShift}
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-3 shrink-0">
                   <span
-                    className={`text-[10px] font-mono px-1.5 py-0.2 rounded font-semibold ${
-                      isSelected ? "bg-white/20 text-cyan-200" : "bg-slate-200 text-slate-600"
+                    className={`text-xs font-mono px-2.5 py-1 rounded-md font-bold ${
+                      isSelected ? "bg-white/20 text-cyan-200" : "bg-slate-200/80 text-slate-700"
                     }`}
                   >
                     {Number(plan.plannedQtyKg) ? `${Number(plan.plannedQtyKg).toLocaleString()} KG` : "0 KG"}
                   </span>
-                </div>
 
-                {recipePlans.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleRemoveRecipe(index);
-                    }}
-                    className={`p-1 rounded-md transition-colors ${
-                      isSelected
-                        ? "text-slate-400 hover:text-red-400 hover:bg-white/10"
-                        : "text-slate-400 hover:text-red-600 hover:bg-red-50"
-                    }`}
-                    title="Remove this recipe run"
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </button>
-                )}
+                  {recipePlans.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRemoveRecipe(index);
+                      }}
+                      className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                        isSelected
+                          ? "text-slate-400 hover:text-red-400 hover:bg-white/10"
+                          : "text-slate-400 hover:text-red-600 hover:bg-red-50"
+                      }`}
+                      title="Remove this quality"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
               </div>
             );
           })}
