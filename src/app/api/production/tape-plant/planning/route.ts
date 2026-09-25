@@ -28,14 +28,62 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    const totalPlannedKg = plans.reduce((acc, p) => acc + (p.plannedQtyKg || 0), 0);
+    // Also query active 2-shift continuous plans (isDayNight = true) on the same date from other shifts (e.g. Day Shift)
+    const otherContinuousPlans = await db.tapePlantPlan.findMany({
+      where: {
+        date,
+        isDayNight: true,
+        shiftId: { not: shiftId },
+      },
+      include: {
+        shift: true,
+      },
+      orderBy: { createdAt: "asc" },
+    });
+
+    let effectivePlans = [...plans];
+
+    if (plans.length === 0) {
+      // If current shift has no plans yet, pre-populate active Day+Night continuous runs
+      if (otherContinuousPlans.length > 0) {
+        effectivePlans = otherContinuousPlans.map((cp) => ({
+          ...cp,
+          id: `temp-carry-${cp.id}`,
+          shiftId,
+          isDayNight: true,
+          carriedOverFromShift: cp.shift?.name || "Day Shift",
+          status: "DRAFT",
+        }));
+      }
+    } else if (otherContinuousPlans.length > 0) {
+      // If current shift already has plans, include any continuous recipe from earlier shift that is not yet in the list
+      const existingQualities = new Set(plans.map((p) => p.recipeQuality));
+      const unlistedContinuous = otherContinuousPlans.filter(
+        (cp) => !existingQualities.has(cp.recipeQuality)
+      );
+      if (unlistedContinuous.length > 0) {
+        effectivePlans = [
+          ...plans,
+          ...unlistedContinuous.map((cp) => ({
+            ...cp,
+            id: `temp-carry-${cp.id}`,
+            shiftId,
+            isDayNight: true,
+            carriedOverFromShift: cp.shift?.name || "Day Shift",
+            status: plans[0]?.status || "DRAFT",
+          })),
+        ];
+      }
+    }
+
+    const totalPlannedKg = effectivePlans.reduce((acc, p) => acc + (p.plannedQtyKg || 0), 0);
 
     return NextResponse.json(
       {
-        plans,
-        count: plans.length,
+        plans: effectivePlans,
+        count: effectivePlans.length,
         totalPlannedKg,
-        ...(plans[0] || {}),
+        ...(effectivePlans[0] || {}),
       },
       {
         headers: {
