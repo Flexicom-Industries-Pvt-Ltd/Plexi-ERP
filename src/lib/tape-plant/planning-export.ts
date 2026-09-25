@@ -69,6 +69,8 @@ export function generateTapePlantPlanningExcel({
 
   const dataRows: (string | number)[][] = [];
 
+  let totalShiftPlannedSum = 0;
+  let totalDayNightSum = 0;
   let totalPlannedSum = 0;
   let totalPPSum = 0;
   let totalCCSum = 0;
@@ -82,6 +84,11 @@ export function generateTapePlantPlanningExcel({
 
   plans.forEach((plan, idx) => {
     const plannedQty = Number(plan.plannedQtyKg) || 0;
+    if (plan.isDayNight) {
+      totalDayNightSum += plannedQty;
+    } else {
+      totalShiftPlannedSum += plannedQty;
+    }
     totalPlannedSum += plannedQty;
 
     // Extract material items
@@ -182,7 +189,7 @@ export function generateTapePlantPlanningExcel({
     "—",
     "—",
     "—",
-    totalPlannedSum,
+    totalDayNightSum > 0 ? `${totalShiftPlannedSum} (+ ${totalDayNightSum} Day+Night)` : totalShiftPlannedSum,
     totalPPSum,
     "—",
     totalCCSum,

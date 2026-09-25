@@ -23,10 +23,13 @@ function formatNumber(val: number | string | undefined | null): string {
 export function generatePlanningSheetHtml(data: TapePlanningPrintData): string {
   const { date, shiftName, status, plans } = data;
 
-  const totalPlannedKg = plans.reduce(
-    (acc, p) => acc + (Number(p.plannedQtyKg) || 0),
-    0
-  );
+  const totalShiftPlannedKg = plans
+    .filter((p) => !p.isDayNight)
+    .reduce((acc, p) => acc + (Number(p.plannedQtyKg) || 0), 0);
+
+  const totalDayNightPlannedKg = plans
+    .filter((p) => p.isDayNight)
+    .reduce((acc, p) => acc + (Number(p.plannedQtyKg) || 0), 0);
 
   // Material aggregates across all recipe runs
   const materialTotals: Record<string, { qty: number; count: number }> = {};
@@ -445,8 +448,9 @@ export function generatePlanningSheetHtml(data: TapePlanningPrintData): string {
     <table class="kpi-table">
       <tr>
         <td style="width: 25%;">
-          <div class="kpi-label">Total Planned Output</div>
-          <div class="kpi-val">${totalPlannedKg.toLocaleString()} <span style="font-size: 7pt; font-weight: normal;">KG</span></div>
+          <div class="kpi-label">Shift Planned Output</div>
+          <div class="kpi-val">${totalShiftPlannedKg.toLocaleString()} <span style="font-size: 7pt; font-weight: normal;">KG</span></div>
+          ${totalDayNightPlannedKg > 0 ? `<div style="font-size: 6.5pt; color: #b45309; font-weight: 700; margin-top: 2px;">+ ${totalDayNightPlannedKg.toLocaleString()} KG (24h Day+Night Batch)</div>` : ""}
         </td>
         <td style="width: 25%;">
           <div class="kpi-label">Total Recipe Runs</div>
@@ -489,12 +493,22 @@ export function generatePlanningSheetHtml(data: TapePlanningPrintData): string {
       <tfoot>
         <tr>
           <td colspan="12" style="text-align: right; text-transform: uppercase; font-size: 7pt; letter-spacing: 0.5px;">
-            Total Shift Planned Output:
+            Total Shift Planned Output${totalDayNightPlannedKg > 0 ? " (Single-Shift Runs)" : ""}:
           </td>
           <td style="text-align: right; font-family: monospace; font-size: 8pt; font-weight: 800; background-color: #f1f5f9;">
-            ${totalPlannedKg.toLocaleString()} KG
+            ${totalShiftPlannedKg.toLocaleString()} KG
           </td>
         </tr>
+        ${totalDayNightPlannedKg > 0 ? `
+        <tr>
+          <td colspan="12" style="text-align: right; text-transform: uppercase; font-size: 7pt; letter-spacing: 0.5px; color: #92400e; background-color: #fef3c7; font-weight: 700;">
+            + Day+Night 24-Hour Continuous Batch (Running across 2 shifts):
+          </td>
+          <td style="text-align: right; font-family: monospace; font-size: 8pt; font-weight: 800; background-color: #fde68a; color: #78350f;">
+            ${totalDayNightPlannedKg.toLocaleString()} KG
+          </td>
+        </tr>
+        ` : ""}
       </tfoot>
     </table>
 

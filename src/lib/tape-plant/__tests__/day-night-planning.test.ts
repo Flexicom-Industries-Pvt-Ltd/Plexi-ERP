@@ -86,7 +86,7 @@ describe("Tape Plant Multi-Shift (Day + Night) Planning & Execution", () => {
   });
 
   describe("Printable Sheet Engine with Day + Night Runs", () => {
-    it("should render Day+Night (24h) badge on 2-shift continuous recipes", () => {
+    it("should render Day+Night (24h) badge and separate continuous batch from single-shift planned output", () => {
       const html = generatePlanningSheetHtml({
         date: "2026-09-25",
         shiftName: "Day + Night (24 Hours)",
@@ -96,18 +96,19 @@ describe("Tape Plant Multi-Shift (Day + Night) Planning & Execution", () => {
 
       expect(html).toContain("wOND/LPP/WH/500/67/S1");
       expect(html).toContain("Day+Night (24h)");
-      expect(html).toContain("5,000");
+      expect(html).toContain("1,200"); // Single shift output sum
+      expect(html).toContain("5,000"); // 24h batch explicitly stated beside total
+      expect(html).toContain("Day+Night 24-Hour Continuous Batch");
     });
   });
 
   describe("Multi-Shift Aggregate Logic", () => {
-    it("should aggregate total 24h continuous planned production volume", () => {
-      const totalPlanned = mockPlans.reduce((sum, p) => sum + Number(p.plannedQtyKg), 0);
-      expect(totalPlanned).toBe(6200);
+    it("should separate single-shift output from 24h continuous planned batch volume", () => {
+      const shiftOnlyPlanned = mockPlans.filter((p) => !p.isDayNight).reduce((sum, p) => sum + Number(p.plannedQtyKg), 0);
+      const dayNightPlanned = mockPlans.filter((p) => p.isDayNight).reduce((sum, p) => sum + Number(p.plannedQtyKg), 0);
 
-      const dayNightPlans = mockPlans.filter((p) => p.isDayNight);
-      expect(dayNightPlans.length).toBe(1);
-      expect(dayNightPlans[0].plannedQtyKg).toBe(5000);
+      expect(shiftOnlyPlanned).toBe(1200);
+      expect(dayNightPlanned).toBe(5000);
     });
 
     it("should support continuous run carryover to Night Shift alongside Night-specific recipes", () => {
