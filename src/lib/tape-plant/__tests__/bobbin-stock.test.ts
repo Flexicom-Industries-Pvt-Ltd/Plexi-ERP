@@ -7,8 +7,11 @@ import {
   computeBobbinStockCount,
   computeCrateStockCount,
   computeBobbinStockTotals,
+  generateBobbinStockSheetHtml,
   BobbinStockItem,
 } from "../bobbin-stock";
+import { generateBobbinIssueSlipHtml } from "../print-bobbin-issue-slip";
+import { generateBobbinInwardSlipHtml } from "../print-bobbin-inward-slip";
 
 describe("Bobbin Stock Summary calculations", () => {
   it("verifies standard packing constants", () => {
@@ -134,8 +137,7 @@ describe("Bobbin Stock Summary calculations", () => {
     expect(totals.totalAvailableCrateStock).toBe(140);
   });
 
-  it("generates Bobbin Issue Slip HTML with loom number, weight conversion and sign-offs", async () => {
-    const { generateBobbinIssueSlipHtml } = await import("../print-bobbin-issue-slip");
+  it("generates Bobbin Issue Slip HTML with loom number, weight conversion and sign-offs", () => {
     const slipData = {
       slipNumber: "TP-ISS-20260926-0001",
       date: "2026-09-26",
@@ -164,8 +166,7 @@ describe("Bobbin Stock Summary calculations", () => {
     expect(html).toContain("Standard Rules:");
   });
 
-  it("generates Bobbin Inward Receipt Slip HTML with gross, waste, net output and packing", async () => {
-    const { generateBobbinInwardSlipHtml } = await import("../print-bobbin-inward-slip");
+  it("generates Bobbin Inward Receipt Slip HTML with gross, waste, net output and packing", () => {
     const slipData = {
       referenceNo: "TP-INW-20260926-0012",
       date: "2026-09-26",
@@ -193,8 +194,7 @@ describe("Bobbin Stock Summary calculations", () => {
     expect(html).toContain("Plant Operator / In-Charge");
   });
 
-  it("generates Bobbin Stock printable HTML sheet with logo, KPI strip, table, and 3-column sign-offs", async () => {
-    const { generateBobbinStockSheetHtml } = await import("../bobbin-stock");
+  it("generates Bobbin Stock printable HTML sheet with logo, KPI strip, table, and 3-column sign-offs", () => {
     const items: BobbinStockItem[] = [
       {
         slNo: 1,
