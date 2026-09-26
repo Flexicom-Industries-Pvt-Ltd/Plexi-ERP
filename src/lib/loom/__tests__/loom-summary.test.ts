@@ -262,3 +262,71 @@ describe("Loom RBAC Permission Guard", () => {
     expect(result.ok).toBe(true);
   });
 });
+
+describe("Pre-Occupied Loom Allocation Protection", () => {
+  interface LoomState {
+    loomNumber: number;
+    activeRecipe: string | null;
+  }
+
+  const checkLoomAllocationConflict = (
+    existingLooms: LoomState[],
+    targetRecipe: string,
+    requestedLoomNumbers: number[]
+  ) => {
+    const conflicts: { loomNumber: number; currentRecipe: string }[] = [];
+    const allowed: number[] = [];
+
+    for (const num of requestedLoomNumbers) {
+      const match = existingLooms.find((l) => l.loomNumber === num);
+      if (
+        match &&
+        match.activeRecipe &&
+        match.activeRecipe.trim().toLowerCase() !== targetRecipe.trim().toLowerCase()
+      ) {
+        conflicts.push({ loomNumber: num, currentRecipe: match.activeRecipe });
+      } else {
+        allowed.push(num);
+      }
+    }
+
+    return {
+      hasConflict: conflicts.length > 0,
+      conflicts,
+      allowed,
+    };
+  };
+
+  const sampleState: LoomState[] = [
+    { loomNumber: 1, activeRecipe: "1000D White Standard" },
+    { loomNumber: 2, activeRecipe: "1000D White Standard" },
+    { loomNumber: 3, activeRecipe: "850D Milky White" },
+    { loomNumber: 4, activeRecipe: null },
+    { loomNumber: 5, activeRecipe: null },
+  ];
+
+  it("should block assigning an already occupied loom to a different recipe", () => {
+    const result = checkLoomAllocationConflict(sampleState, "850D Milky White", [1, 2, 4]);
+    expect(result.hasConflict).toBe(true);
+    expect(result.conflicts).toEqual([
+      { loomNumber: 1, currentRecipe: "1000D White Standard" },
+      { loomNumber: 2, currentRecipe: "1000D White Standard" },
+    ]);
+    expect(result.allowed).toEqual([4]);
+  });
+
+  it("should allow assigning an already occupied loom to the same recipe (idempotent)", () => {
+    const result = checkLoomAllocationConflict(sampleState, "1000D White Standard", [1, 2, 5]);
+    expect(result.hasConflict).toBe(false);
+    expect(result.conflicts).toEqual([]);
+    expect(result.allowed).toEqual([1, 2, 5]);
+  });
+
+  it("should allow assigning idle looms to any recipe", () => {
+    const result = checkLoomAllocationConflict(sampleState, "New Quality ABC", [4, 5]);
+    expect(result.hasConflict).toBe(false);
+    expect(result.conflicts).toEqual([]);
+    expect(result.allowed).toEqual([4, 5]);
+  });
+});
+

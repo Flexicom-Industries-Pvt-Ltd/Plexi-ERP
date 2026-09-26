@@ -22,6 +22,7 @@ import {
   Check,
   AlertTriangle,
   SlidersHorizontal,
+  Lock,
 } from "lucide-react";
 import {
   LoomSummaryDataset,
@@ -137,6 +138,21 @@ export function LoomSummarySection() {
   const handleSaveSingleLoomAssign = async (overrideCode?: string) => {
     if (assigningLoomNumber === null) return;
     const targetCode = overrideCode !== undefined ? overrideCode : assigningQualityCode;
+
+    // Pre-occupied check on single assign
+    const currentLoom = rawLoomList.find((l) => l.loomNumber === assigningLoomNumber);
+    const currentOwner = currentLoom?.activeRecipe;
+    if (
+      currentOwner &&
+      targetCode &&
+      currentOwner.toLowerCase() !== targetCode.toLowerCase()
+    ) {
+      toast.error(
+        `Loom #${assigningLoomNumber} is already allocated to "${currentOwner}". Please unassign (Set Idle) first before assigning to "${targetCode}".`
+      );
+      return;
+    }
+
     setIsSubmittingSingleAssign(true);
     try {
       const res = await fetch("/api/production/loom/summary", {
@@ -205,17 +221,63 @@ export function LoomSummarySection() {
   };
 
   const handleToggleBulkLoom = (loomNo: number) => {
+    const currentOwner = rawLoomList.find((l) => l.loomNumber === loomNo)?.activeRecipe;
+    const isOtherOwner = !!currentOwner && currentOwner.toLowerCase() !== bulkSelectedRecipe.toLowerCase();
+
+    if (isOtherOwner) {
+      toast.error(
+        `Loom #${loomNo} is currently occupied by "${currentOwner}". You cannot assign it to "${bulkSelectedRecipe}" without freeing it first.`
+      );
+      return;
+    }
+
     setBulkSelectedLooms((prev) =>
       prev.includes(loomNo) ? prev.filter((n) => n !== loomNo) : [...prev, loomNo].sort((a, b) => a - b)
     );
   };
 
   const handleSelectLoomRange = (start: number, end: number) => {
+    const validLooms: number[] = [];
+    let blockedCount = 0;
+
+    for (let i = start; i <= end; i++) {
+      const currentOwner = rawLoomList.find((l) => l.loomNumber === i)?.activeRecipe;
+      const isOtherOwner = !!currentOwner && currentOwner.toLowerCase() !== bulkSelectedRecipe.toLowerCase();
+      if (!isOtherOwner) {
+        validLooms.push(i);
+      } else {
+        blockedCount++;
+      }
+    }
+
+    if (blockedCount > 0) {
+      toast.info(`Skipped ${blockedCount} pre-occupied loom(s) in range #${start}..#${end}.`);
+    }
+
     setBulkSelectedLooms((prev) => {
-      const range: number[] = [];
-      for (let i = start; i <= end; i++) range.push(i);
-      return Array.from(new Set([...prev, ...range])).sort((a, b) => a - b);
+      return Array.from(new Set([...prev, ...validLooms])).sort((a, b) => a - b);
     });
+  };
+
+  const handleSelectAllAvailableLooms = () => {
+    const validLooms: number[] = [];
+    let blockedCount = 0;
+
+    for (let i = 1; i <= 91; i++) {
+      const currentOwner = rawLoomList.find((l) => l.loomNumber === i)?.activeRecipe;
+      const isOtherOwner = !!currentOwner && currentOwner.toLowerCase() !== bulkSelectedRecipe.toLowerCase();
+      if (!isOtherOwner) {
+        validLooms.push(i);
+      } else {
+        blockedCount++;
+      }
+    }
+
+    if (blockedCount > 0) {
+      toast.info(`Selected ${validLooms.length} free/owned looms (skipped ${blockedCount} occupied looms).`);
+    }
+
+    setBulkSelectedLooms(validLooms);
   };
 
   const handleSaveBulkRecipeLooms = async () => {
@@ -907,6 +969,20 @@ export function LoomSummarySection() {
             </div>
 
             <div className="p-5 space-y-3.5">
+              {(() => {
+                const currentLoom = rawLoomList.find((l) => l.loomNumber === assigningLoomNumber);
+                const currentOwner = currentLoom?.activeRecipe;
+                if (!currentOwner) return null;
+                return (
+                  <div className="flex items-start gap-2 p-2.5 bg-amber-50 border border-amber-200 rounded-lg text-amber-900 text-xs">
+                    <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 mt-0.5" />
+                    <div>
+                      <span className="font-semibold">Pre-Occupied Machine:</span> Loom #{assigningLoomNumber} is assigned to recipe <strong>{currentOwner}</strong>. To reassign it to a different recipe, click <strong>Unassign (Set Idle)</strong> first.
+                    </div>
+                  </div>
+                );
+              })()}
+
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                   Select Recipe Quality:
@@ -1023,10 +1099,11 @@ export function LoomSummarySection() {
                   <div className="flex items-center gap-1">
                     <button
                       type="button"
-                      onClick={() => setBulkSelectedLooms(Array.from({ length: 91 }, (_, i) => i + 1))}
+                      onClick={handleSelectAllAvailableLooms}
                       className="px-2 py-0.5 text-[10px] text-slate-600 hover:text-slate-900 bg-slate-100 rounded cursor-pointer"
+                      title="Select all free and currently allocated looms for this recipe"
                     >
-                      All 91
+                      All Available
                     </button>
                     <button
                       type="button"
@@ -1063,42 +1140,61 @@ export function LoomSummarySection() {
                 </div>
 
                 {/* 1–91 Grid */}
-                <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200 space-y-2">
                   <div className="grid grid-cols-7 sm:grid-cols-10 md:grid-cols-13 gap-1.5 max-h-56 overflow-y-auto p-0.5">
                     {Array.from({ length: 91 }, (_, i) => i + 1).map((loomNo) => {
                       const isSelected = bulkSelectedLooms.includes(loomNo);
                       const currentOwner = rawLoomList.find((l) => l.loomNumber === loomNo)?.activeRecipe;
-                      const isOtherOwner = currentOwner && currentOwner.toLowerCase() !== bulkSelectedRecipe.toLowerCase();
+                      const isOtherOwner = !!currentOwner && currentOwner.toLowerCase() !== bulkSelectedRecipe.toLowerCase();
 
                       return (
                         <button
                           key={loomNo}
                           type="button"
                           onClick={() => handleToggleBulkLoom(loomNo)}
-                          className={`p-1.5 rounded-lg border text-center transition-all cursor-pointer flex flex-col items-center justify-center ${
+                          disabled={isOtherOwner}
+                          className={`p-1.5 rounded-lg border text-center transition-all flex flex-col items-center justify-center ${
                             isSelected
-                              ? "bg-slate-900 text-white border-slate-900 shadow-2xs font-bold"
+                              ? "bg-slate-900 text-white border-slate-900 shadow-2xs font-bold cursor-pointer"
                               : isOtherOwner
-                              ? "bg-amber-50 hover:bg-amber-100 border-amber-300 text-amber-900 font-medium"
-                              : "bg-white hover:bg-slate-100 border-slate-200 text-slate-600 font-medium"
+                              ? "bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed opacity-60"
+                              : "bg-white hover:bg-slate-100 border-slate-200 text-slate-700 font-medium cursor-pointer"
                           }`}
                           title={
                             isSelected
                               ? `Loom #${loomNo}: Selected for ${bulkSelectedRecipe}`
                               : isOtherOwner
-                              ? `Loom #${loomNo}: Assigned to ${currentOwner}`
-                              : `Loom #${loomNo}: Idle`
+                              ? `Loom #${loomNo}: Occupied by "${currentOwner}" (Locked - unassign first)`
+                              : `Loom #${loomNo}: Free / Idle`
                           }
                         >
-                          <span className="text-[11px] font-mono font-bold leading-none">
-                            #{loomNo}
-                          </span>
+                          <div className="flex items-center gap-0.5">
+                            {isOtherOwner && <Lock className="h-2.5 w-2.5 text-slate-400 shrink-0" />}
+                            <span className="text-[11px] font-mono font-bold leading-none">
+                              #{loomNo}
+                            </span>
+                          </div>
                           <span className="text-[7px] font-mono leading-none mt-1 truncate max-w-full">
-                            {isSelected ? "Selected" : isOtherOwner ? "Other" : "Idle"}
+                            {isSelected ? "Selected" : isOtherOwner ? "Occupied" : "Idle"}
                           </span>
                         </button>
                       );
                     })}
+                  </div>
+
+                  <div className="flex items-center justify-between text-[10px] text-slate-500 pt-1 border-t border-slate-200/60">
+                    <div className="flex items-center gap-3">
+                      <span className="flex items-center gap-1">
+                        <span className="w-2 h-2 rounded-xs bg-slate-900 inline-block" /> Selected
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <span className="w-2 h-2 rounded-xs bg-white border border-slate-300 inline-block" /> Free / Idle
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Lock className="w-2.5 h-2.5 text-slate-400 inline-block" /> Pre-Occupied (Locked)
+                      </span>
+                    </div>
+                    <span>Single-click free loom to allocate</span>
                   </div>
                 </div>
               </div>
