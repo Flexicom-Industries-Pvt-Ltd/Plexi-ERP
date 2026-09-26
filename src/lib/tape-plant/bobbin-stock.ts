@@ -446,18 +446,6 @@ export function generateBobbinStockSheetHtml({
       padding: 5px 6px;
     }
 
-    /* Conversion note */
-    .conversion-note {
-      font-size: 7pt;
-      color: #334155;
-      margin-bottom: 12px;
-      background: #f8fafc;
-      padding: 5px 8px;
-      border-radius: 3px;
-      border: 1px solid #cbd5e1;
-      border-left: 3px solid #2563eb;
-    }
-
     /* Sign-off section */
     .sign-table {
       width: 100%;
@@ -587,11 +575,6 @@ export function generateBobbinStockSheetHtml({
         </tr>
       </tfoot>
     </table>
-
-    <!-- CONVERSION NOTES -->
-    <div class="conversion-note">
-      <strong>Stock Accounting:</strong> Available Stock = Produced Net Output − Dispatched Bobbin Issues. 1 Crate = 8 Bobbins = 12.8 KG • Standard Bobbin = 1.6 KG.
-    </div>
 
     <!-- SIGN-OFF AUTHORIZATION -->
     <div class="avoid-break">

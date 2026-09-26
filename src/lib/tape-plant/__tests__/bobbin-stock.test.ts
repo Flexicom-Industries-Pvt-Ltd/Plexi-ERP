@@ -163,7 +163,8 @@ describe("Bobbin Stock Summary calculations", () => {
     expect(html).toContain("64.00");
     expect(html).toContain("Rajesh Kumar");
     expect(html).toContain("Mahesh Loom Incharge");
-    expect(html).toContain("Standard Rules:");
+    expect(html).toContain("Issued By (Tape Plant)");
+    expect(html).not.toContain("Standard Rules:");
   });
 
   it("generates Bobbin Inward Receipt Slip HTML with gross, waste, net output and packing", () => {
@@ -192,6 +193,7 @@ describe("Bobbin Stock Summary calculations", () => {
     expect(html).toContain("400.00 PCS");
     expect(html).toContain("Vikram Singh");
     expect(html).toContain("Plant Operator / In-Charge");
+    expect(html).not.toContain("Inward Confirmation:");
   });
 
   it("generates Bobbin Stock printable HTML sheet with logo, KPI strip, table, and 3-column sign-offs", () => {
@@ -223,6 +225,6 @@ describe("Bobbin Stock Summary calculations", () => {
     expect(html).toContain("Prepared By (Shift Operator / In-Charge)");
     expect(html).toContain("Verified By (Quality Control / Lab)");
     expect(html).toContain("Approved By (Plant Supervisor / Manager)");
-    expect(html).toContain("Stock Accounting:");
+    expect(html).not.toContain("Stock Accounting:");
   });
 });
