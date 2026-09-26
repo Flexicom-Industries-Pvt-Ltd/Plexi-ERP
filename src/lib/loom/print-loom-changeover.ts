@@ -1,6 +1,7 @@
 /**
  * Minimalist Enterprise ERP Loom Changeover Sheet Print & PDF Engine
- * Generates crisp, high-contrast, professional A4 landscape printable schedules.
+ * Formatted precisely as per Tape Planning standards with top-left Flexicom logo,
+ * centered title, KPI summary cards, structured allocation tables, and official 4-column sign-offs.
  */
 
 import { LoomChangeoverDataset } from "./loom-changeover-export";
@@ -28,10 +29,10 @@ export function generateLoomChangeoverHtml(data: LoomChangeoverDataset): string 
 
     return `
       <tr>
-        <td style="text-align: center; font-weight: 800; font-size: 9pt; background-color: #f1f5f9; width: 35px;">
+        <td style="text-align: center; font-weight: 800; font-size: 8pt; background-color: #f1f5f9; width: 35px;">
           #${seq}
         </td>
-        <td style="text-align: center; font-weight: 800; font-family: monospace; font-size: 8.5pt;">
+        <td style="text-align: center; font-weight: 800; font-family: monospace; font-size: 8pt;">
           Loom #${item.loomNumber}
         </td>
         <td style="font-weight: 700; font-family: monospace; font-size: 7.5pt; color: #334155;">
@@ -90,7 +91,7 @@ export function generateLoomChangeoverHtml(data: LoomChangeoverDataset): string 
   <style>
     @page {
       size: A4 landscape;
-      margin: 8mm;
+      margin: 5mm 6mm;
     }
     * {
       box-sizing: border-box;
@@ -100,308 +101,311 @@ export function generateLoomChangeoverHtml(data: LoomChangeoverDataset): string 
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       font-size: 7.5pt;
-      line-height: 1.3;
+      line-height: 1.25;
       color: #0f172a;
       background: #ffffff;
-      padding: 4mm;
+      padding: 0;
+      width: 100%;
+    }
+    .sheet-container {
+      width: 100%;
+      max-width: 100%;
+      margin: 0 auto;
+      box-sizing: border-box;
     }
     .header-container {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
+      text-align: center;
       border-bottom: 2px solid #0f172a;
-      padding-bottom: 8px;
-      margin-bottom: 10px;
+      padding-bottom: 5px;
+      margin-bottom: 6px;
     }
-    .org-title {
-      font-size: 13pt;
-      font-weight: 800;
-      letter-spacing: -0.3px;
-      color: #0f172a;
+    .company-title {
+      font-size: 13.5pt;
+      font-weight: 900;
+      letter-spacing: 0.6px;
+      color: #000000;
       text-transform: uppercase;
+      text-align: center;
     }
-    .org-subtitle {
-      font-size: 8pt;
-      color: #475569;
-      font-weight: 500;
-      margin-top: 1px;
-    }
-    .doc-meta {
-      text-align: right;
+    .company-sub {
       font-size: 7pt;
-      color: #64748b;
+      color: #475569;
+      margin-top: 1px;
+      text-align: center;
     }
-    .doc-ref {
-      font-family: monospace;
-      font-weight: 700;
-      font-size: 8.5pt;
-      color: #0f172a;
-      background: #f1f5f9;
-      padding: 2px 6px;
-      border: 1px solid #cbd5e1;
-      border-radius: 3px;
+    .doc-main-heading {
       display: inline-block;
-      margin-bottom: 3px;
+      border: 1.5px solid #0f172a;
+      background: #f8fafc;
+      padding: 2.5px 14px;
+      font-size: 8.5pt;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-top: 3px;
+      margin-bottom: 2px;
+      text-align: center;
     }
-    .kpi-bar {
-      display: grid;
-      grid-template-columns: repeat(6, 1fr);
-      gap: 6px;
-      margin-bottom: 10px;
+    .doc-meta-strip {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
+      font-size: 7pt;
+      color: #334155;
+      margin-top: 2px;
+      text-align: center;
     }
-    .kpi-card {
-      border: 1px solid #e2e8f0;
-      border-radius: 4px;
-      padding: 4px 6px;
+    .doc-meta-strip strong {
+      color: #000000;
+    }
+
+    /* KPI Summary Row */
+    .kpi-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 6px;
       background-color: #f8fafc;
+      border: 1px solid #94a3b8;
+    }
+    .kpi-table td {
+      padding: 3.5px 5px;
+      border: 1px solid #cbd5e1;
+      vertical-align: middle;
       text-align: center;
     }
     .kpi-label {
-      font-size: 6pt;
+      font-size: 6.5pt;
       font-weight: 700;
-      color: #64748b;
       text-transform: uppercase;
+      color: #475569;
       letter-spacing: 0.3px;
     }
-    .kpi-value {
-      font-size: 10.5pt;
+    .kpi-val {
+      font-size: 9.5pt;
       font-weight: 800;
-      color: #0f172a;
       font-family: monospace;
+      color: #0f172a;
       margin-top: 1px;
     }
-    table.data-table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-bottom: 12px;
-      font-size: 7pt;
-    }
-    table.data-table th, table.data-table td {
-      border: 1px solid #cbd5e1;
-      padding: 3.5px 5px;
-      vertical-align: middle;
-    }
-    table.data-table th {
-      background-color: #0f172a;
-      color: #ffffff;
-      font-weight: 700;
-      text-transform: uppercase;
-      font-size: 6.5pt;
-      letter-spacing: 0.4px;
-      text-align: left;
-    }
-    table.data-table tr:nth-child(even) td {
-      background-color: #fcfdfe;
-    }
+
+    /* Section Titles */
     .section-title {
       font-size: 8pt;
-      font-weight: 800;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      text-align: center;
+      background-color: #e2e8f0;
+      border: 1px solid #94a3b8;
+      border-bottom: none;
+      padding: 3px 6px;
+      margin-top: 5px;
       color: #0f172a;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-bottom: 4px;
-      display: flex;
-      align-items: center;
-      gap: 6px;
     }
-    .section-title::before {
-      content: "";
-      display: inline-block;
-      width: 4px;
-      height: 10px;
-      background: #0f172a;
-      border-radius: 1px;
+
+    /* Data Tables */
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 6px;
+      font-size: 7pt;
+      table-layout: auto;
     }
-    .signoff-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 12px;
-      margin-top: 16px;
-      padding-top: 10px;
-      border-top: 1px dashed #cbd5e1;
-      page-break-inside: avoid;
-    }
-    .signoff-box {
-      border: 1px solid #e2e8f0;
-      border-radius: 4px;
-      padding: 6px 8px;
-      min-height: 48px;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-    }
-    .signoff-role {
-      font-size: 6.5pt;
+    .data-table th {
+      background-color: #f1f5f9;
+      border: 1px solid #94a3b8;
+      padding: 3px 4px;
       font-weight: 700;
-      color: #475569;
+      font-size: 6.5pt;
       text-transform: uppercase;
+      text-align: center;
+      color: #0f172a;
     }
-    .signoff-line {
-      border-top: 1px dotted #94a3b8;
-      margin-top: 22px;
+    .data-table td {
+      border: 1px solid #cbd5e1;
+      padding: 3px 4px;
+      font-size: 7pt;
+      color: #0f172a;
+    }
+
+    /* Sign-off section */
+    .sign-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 6px;
+      border: 1px solid #94a3b8;
+    }
+    .sign-table td {
+      width: 25%;
+      border: 1px solid #94a3b8;
+      padding: 4px 6px;
+      text-align: center;
+      vertical-align: top;
+    }
+    .sign-title {
+      font-weight: 700;
+      font-size: 6.5pt;
+      text-transform: uppercase;
+      margin-bottom: 14px;
+      color: #334155;
+    }
+    .sign-line {
+      border-top: 1px dotted #64748b;
       padding-top: 2px;
       font-size: 6pt;
-      color: #94a3b8;
+      color: #64748b;
+    }
+
+    /* Footer */
+    .footer-note {
+      margin-top: 3px;
+      font-size: 6pt;
+      color: #64748b;
       display: flex;
       justify-content: space-between;
+      border-top: 1px solid #e2e8f0;
+      padding-top: 2px;
     }
-    .footer-note {
-      margin-top: 8px;
-      font-size: 6pt;
-      color: #94a3b8;
-      text-align: center;
+    .avoid-break {
+      break-inside: avoid;
+      page-break-inside: avoid;
     }
   </style>
 </head>
 <body>
+  <div class="sheet-container">
+    <!-- Header with Flexicom Logo -->
+    <div class="header-container">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px;">
+        <div style="width: 65px; text-align: left; display: flex; align-items: center;">
+          <img src="/logo.png" alt="Flexicom Logo" style="height: 44px; width: auto; object-fit: contain; filter: contrast(1.25) saturate(1.25);" onerror="this.style.display='none'" />
+        </div>
+        <div style="flex: 1; text-align: center;">
+          <div class="company-title">Flexicom Industries Pvt. Ltd.</div>
+          <div class="company-sub">Circular Loom Weaving & Fabric Division • Kathua Industrial Complex, Phase-II, Kathua (J&K)</div>
+          <div class="doc-main-heading">LOOM MACHINE CHANGEOVER & SEQUENCE SCHEDULE</div>
+        </div>
+        <div style="width: 65px;" aria-hidden="true"></div>
+      </div>
+      <div class="doc-meta-strip">
+        <span>Doc Ref: <strong>${docRef}</strong></span>
+        <span>•</span>
+        <span>Scope: <strong>Looms #1–91 Changeover Queue</strong></span>
+        <span>•</span>
+        <span>Printed: <strong>${genTimestamp}</strong></span>
+      </div>
+    </div>
 
-  <!-- Header -->
-  <div class="header-container">
-    <div>
-      <div class="org-title">Flexicom Industries Pvt. Ltd.</div>
-      <div class="org-subtitle">Loom Section — Machine Changeover Sheet & Sequence Schedule</div>
-    </div>
-    <div class="doc-meta">
-      <div><span class="doc-ref">${docRef}</span></div>
-      <div>Printed: <strong>${genTimestamp}</strong></div>
-      <div>Authoritative Production Schedule</div>
-    </div>
-  </div>
-
-  <!-- KPI Metrics Bar -->
-  <div class="kpi-bar">
-    <div class="kpi-card">
-      <div class="kpi-label">Total Installed Looms</div>
-      <div class="kpi-value">${kpis.totalLooms}</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-label">Scheduled Changeovers</div>
-      <div class="kpi-value" style="color: #2563eb;">${kpis.totalScheduled}</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-label">In-Progress Conversions</div>
-      <div class="kpi-value" style="color: #d97706;">${kpis.totalInProgress}</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-label">Completed Changeovers</div>
-      <div class="kpi-value" style="color: #059669;">${kpis.totalCompleted}</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-label">Reed Size Modifications</div>
-      <div class="kpi-value" style="color: #dc2626;">${kpis.totalReedSpaceChanges}</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-label">Steady Running (Pending)</div>
-      <div class="kpi-value" style="color: #64748b;">${kpis.totalPending}</div>
-    </div>
-  </div>
-
-  <!-- Changeover Priority Queue Table -->
-  <div class="section-title">
-    Changeover Priority Execution Queue (${queueItems.length} Looms)
-  </div>
-
-  <table class="data-table">
-    <thead>
+    <!-- KPI Summary Row -->
+    <table class="kpi-table">
       <tr>
-        <th style="width: 35px; text-align: center;">Seq</th>
-        <th style="width: 55px; text-align: center;">Loom #</th>
-        <th>Current Running Quality</th>
-        <th>Color / Denier</th>
-        <th style="width: 50px; text-align: center;">Reed</th>
-        <th>Bobbin Mark</th>
-        <th>Target / Next Quality</th>
-        <th>Next Color / Denier</th>
-        <th style="width: 55px; text-align: center;">Next Reed</th>
-        <th>Next Bobbin</th>
-        <th style="width: 60px; text-align: center;">Status</th>
-        <th style="width: 65px; text-align: center;">Target Shift</th>
-        <th>Technician / Floor Remarks</th>
+        <td style="width: 16.66%;">
+          <div class="kpi-label">Total Looms</div>
+          <div class="kpi-val">${kpis.totalLooms}</div>
+        </td>
+        <td style="width: 16.66%;">
+          <div class="kpi-label">Scheduled Queue</div>
+          <div class="kpi-val" style="color: #1d4ed8;">${kpis.totalScheduled}</div>
+        </td>
+        <td style="width: 16.66%;">
+          <div class="kpi-label">In-Progress</div>
+          <div class="kpi-val" style="color: #b45309;">${kpis.totalInProgress}</div>
+        </td>
+        <td style="width: 16.66%;">
+          <div class="kpi-label">Completed</div>
+          <div class="kpi-val" style="color: #047857;">${kpis.totalCompleted}</div>
+        </td>
+        <td style="width: 16.66%;">
+          <div class="kpi-label">Reed Modifications</div>
+          <div class="kpi-val" style="color: #b91c1c;">${kpis.totalReedSpaceChanges}</div>
+        </td>
+        <td style="width: 16.66%;">
+          <div class="kpi-label">Steady Running</div>
+          <div class="kpi-val" style="color: #64748b;">${kpis.totalPending}</div>
+        </td>
       </tr>
-    </thead>
-    <tbody>
-      ${queueRows.length > 0 ? queueRows : `
+    </table>
+
+    <!-- Priority Queue Section -->
+    <div class="section-title">CHANGEOVER PRIORITY EXECUTION QUEUE (${queueItems.length} MACHINES)</div>
+    <table class="data-table">
+      <thead>
         <tr>
-          <td colspan="13" style="text-align: center; padding: 12px; color: #64748b;">
-            No active changeovers currently queued. All 91 circular looms are operating on steady allocations.
+          <th style="width: 32px; text-align: center;">Seq</th>
+          <th style="width: 48px; text-align: center;">Loom #</th>
+          <th style="text-align: left;">Current Quality</th>
+          <th style="text-align: left;">Color / Denier</th>
+          <th style="width: 45px; text-align: center;">Reed</th>
+          <th style="text-align: left;">Bobbin Mark</th>
+          <th style="text-align: left;">Target Next Quality</th>
+          <th style="text-align: left;">Next Color / Denier</th>
+          <th style="width: 50px; text-align: center;">Next Reed</th>
+          <th style="text-align: left;">Next Mark</th>
+          <th style="width: 55px; text-align: center;">Status</th>
+          <th style="width: 60px; text-align: center;">Target Shift</th>
+          <th style="text-align: left;">Floor Remarks</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${queueRows.length > 0 ? queueRows : `
+          <tr>
+            <td colspan="13" style="text-align: center; padding: 14px; color: #64748b; font-style: italic;">
+              No active changeovers currently queued. All 91 circular looms are operating on steady formulations.
+            </td>
+          </tr>
+        `}
+      </tbody>
+    </table>
+
+    <!-- 4-Column Official Sign-Off Strip -->
+    <div class="avoid-break">
+      <table class="sign-table">
+        <tr>
+          <td>
+            <div class="sign-title">1. Prepared By (Loom Supervisor)</div>
+            <div class="sign-line">Signature & Date</div>
+          </td>
+          <td>
+            <div class="sign-title">2. Mechanical (Loom Master)</div>
+            <div class="sign-line">Creel & Reed Verified</div>
+          </td>
+          <td>
+            <div class="sign-title">3. QC Passed (Inspector)</div>
+            <div class="sign-line">Fabric Sample Approved</div>
+          </td>
+          <td>
+            <div class="sign-title">4. Approved By (Production Head)</div>
+            <div class="sign-line">Authorized</div>
           </td>
         </tr>
-      `}
-    </tbody>
-  </table>
+      </table>
 
-  <!-- Sign-off Block -->
-  <div class="signoff-grid">
-    <div class="signoff-box">
-      <div class="signoff-role">1. Prepared By (Loom Supervisor)</div>
-      <div class="signoff-line">
-        <span>Sign & Date</span>
-        <span>Emp ID: ______</span>
-      </div>
-    </div>
-    <div class="signoff-box">
-      <div class="signoff-role">2. Loom Master (Mechanical)</div>
-      <div class="signoff-line">
-        <span>Sign & Date</span>
-        <span>Creel Verified</span>
-      </div>
-    </div>
-    <div class="signoff-box">
-      <div class="signoff-role">3. Quality Inspector (QC Passed)</div>
-      <div class="signoff-line">
-        <span>Sign & Date</span>
-        <span>Sample Approved</span>
-      </div>
-    </div>
-    <div class="signoff-box">
-      <div class="signoff-role">4. Factory Production Head</div>
-      <div class="signoff-line">
-        <span>Sign & Date</span>
-        <span>Authorized</span>
+      <!-- Footer Note -->
+      <div class="footer-note">
+        <span>Flexicom ERP • Loom Weaving & Tape Plant Sync</span>
+        <span>Confidential & Proprietary • Flexicom Industries Pvt. Ltd.</span>
+        <span>Page 1 of 1</span>
       </div>
     </div>
   </div>
-
-  <div class="footer-note">
-    Confidential & Proprietary — Plexi-ERP &copy; Flexicom Industries Pvt. Ltd. | Generated automatically from authoritative factory floor database.
-  </div>
-
-  <script>
-    window.onload = function() {
-      window.print();
-    };
-  </script>
 </body>
 </html>`;
 }
 
-/**
- * Print the Loom Changeover Schedule via an isolated hidden iframe
- */
 export function printLoomChangeover(data: LoomChangeoverDataset): void {
   const html = generateLoomChangeoverHtml(data);
-  const iframe = document.createElement("iframe");
-  iframe.style.position = "fixed";
-  iframe.style.right = "0";
-  iframe.style.bottom = "0";
-  iframe.style.width = "0";
-  iframe.style.height = "0";
-  iframe.style.border = "0";
-
-  document.body.appendChild(iframe);
-
-  const doc = iframe.contentWindow?.document;
-  if (!doc) return;
-
-  doc.open();
-  doc.write(html);
-  doc.close();
-
+  const printWindow = window.open("", "_blank");
+  if (!printWindow) {
+    alert("Please allow popups for printable reports.");
+    return;
+  }
+  printWindow.document.open();
+  printWindow.document.write(html);
+  printWindow.document.close();
+  printWindow.focus();
   setTimeout(() => {
-    try {
-      document.body.removeChild(iframe);
-    } catch {
-      // Ignore if already removed
-    }
-  }, 60000);
+    printWindow.print();
+  }, 350);
 }
