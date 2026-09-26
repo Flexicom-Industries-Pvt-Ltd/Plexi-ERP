@@ -1812,7 +1812,8 @@ model TapePlantBobbinIssue {
   id             String   @id @default(cuid())
   slipNumber     String   @unique // e.g. "TP-ISS-20260926-0001"
   date           String   // YYYY-MM-DD
-  shiftId        String
+  shiftId        String?
+  shiftName      String?  // e.g. "Day Shift", "Night Shift", "Shift A"
   recipeQuality  String   // Quality Name / Recipe Code e.g. "AMB/PP/WH/500/76/S1"
   loomNumber     Int?     // Circular Loom Machine Number (e.g. 1 to 91)
   loomIdentifier String?  // Optional custom loom label e.g. "Loom 06", "Shed A"
@@ -1826,7 +1827,7 @@ model TapePlantBobbinIssue {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  shift Shift @relation(fields: [shiftId], references: [id])
+  shift Shift? @relation(fields: [shiftId], references: [id], onDelete: SetNull)
 
   @@index([date])
   @@index([shiftId])

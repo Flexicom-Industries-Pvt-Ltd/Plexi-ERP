@@ -226,6 +226,56 @@ export async function POST(request: NextRequest) {
     const bobbinCount = Number((crates * BOBBINS_PER_CRATE).toFixed(2));
     const weightKg = Number((crates * CRATE_WEIGHT_KG).toFixed(2));
 
+    // Safely resolve Shift FK without throwing constraint violation
+    let resolvedShiftId: string | null = null;
+    let resolvedShiftName: string = body.shiftName ? String(body.shiftName).trim() : "";
+
+    if (shiftId && String(shiftId).toUpperCase() !== "ALL") {
+      const rawShift = String(shiftId).trim();
+      let match = await db.shift.findUnique({
+        where: { id: rawShift },
+      });
+
+      if (!match) {
+        match = await db.shift.findFirst({
+          where: {
+            name: { equals: rawShift, mode: "insensitive" },
+          },
+        });
+      }
+
+      if (!match) {
+        if (/night/i.test(rawShift)) {
+          match = await db.shift.findFirst({
+            where: { name: { contains: "Night", mode: "insensitive" } },
+          });
+        } else if (/day/i.test(rawShift)) {
+          match = await db.shift.findFirst({
+            where: { name: { contains: "Day", mode: "insensitive" } },
+          });
+        }
+      }
+
+      if (match) {
+        resolvedShiftId = match.id;
+        if (!resolvedShiftName) resolvedShiftName = match.name;
+      } else {
+        resolvedShiftId = null;
+        if (!resolvedShiftName) {
+          if (/night/i.test(rawShift)) resolvedShiftName = "Night Shift";
+          else if (/day/i.test(rawShift)) resolvedShiftName = "Day Shift";
+          else resolvedShiftName = rawShift;
+        }
+      }
+    } else {
+      const firstShift = await db.shift.findFirst({
+        where: { isActive: true },
+        orderBy: { createdAt: "asc" },
+      });
+      resolvedShiftId = firstShift?.id || null;
+      if (!resolvedShiftName) resolvedShiftName = firstShift?.name || "General Shift";
+    }
+
     // Generate unique sequential slipNumber: TP-ISS-YYYYMMDD-XXXX
     const dateCompact = date.replace(/-/g, "");
     const todayIssuesCount = await db.tapePlantBobbinIssue.count({
@@ -241,7 +291,8 @@ export async function POST(request: NextRequest) {
       data: {
         slipNumber,
         date,
-        shiftId,
+        shiftId: resolvedShiftId,
+        shiftName: resolvedShiftName,
         recipeQuality: cleanQuality,
         loomNumber: parsedLoomNumber,
         loomIdentifier: loomIdentifier || (parsedLoomNumber ? `Loom #${parsedLoomNumber}` : null),
@@ -264,8 +315,8 @@ export async function POST(request: NextRequest) {
         id: created.id,
         slipNumber: created.slipNumber,
         date: created.date,
-        shiftId: created.shiftId,
-        shiftName: created.shift?.name || created.shiftId,
+        shiftId: created.shiftId || "shift_day",
+        shiftName: created.shift?.name || created.shiftName || "General Shift",
         recipeQuality: created.recipeQuality,
         loomNumber: created.loomNumber,
         loomIdentifier: created.loomIdentifier,
