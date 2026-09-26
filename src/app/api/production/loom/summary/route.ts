@@ -225,11 +225,12 @@ export async function GET(request: NextRequest) {
       recentIssues: any[];
     }>();
 
-    // First populate from LoomMachineMapping (manual assignments)
+    // First populate from LoomMachineMapping (manual assignments with assigned looms)
     for (const mapping of mappings) {
       const q = mapping.qualityCode;
       const matchedSpec = recipeSpecMap.get(q.toLowerCase());
       const looms = (mapping.loomNumbers || []).filter((n) => typeof n === "number" && n >= 1 && n <= TOTAL_LOOMS);
+      if (looms.length === 0) continue; // Don't include empty recipe mappings
 
       recipeMap.set(q, {
         recipeQuality: q,
@@ -254,65 +255,41 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Next aggregate bobbin issue allocations into the recipeMap
+    // Next aggregate bobbin issue allocations into the recipeMap (only for active assigned looms/recipes)
     for (const alloc of normalizedAllocations) {
       const q = alloc.recipeQuality;
       let entry = recipeMap.get(q);
-      if (!entry) {
-        const matchedSpec = recipeSpecMap.get(q.toLowerCase());
-        entry = {
-          recipeQuality: q,
-          colorGroup: matchedSpec?.colorGroup || "Standard",
-          colour: matchedSpec?.colour || "White",
-          denier: matchedSpec?.denier ?? null,
-          tapeWidth: matchedSpec?.tapeWidth ?? null,
-          bobbinMarking: matchedSpec?.bobbinMarking || "Bobbin Issue",
-          reedSpaceCm: null,
-          mesh: "Standard",
-          assignedLoomsSet: new Set<number>(),
-          assignedLoomIdentsSet: new Set<string>(),
-          totalCrates: 0,
-          totalBobbins: 0,
-          totalWeightKg: 0,
-          latestDate: alloc.date,
-          activeShiftsSet: new Set<string>(),
-          issuesCount: 0,
-          issuersSet: new Set<string>(),
-          receiversSet: new Set<string>(),
-          recentIssues: [],
-        };
-        recipeMap.set(q, entry);
-      }
+      if (!entry) continue; // Only aggregate into active manual recipe allocations
 
       if (alloc.loomNumber && alloc.loomNumber >= 1 && alloc.loomNumber <= TOTAL_LOOMS) {
-        entry.assignedLoomsSet.add(alloc.loomNumber);
-      }
-      if (alloc.loomIdentifier) entry.assignedLoomIdentsSet.add(alloc.loomIdentifier);
-      entry.totalCrates += alloc.crateCount;
-      entry.totalBobbins += alloc.bobbinCount;
-      entry.totalWeightKg += alloc.weightKg;
-      entry.activeShiftsSet.add(alloc.shiftName);
-      entry.issuesCount += 1;
-      if (alloc.date && (!entry.latestDate || alloc.date > entry.latestDate)) {
-        entry.latestDate = alloc.date;
-      }
-      if (alloc.issuedBy) entry.issuersSet.add(alloc.issuedBy);
-      if (alloc.receivedBy) entry.receiversSet.add(alloc.receivedBy);
+        if (entry.assignedLoomsSet.has(alloc.loomNumber)) {
+          entry.totalCrates += alloc.crateCount;
+          entry.totalBobbins += alloc.bobbinCount;
+          entry.totalWeightKg += alloc.weightKg;
+          entry.activeShiftsSet.add(alloc.shiftName);
+          entry.issuesCount += 1;
+          if (alloc.date && (!entry.latestDate || alloc.date > entry.latestDate)) {
+            entry.latestDate = alloc.date;
+          }
+          if (alloc.issuedBy) entry.issuersSet.add(alloc.issuedBy);
+          if (alloc.receivedBy) entry.receiversSet.add(alloc.receivedBy);
 
-      if (entry.recentIssues.length < 5) {
-        entry.recentIssues.push({
-          slipNumber: alloc.slipNumber,
-          date: alloc.date,
-          shiftName: alloc.shiftName,
-          crateCount: alloc.crateCount,
-          weightKg: alloc.weightKg,
-          loomIdentifier: alloc.loomIdentifier,
-        });
+          if (entry.recentIssues.length < 5) {
+            entry.recentIssues.push({
+              slipNumber: alloc.slipNumber,
+              date: alloc.date,
+              shiftName: alloc.shiftName,
+              crateCount: alloc.crateCount,
+              weightKg: alloc.weightKg,
+              loomIdentifier: alloc.loomIdentifier,
+            });
+          }
+        }
       }
     }
 
     const allRecipeSummaries: RecipeLoomSummaryItem[] = Array.from(recipeMap.values())
-      .filter((r) => r.assignedLoomsSet.size > 0 || r.totalCrates > 0)
+      .filter((r) => r.assignedLoomsSet.size > 0)
       .map((r) => ({
         recipeQuality: r.recipeQuality,
         totalLoomsCount: r.assignedLoomsSet.size,
@@ -321,7 +298,7 @@ export async function GET(request: NextRequest) {
         totalCratesIssued: Number(r.totalCrates.toFixed(2)),
         totalBobbinsIssued: Number(r.totalBobbins.toFixed(2)),
         totalWeightIssuedKg: Number(r.totalWeightKg.toFixed(2)),
-        latestIssueDate: r.latestDate || (r.assignedLoomsSet.size > 0 ? "Assigned" : "—"),
+        latestIssueDate: r.latestDate || "Assigned",
         activeShifts: Array.from(r.activeShiftsSet),
         issuesCount: r.issuesCount,
         issuers: Array.from(r.issuersSet),
@@ -329,10 +306,10 @@ export async function GET(request: NextRequest) {
         recentIssues: r.recentIssues,
       }));
 
-    // Sort recipes by assigned looms count descending, then total crates
-    allRecipeSummaries.sort((a, b) => b.totalLoomsCount - a.totalLoomsCount || b.totalCratesIssued - a.totalCratesIssued);
+    // Sort recipes by assigned looms count descending, then quality code
+    allRecipeSummaries.sort((a, b) => b.totalLoomsCount - a.totalLoomsCount || a.recipeQuality.localeCompare(b.recipeQuality));
 
-    // 4. Build Loom-Wise Summary (Looms 1 to 91) based on Authoritative Manual Mappings
+    // 4. Build Loom-Wise Summary (Looms 1 to 91) strictly based on Authoritative Manual Mappings
     const loomSummaries: LoomMachineSummaryItem[] = [];
 
     // Map each loom 1..91 to its assigned mapping
@@ -347,16 +324,11 @@ export async function GET(request: NextRequest) {
 
     for (let loomNo = 1; loomNo <= TOTAL_LOOMS; loomNo++) {
       const assignedMapping = loomToMappingMap.get(loomNo);
-      const loomAllocs = normalizedAllocations.filter((a) => a.loomNumber === loomNo);
+      const isActive = Boolean(assignedMapping);
+      const activeRecipe = assignedMapping ? assignedMapping.qualityCode : null;
+      const allRecipes = activeRecipe ? [activeRecipe] : [];
 
-      const isActive = Boolean(assignedMapping || loomAllocs.length > 0);
-      const activeRecipe = assignedMapping ? assignedMapping.qualityCode : loomAllocs[0]?.recipeQuality || null;
-      const allRecipes = Array.from(
-        new Set([
-          ...(activeRecipe ? [activeRecipe] : []),
-          ...loomAllocs.map((a) => a.recipeQuality),
-        ])
-      );
+      const loomAllocs = isActive ? normalizedAllocations.filter((a) => a.loomNumber === loomNo && a.recipeQuality.toLowerCase() === activeRecipe?.toLowerCase()) : [];
 
       const totalCrates = loomAllocs.reduce((sum, a) => sum + a.crateCount, 0);
       const totalBobbins = loomAllocs.reduce((sum, a) => sum + a.bobbinCount, 0);
@@ -392,9 +364,9 @@ export async function GET(request: NextRequest) {
     // 5. Compute Grand KPIs
     const activeLoomsCount = loomSummaries.filter((l) => l.isActive).length;
     const idleLoomsCount = TOTAL_LOOMS - activeLoomsCount;
-    const totalCratesDispatched = normalizedAllocations.reduce((sum, a) => sum + a.crateCount, 0);
-    const totalBobbinsDispatched = normalizedAllocations.reduce((sum, a) => sum + a.bobbinCount, 0);
-    const totalWeightDispatchedKg = normalizedAllocations.reduce((sum, a) => sum + a.weightKg, 0);
+    const totalCratesDispatched = loomSummaries.reduce((sum, l) => sum + l.totalCrates, 0);
+    const totalBobbinsDispatched = loomSummaries.reduce((sum, l) => sum + l.totalBobbins, 0);
+    const totalWeightDispatchedKg = loomSummaries.reduce((sum, l) => sum + l.totalWeightKg, 0);
 
     // Filter results if search query or loom filter provided
     let filteredRecipes = allRecipeSummaries;
@@ -535,6 +507,35 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { action, loomNumber, qualityCode, loomNumbers } = body;
     const TOTAL_LOOMS = 91;
+
+    // Action: Reset all loom assignments to blank
+    if (action === "RESET_ALL_MAPPINGS") {
+      await db.loomMachineMapping.updateMany({
+        data: { loomNumbers: [], totalLooms: 0 },
+      });
+      return NextResponse.json({
+        success: true,
+        message: "All circular loom assignments have been reset to blank (Idle).",
+      });
+    }
+
+    // Action: Delete all loom assignments for a specific recipe quality
+    if (action === "DELETE_RECIPE_MAPPING" || action === "CLEAR_RECIPE_LOOMS") {
+      if (!qualityCode || typeof qualityCode !== "string") {
+        return NextResponse.json({ error: "Quality Code is required." }, { status: 400 });
+      }
+
+      const cleanCode = qualityCode.trim();
+      await db.loomMachineMapping.updateMany({
+        where: { qualityCode: { equals: cleanCode, mode: "insensitive" } },
+        data: { loomNumbers: [], totalLooms: 0 },
+      });
+
+      return NextResponse.json({
+        success: true,
+        message: `Deleted loom assignment for quality "${cleanCode}".`,
+      });
+    }
 
     // Action 1: Assign a single loom to a quality (or unassign if qualityCode is empty)
     if (action === "ASSIGN_LOOM") {
@@ -724,30 +725,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true,
         message: `Allocated ${sanitizedLooms.length} looms to quality "${cleanCode}".`,
-      });
-    }
-
-    // Action 4: Clear all looms for a recipe
-    if (action === "CLEAR_RECIPE_LOOMS") {
-      if (!qualityCode || typeof qualityCode !== "string") {
-        return NextResponse.json({ error: "Quality Code is required." }, { status: 400 });
-      }
-
-      const cleanCode = qualityCode.trim();
-      const existing = await db.loomMachineMapping.findUnique({
-        where: { qualityCode: cleanCode },
-      });
-
-      if (existing) {
-        await db.loomMachineMapping.update({
-          where: { id: existing.id },
-          data: { loomNumbers: [], totalLooms: 0 },
-        });
-      }
-
-      return NextResponse.json({
-        success: true,
-        message: `Cleared all loom allocations for "${cleanCode}".`,
       });
     }
 

@@ -4,7 +4,6 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { toast } from "sonner";
 import {
   Search,
-  Filter,
   RefreshCw,
   Printer,
   FileSpreadsheet,
@@ -13,20 +12,15 @@ import {
   Clock,
   Layers,
   Activity,
-  Boxes,
   Package,
   Scale,
   RotateCcw,
-  CheckCircle2,
-  ChevronRight,
-  Sparkles,
-  Zap,
-  PlusCircle,
-  Edit3,
+  Plus,
+  Edit2,
+  Trash2,
   X,
   Check,
-  Trash2,
-  AlertCircle,
+  AlertTriangle,
   SlidersHorizontal,
 } from "lucide-react";
 import {
@@ -77,6 +71,10 @@ export function LoomSummarySection() {
   const [bulkSelectedRecipe, setBulkSelectedRecipe] = useState<string>("");
   const [bulkSelectedLooms, setBulkSelectedLooms] = useState<number[]>([]);
   const [isSubmittingBulkAssign, setIsSubmittingBulkAssign] = useState(false);
+
+  // Reset All Confirmation Modal State
+  const [resetConfirmModalOpen, setResetConfirmModalOpen] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
 
   const fetchSummary = useCallback(async () => {
     setLoading(true);
@@ -132,7 +130,7 @@ export function LoomSummarySection() {
   const handleOpenSingleLoomModal = (loomNo: number) => {
     const current = rawLoomList.find((l) => l.loomNumber === loomNo);
     setAssigningLoomNumber(loomNo);
-    setAssigningQualityCode(current?.activeRecipe || (availableRecipes[0]?.code || ""));
+    setAssigningQualityCode(current?.activeRecipe || availableRecipes[0]?.code || "");
     setSingleLoomModalOpen(true);
   };
 
@@ -249,28 +247,47 @@ export function LoomSummarySection() {
     }
   };
 
-  const handleClearBulkRecipeLooms = async () => {
-    if (!bulkSelectedRecipe.trim()) return;
-    setIsSubmittingBulkAssign(true);
+  const handleDeleteRecipeMapping = async (qualityCode: string) => {
+    if (!confirm(`Are you sure you want to remove the loom allocations for "${qualityCode}"?`)) return;
     try {
       const res = await fetch("/api/production/loom/summary", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          action: "CLEAR_RECIPE_LOOMS",
-          qualityCode: bulkSelectedRecipe.trim(),
+          action: "DELETE_RECIPE_MAPPING",
+          qualityCode,
         }),
       });
       const result = await res.json();
-      if (!res.ok) throw new Error(result.error || "Failed to clear looms");
+      if (!res.ok) throw new Error(result.error || "Failed to delete assignment");
 
-      toast.success(result.message || `Cleared all looms for "${bulkSelectedRecipe}"`);
-      setBulkSelectedLooms([]);
+      toast.success(`Removed loom assignments for "${qualityCode}"`);
       await fetchSummary();
     } catch (err: any) {
-      toast.error(err?.message || "Failed to clear recipe looms");
+      toast.error(err?.message || "Failed to delete assignment");
+    }
+  };
+
+  const handleResetAllToBlank = async () => {
+    setIsResetting(true);
+    try {
+      const res = await fetch("/api/production/loom/summary", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "RESET_ALL_MAPPINGS",
+        }),
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || "Failed to reset assignments");
+
+      toast.success("All circular loom assignments reset to blank.");
+      setResetConfirmModalOpen(false);
+      await fetchSummary();
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to reset assignments");
     } finally {
-      setIsSubmittingBulkAssign(false);
+      setIsResetting(false);
     }
   };
 
@@ -340,258 +357,207 @@ export function LoomSummarySection() {
   const kpis = data?.kpis;
 
   return (
-    <div className="space-y-5 w-full min-w-0 max-w-full">
-      {/* Top Header & Master Action Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-4 sm:p-5 rounded-xl border border-slate-200/90 shadow-2xs min-w-0">
+    <div className="space-y-4 w-full min-w-0 max-w-full font-sans text-slate-800">
+      {/* 1. Header Toolbar (Minimalist, Sleek, Professional) */}
+      <div className="bg-white px-5 py-4 rounded-xl border border-slate-200/90 shadow-2xs flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-xl bg-slate-900 text-white flex items-center justify-center shrink-0 shadow-xs">
-            <LayoutGrid className="h-5 w-5" />
+          <div className="h-9 w-9 rounded-lg bg-slate-900 text-white flex items-center justify-center shrink-0">
+            <LayoutGrid className="h-4 w-4" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
-                Loom Machine Allocations & Recipe Summary
-              </h2>
-              <span className="hidden sm:inline-block px-2 py-0.5 bg-slate-100 text-slate-700 text-[10px] font-bold uppercase rounded border border-slate-200">
-                1-91 Looms Live
+              <h1 className="text-base font-semibold text-slate-900 tracking-tight">
+                Loom Machine Allocations
+              </h1>
+              <span className="px-2 py-0.5 bg-slate-100 text-slate-600 text-[10px] font-semibold uppercase rounded tracking-wider border border-slate-200">
+                Manual Allocation
               </span>
             </div>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Direct manual quality-to-loom assignment with live shop-floor tracking across Circular Looms 1–91.
+            <p className="text-xs text-slate-500">
+              Direct quality-to-loom machine assignments across Circular Looms 1–91.
             </p>
           </div>
         </div>
 
-        {/* Master Actions & Allocation Controls */}
+        {/* Actions Strip */}
         <div className="flex flex-wrap items-center gap-2">
-          {/* Direct Manual Quality-to-Loom Assign Button */}
+          {/* Primary Action Button */}
           <button
             type="button"
             onClick={() => handleOpenBulkRecipeModal()}
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-700 hover:bg-blue-800 text-white text-xs font-bold rounded-lg shadow-xs transition-colors cursor-pointer"
-            title="Open manual quality-to-loom allocation editor"
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-lg shadow-2xs transition-colors cursor-pointer"
           >
-            <PlusCircle className="h-3.5 w-3.5" />
-            <span>Assign Qualities to Looms</span>
+            <Plus className="h-3.5 w-3.5" />
+            <span>Assign Quality</span>
           </button>
 
+          {/* Reset All to Blank Action */}
+          <button
+            type="button"
+            onClick={() => setResetConfirmModalOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 hover:bg-rose-50 text-slate-600 hover:text-rose-700 text-xs font-medium rounded-lg border border-slate-200 hover:border-rose-200 transition-colors cursor-pointer"
+            title="Wipe all loom assignments to start completely fresh"
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Reset to Blank</span>
+          </button>
+
+          {/* Refresh */}
           <button
             type="button"
             onClick={fetchSummary}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition-colors cursor-pointer"
-            title="Reload live allocations from database"
+            className="p-1.5 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors cursor-pointer"
+            title="Refresh allocations"
           >
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
-            <span>Refresh</span>
+            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
           </button>
 
+          {/* Print PDF */}
           <button
             type="button"
             onClick={handlePrint}
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-lg shadow-xs transition-colors cursor-pointer"
-            title="Print PDF for current view matching active filters in Tape Planning format"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium rounded-lg border border-slate-200 transition-colors cursor-pointer"
+            title="Print PDF of current schedule"
           >
-            <Printer className="h-3.5 w-3.5" />
-            <span>Print PDF ({activeView === "recipes" ? "Recipe Schedule" : "Loom Matrix"})</span>
+            <Printer className="h-3.5 w-3.5 text-slate-500" />
+            <span className="hidden md:inline">Print</span>
           </button>
 
+          {/* Export Excel */}
           <button
             type="button"
             onClick={handleExportExcel}
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-bold rounded-lg shadow-xs transition-colors cursor-pointer"
-            title="Export full Loom Allocations and 1-91 Matrix to Excel"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium rounded-lg border border-slate-200 transition-colors cursor-pointer"
+            title="Export Excel spreadsheet"
           >
-            <FileSpreadsheet className="h-3.5 w-3.5" />
-            <span>Export Excel (.xlsx)</span>
+            <FileSpreadsheet className="h-3.5 w-3.5 text-slate-500" />
+            <span className="hidden md:inline">Export</span>
           </button>
         </div>
       </div>
 
-      {/* Minimalist Bento KPI Strip */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        {/* Active Looms Running */}
+      {/* 2. Sleek Minimalist KPIs Strip */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {/* Active Looms */}
         <div
           onClick={() => {
             setActiveView("looms");
             setLoomStatusFilter("ACTIVE_ONLY");
           }}
-          className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-2xs hover:border-emerald-300 transition-colors cursor-pointer group"
-          title="Click to view Active Running Looms in Loom View"
+          className="bg-white p-3.5 rounded-xl border border-slate-200/90 shadow-2xs cursor-pointer hover:border-slate-300 transition-all group"
         >
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-medium text-slate-500 uppercase tracking-wider group-hover:text-emerald-700 transition-colors">
-              Active Running Looms
-            </span>
-            <div className="p-1.5 bg-emerald-50 text-emerald-700 rounded-lg group-hover:bg-emerald-100 transition-colors">
-              <Activity className="h-4 w-4" />
-            </div>
+          <div className="flex items-center justify-between text-xs text-slate-500 font-medium">
+            <span>Running Looms</span>
+            <Activity className="h-3.5 w-3.5 text-emerald-600" />
           </div>
-          <div className="mt-2.5">
-            <div className="text-xl font-bold font-mono text-emerald-700 tracking-tight">
-              {loading ? (
-                <div className="h-6 w-16 bg-slate-100 animate-pulse rounded" />
-              ) : (
-                `${kpis?.activeLoomsCount ?? 0} / 91`
-              )}
-            </div>
-            <p className="text-[11px] text-slate-400 mt-0.5">
-              {kpis?.idleLoomsCount ?? 0} idle / unassigned looms • <span className="text-emerald-600 font-semibold underline">View Active</span>
-            </p>
+          <div className="mt-1.5 flex items-baseline gap-1.5">
+            <span className="text-xl font-bold font-mono text-slate-900">
+              {kpis?.activeLoomsCount ?? 0}
+            </span>
+            <span className="text-xs font-mono text-slate-400">/ 91 looms</span>
           </div>
         </div>
 
-        {/* Active Recipe Qualities */}
+        {/* Assigned Qualities */}
         <div
           onClick={() => setActiveView("recipes")}
-          className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-2xs hover:border-blue-300 transition-colors cursor-pointer group"
-          title="Click to view Recipe-Wise Formulations"
+          className="bg-white p-3.5 rounded-xl border border-slate-200/90 shadow-2xs cursor-pointer hover:border-slate-300 transition-all group"
         >
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-medium text-slate-500 uppercase tracking-wider group-hover:text-blue-700 transition-colors">
-              Active Recipe Qualities
-            </span>
-            <div className="p-1.5 bg-blue-50 text-blue-700 rounded-lg group-hover:bg-blue-100 transition-colors">
-              <Layers className="h-4 w-4" />
-            </div>
+          <div className="flex items-center justify-between text-xs text-slate-500 font-medium">
+            <span>Active Formulations</span>
+            <Layers className="h-3.5 w-3.5 text-blue-600" />
           </div>
-          <div className="mt-2.5">
-            <div className="text-xl font-bold font-mono text-slate-900 tracking-tight">
-              {loading ? (
-                <div className="h-6 w-16 bg-slate-100 animate-pulse rounded" />
-              ) : (
-                `${kpis?.uniqueRecipesCount ?? 0} Qualities`
-              )}
-            </div>
-            <p className="text-[11px] text-slate-400 mt-0.5">
-              Distinct tape recipes in loom shed
-            </p>
+          <div className="mt-1.5 flex items-baseline gap-1.5">
+            <span className="text-xl font-bold font-mono text-slate-900">
+              {recipeList.length}
+            </span>
+            <span className="text-xs text-slate-400">qualities</span>
           </div>
         </div>
 
-        {/* Total Crates Dispatched */}
-        <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-2xs">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">
-              Total Crates Issued
-            </span>
-            <div className="p-1.5 bg-purple-50 text-purple-700 rounded-lg">
-              <Package className="h-4 w-4" />
-            </div>
+        {/* Dispatched Crates */}
+        <div className="bg-white p-3.5 rounded-xl border border-slate-200/90 shadow-2xs">
+          <div className="flex items-center justify-between text-xs text-slate-500 font-medium">
+            <span>Dispatched Crates</span>
+            <Package className="h-3.5 w-3.5 text-slate-400" />
           </div>
-          <div className="mt-2.5">
-            <div className="text-xl font-bold font-mono text-slate-900 tracking-tight">
-              {loading ? (
-                <div className="h-6 w-20 bg-slate-100 animate-pulse rounded" />
-              ) : (
-                `${(kpis?.totalCratesDispatched ?? 0).toLocaleString(undefined, {
-                  minimumFractionDigits: 1,
-                  maximumFractionDigits: 2,
-                })} crates`
-              )}
-            </div>
-            <p className="text-[11px] text-slate-400 mt-0.5">
-              {(kpis?.totalBobbinsDispatched ?? 0).toLocaleString()} bobbins (@ 8/crate)
-            </p>
+          <div className="mt-1.5 flex items-baseline gap-1.5">
+            <span className="text-xl font-bold font-mono text-slate-900">
+              {(kpis?.totalCratesDispatched ?? 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
+            </span>
+            <span className="text-xs text-slate-400">crates</span>
           </div>
         </div>
 
-        {/* Total Weight Dispatched (KG) */}
-        <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-2xs">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">
-              Total Dispatched Weight
-            </span>
-            <div className="p-1.5 bg-slate-100 text-slate-800 rounded-lg">
-              <Scale className="h-4 w-4" />
-            </div>
+        {/* Total Weight */}
+        <div className="bg-white p-3.5 rounded-xl border border-slate-200/90 shadow-2xs">
+          <div className="flex items-center justify-between text-xs text-slate-500 font-medium">
+            <span>Dispatched Weight</span>
+            <Scale className="h-3.5 w-3.5 text-slate-400" />
           </div>
-          <div className="mt-2.5">
-            <div className="text-xl font-bold font-mono text-slate-900 tracking-tight">
-              {loading ? (
-                <div className="h-6 w-24 bg-slate-100 animate-pulse rounded" />
-              ) : (
-                `${(kpis?.totalWeightDispatchedKg ?? 0).toLocaleString(undefined, {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })} kg`
-              )}
-            </div>
-            <p className="text-[11px] text-slate-400 mt-0.5">
-              12.8 kg per crate conversion
-            </p>
+          <div className="mt-1.5 flex items-baseline gap-1.5">
+            <span className="text-xl font-bold font-mono text-slate-900">
+              {(kpis?.totalWeightDispatchedKg ?? 0).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+            </span>
+            <span className="text-xs text-slate-400">kg</span>
           </div>
         </div>
       </div>
 
-      {/* Filter & View Switcher Bar */}
-      <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-slate-200 shadow-2xs space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
-          {/* Primary View Switcher */}
-          <div className="inline-flex rounded-lg bg-slate-100 p-1 text-xs font-semibold">
+      {/* 3. View Switcher & Minimalist Filter Bar */}
+      <div className="bg-white p-3 rounded-xl border border-slate-200/90 shadow-2xs space-y-2.5">
+        <div className="flex flex-wrap items-center justify-between gap-2.5 text-xs">
+          {/* View Mode Toggle */}
+          <div className="inline-flex rounded-lg bg-slate-100 p-0.5 text-xs font-medium">
             <button
               type="button"
               onClick={() => setActiveView("recipes")}
-              className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-md transition-all cursor-pointer ${
+              className={`px-3 py-1 rounded-md transition-all cursor-pointer ${
                 activeView === "recipes"
-                  ? "bg-white text-slate-900 shadow-2xs font-bold"
+                  ? "bg-white text-slate-900 shadow-2xs font-semibold"
                   : "text-slate-600 hover:text-slate-900"
               }`}
             >
-              <Layers className="h-3.5 w-3.5" />
-              <span>Recipe-Wise View ({recipeList.length})</span>
+              Recipe Schedule ({recipeList.length})
             </button>
             <button
               type="button"
               onClick={() => setActiveView("looms")}
-              className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-md transition-all cursor-pointer ${
+              className={`px-3 py-1 rounded-md transition-all cursor-pointer ${
                 activeView === "looms"
-                  ? "bg-white text-slate-900 shadow-2xs font-bold"
+                  ? "bg-white text-slate-900 shadow-2xs font-semibold"
                   : "text-slate-600 hover:text-slate-900"
               }`}
             >
-              <LayoutGrid className="h-3.5 w-3.5" />
-              <span>
-                Loom-Wise View ({loomStatusFilter === "ACTIVE_ONLY" ? `${kpis?.activeLoomsCount ?? 0} Active` : "1-91 Looms"})
-              </span>
+              Loom Shed (1–91)
             </button>
           </div>
 
-          {/* Date Presets & Shift Filter */}
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Date Scope Pills */}
+          {/* Date & Shift Filter Strip */}
+          <div className="flex flex-wrap items-center gap-1.5">
             <div className="inline-flex rounded-lg bg-slate-100 p-0.5 text-xs font-medium">
               <button
                 type="button"
                 onClick={() => setDatePreset("ALL")}
-                className={`px-2.5 py-1 rounded transition-all cursor-pointer ${
-                  selectedDate === "ALL" ? "bg-white text-slate-900 shadow-2xs font-bold" : "text-slate-600"
+                className={`px-2.5 py-0.5 rounded transition-all cursor-pointer ${
+                  selectedDate === "ALL" ? "bg-white text-slate-900 shadow-2xs font-semibold" : "text-slate-600"
                 }`}
               >
-                All (Till Date)
+                All
               </button>
               <button
                 type="button"
                 onClick={() => setDatePreset("TODAY")}
-                className={`px-2.5 py-1 rounded transition-all cursor-pointer ${
-                  selectedDate === new Date().toISOString().slice(0, 10) ? "bg-white text-slate-900 shadow-2xs font-bold" : "text-slate-600"
+                className={`px-2.5 py-0.5 rounded transition-all cursor-pointer ${
+                  selectedDate === new Date().toISOString().slice(0, 10) ? "bg-white text-slate-900 shadow-2xs font-semibold" : "text-slate-600"
                 }`}
               >
                 Today
               </button>
-              <button
-                type="button"
-                onClick={() => setDatePreset("YESTERDAY")}
-                className={`px-2.5 py-1 rounded transition-all cursor-pointer ${
-                  selectedDate === new Date(Date.now() - 86400000).toISOString().slice(0, 10) ? "bg-white text-slate-900 shadow-2xs font-bold" : "text-slate-600"
-                }`}
-              >
-                Yesterday
-              </button>
             </div>
 
-            {/* Custom Date Picker */}
-            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 text-xs">
-              <Calendar className="h-3.5 w-3.5 text-slate-400" />
+            <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg px-2 py-0.5 text-xs">
+              <Calendar className="h-3 w-3 text-slate-400" />
               <input
                 type="date"
                 value={selectedDate === "ALL" ? "" : selectedDate}
@@ -600,9 +566,8 @@ export function LoomSummarySection() {
               />
             </div>
 
-            {/* Shift Selector */}
-            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 text-xs">
-              <Clock className="h-3.5 w-3.5 text-slate-400" />
+            <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg px-2 py-0.5 text-xs">
+              <Clock className="h-3 w-3 text-slate-400" />
               <select
                 value={selectedShiftId}
                 onChange={(e) => setSelectedShiftId(e.target.value)}
@@ -617,31 +582,14 @@ export function LoomSummarySection() {
               </select>
             </div>
 
-            {/* Loom Filter */}
-            <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 text-xs">
-              <span className="text-[10px] text-slate-400 uppercase">Loom:</span>
-              <select
-                value={selectedLoomFilter}
-                onChange={(e) => setSelectedLoomFilter(e.target.value)}
-                className="text-xs font-medium text-slate-800 bg-transparent outline-none cursor-pointer"
-              >
-                <option value="ALL">All 91 Looms</option>
-                {Array.from({ length: 91 }, (_, i) => i + 1).map((num) => (
-                  <option key={num} value={num}>
-                    Loom #{num}
-                  </option>
-                ))}
-              </select>
-            </div>
-
             {isFilterActive && (
               <button
                 type="button"
                 onClick={handleResetFilters}
-                className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                className="px-2 py-0.5 text-xs text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors cursor-pointer"
+                title="Reset filters"
               >
-                <RotateCcw className="h-3 w-3" />
-                <span>Reset</span>
+                Reset
               </button>
             )}
           </div>
@@ -649,176 +597,135 @@ export function LoomSummarySection() {
 
         {/* Search */}
         <div className="relative w-full">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by recipe quality code, loom number (e.g. 14), operator..."
-            className="w-full pl-9 pr-3 py-1.5 text-xs font-medium bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-slate-800 focus:bg-white transition-colors"
+            placeholder="Search quality code, loom number (e.g. 14)..."
+            className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200/90 rounded-lg outline-none focus:border-slate-800 focus:bg-white transition-colors"
           />
         </div>
       </div>
 
       {/* ======================================================== */}
-      {/* VIEW 1: RECIPE-WISE ALLOCATION SCHEDULE                  */}
+      {/* 4. VIEW 1: RECIPE-WISE ALLOCATION SCHEDULE               */}
       {/* ======================================================== */}
       {activeView === "recipes" && (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-2xs overflow-hidden">
-          <div className="px-5 py-3.5 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3 bg-slate-50/50">
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
-                  Recipe Formulation Allocations ({recipeList.length} Qualities)
-                </h3>
-                <span className="px-2 py-0.5 bg-blue-50 text-blue-700 text-[10px] font-bold rounded border border-blue-200">
-                  Manual Loom Mapping
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-500">
-                Direct quality-to-loom machine assignments with shop-floor dispenses
-              </p>
-            </div>
-            
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => handleOpenBulkRecipeModal()}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-700 hover:bg-blue-800 text-white text-xs font-bold rounded-lg shadow-xs transition-colors cursor-pointer"
-                title="Assign loom numbers to any recipe quality"
-              >
-                <PlusCircle className="h-3.5 w-3.5" />
-                <span>Assign Quality to Looms</span>
-              </button>
-            </div>
-          </div>
-
+        <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[950px] text-xs">
+            <table className="w-full text-left border-collapse min-w-[800px] text-xs">
               <thead>
-                <tr className="bg-slate-50/75 border-b border-slate-200 text-[11px] font-medium text-slate-600 uppercase tracking-wider">
-                  <th className="py-2.5 px-3 w-10 text-center">#</th>
-                  <th className="py-2.5 px-3">Recipe Quality</th>
-                  <th className="py-2.5 px-3 text-center">Total Looms</th>
-                  <th className="py-2.5 px-3">Assigned Loom Machines</th>
+                <tr className="bg-slate-50/80 border-b border-slate-200 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                  <th className="py-2.5 px-3.5 w-10 text-center">#</th>
+                  <th className="py-2.5 px-3.5">Recipe Quality</th>
+                  <th className="py-2.5 px-3 text-center w-24">Looms</th>
+                  <th className="py-2.5 px-3.5">Assigned Loom Numbers</th>
                   <th className="py-2.5 px-3 text-right">Crates</th>
-                  <th className="py-2.5 px-3 text-right">Bobbins</th>
-                  <th className="py-2.5 px-3 text-right">Dispatched Weight</th>
-                  <th className="py-2.5 px-3 text-center">Status / Date</th>
-                  <th className="py-2.5 px-3 text-center w-28">Actions</th>
+                  <th className="py-2.5 px-3 text-right">Weight</th>
+                  <th className="py-2.5 px-3 text-right w-24">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs text-slate-700">
                 {loading ? (
                   <tr>
-                    <td colSpan={9} className="py-12 text-center text-slate-500">
+                    <td colSpan={7} className="py-12 text-center text-slate-400">
                       <div className="inline-flex items-center gap-2">
-                        <RefreshCw className="h-4 w-4 animate-spin text-slate-600" />
-                        <span>Loading recipe allocations...</span>
+                        <RefreshCw className="h-4 w-4 animate-spin text-slate-500" />
+                        <span>Loading assignments...</span>
                       </div>
                     </td>
                   </tr>
                 ) : recipeList.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="py-12 text-center">
-                      <div className="max-w-md mx-auto flex flex-col items-center justify-center p-4">
-                        <div className="p-3 bg-slate-100 text-slate-400 rounded-xl mb-2.5">
-                          <Layers className="h-6 w-6" />
+                    <td colSpan={7} className="py-12 text-center">
+                      <div className="max-w-sm mx-auto flex flex-col items-center justify-center p-4 text-center">
+                        <div className="h-10 w-10 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mb-2.5">
+                          <Layers className="h-5 w-5" />
                         </div>
-                        <h3 className="text-xs font-semibold text-slate-800">No Recipe Allocations Found</h3>
-                        <p className="text-[11px] text-slate-500 mt-0.5 text-center">
-                          {search
-                            ? `No recipe records matching "${search}".`
-                            : "No loom machine allocations configured yet. Click below to assign looms to a quality."}
+                        <h3 className="text-xs font-semibold text-slate-900">No Loom Allocations Configured</h3>
+                        <p className="text-[11px] text-slate-500 mt-1">
+                          No recipe qualities are currently assigned to looms. Click below to manually assign looms to a quality.
                         </p>
                         <button
                           type="button"
                           onClick={() => handleOpenBulkRecipeModal()}
-                          className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-700 hover:bg-blue-800 text-white text-xs font-bold rounded-lg shadow-xs transition-colors cursor-pointer"
+                          className="mt-3.5 inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-lg shadow-2xs transition-colors cursor-pointer"
                         >
-                          <PlusCircle className="h-3.5 w-3.5" />
-                          <span>Assign Looms to Quality</span>
+                          <Plus className="h-3.5 w-3.5" />
+                          <span>Assign First Quality</span>
                         </button>
                       </div>
                     </td>
                   </tr>
                 ) : (
                   recipeList.map((item, idx) => (
-                    <tr key={item.recipeQuality} className="hover:bg-slate-50/70 transition-colors group">
-                      <td className="py-3 px-3 text-center text-slate-400 font-mono text-[11px]">{idx + 1}</td>
+                    <tr key={item.recipeQuality} className="hover:bg-slate-50/60 transition-colors group">
+                      <td className="py-3 px-3.5 text-center text-slate-400 font-mono text-[11px]">
+                        {idx + 1}
+                      </td>
 
-                      <td className="py-3 px-3">
+                      <td className="py-3 px-3.5">
                         <RecipeQualityBadge value={item.recipeQuality} />
                       </td>
 
-                      <td className="py-3 px-3 text-center font-mono font-bold text-slate-900">
-                        <span className={`inline-block px-2 py-0.5 rounded border ${
-                          item.totalLoomsCount > 0 
-                            ? "bg-emerald-50 text-emerald-800 border-emerald-200 font-bold" 
-                            : "bg-slate-100 text-slate-500 border-slate-200"
-                        }`}>
+                      <td className="py-3 px-3 text-center">
+                        <span className="inline-block px-2 py-0.5 rounded bg-slate-100 text-slate-800 font-bold font-mono text-[11px] border border-slate-200">
                           {item.totalLoomsCount} {item.totalLoomsCount === 1 ? "Loom" : "Looms"}
                         </span>
                       </td>
 
-                      <td className="py-3 px-3 font-mono">
-                        <div className="flex flex-wrap gap-1 max-w-sm">
-                          {item.assignedLooms.length > 0 ? (
-                            item.assignedLooms.map((loomNo) => (
-                              <button
-                                key={loomNo}
-                                type="button"
-                                onClick={() => handleOpenSingleLoomModal(loomNo)}
-                                className="px-1.5 py-0.5 bg-blue-50 hover:bg-blue-100 text-blue-800 font-bold text-[11px] rounded border border-blue-200 transition-colors cursor-pointer"
-                                title={`Click to edit assignment for Loom #${loomNo}`}
-                              >
-                                #{loomNo}
-                              </button>
-                            ))
-                          ) : (
-                            <span className="text-slate-400 italic text-[11px]">No looms assigned</span>
-                          )}
+                      <td className="py-3 px-3.5 font-mono">
+                        <div className="flex flex-wrap gap-1 max-w-md">
+                          {item.assignedLooms.map((loomNo) => (
+                            <button
+                              key={loomNo}
+                              type="button"
+                              onClick={() => handleOpenSingleLoomModal(loomNo)}
+                              className="px-1.5 py-0.5 bg-slate-100 hover:bg-blue-100 text-slate-800 hover:text-blue-900 font-semibold text-[11px] rounded border border-slate-200 hover:border-blue-300 transition-colors cursor-pointer"
+                              title={`Click to edit Loom #${loomNo}`}
+                            >
+                              #{loomNo}
+                            </button>
+                          ))}
                         </div>
                       </td>
 
-                      <td className="py-3 px-3 text-right font-mono font-semibold text-purple-900">
+                      <td className="py-3 px-3 text-right font-mono font-medium text-slate-800">
                         {item.totalCratesIssued > 0 ? (
-                          `${item.totalCratesIssued.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 })} c`
+                          `${item.totalCratesIssued.toFixed(1)} c`
                         ) : (
-                          <span className="text-slate-300 font-normal">—</span>
+                          <span className="text-slate-300">—</span>
                         )}
                       </td>
 
-                      <td className="py-3 px-3 text-right font-mono font-semibold text-blue-900">
-                        {item.totalBobbinsIssued > 0 ? (
-                          `${item.totalBobbinsIssued.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 })} pcs`
-                        ) : (
-                          <span className="text-slate-300 font-normal">—</span>
-                        )}
-                      </td>
-
-                      <td className="py-3 px-3 text-right font-mono font-bold text-emerald-800">
+                      <td className="py-3 px-3 text-right font-mono font-medium text-slate-800">
                         {item.totalWeightIssuedKg > 0 ? (
-                          `${item.totalWeightIssuedKg.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kg`
+                          `${item.totalWeightIssuedKg.toFixed(1)} kg`
                         ) : (
-                          <span className="text-slate-300 font-normal">—</span>
+                          <span className="text-slate-300">—</span>
                         )}
                       </td>
 
-                      <td className="py-3 px-3 text-center font-mono text-[11px] text-slate-800">
-                        {item.latestIssueDate || "Assigned"}
-                      </td>
-
-                      <td className="py-3 px-3 text-center">
-                        <button
-                          type="button"
-                          onClick={() => handleOpenBulkRecipeModal(item.recipeQuality)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 hover:text-blue-800 font-bold text-[11px] rounded-md border border-blue-200 transition-colors cursor-pointer"
-                          title={`Assign or change loom machines for ${item.recipeQuality}`}
-                        >
-                          <Edit3 className="h-3 w-3" />
-                          <span>Assign Looms</span>
-                        </button>
+                      <td className="py-3 px-3 text-right">
+                        <div className="inline-flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenBulkRecipeModal(item.recipeQuality)}
+                            className="p-1.5 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors cursor-pointer"
+                            title="Edit assigned looms"
+                          >
+                            <Edit2 className="h-3.5 w-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteRecipeMapping(item.recipeQuality)}
+                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors cursor-pointer"
+                            title="Delete this quality allocation"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -830,237 +737,144 @@ export function LoomSummarySection() {
       )}
 
       {/* ======================================================== */}
-      {/* VIEW 2: LOOM-WISE VIEW (LOOMS 1 TO 91 STATUS & MATRIX)    */}
+      {/* 5. VIEW 2: LOOM-WISE VIEW (1–91 SHED MATRIX & TABLE)     */}
       {/* ======================================================== */}
       {activeView === "looms" && (
-        <div className="space-y-4">
+        <div className="space-y-3.5">
           {/* Visual Interactive Loom Chips Grid */}
-          <div className="bg-white p-4 sm:p-5 rounded-xl border border-slate-200 shadow-2xs space-y-3">
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-2.5">
-              <div>
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
-                  Circular Loom Shed Machine Grid (Click any Loom to Assign Quality)
-                </h3>
-                <p className="text-[11px] text-slate-500">
-                  {loomStatusFilter === "ACTIVE_ONLY"
-                    ? `Showing active assigned machines (${displayedLoomList.length} of 91)`
-                    : "Showing all 91 circular looms. Click on any loom machine tile to manually assign quality."}
-                </p>
+          <div className="bg-white p-4 rounded-xl border border-slate-200/90 shadow-2xs space-y-2.5">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-slate-900">
+                  Loom Shed Machine Grid (1–91)
+                </span>
+                <span className="text-[11px] text-slate-400">
+                  • Click any machine to assign or edit
+                </span>
               </div>
 
-              {/* Active Looms Toggle Filter */}
-              <div className="flex flex-wrap items-center gap-2">
-                <div className="inline-flex rounded-lg bg-slate-100 p-0.5 text-xs font-semibold">
-                  <button
-                    type="button"
-                    onClick={() => setLoomStatusFilter("ALL")}
-                    className={`px-3 py-1 rounded-md transition-all cursor-pointer ${
-                      loomStatusFilter === "ALL"
-                        ? "bg-white text-slate-900 shadow-2xs font-bold"
-                        : "text-slate-600 hover:text-slate-900"
-                    }`}
-                  >
-                    All 91 Looms
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setLoomStatusFilter("ACTIVE_ONLY")}
-                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-md transition-all cursor-pointer ${
-                      loomStatusFilter === "ACTIVE_ONLY"
-                        ? "bg-emerald-700 text-white shadow-2xs font-bold"
-                        : "text-slate-600 hover:text-emerald-800"
-                    }`}
-                  >
-                    <span className={`h-2 w-2 rounded-full ${loomStatusFilter === "ACTIVE_ONLY" ? "bg-white" : "bg-emerald-500"} inline-block`} />
-                    <span>Active Looms Only ({kpis?.activeLoomsCount ?? 0})</span>
-                  </button>
-                </div>
-
-                <div className="hidden sm:flex items-center gap-2 text-[11px] text-slate-500 pl-1">
-                  <span>{kpis?.idleLoomsCount ?? 0} idle</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Loom Machines Chip Grid */}
-            {displayedLoomList.length === 0 ? (
-              <div className="py-8 text-center bg-slate-50 rounded-lg border border-dashed border-slate-200 p-4">
-                <p className="text-xs font-medium text-slate-600">No active running looms found for the selected filters.</p>
+              {/* Status Filter */}
+              <div className="inline-flex rounded-lg bg-slate-100 p-0.5 text-xs font-medium">
                 <button
                   type="button"
                   onClick={() => setLoomStatusFilter("ALL")}
-                  className="mt-2 text-xs text-blue-700 font-semibold hover:underline cursor-pointer"
+                  className={`px-2.5 py-0.5 rounded transition-all cursor-pointer ${
+                    loomStatusFilter === "ALL" ? "bg-white text-slate-900 shadow-2xs font-semibold" : "text-slate-600"
+                  }`}
                 >
-                  View All 91 Looms
+                  All (91)
                 </button>
-              </div>
-            ) : (
-              <div className="grid grid-cols-6 sm:grid-cols-10 md:grid-cols-13 gap-1.5 max-h-80 overflow-y-auto p-1">
-                {displayedLoomList.map((loom) => {
-                  const isFiltered = selectedLoomFilter === String(loom.loomNumber);
-                  return (
-                    <button
-                      key={loom.loomNumber}
-                      type="button"
-                      onClick={() => handleOpenSingleLoomModal(loom.loomNumber)}
-                      className={`p-1.5 rounded-lg border text-center transition-all cursor-pointer flex flex-col items-center justify-center relative group ${
-                        isFiltered
-                          ? "bg-slate-900 text-white border-slate-900 shadow-md ring-2 ring-slate-800"
-                          : loom.isActive
-                          ? "bg-emerald-50 hover:bg-emerald-100 border-emerald-300 text-emerald-900 font-bold hover:shadow-xs"
-                          : "bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-400 font-medium hover:border-slate-400 hover:text-slate-700"
-                      }`}
-                      title={
-                        loom.isActive
-                          ? `Loom #${loom.loomNumber}: ${loom.activeRecipe} (Click to change quality or unassign)`
-                          : `Loom #${loom.loomNumber}: Idle (Click to manually assign quality)`
-                      }
-                    >
-                      <span className="text-[11px] font-mono font-bold leading-none">
-                        #{loom.loomNumber}
-                      </span>
-                      <span className="text-[8px] font-mono leading-none mt-1 truncate max-w-full">
-                        {loom.isActive ? (loom.activeRecipe?.split("/")[0] || "Active") : "Idle"}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* Loom Table List */}
-          <div className="bg-white rounded-xl border border-slate-200 shadow-2xs overflow-hidden">
-            <div className="px-5 py-3.5 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3 bg-slate-50/50">
-              <div>
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
-                  Loom Machines Status & Assigned Recipe ({displayedLoomList.length} {displayedLoomList.length === 1 ? "Machine" : "Machines"})
-                </h3>
-                <p className="text-[11px] text-slate-500">
-                  Manual quality assignments, status, and crate totals for each circular loom
-                </p>
-              </div>
-              <div className="flex items-center gap-3 text-xs">
-                {loomStatusFilter === "ACTIVE_ONLY" && (
-                  <span className="px-2 py-0.5 bg-emerald-50 text-emerald-800 font-bold text-[10px] rounded border border-emerald-200">
-                    Active Only Filter
-                  </span>
-                )}
-                {(selectedLoomFilter !== "ALL" || loomStatusFilter !== "ALL") && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedLoomFilter("ALL");
-                      setLoomStatusFilter("ALL");
-                    }}
-                    className="text-[11px] text-blue-700 hover:underline font-semibold cursor-pointer"
-                  >
-                    Reset & Show All 91 Looms
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={() => setLoomStatusFilter("ACTIVE_ONLY")}
+                  className={`px-2.5 py-0.5 rounded transition-all cursor-pointer ${
+                    loomStatusFilter === "ACTIVE_ONLY" ? "bg-white text-slate-900 shadow-2xs font-semibold" : "text-slate-600"
+                  }`}
+                >
+                  Active ({kpis?.activeLoomsCount ?? 0})
+                </button>
               </div>
             </div>
 
+            {/* 1–91 Grid */}
+            <div className="grid grid-cols-7 sm:grid-cols-10 md:grid-cols-13 gap-1.5 max-h-72 overflow-y-auto p-0.5">
+              {displayedLoomList.map((loom) => {
+                const isFiltered = selectedLoomFilter === String(loom.loomNumber);
+                return (
+                  <button
+                    key={loom.loomNumber}
+                    type="button"
+                    onClick={() => handleOpenSingleLoomModal(loom.loomNumber)}
+                    className={`p-1.5 rounded-lg border text-center transition-all cursor-pointer flex flex-col items-center justify-center ${
+                      isFiltered
+                        ? "bg-slate-900 text-white border-slate-900 shadow-xs ring-2 ring-slate-800"
+                        : loom.isActive
+                        ? "bg-emerald-50/80 hover:bg-emerald-100 border-emerald-300 text-emerald-900 font-bold"
+                        : "bg-slate-50/70 hover:bg-slate-100 border-slate-200 text-slate-400 font-medium"
+                    }`}
+                    title={
+                      loom.isActive
+                        ? `Loom #${loom.loomNumber}: ${loom.activeRecipe} (Click to edit)`
+                        : `Loom #${loom.loomNumber}: Idle (Click to assign)`
+                    }
+                  >
+                    <span className="text-[11px] font-mono font-bold leading-none">
+                      #{loom.loomNumber}
+                    </span>
+                    <span className="text-[7px] font-mono leading-none mt-1 truncate max-w-full">
+                      {loom.isActive ? (loom.activeRecipe?.split("/")[0] || "Active") : "Idle"}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Detailed Loom Machine Table */}
+          <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse min-w-[900px] text-xs">
+              <table className="w-full text-left border-collapse min-w-[800px] text-xs">
                 <thead>
-                  <tr className="bg-slate-50/75 border-b border-slate-200 text-[11px] font-medium text-slate-600 uppercase tracking-wider">
-                    <th className="py-2.5 px-3 w-16 text-center">Loom #</th>
-                    <th className="py-2.5 px-3 text-center w-24">Status</th>
-                    <th className="py-2.5 px-3">Assigned Recipe Quality</th>
+                  <tr className="bg-slate-50/80 border-b border-slate-200 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                    <th className="py-2.5 px-3.5 w-16 text-center">Loom #</th>
+                    <th className="py-2.5 px-3 text-center w-20">Status</th>
+                    <th className="py-2.5 px-3.5">Assigned Quality</th>
                     <th className="py-2.5 px-3 text-right">Crates</th>
                     <th className="py-2.5 px-3 text-right">Weight</th>
-                    <th className="py-2.5 px-3 text-center">Latest Date</th>
-                    <th className="py-2.5 px-3">Latest Shift</th>
-                    <th className="py-2.5 px-3 text-center w-24">Action</th>
+                    <th className="py-2.5 px-3 text-center w-20">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-xs text-slate-700">
-                  {loading ? (
-                    <tr>
-                      <td colSpan={8} className="py-12 text-center text-slate-500">
-                        <div className="inline-flex items-center gap-2">
-                          <RefreshCw className="h-4 w-4 animate-spin text-slate-600" />
-                          <span>Loading machines...</span>
-                        </div>
+                  {displayedLoomList.map((loom) => (
+                    <tr
+                      key={loom.loomNumber}
+                      className={`hover:bg-slate-50/60 transition-colors ${
+                        loom.isActive ? "bg-white" : "bg-slate-50/20 text-slate-400"
+                      }`}
+                    >
+                      <td className="py-2.5 px-3.5 text-center font-mono font-semibold text-slate-900">
+                        #{loom.loomNumber}
+                      </td>
+
+                      <td className="py-2.5 px-3 text-center">
+                        <span
+                          className={`inline-block px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${
+                            loom.isActive
+                              ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
+                              : "bg-slate-100 text-slate-400 border border-slate-200"
+                          }`}
+                        >
+                          {loom.isActive ? "ACTIVE" : "IDLE"}
+                        </span>
+                      </td>
+
+                      <td className="py-2.5 px-3.5">
+                        {loom.activeRecipe ? (
+                          <RecipeQualityBadge value={loom.activeRecipe} />
+                        ) : (
+                          <span className="text-slate-400 italic text-[11px]">Unassigned</span>
+                        )}
+                      </td>
+
+                      <td className="py-2.5 px-3 text-right font-mono text-slate-700">
+                        {loom.totalCrates > 0 ? `${loom.totalCrates.toFixed(1)} c` : "—"}
+                      </td>
+
+                      <td className="py-2.5 px-3 text-right font-mono text-slate-700">
+                        {loom.totalWeightKg > 0 ? `${loom.totalWeightKg.toFixed(1)} kg` : "—"}
+                      </td>
+
+                      <td className="py-2.5 px-3 text-center">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenSingleLoomModal(loom.loomNumber)}
+                          className="px-2 py-0.5 text-[11px] font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded border border-slate-200 transition-colors cursor-pointer"
+                        >
+                          Edit
+                        </button>
                       </td>
                     </tr>
-                  ) : displayedLoomList.length === 0 ? (
-                    <tr>
-                      <td colSpan={8} className="py-12 text-center text-slate-500">
-                        No loom machine records found matching the current filters.
-                      </td>
-                    </tr>
-                  ) : (
-                    displayedLoomList.map((loom) => (
-                      <tr
-                        key={loom.loomNumber}
-                        className={`hover:bg-slate-50/70 transition-colors ${
-                          loom.isActive ? "bg-white" : "bg-slate-50/30"
-                        }`}
-                      >
-                        <td className="py-2.5 px-3 text-center font-mono font-bold text-slate-900 text-xs">
-                          #{loom.loomNumber}
-                        </td>
-
-                        <td className="py-2.5 px-3 text-center">
-                          <span
-                            className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                              loom.isActive
-                                ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
-                                : "bg-slate-100 text-slate-500 border border-slate-200"
-                            }`}
-                          >
-                            {loom.isActive ? "RUNNING" : "IDLE"}
-                          </span>
-                        </td>
-
-                        <td className="py-2.5 px-3">
-                          {loom.activeRecipe ? (
-                            <RecipeQualityBadge value={loom.activeRecipe} />
-                          ) : (
-                            <span className="text-slate-400 italic text-[11px]">Unassigned / Idle</span>
-                          )}
-                        </td>
-
-                        <td className="py-2.5 px-3 text-right font-mono font-semibold text-purple-900">
-                          {loom.totalCrates > 0 ? (
-                            `${loom.totalCrates.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 })} c`
-                          ) : (
-                            <span className="text-slate-300 font-normal">—</span>
-                          )}
-                        </td>
-
-                        <td className="py-2.5 px-3 text-right font-mono font-bold text-emerald-800">
-                          {loom.totalWeightKg > 0 ? (
-                            `${loom.totalWeightKg.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kg`
-                          ) : (
-                            <span className="text-slate-300 font-normal">—</span>
-                          )}
-                        </td>
-
-                        <td className="py-2.5 px-3 text-center font-mono text-[11px] text-slate-700">
-                          {loom.latestDate || "—"}
-                        </td>
-
-                        <td className="py-2.5 px-3 text-[11px] text-slate-700">
-                          {loom.latestShiftName || "—"}
-                        </td>
-
-                        <td className="py-2.5 px-3 text-center">
-                          <button
-                            type="button"
-                            onClick={() => handleOpenSingleLoomModal(loom.loomNumber)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px] rounded transition-colors cursor-pointer"
-                            title={`Assign or change quality for Loom #${loom.loomNumber}`}
-                          >
-                            <Edit3 className="h-3 w-3" />
-                            <span>Assign</span>
-                          </button>
-                        </td>
-                      </tr>
-                    ))
-                  )}
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -1069,78 +883,45 @@ export function LoomSummarySection() {
       )}
 
       {/* ======================================================== */}
-      {/* MODAL 1: SINGLE LOOM MANUAL ASSIGNMENT MODAL             */}
+      {/* MODAL 1: SINGLE LOOM QUICK ASSIGN MODAL                  */}
       {/* ======================================================== */}
       {singleLoomModalOpen && assigningLoomNumber !== null && (
-        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-xl border border-slate-200 max-w-md w-full overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-            {/* Modal Header */}
-            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
-              <div className="flex items-center gap-2.5">
-                <div className="h-8 w-8 rounded-lg bg-blue-700 text-white flex items-center justify-center font-mono font-bold text-sm">
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-2xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-xl border border-slate-200 max-w-md w-full overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+            <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between bg-slate-50/60">
+              <div className="flex items-center gap-2">
+                <span className="font-mono font-bold text-sm bg-slate-900 text-white px-2 py-0.5 rounded">
                   #{assigningLoomNumber}
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900">
-                    Assign Quality to Loom #{assigningLoomNumber}
-                  </h3>
-                  <p className="text-[11px] text-slate-500">
-                    Manual shop-floor recipe quality allocation
-                  </p>
-                </div>
+                </span>
+                <h3 className="text-sm font-semibold text-slate-900">
+                  Assign Quality to Loom #{assigningLoomNumber}
+                </h3>
               </div>
               <button
                 type="button"
                 onClick={() => setSingleLoomModalOpen(false)}
-                className="text-slate-400 hover:text-slate-700 p-1 rounded-lg hover:bg-slate-200/50 transition-colors"
+                className="text-slate-400 hover:text-slate-700 p-1 rounded-lg"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
-            {/* Modal Body */}
-            <div className="p-5 space-y-4">
-              {/* Current Status Preview */}
-              <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
-                <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block mb-1">
-                  Current Loom Status
-                </span>
-                {rawLoomList.find((l) => l.loomNumber === assigningLoomNumber)?.activeRecipe ? (
-                  <div className="flex items-center justify-between">
-                    <RecipeQualityBadge
-                      value={rawLoomList.find((l) => l.loomNumber === assigningLoomNumber)?.activeRecipe || ""}
-                    />
-                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                      RUNNING
-                    </span>
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-slate-500 italic">Unassigned (Idle Machine)</span>
-                    <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
-                      IDLE
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              {/* Quality Selector */}
+            <div className="p-5 space-y-3.5">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                  Select Recipe Quality to Assign:
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  Select Recipe Quality:
                 </label>
                 <select
                   value={assigningQualityCode}
                   onChange={(e) => setAssigningQualityCode(e.target.value)}
-                  className="w-full px-3 py-2 text-xs font-medium bg-white border border-slate-300 rounded-lg outline-none focus:border-blue-700 focus:ring-1 focus:ring-blue-700"
+                  className="w-full px-3 py-2 text-xs font-medium bg-white border border-slate-200 rounded-lg outline-none focus:border-slate-800"
                 >
-                  <option value="">-- Select Recipe Quality --</option>
+                  <option value="">-- Choose Quality --</option>
                   {availableRecipes.map((r) => (
                     <option key={r.id} value={r.code}>
                       {r.code} {r.denier ? `(${r.denier}D / ${r.colour || "White"})` : ""}
                     </option>
                   ))}
-                  {/* Also list any active recipe from existing recipe summaries if not in availableRecipes */}
                   {recipeList
                     .filter((r) => !availableRecipes.some((ar) => ar.code.toLowerCase() === r.recipeQuality.toLowerCase()))
                     .map((r) => (
@@ -1149,30 +930,25 @@ export function LoomSummarySection() {
                       </option>
                     ))}
                 </select>
-                <p className="text-[10px] text-slate-400 mt-1">
-                  Assigning this quality will associate Loom #{assigningLoomNumber} with this recipe.
-                </p>
               </div>
             </div>
 
-            {/* Modal Footer */}
-            <div className="px-5 py-3.5 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-2">
+            <div className="px-5 py-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-2">
               <button
                 type="button"
                 onClick={handleUnassignSingleLoom}
                 disabled={isSubmittingSingleAssign}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer border border-rose-200"
-                title="Unassign this loom and set to Idle"
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs text-rose-600 hover:bg-rose-50 rounded-lg border border-rose-200 transition-colors cursor-pointer"
               >
                 <Trash2 className="h-3.5 w-3.5" />
-                <span>Set Idle (Unassign)</span>
+                <span>Unassign (Set Idle)</span>
               </button>
 
               <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => setSingleLoomModalOpen(false)}
-                  className="px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-200/60 rounded-lg transition-colors cursor-pointer"
+                  className="px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-100 rounded-lg cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -1180,10 +956,10 @@ export function LoomSummarySection() {
                   type="button"
                   onClick={() => handleSaveSingleLoomAssign()}
                   disabled={isSubmittingSingleAssign || !assigningQualityCode.trim()}
-                  className="inline-flex items-center gap-1.5 px-4 py-1.5 bg-blue-700 hover:bg-blue-800 disabled:opacity-50 text-white text-xs font-bold rounded-lg shadow-xs transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white text-xs font-semibold rounded-lg shadow-2xs cursor-pointer"
                 >
                   <Check className="h-3.5 w-3.5" />
-                  <span>{isSubmittingSingleAssign ? "Saving..." : "Save Assignment"}</span>
+                  <span>{isSubmittingSingleAssign ? "Saving..." : "Save"}</span>
                 </button>
               </div>
             </div>
@@ -1195,43 +971,33 @@ export function LoomSummarySection() {
       {/* MODAL 2: BULK RECIPE LOOM ALLOCATOR MODAL                 */}
       {/* ======================================================== */}
       {bulkRecipeModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-2xl border border-slate-200 max-w-2xl w-full overflow-hidden animate-in fade-in zoom-in-95 duration-150 max-h-[92vh] flex flex-col">
-            {/* Modal Header */}
-            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50 shrink-0">
-              <div className="flex items-center gap-2.5">
-                <div className="h-9 w-9 rounded-lg bg-blue-700 text-white flex items-center justify-center shadow-xs">
-                  <SlidersHorizontal className="h-5 w-5" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900">
-                    Manual Quality-to-Loom Allocation
-                  </h3>
-                  <p className="text-[11px] text-slate-500">
-                    Select a recipe quality and toggle circular looms 1–91 to allocate
-                  </p>
-                </div>
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-2xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl border border-slate-200 max-w-2xl w-full overflow-hidden animate-in fade-in zoom-in-95 duration-100 max-h-[90vh] flex flex-col">
+            <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between bg-slate-50/60 shrink-0">
+              <div className="flex items-center gap-2">
+                <SlidersHorizontal className="h-4 w-4 text-slate-700" />
+                <h3 className="text-sm font-semibold text-slate-900">
+                  Manual Loom Allocation
+                </h3>
               </div>
               <button
                 type="button"
                 onClick={() => setBulkRecipeModalOpen(false)}
-                className="text-slate-400 hover:text-slate-700 p-1 rounded-lg hover:bg-slate-200/50 transition-colors cursor-pointer"
+                className="text-slate-400 hover:text-slate-700 p-1 rounded-lg"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
-            {/* Modal Body */}
             <div className="p-5 space-y-4 overflow-y-auto flex-1">
-              {/* Recipe Selector */}
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                   Recipe Quality Formulation:
                 </label>
                 <select
                   value={bulkSelectedRecipe}
                   onChange={(e) => handleSelectRecipeInBulkModal(e.target.value)}
-                  className="w-full px-3 py-2 text-xs font-medium bg-white border border-slate-300 rounded-lg outline-none focus:border-blue-700 focus:ring-1 focus:ring-blue-700"
+                  className="w-full px-3 py-2 text-xs font-medium bg-white border border-slate-200 rounded-lg outline-none focus:border-slate-800"
                 >
                   {availableRecipes.map((r) => (
                     <option key={r.id} value={r.code}>
@@ -1248,31 +1014,31 @@ export function LoomSummarySection() {
                 </select>
               </div>
 
-              {/* Quick Range Selector Buttons */}
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between text-[11px]">
-                  <span className="font-bold text-slate-700">
-                    Click Looms to Toggle Allocation ({bulkSelectedLooms.length} Selected):
+              {/* Looms Interactive Grid */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-medium text-slate-700">
+                    Allocated Looms: <strong>{bulkSelectedLooms.length}</strong> of 91
                   </span>
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1">
                     <button
                       type="button"
                       onClick={() => setBulkSelectedLooms(Array.from({ length: 91 }, (_, i) => i + 1))}
-                      className="px-2 py-0.5 text-[10px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded transition-colors cursor-pointer"
+                      className="px-2 py-0.5 text-[10px] text-slate-600 hover:text-slate-900 bg-slate-100 rounded cursor-pointer"
                     >
-                      All 1-91
+                      All 91
                     </button>
                     <button
                       type="button"
                       onClick={() => setBulkSelectedLooms([])}
-                      className="px-2 py-0.5 text-[10px] font-bold bg-slate-100 hover:bg-slate-200 text-rose-700 rounded transition-colors cursor-pointer"
+                      className="px-2 py-0.5 text-[10px] text-rose-600 hover:bg-rose-50 rounded cursor-pointer"
                     >
-                      Clear Selection
+                      Clear
                     </button>
                   </div>
                 </div>
 
-                {/* Range Pills */}
+                {/* Range Buttons */}
                 <div className="flex flex-wrap gap-1">
                   {[
                     [1, 10],
@@ -1289,84 +1055,74 @@ export function LoomSummarySection() {
                       key={`${start}-${end}`}
                       type="button"
                       onClick={() => handleSelectLoomRange(start, end)}
-                      className="px-2 py-0.5 text-[10px] font-medium bg-slate-50 hover:bg-blue-50 hover:text-blue-700 text-slate-600 border border-slate-200 rounded transition-colors cursor-pointer"
+                      className="px-2 py-0.5 text-[10px] bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200 rounded cursor-pointer"
                     >
                       +{start}..{end}
                     </button>
                   ))}
                 </div>
-              </div>
 
-              {/* 1-91 Interactive Grid */}
-              <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
-                <div className="grid grid-cols-7 sm:grid-cols-10 md:grid-cols-13 gap-1.5 max-h-64 overflow-y-auto p-0.5">
-                  {Array.from({ length: 91 }, (_, i) => i + 1).map((loomNo) => {
-                    const isSelected = bulkSelectedLooms.includes(loomNo);
-                    const currentOwner = rawLoomList.find((l) => l.loomNumber === loomNo)?.activeRecipe;
-                    const isOtherOwner = currentOwner && currentOwner.toLowerCase() !== bulkSelectedRecipe.toLowerCase();
+                {/* 1–91 Grid */}
+                <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                  <div className="grid grid-cols-7 sm:grid-cols-10 md:grid-cols-13 gap-1.5 max-h-56 overflow-y-auto p-0.5">
+                    {Array.from({ length: 91 }, (_, i) => i + 1).map((loomNo) => {
+                      const isSelected = bulkSelectedLooms.includes(loomNo);
+                      const currentOwner = rawLoomList.find((l) => l.loomNumber === loomNo)?.activeRecipe;
+                      const isOtherOwner = currentOwner && currentOwner.toLowerCase() !== bulkSelectedRecipe.toLowerCase();
 
-                    return (
-                      <button
-                        key={loomNo}
-                        type="button"
-                        onClick={() => handleToggleBulkLoom(loomNo)}
-                        className={`p-1.5 rounded-lg border text-center transition-all cursor-pointer flex flex-col items-center justify-center ${
-                          isSelected
-                            ? "bg-blue-700 text-white border-blue-800 shadow-xs font-bold ring-2 ring-blue-600"
-                            : isOtherOwner
-                            ? "bg-amber-50 hover:bg-amber-100 border-amber-300 text-amber-900 font-semibold"
-                            : "bg-white hover:bg-slate-100 border-slate-200 text-slate-600 font-medium"
-                        }`}
-                        title={
-                          isSelected
-                            ? `Loom #${loomNo}: Selected for ${bulkSelectedRecipe}`
-                            : isOtherOwner
-                            ? `Loom #${loomNo}: Currently on ${currentOwner} (Click to reassign to ${bulkSelectedRecipe})`
-                            : `Loom #${loomNo}: Idle (Click to assign)`
-                        }
-                      >
-                        <span className="text-[11px] font-mono font-bold leading-none">
-                          #{loomNo}
-                        </span>
-                        <span className="text-[7px] font-mono leading-none mt-1 truncate max-w-full">
-                          {isSelected ? "Selected" : isOtherOwner ? "Other" : "Idle"}
-                        </span>
-                      </button>
-                    );
-                  })}
+                      return (
+                        <button
+                          key={loomNo}
+                          type="button"
+                          onClick={() => handleToggleBulkLoom(loomNo)}
+                          className={`p-1.5 rounded-lg border text-center transition-all cursor-pointer flex flex-col items-center justify-center ${
+                            isSelected
+                              ? "bg-slate-900 text-white border-slate-900 shadow-2xs font-bold"
+                              : isOtherOwner
+                              ? "bg-amber-50 hover:bg-amber-100 border-amber-300 text-amber-900 font-medium"
+                              : "bg-white hover:bg-slate-100 border-slate-200 text-slate-600 font-medium"
+                          }`}
+                          title={
+                            isSelected
+                              ? `Loom #${loomNo}: Selected for ${bulkSelectedRecipe}`
+                              : isOtherOwner
+                              ? `Loom #${loomNo}: Assigned to ${currentOwner}`
+                              : `Loom #${loomNo}: Idle`
+                          }
+                        >
+                          <span className="text-[11px] font-mono font-bold leading-none">
+                            #{loomNo}
+                          </span>
+                          <span className="text-[7px] font-mono leading-none mt-1 truncate max-w-full">
+                            {isSelected ? "Selected" : isOtherOwner ? "Other" : "Idle"}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-
-              <div className="flex items-center gap-3 text-[11px] text-slate-500 pt-1">
-                <span className="flex items-center gap-1">
-                  <span className="h-2.5 w-2.5 rounded bg-blue-700 inline-block" /> Selected for this recipe
-                </span>
-                <span className="flex items-center gap-1">
-                  <span className="h-2.5 w-2.5 rounded bg-amber-200 border border-amber-400 inline-block" /> Assigned to other recipe
-                </span>
-                <span className="flex items-center gap-1">
-                  <span className="h-2.5 w-2.5 rounded bg-white border border-slate-300 inline-block" /> Idle / Unassigned
-                </span>
               </div>
             </div>
 
-            {/* Modal Footer */}
-            <div className="px-5 py-3.5 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-2 shrink-0">
+            <div className="px-5 py-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-2 shrink-0">
               <button
                 type="button"
-                onClick={handleClearBulkRecipeLooms}
-                disabled={isSubmittingBulkAssign}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer border border-rose-200"
+                onClick={() => {
+                  if (confirm(`Remove all loom allocations for "${bulkSelectedRecipe}"?`)) {
+                    handleDeleteRecipeMapping(bulkSelectedRecipe);
+                    setBulkRecipeModalOpen(false);
+                  }
+                }}
+                className="text-xs text-rose-600 hover:underline cursor-pointer"
               >
-                <Trash2 className="h-3.5 w-3.5" />
-                <span>Clear All for this Recipe</span>
+                Delete Assignment
               </button>
 
               <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => setBulkRecipeModalOpen(false)}
-                  className="px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-200/60 rounded-lg transition-colors cursor-pointer"
+                  className="px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-100 rounded-lg cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -1374,12 +1130,53 @@ export function LoomSummarySection() {
                   type="button"
                   onClick={handleSaveBulkRecipeLooms}
                   disabled={isSubmittingBulkAssign || !bulkSelectedRecipe.trim()}
-                  className="inline-flex items-center gap-1.5 px-4 py-1.5 bg-blue-700 hover:bg-blue-800 disabled:opacity-50 text-white text-xs font-bold rounded-lg shadow-xs transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-4 py-1.5 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white text-xs font-semibold rounded-lg shadow-2xs cursor-pointer"
                 >
                   <Check className="h-3.5 w-3.5" />
                   <span>{isSubmittingBulkAssign ? "Saving..." : `Save ${bulkSelectedLooms.length} Looms`}</span>
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* MODAL 3: RESET TO BLANK CONFIRMATION MODAL               */}
+      {/* ======================================================== */}
+      {resetConfirmModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-2xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-xl border border-slate-200 max-w-md w-full overflow-hidden animate-in fade-in zoom-in-95 duration-100 p-5 space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="h-10 w-10 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
+                <AlertTriangle className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-slate-900">
+                  Reset All Loom Assignments to Blank?
+                </h3>
+                <p className="text-xs text-slate-500 mt-1">
+                  This will clear all 91 circular loom allocations and give you a completely clean, blank slate. You can then manually assign qualities to looms one by one.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setResetConfirmModalOpen(false)}
+                className="px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-100 rounded-lg cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleResetAllToBlank}
+                disabled={isResetting}
+                className="px-4 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-lg shadow-2xs cursor-pointer"
+              >
+                {isResetting ? "Resetting..." : "Yes, Reset to Blank"}
+              </button>
             </div>
           </div>
         </div>
