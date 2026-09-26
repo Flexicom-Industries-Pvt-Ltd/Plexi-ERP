@@ -74,6 +74,16 @@ export interface LoomSummaryDataset {
     startTime: string;
     endTime: string;
   }[];
+  availableRecipes?: {
+    id: string;
+    code: string;
+    tapeType: string;
+    colorGroup?: string | null;
+    colour?: string | null;
+    denier?: number | null;
+    tapeWidth?: number | null;
+    bobbinMarking?: string | null;
+  }[];
   shiftSummaryList?: LoomShiftSummaryItem[];
   recipeSummaries?: RecipeLoomSummaryItem[];
   loomSummaries?: LoomMachineSummaryItem[];
