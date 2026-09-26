@@ -566,6 +566,20 @@ export async function POST(request: NextRequest) {
 
       const cleanCode = qualityCode.trim();
 
+      // Guard: Check if loom is already occupied by another quality
+      const occupiedByOther = await db.loomMachineMapping.findFirst({
+        where: {
+          loomNumbers: { has: lNum },
+          qualityCode: { not: cleanCode },
+        },
+      });
+
+      if (occupiedByOther) {
+        return NextResponse.json({
+          error: `Cannot assign Loom #${lNum} because it is currently occupied by "${occupiedByOther.qualityCode}". Please unassign it first to free the machine.`,
+        }, { status: 400 });
+      }
+
       // Find or create mapping for this quality
       let targetMapping = await db.loomMachineMapping.findUnique({
         where: { qualityCode: cleanCode },
@@ -590,34 +604,18 @@ export async function POST(request: NextRequest) {
             isActive: true,
           },
         });
-      }
-
-      // Remove lNum from all other mappings
-      const otherMappings = await db.loomMachineMapping.findMany({
-        where: {
-          loomNumbers: { has: lNum },
-          qualityCode: { not: cleanCode },
-        },
-      });
-
-      for (const m of otherMappings) {
-        const updated = m.loomNumbers.filter((n) => n !== lNum);
+      } else {
+        // Add lNum to targetMapping
+        const targetLooms = Array.from(new Set([...(targetMapping.loomNumbers || []), lNum])).sort((a, b) => a - b);
         await db.loomMachineMapping.update({
-          where: { id: m.id },
-          data: { loomNumbers: updated, totalLooms: updated.length },
+          where: { id: targetMapping.id },
+          data: {
+            loomNumbers: targetLooms,
+            totalLooms: targetLooms.length,
+            isActive: true,
+          },
         });
       }
-
-      // Add lNum to targetMapping
-      const targetLooms = Array.from(new Set([...(targetMapping.loomNumbers || []), lNum])).sort((a, b) => a - b);
-      await db.loomMachineMapping.update({
-        where: { id: targetMapping.id },
-        data: {
-          loomNumbers: targetLooms,
-          totalLooms: targetLooms.length,
-          isActive: true,
-        },
-      });
 
       return NextResponse.json({
         success: true,
@@ -650,7 +648,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Action 3: Assign a list of looms to a quality in bulk
+    // Action 3: Assign a list of looms to a quality in bulk (strictly rejecting pre-occupied looms)
     if (action === "ASSIGN_RECIPE_LOOMS") {
       if (!qualityCode || typeof qualityCode !== "string" || !qualityCode.trim()) {
         return NextResponse.json({ error: "Quality Code is required." }, { status: 400 });
@@ -666,6 +664,22 @@ export async function POST(request: NextRequest) {
             )
           ).sort((a: number, b: number) => a - b)
         : [];
+
+      // Guard: Check if any requested loom is already occupied by ANOTHER recipe
+      const otherMappings = await db.loomMachineMapping.findMany({
+        where: {
+          qualityCode: { not: cleanCode },
+        },
+      });
+
+      for (const other of otherMappings) {
+        const conflicts = (other.loomNumbers || []).filter((num) => sanitizedLooms.includes(num));
+        if (conflicts.length > 0) {
+          return NextResponse.json({
+            error: `Cannot assign Loom(s) ${conflicts.map((n) => `#${n}`).join(", ")} because they are already occupied by "${other.qualityCode}". Please unassign them from "${other.qualityCode}" first.`,
+          }, { status: 400 });
+        }
+      }
 
       // Find or create target mapping
       let targetMapping = await db.loomMachineMapping.findUnique({
@@ -700,26 +714,6 @@ export async function POST(request: NextRequest) {
             isActive: true,
           },
         });
-      }
-
-      // Remove these looms from any other mappings
-      if (sanitizedLooms.length > 0) {
-        const otherMappings = await db.loomMachineMapping.findMany({
-          where: {
-            qualityCode: { not: cleanCode },
-          },
-        });
-
-        for (const m of otherMappings) {
-          const overlap = m.loomNumbers.some((num) => sanitizedLooms.includes(num));
-          if (overlap) {
-            const updated = m.loomNumbers.filter((num) => !sanitizedLooms.includes(num));
-            await db.loomMachineMapping.update({
-              where: { id: m.id },
-              data: { loomNumbers: updated, totalLooms: updated.length },
-            });
-          }
-        }
       }
 
       return NextResponse.json({
