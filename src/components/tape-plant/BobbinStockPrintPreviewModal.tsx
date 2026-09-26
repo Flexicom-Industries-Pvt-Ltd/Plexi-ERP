@@ -195,23 +195,10 @@ export function BobbinStockPrintPreviewModal({
 
               <div className="border-r border-slate-200 last:border-0 pr-2">
                 <span className="text-slate-500 block text-[10px] uppercase font-bold tracking-wider">
-                  Total Bobbins (@ 1.6 KG)
+                  Available Crates (@ 12.8)
                 </span>
-                <span className="text-base font-black font-mono text-blue-900">
-                  {totals.totalBobbinStock.toLocaleString(undefined, {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}{" "}
-                  <span className="text-xs font-normal">PCS</span>
-                </span>
-              </div>
-
-              <div className="border-r border-slate-200 last:border-0 pr-2">
-                <span className="text-slate-500 block text-[10px] uppercase font-bold tracking-wider">
-                  Total Crates (@ 12.8 KG)
-                </span>
-                <span className="text-base font-black font-mono text-purple-900">
-                  {totals.totalCrateStock.toLocaleString(undefined, {
+                <span className="text-base font-black font-mono text-emerald-900">
+                  {(totals.totalAvailableCrateStock ?? totals.totalCrateStock).toLocaleString(undefined, {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2,
                   })}{" "}
@@ -219,13 +206,29 @@ export function BobbinStockPrintPreviewModal({
                 </span>
               </div>
 
+              <div className="border-r border-slate-200 last:border-0 pr-2">
+                <span className="text-slate-500 block text-[10px] uppercase font-bold tracking-wider">
+                  Available Bobbins (KG)
+                </span>
+                <span className="text-base font-black font-mono text-blue-900">
+                  {(totals.totalAvailableKg ?? totals.totalNetProductionKg).toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}{" "}
+                  <span className="text-xs font-normal">KG</span>
+                </span>
+              </div>
+
               <div>
                 <span className="text-slate-500 block text-[10px] uppercase font-bold tracking-wider">
-                  Active Qualities
+                  Issued to Looms
                 </span>
-                <span className="text-base font-black font-mono text-slate-900">
-                  {totals.uniqueQualitiesCount}{" "}
-                  <span className="text-xs font-normal">Recipes</span>
+                <span className="text-base font-black font-mono text-purple-900">
+                  {(totals.totalIssuedKg ?? 0).toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}{" "}
+                  <span className="text-xs font-normal">KG</span>
                 </span>
               </div>
             </div>
@@ -234,7 +237,7 @@ export function BobbinStockPrintPreviewModal({
             <div className="space-y-1.5">
               <div className="bg-slate-200 border border-slate-300 border-b-0 py-1 px-3 text-center">
                 <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-900">
-                  1. FINISHED BOBBIN & CRATE STOCK SUMMARY
+                  1. FINISHED BOBBIN & CRATE STOCK SUMMARY (PRODUCED − ISSUED)
                 </h3>
               </div>
 
@@ -249,14 +252,14 @@ export function BobbinStockPrintPreviewModal({
                       <th className="p-2 border-r border-slate-300 text-right font-bold text-emerald-900 w-24">
                         Produced Net
                       </th>
-                      <th className="p-2 border-r border-slate-300 text-right font-bold bg-purple-50 text-purple-900 w-28">
-                        Issued to Looms
+                      <th className="p-2 border-r border-slate-300 text-right font-bold bg-emerald-50 text-emerald-900 w-28">
+                        Avail Crates (@ 12.8)
                       </th>
                       <th className="p-2 border-r border-slate-300 text-right font-bold bg-blue-50 text-blue-900 w-28">
-                        Avail Bobbins (@ 1.6)
+                        Avail Bobbins (KG)
                       </th>
-                      <th className="p-2 border-slate-300 text-right font-bold bg-emerald-50 text-emerald-900 w-28">
-                        Avail Crates (@ 12.8)
+                      <th className="p-2 border-slate-300 text-right font-bold bg-purple-50 text-purple-900 w-28">
+                        Issued to Looms
                       </th>
                     </tr>
                   </thead>
@@ -268,56 +271,64 @@ export function BobbinStockPrintPreviewModal({
                         </td>
                       </tr>
                     ) : (
-                      items.map((item) => (
-                        <tr key={item.id || item.slNo} className="hover:bg-slate-50">
-                          <td className="p-2 border-r border-slate-200 text-center font-bold text-slate-500">
-                            {item.slNo}
-                          </td>
-                          <td className="p-2 border-r border-slate-200 font-mono font-bold text-slate-900">
-                            {item.recipeQuality}
-                          </td>
-                          <td className="p-2 border-r border-slate-200 text-right font-mono text-slate-600">
-                            {item.productionDoneKg.toLocaleString(undefined, {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })}
-                          </td>
-                          <td className="p-2 border-r border-slate-200 text-right font-mono text-rose-600 font-semibold">
-                            {item.wasteKg.toLocaleString(undefined, {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })}
-                          </td>
-                          <td className="p-2 border-r border-slate-200 text-right font-mono font-bold text-slate-900">
-                            {item.netProductionKg.toLocaleString(undefined, {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })}{" "}
-                            <span className="text-[10px] font-medium text-slate-500">KG</span>
-                          </td>
-                          <td className="p-2 border-r border-slate-200 text-right font-mono font-bold text-purple-900 bg-purple-50/40">
-                            {(item.issuedCrates || 0).toLocaleString(undefined, {
-                              minimumFractionDigits: 1,
-                              maximumFractionDigits: 2,
-                            })}{" "}
-                            <span className="text-[10px] font-medium text-purple-600">crates</span>
-                          </td>
-                          <td className="p-2 border-r border-slate-200 text-right font-mono font-extrabold text-blue-900 bg-blue-50/50">
-                            {item.bobbinStock.toLocaleString(undefined, {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })}{" "}
-                            <span className="text-[10px] font-medium text-blue-600">PCS</span>
-                          </td>
-                          <td className="p-2 border-slate-200 text-right font-mono font-extrabold text-emerald-900 bg-emerald-50/50">
-                            {item.crateStock.toLocaleString(undefined, {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })}{" "}
-                            <span className="text-[10px] font-medium text-emerald-600">CRATES</span>
-                          </td>
-                        </tr>
-                      ))
+                      items.map((item) => {
+                        const availCrates = item.availableCrates !== undefined ? item.availableCrates : item.crateStock;
+                        const availKg = item.availableKg !== undefined ? item.availableKg : item.netProductionKg - (item.issuedKg || 0);
+                        const issuedCrates = item.issuedCrates || 0;
+                        const issuedKg = item.issuedKg || 0;
+
+                        return (
+                          <tr key={item.id || item.slNo} className="hover:bg-slate-50">
+                            <td className="p-2 border-r border-slate-200 text-center font-bold text-slate-500">
+                              {item.slNo}
+                            </td>
+                            <td className="p-2 border-r border-slate-200 font-mono font-bold text-slate-900">
+                              {item.recipeQuality}
+                            </td>
+                            <td className="p-2 border-r border-slate-200 text-right font-mono text-slate-600">
+                              {item.productionDoneKg.toLocaleString(undefined, {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}
+                            </td>
+                            <td className="p-2 border-r border-slate-200 text-right font-mono text-rose-600 font-semibold">
+                              {item.wasteKg.toLocaleString(undefined, {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}
+                            </td>
+                            <td className="p-2 border-r border-slate-200 text-right font-mono font-bold text-slate-900">
+                              {item.netProductionKg.toLocaleString(undefined, {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}{" "}
+                              <span className="text-[10px] font-medium text-slate-500">KG</span>
+                            </td>
+                            <td className="p-2 border-r border-slate-200 text-right font-mono font-extrabold text-emerald-900 bg-emerald-50/50">
+                              {availCrates.toLocaleString(undefined, {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}{" "}
+                              <span className="text-[10px] font-medium text-emerald-600">CRATES</span>
+                            </td>
+                            <td className="p-2 border-r border-slate-200 text-right font-mono font-extrabold text-blue-900 bg-blue-50/50">
+                              {availKg.toLocaleString(undefined, {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}{" "}
+                              <span className="text-[10px] font-medium text-blue-600">KG</span>
+                            </td>
+                            <td className="p-2 border-slate-200 text-right font-mono font-bold text-purple-900 bg-purple-50/40">
+                              {issuedCrates.toLocaleString(undefined, {
+                                minimumFractionDigits: 1,
+                                maximumFractionDigits: 2,
+                              })}{" "}
+                              <span className="text-[10px] font-medium text-purple-600">crates</span>
+                              <span className="block text-[9px] text-purple-500">({issuedKg.toFixed(1)} kg)</span>
+                            </td>
+                          </tr>
+                        );
+                      })
                     )}
                   </tbody>
                   {items.length > 0 && (
@@ -345,26 +356,26 @@ export function BobbinStockPrintPreviewModal({
                           })}{" "}
                           KG
                         </td>
+                        <td className="p-2 text-right font-mono font-black text-emerald-950 bg-emerald-100">
+                          {(totals.totalAvailableCrateStock ?? totals.totalCrateStock).toLocaleString(undefined, {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}{" "}
+                          CRATES
+                        </td>
+                        <td className="p-2 text-right font-mono font-black text-blue-950 bg-blue-100">
+                          {(totals.totalAvailableKg ?? totals.totalNetProductionKg).toLocaleString(undefined, {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}{" "}
+                          KG
+                        </td>
                         <td className="p-2 text-right font-mono font-bold text-purple-900 bg-purple-100">
                           {totals.totalIssuedCrates.toLocaleString(undefined, {
                             minimumFractionDigits: 1,
                             maximumFractionDigits: 2,
                           })}{" "}
                           crates
-                        </td>
-                        <td className="p-2 text-right font-mono font-black text-blue-950 bg-blue-100">
-                          {totals.totalBobbinStock.toLocaleString(undefined, {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                          })}{" "}
-                          PCS
-                        </td>
-                        <td className="p-2 text-right font-mono font-black text-emerald-950 bg-emerald-100">
-                          {totals.totalCrateStock.toLocaleString(undefined, {
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                          })}{" "}
-                          CRATES
                         </td>
                       </tr>
                     </tfoot>
