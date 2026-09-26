@@ -167,6 +167,36 @@ describe("Bobbin Stock Summary calculations", () => {
     expect(html).not.toContain("Standard Rules:");
   });
 
+  it("generates multi-loom Bobbin Issue Slip HTML with loom allocation breakdown table", () => {
+    const multiSlipData = {
+      slipNumber: "TP-ISS-20260926-0002",
+      date: "2026-09-26",
+      shiftName: "Day Shift (08:00 - 20:00)",
+      recipeQuality: "1000D White Standard",
+      allocations: [
+        { loomNumber: 4, loomIdentifier: "Loom #04", crateCount: 5, bobbinCount: 40, weightKg: 64 },
+        { loomNumber: 12, loomIdentifier: "Loom #12", crateCount: 10, bobbinCount: 80, weightKg: 128 },
+      ],
+      crateCount: 15,
+      bobbinCount: 120,
+      weightKg: 192,
+      issuedBy: "Rajesh Kumar",
+      receivedBy: "Mahesh Loom Incharge",
+      remarks: "Multi-loom allocation for Looms 4 and 12",
+    };
+
+    const html = generateBobbinIssueSlipHtml(multiSlipData);
+    expect(html).toContain("BOBBIN ISSUE SLIP");
+    expect(html).toContain("TP-ISS-20260926-0002");
+    expect(html).toContain("1000D White Standard");
+    expect(html).toContain("Loom #04");
+    expect(html).toContain("Loom #12");
+    expect(html).toContain("15.0");
+    expect(html).toContain("120.0");
+    expect(html).toContain("192.00");
+    expect(html).toContain("Total Dispatch:");
+  });
+
   it("generates Bobbin Inward Receipt Slip HTML with gross, waste, net output and packing", () => {
     const slipData = {
       referenceNo: "TP-INW-20260926-0012",

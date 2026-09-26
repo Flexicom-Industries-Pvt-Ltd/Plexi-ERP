@@ -23,6 +23,7 @@ export interface BobbinTransactionEntry {
   referenceNo: string;
   loomNumber?: number | null;
   loomIdentifier?: string | null;
+  loomAllocations?: any;
   grossKg?: number;
   wasteKg?: number;
   netKg: number;
@@ -174,6 +175,7 @@ export async function GET(request: NextRequest) {
           referenceNo: i.slipNumber,
           loomNumber: i.loomNumber,
           loomIdentifier: i.loomIdentifier,
+          loomAllocations: i.loomAllocations || null,
           netKg: Number(i.weightKg),
           bobbins: Number(i.bobbinCount),
           crates: Number(i.crateCount),

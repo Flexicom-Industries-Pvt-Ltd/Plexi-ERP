@@ -38,6 +38,7 @@ interface BobbinIssueItem {
   recipeQuality: string;
   loomNumber?: number | null;
   loomIdentifier?: string | null;
+  loomAllocations?: any;
   crateCount: number;
   bobbinCount: number;
   weightKg: number;
@@ -257,6 +258,7 @@ export function BobbinIssueSection({ onNavigateToBobbinStock }: BobbinIssueSecti
       recipeQuality: item.recipeQuality,
       loomNumber: item.loomNumber,
       loomIdentifier: item.loomIdentifier,
+      allocations: item.loomAllocations || (item as any).allocations || null,
       crateCount: item.crateCount,
       bobbinCount: item.bobbinCount,
       weightKg: item.weightKg,

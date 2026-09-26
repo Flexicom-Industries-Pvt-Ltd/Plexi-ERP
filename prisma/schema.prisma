@@ -1815,11 +1815,12 @@ model TapePlantBobbinIssue {
   shiftId        String?
   shiftName      String?  // e.g. "Day Shift", "Night Shift", "Shift A"
   recipeQuality  String   // Quality Name / Recipe Code e.g. "AMB/PP/WH/500/76/S1"
-  loomNumber     Int?     // Circular Loom Machine Number (e.g. 1 to 91)
-  loomIdentifier String?  // Optional custom loom label e.g. "Loom 06", "Shed A"
-  crateCount     Float    // Number of crates issued
-  bobbinCount    Float    // Computed: crateCount * 8
-  weightKg       Float    // Computed: crateCount * 12.8
+  loomNumber     Int?     // Circular Loom Machine Number (e.g. 1 to 91 or primary loom)
+  loomIdentifier String?  // Optional custom loom label e.g. "Looms #03, #07, #14"
+  loomAllocations Json?   // Array of { loomNumber: number, loomIdentifier?: string, crateCount: number, bobbinCount: number, weightKg: number, remarks?: string }
+  crateCount     Float    // Total Number of crates issued
+  bobbinCount    Float    // Total Computed: crateCount * 8
+  weightKg       Float    // Total Computed: crateCount * 12.8
   issuedBy       String?  // Name or ID of Tape Plant issuer/operator
   receivedBy     String?  // Name or ID of Loom receiver/operator
   remarks        String?

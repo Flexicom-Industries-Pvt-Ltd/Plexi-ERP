@@ -6,6 +6,15 @@
 
 import { BOBBIN_WEIGHT_KG, CRATE_WEIGHT_KG, BOBBINS_PER_CRATE } from "./bobbin-stock";
 
+export interface LoomAllocationItem {
+  loomNumber?: number | null;
+  loomIdentifier?: string | null;
+  crateCount: number;
+  bobbinCount?: number;
+  weightKg?: number;
+  remarks?: string | null;
+}
+
 export interface BobbinIssueSlipData {
   slipNumber: string;
   date: string;
@@ -13,6 +22,7 @@ export interface BobbinIssueSlipData {
   recipeQuality: string;
   loomNumber?: number | null;
   loomIdentifier?: string | null;
+  allocations?: LoomAllocationItem[] | null;
   crateCount: number;
   bobbinCount: number;
   weightKg: number;
@@ -30,6 +40,7 @@ export function generateBobbinIssueSlipHtml(data: BobbinIssueSlipData): string {
     recipeQuality,
     loomNumber,
     loomIdentifier,
+    allocations,
     crateCount,
     bobbinCount,
     weightKg,
@@ -38,7 +49,8 @@ export function generateBobbinIssueSlipHtml(data: BobbinIssueSlipData): string {
     remarks,
   } = data;
 
-  const targetLoom = loomIdentifier || (loomNumber ? `Loom #${loomNumber}` : "Loom Shed");
+  const hasMultiLoom = Array.isArray(allocations) && allocations.length > 0;
+  const targetLoom = loomIdentifier || (loomNumber ? `Loom #${loomNumber}` : (hasMultiLoom ? `${allocations.length} Looms Allocated` : "Loom Shed"));
   const printTimestamp = new Date().toLocaleString("en-IN", {
     day: "2-digit",
     month: "short",
@@ -252,6 +264,49 @@ export function generateBobbinIssueSlipHtml(data: BobbinIssueSlipData): string {
     </div>
 
     <!-- Issue Metrics Table -->
+    ${
+      hasMultiLoom && allocations.length > 1
+        ? `
+    <table class="metric-table" style="margin-bottom: 6px;">
+      <thead>
+        <tr>
+          <th style="width: 8%;">#</th>
+          <th style="width: 28%; text-align: left; padding-left: 8px;">Loom Machine</th>
+          <th style="width: 20%;">Crates Issued</th>
+          <th style="width: 22%;">Bobbins (@ 8)</th>
+          <th style="width: 22%;">Net Weight (KG)</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${allocations
+          .map((item, idx) => {
+            const lCrates = Number(item.crateCount) || 0;
+            const lBobbins = item.bobbinCount !== undefined ? item.bobbinCount : Number((lCrates * BOBBINS_PER_CRATE).toFixed(2));
+            const lKg = item.weightKg !== undefined ? item.weightKg : Number((lCrates * CRATE_WEIGHT_KG).toFixed(2));
+            const loomName = item.loomIdentifier || (item.loomNumber ? `Loom #${item.loomNumber}` : `Loom`);
+            return `
+        <tr>
+          <td style="font-size: 8pt; font-weight: normal; color: #64748b;">${idx + 1}</td>
+          <td style="text-align: left; padding-left: 8px; font-size: 9pt; color: #1e3a8a; font-weight: bold;">
+            ${loomName}
+            ${item.remarks ? `<div style="font-size: 6.5pt; font-weight: normal; color: #64748b;">${item.remarks}</div>` : ""}
+          </td>
+          <td style="color: #6b21a8; background: #faf5ff; font-size: 9.5pt;">${lCrates.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 })}</td>
+          <td style="color: #1e40af; background: #eff6ff; font-size: 9.5pt;">${lBobbins.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 })}</td>
+          <td style="color: #047857; background: #f0fdf4; font-size: 9.5pt;">${lKg.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+        </tr>`;
+          })
+          .join("")}
+        <tr style="background: #f8fafc; border-top: 2px solid #0f172a; font-weight: 900;">
+          <td colspan="2" style="text-align: right; padding-right: 8px; font-size: 8.5pt; text-transform: uppercase; color: #0f172a;">Total Dispatch:</td>
+          <td style="color: #6b21a8; font-size: 10.5pt; background: #f3e8ff;">${crateCount.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 })}</td>
+          <td style="color: #1e40af; font-size: 10.5pt; background: #dbeafe;">${bobbinCount.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 })}</td>
+          <td style="color: #047857; font-size: 10.5pt; background: #dcfce7;">${weightKg.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+        </tr>
+      </tbody>
+    </table>
+    `
+        : `
     <table class="metric-table">
       <thead>
         <tr>
@@ -274,6 +329,8 @@ export function generateBobbinIssueSlipHtml(data: BobbinIssueSlipData): string {
         </tr>
       </tbody>
     </table>
+    `
+    }
 
     ${remarks ? `<div style="font-size: 7pt; color: #475569; margin-bottom: 6px;"><strong>Remarks / Notes:</strong> ${remarks}</div>` : ""}
 
