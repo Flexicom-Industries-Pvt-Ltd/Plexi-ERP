@@ -16,136 +16,160 @@ vi.mock("xlsx", async () => {
 
 describe("Loom Summary Export & Print Engine", () => {
   const mockDataset: LoomSummaryDataset = {
+    selectedDate: "2026-09-26",
+    selectedShiftName: "Day Shift",
+    recipeSummaries: [
+      {
+        recipeQuality: "1000D White Standard",
+        totalLoomsCount: 3,
+        assignedLooms: [4, 12, 45],
+        assignedLoomIdentifiers: ["Loom #4", "Loom #12", "Loom #45"],
+        totalCratesIssued: 15,
+        totalBobbinsIssued: 120,
+        totalWeightIssuedKg: 192,
+        latestIssueDate: "2026-09-26",
+        activeShifts: ["Day Shift"],
+        issuesCount: 2,
+        issuers: ["Rajesh Kumar"],
+        receivers: ["Mahesh Loom Incharge"],
+        recentIssues: [
+          {
+            slipNumber: "TP-ISS-20260926-0001",
+            date: "2026-09-26",
+            shiftName: "Day Shift",
+            crateCount: 5,
+            weightKg: 64,
+            loomIdentifier: "Loom #4",
+          },
+        ],
+      },
+      {
+        recipeQuality: "850D Milky White",
+        totalLoomsCount: 2,
+        assignedLooms: [1, 2],
+        assignedLoomIdentifiers: ["Loom #1", "Loom #2"],
+        totalCratesIssued: 10,
+        totalBobbinsIssued: 80,
+        totalWeightIssuedKg: 128,
+        latestIssueDate: "2026-09-26",
+        activeShifts: ["Day Shift"],
+        issuesCount: 1,
+        issuers: ["Rajesh Kumar"],
+        receivers: ["Suresh"],
+        recentIssues: [],
+      },
+    ],
+    loomSummaries: [
+      {
+        loomNumber: 1,
+        loomIdentifier: "Loom #1",
+        isActive: true,
+        activeRecipe: "850D Milky White",
+        allRecipes: ["850D Milky White"],
+        totalCrates: 5,
+        totalBobbins: 40,
+        totalWeightKg: 64,
+        latestDate: "2026-09-26",
+        latestShiftName: "Day Shift",
+        lastIssuedBy: "Rajesh Kumar",
+        lastReceivedBy: "Suresh",
+        allocationsCount: 1,
+        recentIssues: [],
+      },
+      {
+        loomNumber: 4,
+        loomIdentifier: "Loom #4",
+        isActive: true,
+        activeRecipe: "1000D White Standard",
+        allRecipes: ["1000D White Standard"],
+        totalCrates: 5,
+        totalBobbins: 40,
+        totalWeightKg: 64,
+        latestDate: "2026-09-26",
+        latestShiftName: "Day Shift",
+        lastIssuedBy: "Rajesh Kumar",
+        lastReceivedBy: "Mahesh",
+        allocationsCount: 1,
+        recentIssues: [],
+      },
+      {
+        loomNumber: 91,
+        loomIdentifier: "Loom #91",
+        isActive: false,
+        activeRecipe: null,
+        allRecipes: [],
+        totalCrates: 0,
+        totalBobbins: 0,
+        totalWeightKg: 0,
+        latestDate: null,
+        latestShiftName: null,
+        lastIssuedBy: null,
+        lastReceivedBy: null,
+        allocationsCount: 0,
+        recentIssues: [],
+      },
+    ],
     qualities: [
       {
         id: "q-1",
-        qualityCode: "wOND/LPP/WH/500/67/S1",
-        colorGroup: "White",
-        colour: "WHITE",
-        denier: 840,
-        tapeWidth: 2.5,
-        bobbinMarking: "RED",
-        reedSpaceCm: 67,
-        mesh: "10x10",
-        targetPpm: 850,
+        qualityCode: "1000D White Standard",
+        colorGroup: "Standard",
+        colour: "White",
+        denier: null,
+        tapeWidth: null,
+        bobbinMarking: "Bobbin Issue",
+        reedSpaceCm: null,
+        mesh: "Standard",
+        targetPpm: null,
         remarks: null,
-        loomNumbers: [6, 7, 8, 9, 10],
-        totalLooms: 5,
+        loomNumbers: [4, 12, 45],
+        totalLooms: 3,
         status: "RUNNING",
-        lastRunDate: "2026-09-24",
+        lastRunDate: "2026-09-26",
         latestOperator: "Rajesh Kumar",
-        activeShifts: ["Shift A"],
-        plannedOutputKg: 1200,
-        actualOutputKg: 1180,
-      },
-      {
-        id: "q-2",
-        qualityCode: "AMB/PP/YL/74/500/S1",
-        colorGroup: "Yellow",
-        colour: "YELLOW",
-        denier: 900,
-        tapeWidth: 3.0,
-        bobbinMarking: "BLACK",
-        reedSpaceCm: 50,
-        mesh: "12x12",
-        targetPpm: 900,
-        remarks: null,
-        loomNumbers: [1, 2, 3, 4, 5],
-        totalLooms: 5,
-        status: "PLANNED",
-        lastRunDate: "2026-09-24",
-        latestOperator: null,
-        activeShifts: ["Shift B"],
-        plannedOutputKg: 800,
-        actualOutputKg: 0,
+        activeShifts: ["Day Shift"],
+        actualOutputKg: 192,
       },
     ],
     loomMatrix: [
       {
-        loomNumber: 1,
-        isAllocated: true,
-        qualityId: "q-2",
-        qualityCode: "AMB/PP/YL/74/500/S1",
-        colorGroup: "Yellow",
-        colour: "YELLOW",
-        denier: 900,
-        tapeWidth: 3.0,
-        reedSpaceCm: 50,
-        bobbinMarking: "BLACK",
-        status: "PLANNED",
-      },
-      {
-        loomNumber: 6,
+        loomNumber: 4,
         isAllocated: true,
         qualityId: "q-1",
-        qualityCode: "wOND/LPP/WH/500/67/S1",
-        colorGroup: "White",
-        colour: "WHITE",
-        denier: 840,
-        tapeWidth: 2.5,
-        reedSpaceCm: 67,
-        bobbinMarking: "RED",
+        qualityCode: "1000D White Standard",
+        colorGroup: "Active",
+        colour: "Assigned",
+        denier: null,
+        tapeWidth: null,
+        reedSpaceCm: null,
+        bobbinMarking: "5 Crates",
         status: "RUNNING",
       },
     ],
     kpis: {
+      totalLooms: 91,
+      activeLoomsCount: 5,
+      idleLoomsCount: 86,
+      uniqueRecipesCount: 2,
+      totalCratesDispatched: 25,
+      totalBobbinsDispatched: 200,
+      totalWeightDispatchedKg: 320,
+      totalIssueSlipsCount: 3,
       totalFactoryLooms: 91,
-      totalAllocatedLooms: 10,
+      totalAllocatedLooms: 5,
       totalRunningLooms: 5,
-      totalPlannedLooms: 5,
-      totalStandbyLooms: 0,
-      totalUnallocatedLooms: 81,
-      runningQualitiesCount: 1,
-      plannedQualitiesCount: 1,
+      totalPlannedLooms: 0,
+      totalStandbyLooms: 86,
+      totalUnallocatedLooms: 86,
+      runningQualitiesCount: 2,
+      plannedQualitiesCount: 0,
       totalQualitiesCount: 2,
-      totalTapePlannedKg: 2000,
-      totalTapeProducedKg: 1180,
+      totalTapePlannedKg: 0,
+      totalTapeProducedKg: 320,
     },
-    colorGroupsSummary: [
-      {
-        colorGroup: "White",
-        totalLooms: 5,
-        qualityCount: 1,
-        activeLooms: 5,
-      },
-      {
-        colorGroup: "Yellow",
-        totalLooms: 5,
-        qualityCount: 1,
-        activeLooms: 0,
-      },
-    ],
-    shiftSummaryList: [
-      {
-        shiftId: "s-1",
-        shiftName: "Shift A",
-        startTime: "06:00",
-        endTime: "14:00",
-        qualitiesCount: 1,
-        activeLoomsCount: 5,
-        producedKg: 1180,
-        plannedKg: 1200,
-        operators: ["Rajesh Kumar"],
-        qualityCodes: ["wOND/LPP/WH/500/67/S1"],
-      },
-      {
-        shiftId: "s-2",
-        shiftName: "Shift B",
-        startTime: "14:00",
-        endTime: "22:00",
-        qualitiesCount: 1,
-        activeLoomsCount: 5,
-        producedKg: 0,
-        plannedKg: 800,
-        operators: [],
-        qualityCodes: ["AMB/PP/YL/74/500/S1"],
-      },
-    ],
-    selectedDate: "2026-09-24",
-    selectedShiftName: "Shift A",
   };
 
-  it("should export full multi-sheet Excel workbook with Shift Operations for Loom Summary", () => {
+  it("should export multi-sheet Excel workbook for Loom Summary with Recipe Allocations & 1-91 Matrix", () => {
     exportLoomSummaryExcel(mockDataset);
 
     expect(XLSX.writeFile).toHaveBeenCalled();
@@ -154,37 +178,24 @@ describe("Loom Summary Export & Print Engine", () => {
     const wb = lastCall[0];
     const filename = lastCall[1];
 
-    expect(filename).toContain("Loom_Summary_Allocations_2026-09-24.xlsx");
-    expect(wb.SheetNames).toContain("Loom Allocations");
-    expect(wb.SheetNames).toContain("1-91 Loom Matrix");
-    expect(wb.SheetNames).toContain("Shift Operations");
-    expect(wb.SheetNames).toContain("KPI Scorecard");
+    expect(filename).toContain("Loom_Summary_Allocations_20260926.xlsx");
+    expect(wb.SheetNames).toContain("Recipe Allocations");
+    expect(wb.SheetNames).toContain("Looms 1-91 Matrix");
   });
 
-  it("should generate valid A4 landscape printable HTML document with Date and Shift context", () => {
+  it("should generate valid A4 landscape printable HTML document with Tape Planning layout", () => {
     const html = generateLoomSummaryHtml(mockDataset);
 
     expect(html).toContain("<!DOCTYPE html>");
     expect(html).toContain("Flexicom Industries Pvt. Ltd.");
-    expect(html).toContain("Loom Machine Master Allocations & Running Qualities");
-    expect(html).toContain("Date: <strong>2026-09-24</strong>");
-    expect(html).toContain("Shift: <strong>Shift A</strong>");
-    expect(html).toContain("size: A4 landscape;");
-    expect(html).toContain("margin: 8mm;");
-    expect(html).toContain("wOND/LPP/WH/500/67/S1");
-    expect(html).toContain("AMB/PP/YL/74/500/S1");
-    expect(html).toContain("RUNNING IN TAPE");
-    expect(html).toContain("PLANNED IN TAPE");
-    expect(html).toContain("#6, #7, #8, #9, #10");
-    expect(html).toContain("Shift-Wise Tape Output & Active Loom Machine Deployments");
-  });
-
-  it("should render 3 official sign-offs on printed audit sheet", () => {
-    const html = generateLoomSummaryHtml(mockDataset);
-
-    expect(html).toContain("Prepared By (Loom Section Master)");
-    expect(html).toContain("Verified By (Tape Plant In-Charge)");
-    expect(html).toContain("Approved By (Plant Supervisor / GM)");
+    expect(html).toContain("LOOM MACHINE ALLOCATIONS & RECIPE SUMMARY");
+    expect(html).toContain("1000D White Standard");
+    expect(html).toContain("850D Milky White");
+    expect(html).toContain("#4, #12, #45");
+    expect(html).toContain("logo.png");
+    expect(html).toContain("Prepared By (Loom Shed In-Charge)");
+    expect(html).toContain("Verified By (Tape Plant Supervisor)");
+    expect(html).toContain("Approved By (Plant Manager)");
   });
 });
 
@@ -250,4 +261,3 @@ describe("Loom RBAC Permission Guard", () => {
     expect(result.ok).toBe(true);
   });
 });
-

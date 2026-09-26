@@ -1,4 +1,5 @@
 import * as XLSX from "xlsx";
+import { RecipeLoomSummaryItem, LoomMachineSummaryItem } from "@/app/api/production/loom/summary/route";
 
 export interface LoomQualityShiftEntry {
   shiftId: string;
@@ -74,10 +75,20 @@ export interface LoomSummaryDataset {
     endTime: string;
   }[];
   shiftSummaryList?: LoomShiftSummaryItem[];
+  recipeSummaries?: RecipeLoomSummaryItem[];
+  loomSummaries?: LoomMachineSummaryItem[];
   qualities: LoomQualityItem[];
   allQualities?: LoomQualityItem[];
   loomMatrix: LoomMatrixNode[];
   kpis: {
+    totalLooms?: number;
+    activeLoomsCount?: number;
+    idleLoomsCount?: number;
+    uniqueRecipesCount?: number;
+    totalCratesDispatched?: number;
+    totalBobbinsDispatched?: number;
+    totalWeightDispatchedKg?: number;
+    totalIssueSlipsCount?: number;
     totalFactoryLooms: number;
     totalAllocatedLooms: number;
     totalRunningLooms: number;
@@ -90,7 +101,7 @@ export interface LoomSummaryDataset {
     totalTapePlannedKg: number;
     totalTapeProducedKg: number;
   };
-  colorGroupsSummary: {
+  colorGroupsSummary?: {
     colorGroup: string;
     totalLooms: number;
     qualityCount: number;
@@ -103,249 +114,148 @@ export function exportLoomSummaryExcel(data: LoomSummaryDataset): void {
   const genTimestamp = new Date().toLocaleString();
   const emptyRow: any[] = [];
 
-  const dateLabel = data.selectedDate && data.selectedDate !== "ALL" ? data.selectedDate : "All Dates (Latest Live)";
+  const dateLabel = data.selectedDate && data.selectedDate !== "ALL" ? data.selectedDate : "All Dates (Till Date)";
   const shiftLabel = data.selectedShiftName || (data.selectedShiftId && data.selectedShiftId !== "ALL" ? data.selectedShiftId : "All Shifts");
 
   // -------------------------------------------------------------
-  // Sheet 1: Quality Formulation & Loom Allocations
+  // Sheet 1: Recipe-Wise Loom Allocations
   // -------------------------------------------------------------
-  const qualityHeader = [
+  const recipeHeader = [
     "#",
-    "Quality Formulation Code",
-    "Tape Plant Status",
-    "Color Group",
-    "Colour",
-    "Denier",
-    "Tape Width (mm)",
-    "Reed Space (cm)",
-    "Bobbin Marking",
-    "Mesh",
-    "Target PPM",
-    "Allocated Looms Count",
+    "Recipe Quality Code",
+    "Assigned Looms Count",
     "Assigned Loom Numbers",
-    "Tape Produced (Kg)",
-    "Tape Planned (Kg)",
+    "Total Crates Issued",
+    "Total Bobbins (@ 8)",
+    "Total Weight Dispatched (KG)",
+    "Latest Issue Date",
     "Active Shifts",
-    "Latest Operator",
-    "Last Date",
+    "Issues Count",
+    "Issuers (Tape Plant)",
+    "Receivers (Loom)",
   ];
 
-  const qualityRows = data.qualities.map((q, idx) => [
+  const recipes = data.recipeSummaries && data.recipeSummaries.length > 0
+    ? data.recipeSummaries
+    : data.qualities.map((q) => ({
+        recipeQuality: q.qualityCode,
+        totalLoomsCount: q.totalLooms,
+        assignedLooms: q.loomNumbers,
+        assignedLoomIdentifiers: q.loomNumbers.map((n) => `Loom #${n}`),
+        totalCratesIssued: Number(((q.actualOutputKg || 0) / 12.8).toFixed(2)),
+        totalBobbinsIssued: Number(((q.actualOutputKg || 0) / 1.6).toFixed(2)),
+        totalWeightIssuedKg: q.actualOutputKg || 0,
+        latestIssueDate: q.lastRunDate || "—",
+        activeShifts: q.activeShifts || [],
+        issuesCount: 1,
+        issuers: q.latestOperator ? [q.latestOperator] : [],
+        receivers: [],
+        recentIssues: [],
+      }));
+
+  const recipeRows = recipes.map((r, idx) => [
     idx + 1,
-    q.qualityCode,
-    q.status,
-    q.colorGroup,
-    q.colour,
-    q.denier || "—",
-    q.tapeWidth || "—",
-    q.reedSpaceCm || "—",
-    q.bobbinMarking,
-    q.mesh,
-    q.targetPpm || "—",
-    q.totalLooms,
-    q.loomNumbers.map((n) => `#${n}`).join(", "),
-    q.actualOutputKg || 0,
-    q.plannedOutputKg || 0,
-    (q.activeShifts || []).join(", ") || "—",
-    q.latestOperator || "—",
-    q.lastRunDate || "—",
+    r.recipeQuality,
+    r.totalLoomsCount,
+    r.assignedLooms.map((n) => `#${n}`).join(", ") || (r.assignedLoomIdentifiers ? r.assignedLoomIdentifiers.join(", ") : "—"),
+    r.totalCratesIssued,
+    r.totalBobbinsIssued,
+    r.totalWeightIssuedKg,
+    r.latestIssueDate,
+    (r.activeShifts || []).join(", ") || "—",
+    r.issuesCount,
+    (r.issuers || []).join(", ") || "—",
+    (r.receivers || []).join(", ") || "—",
   ]);
 
-  const ws1 = XLSX.utils.aoa_to_sheet([
-    ["FLEXICOM INDUSTRIES PVT. LTD. - LOOM SECTION MASTER ALLOCATIONS & TAPE STATUS"],
-    [`Date Filter: ${dateLabel}`, `Shift Filter: ${shiftLabel}`, `Generated: ${genTimestamp}`],
-    [`Total Factory Looms: ${data.kpis.totalFactoryLooms}`, `Allocated: ${data.kpis.totalAllocatedLooms}`, `Running Looms: ${data.kpis.totalRunningLooms}`],
+  const recipeSheetData = [
+    ["FLEXICOM INDUSTRIES PVT. LTD. — LOOM SECTION SUMMARY"],
+    ["RECIPE-WISE ALLOCATION SCHEDULE & BOBBIN DISPATCH REPORT"],
+    [`Date Context: ${dateLabel}`, `Shift Context: ${shiftLabel}`, `Generated: ${genTimestamp}`],
     emptyRow,
-    qualityHeader,
-    ...qualityRows,
+    recipeHeader,
+    ...recipeRows,
     emptyRow,
     [
-      "TOTAL",
-      `${data.qualities.length} Active Qualities`,
-      `${data.kpis.runningQualitiesCount} Running`,
+      "TOTALS:",
+      `${recipes.length} Qualities`,
+      data.kpis.activeLoomsCount ?? data.kpis.totalRunningLooms,
+      "—",
+      data.kpis.totalCratesDispatched ?? 0,
+      data.kpis.totalBobbinsDispatched ?? 0,
+      data.kpis.totalWeightDispatchedKg ?? data.kpis.totalTapeProducedKg,
       "—",
       "—",
-      "—",
-      "—",
-      "—",
-      "—",
-      "—",
-      "—",
-      data.kpis.totalAllocatedLooms,
-      "—",
-      data.kpis.totalTapeProducedKg,
-      data.kpis.totalTapePlannedKg,
-      "—",
-      "",
-      "",
+      data.kpis.totalIssueSlipsCount ?? 0,
     ],
-  ]);
-
-  ws1["!cols"] = [
-    { wch: 6 },  // #
-    { wch: 30 }, // Quality
-    { wch: 18 }, // Status
-    { wch: 16 }, // Color Group
-    { wch: 14 }, // Colour
-    { wch: 10 }, // Denier
-    { wch: 16 }, // Tape Width
-    { wch: 16 }, // Reed Space
-    { wch: 18 }, // Bobbin Marking
-    { wch: 12 }, // Mesh
-    { wch: 12 }, // Target PPM
-    { wch: 22 }, // Loom Count
-    { wch: 45 }, // Loom Numbers
-    { wch: 18 }, // Produced Kg
-    { wch: 18 }, // Planned Kg
-    { wch: 22 }, // Shifts
-    { wch: 20 }, // Operator
-    { wch: 16 }, // Last Date
   ];
 
-  XLSX.utils.book_append_sheet(wb, ws1, "Loom Allocations");
+  const wsRecipes = XLSX.utils.aoa_to_sheet(recipeSheetData);
+  XLSX.utils.book_append_sheet(wb, wsRecipes, "Recipe Allocations");
 
   // -------------------------------------------------------------
-  // Sheet 2: 1-91 Factory Loom Floor Matrix
+  // Sheet 2: Loom-Wise Machine Matrix (Looms 1 to 91)
   // -------------------------------------------------------------
-  const matrixHeader = [
+  const loomHeader = [
     "Loom #",
-    "Allocation Status",
-    "Running Quality Code",
-    "Color Group",
-    "Colour",
-    "Denier",
-    "Tape Width (mm)",
-    "Reed Space (cm)",
-    "Bobbin Marking",
-    "Tape Plant Status",
-    "Active Shifts",
-    "Operator",
+    "Machine ID",
+    "Status",
+    "Active Running Recipe",
+    "Total Crates Dispatched",
+    "Total Bobbins (@ 8)",
+    "Total Weight (KG)",
+    "Latest Issue Date",
+    "Latest Shift",
+    "Last Issued By",
+    "Last Received By",
   ];
 
-  const matrixRows = data.loomMatrix.map((m) => [
-    `Loom #${m.loomNumber}`,
-    m.isAllocated ? "ALLOCATED" : "UNALLOCATED",
-    m.qualityCode || "—",
-    m.colorGroup,
-    m.colour,
-    m.denier || "—",
-    m.tapeWidth || "—",
-    m.reedSpaceCm || "—",
-    m.bobbinMarking,
-    m.status,
-    (m.activeShifts || []).join(", ") || "—",
-    m.latestOperator || "—",
+  const looms = data.loomSummaries && data.loomSummaries.length > 0
+    ? data.loomSummaries
+    : data.loomMatrix.map((m) => ({
+        loomNumber: m.loomNumber,
+        loomIdentifier: `Loom #${m.loomNumber}`,
+        isActive: m.isAllocated,
+        activeRecipe: m.qualityCode,
+        allRecipes: m.qualityCode ? [m.qualityCode] : [],
+        totalCrates: 0,
+        totalBobbins: 0,
+        totalWeightKg: 0,
+        latestDate: null,
+        latestShiftName: m.activeShifts?.[0] || null,
+        lastIssuedBy: m.latestOperator || null,
+        lastReceivedBy: null,
+        allocationsCount: m.isAllocated ? 1 : 0,
+        recentIssues: [],
+      }));
+
+  const loomRows = looms.map((l) => [
+    l.loomNumber,
+    l.loomIdentifier,
+    l.isActive ? "ACTIVE / RUNNING" : "IDLE / UNASSIGNED",
+    l.activeRecipe || "—",
+    l.totalCrates || 0,
+    l.totalBobbins || 0,
+    l.totalWeightKg || 0,
+    l.latestDate || "—",
+    l.latestShiftName || "—",
+    l.lastIssuedBy || "—",
+    l.lastReceivedBy || "—",
   ]);
 
-  const ws2 = XLSX.utils.aoa_to_sheet([
-    ["FLEXICOM INDUSTRIES - FACTORY FLOOR 1-91 LOOM MACHINE STATUS MATRIX"],
-    [`Date: ${dateLabel}`, `Shift: ${shiftLabel}`, `Generated: ${genTimestamp}`],
+  const loomSheetData = [
+    ["FLEXICOM INDUSTRIES PVT. LTD. — LOOM MACHINE RUN REPORT"],
+    ["LOOMS 1 TO 91 STATUS & ACTIVE RECIPE MATRIX"],
+    [`Date Context: ${dateLabel}`, `Shift Context: ${shiftLabel}`, `Generated: ${genTimestamp}`],
     emptyRow,
-    matrixHeader,
-    ...matrixRows,
-  ]);
-
-  ws2["!cols"] = [
-    { wch: 12 }, // Loom #
-    { wch: 20 }, // Allocation
-    { wch: 30 }, // Quality
-    { wch: 16 }, // Color Group
-    { wch: 14 }, // Colour
-    { wch: 10 }, // Denier
-    { wch: 16 }, // Tape Width
-    { wch: 16 }, // Reed Space
-    { wch: 18 }, // Bobbin
-    { wch: 18 }, // Status
-    { wch: 20 }, // Shifts
-    { wch: 20 }, // Operator
+    loomHeader,
+    ...loomRows,
   ];
 
-  XLSX.utils.book_append_sheet(wb, ws2, "1-91 Loom Matrix");
+  const wsLooms = XLSX.utils.aoa_to_sheet(loomSheetData);
+  XLSX.utils.book_append_sheet(wb, wsLooms, "Looms 1-91 Matrix");
 
-  // -------------------------------------------------------------
-  // Sheet 3: Shift-Wise Production & Loom Operations
-  // -------------------------------------------------------------
-  if (data.shiftSummaryList && data.shiftSummaryList.length > 0) {
-    const shiftHeader = [
-      "Shift Name",
-      "Timing",
-      "Active Qualities Count",
-      "Running Looms Count",
-      "Tape Produced (Kg)",
-      "Tape Planned (Kg)",
-      "Operators",
-      "Running Quality Codes",
-    ];
-
-    const shiftRows = data.shiftSummaryList.map((s) => [
-      s.shiftName,
-      `${s.startTime} - ${s.endTime}`,
-      s.qualitiesCount,
-      s.activeLoomsCount,
-      s.producedKg,
-      s.plannedKg,
-      s.operators.join(", ") || "—",
-      s.qualityCodes.join(", ") || "—",
-    ]);
-
-    const ws3 = XLSX.utils.aoa_to_sheet([
-      ["FLEXICOM INDUSTRIES - SHIFT-WISE TAPE OUTPUT & LOOM ALLOCATIONS"],
-      [`Date: ${dateLabel}`, `Generated: ${genTimestamp}`],
-      emptyRow,
-      shiftHeader,
-      ...shiftRows,
-    ]);
-
-    ws3["!cols"] = [
-      { wch: 16 },
-      { wch: 18 },
-      { wch: 22 },
-      { wch: 22 },
-      { wch: 20 },
-      { wch: 20 },
-      { wch: 30 },
-      { wch: 50 },
-    ];
-
-    XLSX.utils.book_append_sheet(wb, ws3, "Shift Operations");
-  }
-
-  // -------------------------------------------------------------
-  // Sheet 4: Scorecard & Color Group Distribution
-  // -------------------------------------------------------------
-  const cgHeader = ["Color Group", "Assigned Looms Count", "Active Qualities", "Running Looms"];
-  const cgRows = data.colorGroupsSummary.map((cg) => [
-    cg.colorGroup,
-    cg.totalLooms,
-    cg.qualityCount,
-    cg.activeLooms,
-  ]);
-
-  const ws4 = XLSX.utils.aoa_to_sheet([
-    ["FLEXICOM INDUSTRIES - LOOM SECTION EXECUTIVE SCORECARD"],
-    [`Date: ${dateLabel}`, `Shift: ${shiftLabel}`, `Generated: ${genTimestamp}`],
-    emptyRow,
-    ["KPI METRICS", "VALUE"],
-    ["Total Factory Looms", data.kpis.totalFactoryLooms],
-    ["Total Allocated Looms", data.kpis.totalAllocatedLooms],
-    ["Looms On Active Running Tape", data.kpis.totalRunningLooms],
-    ["Looms On Planned Tape", data.kpis.totalPlannedLooms],
-    ["Looms On Standby Qualities", data.kpis.totalStandbyLooms],
-    ["Unallocated / Idle Looms", data.kpis.totalUnallocatedLooms],
-    ["Active Qualities In Production", data.kpis.runningQualitiesCount],
-    ["Total Mapped Qualities", data.kpis.totalQualitiesCount],
-    ["Total Tape Produced (Kg)", data.kpis.totalTapeProducedKg],
-    ["Total Tape Planned (Kg)", data.kpis.totalTapePlannedKg],
-    emptyRow,
-    ["COLOR GROUP LOOM DISTRIBUTION", "", "", ""],
-    cgHeader,
-    ...cgRows,
-  ]);
-
-  ws4["!cols"] = [{ wch: 32 }, { wch: 22 }, { wch: 18 }, { wch: 18 }];
-  XLSX.utils.book_append_sheet(wb, ws4, "KPI Scorecard");
-
-  const dateFileTag = data.selectedDate && data.selectedDate !== "ALL" ? data.selectedDate : new Date().toISOString().slice(0, 10);
-  const filename = `Loom_Summary_Allocations_${dateFileTag}.xlsx`;
-  XLSX.writeFile(wb, filename);
+  // Trigger Excel File Download
+  const filenameDate = (data.selectedDate && data.selectedDate !== "ALL" ? data.selectedDate : new Date().toISOString().slice(0, 10)).replace(/-/g, "");
+  XLSX.writeFile(wb, `Loom_Summary_Allocations_${filenameDate}.xlsx`);
 }
