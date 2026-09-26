@@ -3,7 +3,8 @@ CREATE TABLE IF NOT EXISTS "TapePlantBobbinIssue" (
     "id" TEXT NOT NULL,
     "slipNumber" TEXT NOT NULL,
     "date" TEXT NOT NULL,
-    "shiftId" TEXT NOT NULL,
+    "shiftId" TEXT,
+    "shiftName" TEXT,
     "recipeQuality" TEXT NOT NULL,
     "loomNumber" INTEGER,
     "loomIdentifier" TEXT,
@@ -35,6 +36,6 @@ BEGIN
     IF NOT EXISTS (
         SELECT 1 FROM pg_constraint WHERE conname = 'TapePlantBobbinIssue_shiftId_fkey'
     ) THEN
-        ALTER TABLE "TapePlantBobbinIssue" ADD CONSTRAINT "TapePlantBobbinIssue_shiftId_fkey" FOREIGN KEY ("shiftId") REFERENCES "Shift"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+        ALTER TABLE "TapePlantBobbinIssue" ADD CONSTRAINT "TapePlantBobbinIssue_shiftId_fkey" FOREIGN KEY ("shiftId") REFERENCES "Shift"("id") ON DELETE SET NULL ON UPDATE CASCADE;
     END IF;
 END $$;

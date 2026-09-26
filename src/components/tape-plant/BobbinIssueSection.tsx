@@ -18,8 +18,6 @@ import {
   Filter,
   FileText,
   RotateCcw,
-  Sparkles,
-  ChevronRight,
   Trash2,
 } from "lucide-react";
 import { RecipeQualityBadge } from "./RecipeQualityBadge";
@@ -322,23 +320,23 @@ export function BobbinIssueSection({ onNavigateToBobbinStock }: BobbinIssueSecti
     transactionTypeFilter !== "ALL";
 
   return (
-    <div className="space-y-6 w-full min-w-0 max-w-full">
-      {/* Bento Metric Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="space-y-5 w-full min-w-0 max-w-full">
+      {/* Minimalist Bento Metric Strip */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {/* Total Crates Issued */}
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-purple-500/10 via-purple-500/5 to-transparent border border-purple-500/20 p-5 shadow-sm transition-all hover:shadow-md">
+        <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-2xs transition-all hover:border-slate-300">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-purple-800 uppercase tracking-wider">
+            <span className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">
               Total Crates Issued
             </span>
-            <div className="p-2.5 bg-purple-500/10 text-purple-600 rounded-xl">
-              <Package className="h-5 w-5" />
+            <div className="p-1.5 bg-slate-100 text-slate-700 rounded-lg">
+              <Package className="h-4 w-4" />
             </div>
           </div>
-          <div className="mt-3">
-            <div className="text-2xl font-extrabold text-purple-900 tracking-tight">
+          <div className="mt-2.5">
+            <div className="text-xl font-bold font-mono text-slate-900 tracking-tight">
               {loading ? (
-                <div className="h-7 w-24 bg-slate-200 animate-pulse rounded" />
+                <div className="h-6 w-20 bg-slate-100 animate-pulse rounded" />
               ) : (
                 `${issueTotals.totalCratesIssued.toLocaleString(undefined, {
                   minimumFractionDigits: 1,
@@ -346,26 +344,26 @@ export function BobbinIssueSection({ onNavigateToBobbinStock }: BobbinIssueSecti
                 })} crates`
               )}
             </div>
-            <p className="text-[11px] font-medium text-purple-700/80 mt-1">
-              Standard 8 bobbins (12.8 kg) per crate
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              8 bobbins (12.8 kg) per crate
             </p>
           </div>
         </div>
 
         {/* Total Bobbins Issued */}
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-500/10 via-blue-500/5 to-transparent border border-blue-500/20 p-5 shadow-sm transition-all hover:shadow-md">
+        <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-2xs transition-all hover:border-slate-300">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-blue-800 uppercase tracking-wider">
+            <span className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">
               Total Bobbins Issued
             </span>
-            <div className="p-2.5 bg-blue-500/10 text-blue-600 rounded-xl">
-              <Boxes className="h-5 w-5" />
+            <div className="p-1.5 bg-slate-100 text-slate-700 rounded-lg">
+              <Boxes className="h-4 w-4" />
             </div>
           </div>
-          <div className="mt-3">
-            <div className="text-2xl font-extrabold text-blue-900 tracking-tight">
+          <div className="mt-2.5">
+            <div className="text-xl font-bold font-mono text-slate-900 tracking-tight">
               {loading ? (
-                <div className="h-7 w-24 bg-slate-200 animate-pulse rounded" />
+                <div className="h-6 w-20 bg-slate-100 animate-pulse rounded" />
               ) : (
                 `${issueTotals.totalBobbinsIssued.toLocaleString(undefined, {
                   minimumFractionDigits: 1,
@@ -373,26 +371,26 @@ export function BobbinIssueSection({ onNavigateToBobbinStock }: BobbinIssueSecti
                 })} pcs`
               )}
             </div>
-            <p className="text-[11px] font-medium text-blue-700/80 mt-1">
-              Auto-calculated at 1.6 kg per bobbin
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              Standard 1.6 kg per bobbin
             </p>
           </div>
         </div>
 
         {/* Total Weight Issued (KG) */}
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-transparent border border-emerald-500/20 p-5 shadow-sm transition-all hover:shadow-md">
+        <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-2xs transition-all hover:border-slate-300">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-emerald-800 uppercase tracking-wider">
+            <span className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">
               Total Weight Issued
             </span>
-            <div className="p-2.5 bg-emerald-500/10 text-emerald-600 rounded-xl">
-              <Scale className="h-5 w-5" />
+            <div className="p-1.5 bg-slate-100 text-slate-700 rounded-lg">
+              <Scale className="h-4 w-4" />
             </div>
           </div>
-          <div className="mt-3">
-            <div className="text-2xl font-extrabold text-slate-900 tracking-tight">
+          <div className="mt-2.5">
+            <div className="text-xl font-bold font-mono text-slate-900 tracking-tight">
               {loading ? (
-                <div className="h-7 w-24 bg-slate-200 animate-pulse rounded" />
+                <div className="h-6 w-20 bg-slate-100 animate-pulse rounded" />
               ) : (
                 `${issueTotals.totalWeightIssuedKg.toLocaleString(undefined, {
                   minimumFractionDigits: 2,
@@ -400,81 +398,82 @@ export function BobbinIssueSection({ onNavigateToBobbinStock }: BobbinIssueSecti
                 })} kg`
               )}
             </div>
-            <p className="text-[11px] font-medium text-slate-500 mt-1">
-              Deducted live from Tape Plant Stock
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              Deducted live from Bobbin Stock
             </p>
           </div>
         </div>
 
         {/* Active Looms Fed */}
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-transparent border border-amber-500/20 p-5 shadow-sm transition-all hover:shadow-md">
+        <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-2xs transition-all hover:border-slate-300">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-amber-800 uppercase tracking-wider">
+            <span className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">
               Looms Fed / Dispatches
             </span>
-            <div className="p-2.5 bg-amber-500/10 text-amber-600 rounded-xl">
-              <Layers className="h-5 w-5" />
+            <div className="p-1.5 bg-slate-100 text-slate-700 rounded-lg">
+              <Layers className="h-4 w-4" />
             </div>
           </div>
-          <div className="mt-3">
-            <div className="text-2xl font-extrabold text-slate-900 tracking-tight">
+          <div className="mt-2.5">
+            <div className="text-xl font-bold font-mono text-slate-900 tracking-tight">
               {loading ? (
-                <div className="h-7 w-24 bg-slate-200 animate-pulse rounded" />
+                <div className="h-6 w-20 bg-slate-100 animate-pulse rounded" />
               ) : (
-                `${issueTotals.uniqueLoomsCount} Looms (${issueTotals.totalIssuesCount} Slips)`
+                `${issueTotals.uniqueLoomsCount} Looms`
               )}
             </div>
-            <p className="text-[11px] font-medium text-slate-500 mt-1">
-              Across {issueTotals.uniqueQualitiesCount} Recipe Qualities
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              {issueTotals.totalIssuesCount} slips across {issueTotals.uniqueQualitiesCount} qualities
             </p>
           </div>
         </div>
       </div>
 
-      {/* Main Container Card with Sub-tabs */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      {/* Main Container Card */}
+      <div className="bg-white rounded-xl border border-slate-200/80 shadow-2xs overflow-hidden">
         {/* Header & Sub-tab Switcher */}
-        <div className="p-5 border-b border-slate-200 bg-slate-50/60 flex flex-col gap-4">
-          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
-            <div>
-              <div className="flex items-center gap-3">
-                <h2 className="text-base font-bold text-slate-900">
-                  {activeSubTab === "issues" ? "Bobbin Loom Issue Register" : "Stock Transactions Ledger"}
-                </h2>
-                <div className="inline-flex rounded-lg bg-slate-200/80 p-0.5 text-xs font-semibold">
-                  <button
-                    type="button"
-                    onClick={() => setActiveSubTab("issues")}
-                    className={`px-3 py-1 rounded-md transition-all ${
-                      activeSubTab === "issues"
-                        ? "bg-white text-slate-900 shadow-xs font-bold"
-                        : "text-slate-600 hover:text-slate-900"
-                    }`}
-                  >
-                    Loom Issues (Outward)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setActiveSubTab("ledger")}
-                    className={`px-3 py-1 rounded-md transition-all ${
-                      activeSubTab === "ledger"
-                        ? "bg-white text-slate-900 shadow-xs font-bold"
-                        : "text-slate-600 hover:text-slate-900"
-                    }`}
-                  >
-                    Full Ledger (IN / OUT)
-                  </button>
-                </div>
+        <div className="p-4 border-b border-slate-100 bg-white flex flex-col gap-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              {/* Sleek Subtab Pill Control */}
+              <div className="inline-flex rounded-lg bg-slate-100 p-0.5 text-xs font-medium border border-slate-200/60">
+                <button
+                  type="button"
+                  onClick={() => setActiveSubTab("issues")}
+                  className={`px-3 py-1 rounded-md transition-all cursor-pointer ${
+                    activeSubTab === "issues"
+                      ? "bg-white text-slate-900 shadow-2xs font-semibold"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  Loom Issues (Outward)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveSubTab("ledger")}
+                  className={`px-3 py-1 rounded-md transition-all cursor-pointer ${
+                    activeSubTab === "ledger"
+                      ? "bg-white text-slate-900 shadow-2xs font-semibold"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  Full Ledger (IN / OUT)
+                </button>
               </div>
-              <p className="text-xs text-slate-500 mt-1">
-                {activeSubTab === "issues"
-                  ? "Issue bobbin crates to circular looms with auto-calculated KG and print official issue slips."
-                  : "Consolidated transaction history of Tape Plant receipts (IN) and Loom issues (OUT) with running balances."}
-              </p>
+
+              {onNavigateToBobbinStock && (
+                <button
+                  type="button"
+                  onClick={onNavigateToBobbinStock}
+                  className="text-xs font-medium text-slate-500 hover:text-slate-900 transition-colors hidden md:inline"
+                >
+                  Bobbin Stock Summary &rarr;
+                </button>
+              )}
             </div>
 
             {/* Actions */}
-            <div className="flex items-center gap-2 self-end md:self-auto">
+            <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => {
@@ -483,34 +482,34 @@ export function BobbinIssueSection({ onNavigateToBobbinStock }: BobbinIssueSecti
                   fetchAvailableStock();
                 }}
                 disabled={refreshing || loading}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 active:bg-slate-100 shadow-sm transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 active:bg-slate-100 shadow-2xs transition-colors cursor-pointer"
                 title="Refresh Data"
               >
-                <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin text-primary" : "text-slate-500"}`} />
+                <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin text-slate-700" : "text-slate-500"}`} />
                 <span className="hidden sm:inline">Refresh</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setIssueModalOpen(true)}
-                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 active:bg-blue-800 rounded-lg shadow-sm transition-all cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-medium text-white bg-slate-900 hover:bg-slate-800 active:bg-black rounded-lg shadow-xs transition-colors cursor-pointer"
               >
-                <Plus className="h-4 w-4" />
+                <Plus className="h-3.5 w-3.5" />
                 <span>Issue to Loom</span>
               </button>
             </div>
           </div>
 
-          {/* Filter Bar */}
-          <div className="pt-3 border-t border-slate-200/80 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-2.5">
+          {/* Minimalist Filter Strip */}
+          <div className="pt-2.5 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2.5">
+            <div className="flex flex-wrap items-center gap-2">
               {/* Date Scope Pills */}
-              <div className="inline-flex rounded-lg bg-slate-200/70 p-0.5 text-xs font-semibold">
+              <div className="inline-flex rounded-md bg-slate-100 p-0.5 text-xs font-medium">
                 <button
                   type="button"
                   onClick={() => setDateFilterMode("all")}
-                  className={`px-3 py-1 rounded-md transition-all ${
-                    dateFilterMode === "all" ? "bg-white text-slate-900 shadow-xs font-bold" : "text-slate-600"
+                  className={`px-2.5 py-0.5 rounded transition-all cursor-pointer ${
+                    dateFilterMode === "all" ? "bg-white text-slate-900 shadow-2xs font-semibold" : "text-slate-600"
                   }`}
                 >
                   All (Till Today)
@@ -518,8 +517,8 @@ export function BobbinIssueSection({ onNavigateToBobbinStock }: BobbinIssueSecti
                 <button
                   type="button"
                   onClick={() => setDateFilterMode("single")}
-                  className={`px-3 py-1 rounded-md transition-all ${
-                    dateFilterMode === "single" ? "bg-white text-slate-900 shadow-xs font-bold" : "text-slate-600"
+                  className={`px-2.5 py-0.5 rounded transition-all cursor-pointer ${
+                    dateFilterMode === "single" ? "bg-white text-slate-900 shadow-2xs font-semibold" : "text-slate-600"
                   }`}
                 >
                   Single Date
@@ -527,53 +526,53 @@ export function BobbinIssueSection({ onNavigateToBobbinStock }: BobbinIssueSecti
                 <button
                   type="button"
                   onClick={() => setDateFilterMode("range")}
-                  className={`px-3 py-1 rounded-md transition-all ${
-                    dateFilterMode === "range" ? "bg-white text-slate-900 shadow-xs font-bold" : "text-slate-600"
+                  className={`px-2.5 py-0.5 rounded transition-all cursor-pointer ${
+                    dateFilterMode === "range" ? "bg-white text-slate-900 shadow-2xs font-semibold" : "text-slate-600"
                   }`}
                 >
-                  Date Range
+                  Range
                 </button>
               </div>
 
               {/* Conditional Date Pickers */}
               {dateFilterMode === "single" && (
-                <div className="flex items-center gap-1.5 bg-white rounded-lg border border-slate-200 px-2.5 py-1 shadow-xs">
-                  <Calendar className="h-3.5 w-3.5 text-slate-400" />
+                <div className="flex items-center gap-1.5 bg-white rounded-lg border border-slate-200 px-2 py-1 text-xs">
+                  <Calendar className="h-3 w-3 text-slate-400" />
                   <input
                     type="date"
                     value={selectedSingleDate}
                     onChange={(e) => setSelectedSingleDate(e.target.value)}
-                    className="text-xs font-bold text-slate-800 bg-transparent outline-none cursor-pointer"
+                    className="text-xs font-medium text-slate-800 bg-transparent outline-none cursor-pointer"
                   />
                 </div>
               )}
 
               {dateFilterMode === "range" && (
-                <div className="flex items-center gap-2 bg-white rounded-lg border border-slate-200 px-2.5 py-1 shadow-xs">
-                  <Calendar className="h-3.5 w-3.5 text-slate-400" />
+                <div className="flex items-center gap-1.5 bg-white rounded-lg border border-slate-200 px-2 py-1 text-xs">
+                  <Calendar className="h-3 w-3 text-slate-400" />
                   <input
                     type="date"
                     value={dateFrom}
                     onChange={(e) => setDateFrom(e.target.value)}
-                    className="text-xs font-bold text-slate-800 bg-transparent outline-none cursor-pointer"
+                    className="text-xs font-medium text-slate-800 bg-transparent outline-none cursor-pointer"
                   />
-                  <span className="text-xs text-slate-400 font-semibold">to</span>
+                  <span className="text-slate-400 text-[10px]">to</span>
                   <input
                     type="date"
                     value={dateTo}
                     onChange={(e) => setDateTo(e.target.value)}
-                    className="text-xs font-bold text-slate-800 bg-transparent outline-none cursor-pointer"
+                    className="text-xs font-medium text-slate-800 bg-transparent outline-none cursor-pointer"
                   />
                 </div>
               )}
 
               {/* Shift Filter */}
-              <div className="flex items-center gap-1.5 bg-white rounded-lg border border-slate-200 px-2.5 py-1 shadow-xs">
-                <Clock className="h-3.5 w-3.5 text-slate-400" />
+              <div className="flex items-center gap-1 bg-white rounded-lg border border-slate-200 px-2 py-1 text-xs">
+                <Clock className="h-3 w-3 text-slate-400" />
                 <select
                   value={selectedShiftId}
                   onChange={(e) => setSelectedShiftId(e.target.value)}
-                  className="text-xs font-bold text-slate-800 bg-transparent outline-none cursor-pointer"
+                  className="text-xs font-medium text-slate-800 bg-transparent outline-none cursor-pointer"
                 >
                   <option value="ALL">All Shifts</option>
                   {shifts.map((s) => (
@@ -585,12 +584,12 @@ export function BobbinIssueSection({ onNavigateToBobbinStock }: BobbinIssueSecti
               </div>
 
               {/* Loom Filter */}
-              <div className="flex items-center gap-1.5 bg-white rounded-lg border border-slate-200 px-2.5 py-1 shadow-xs">
-                <span className="text-[10px] font-bold text-slate-400 uppercase">Loom:</span>
+              <div className="flex items-center gap-1 bg-white rounded-lg border border-slate-200 px-2 py-1 text-xs">
+                <span className="text-[10px] text-slate-400 uppercase">Loom:</span>
                 <select
                   value={selectedLoom}
                   onChange={(e) => setSelectedLoom(e.target.value)}
-                  className="text-xs font-bold text-slate-800 bg-transparent outline-none cursor-pointer"
+                  className="text-xs font-medium text-slate-800 bg-transparent outline-none cursor-pointer"
                 >
                   <option value="ALL">All Looms</option>
                   {Array.from({ length: 91 }, (_, i) => i + 1).map((num) => (
@@ -601,14 +600,14 @@ export function BobbinIssueSection({ onNavigateToBobbinStock }: BobbinIssueSecti
                 </select>
               </div>
 
-              {/* Ledger Type Filter if in Ledger tab */}
+              {/* Ledger Type Filter */}
               {activeSubTab === "ledger" && (
-                <div className="inline-flex rounded-lg bg-slate-200/70 p-0.5 text-xs font-semibold">
+                <div className="inline-flex rounded-md bg-slate-100 p-0.5 text-xs font-medium">
                   <button
                     type="button"
                     onClick={() => setTransactionTypeFilter("ALL")}
-                    className={`px-2.5 py-0.5 rounded-md ${
-                      transactionTypeFilter === "ALL" ? "bg-white text-slate-900 font-bold" : "text-slate-600"
+                    className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
+                      transactionTypeFilter === "ALL" ? "bg-white text-slate-900 font-semibold shadow-2xs" : "text-slate-600"
                     }`}
                   >
                     All Types
@@ -616,20 +615,20 @@ export function BobbinIssueSection({ onNavigateToBobbinStock }: BobbinIssueSecti
                   <button
                     type="button"
                     onClick={() => setTransactionTypeFilter("INWARD")}
-                    className={`px-2.5 py-0.5 rounded-md ${
-                      transactionTypeFilter === "INWARD" ? "bg-emerald-600 text-white font-bold" : "text-slate-600"
+                    className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
+                      transactionTypeFilter === "INWARD" ? "bg-slate-900 text-white font-medium" : "text-slate-600"
                     }`}
                   >
-                    IN (+ Receipts)
+                    IN Receipts
                   </button>
                   <button
                     type="button"
                     onClick={() => setTransactionTypeFilter("OUTWARD")}
-                    className={`px-2.5 py-0.5 rounded-md ${
-                      transactionTypeFilter === "OUTWARD" ? "bg-purple-600 text-white font-bold" : "text-slate-600"
+                    className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
+                      transactionTypeFilter === "OUTWARD" ? "bg-slate-900 text-white font-medium" : "text-slate-600"
                     }`}
                   >
-                    OUT (- Issues)
+                    OUT Issues
                   </button>
                 </div>
               )}
@@ -638,7 +637,7 @@ export function BobbinIssueSection({ onNavigateToBobbinStock }: BobbinIssueSecti
                 <button
                   type="button"
                   onClick={handleResetFilters}
-                  className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-slate-500 hover:text-slate-800 hover:bg-slate-200/60 rounded-lg transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
                 >
                   <RotateCcw className="h-3 w-3" />
                   <span>Reset</span>
@@ -646,15 +645,15 @@ export function BobbinIssueSection({ onNavigateToBobbinStock }: BobbinIssueSecti
               )}
             </div>
 
-            {/* Live Search */}
-            <div className="relative w-full sm:w-64">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+            {/* Search */}
+            <div className="relative w-full sm:w-56">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
               <input
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Search slip, quality, loom, operator..."
-                className="w-full pl-8 pr-3 py-1 text-xs font-medium bg-white border border-slate-200 rounded-lg outline-none focus:border-blue-500 shadow-xs"
+                placeholder="Search slip, quality, loom..."
+                className="w-full pl-8 pr-2.5 py-1 text-xs font-medium bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-slate-800 focus:bg-white transition-colors"
               />
             </div>
           </div>
@@ -663,33 +662,27 @@ export function BobbinIssueSection({ onNavigateToBobbinStock }: BobbinIssueSecti
         {/* Tab View 1: Outgoing Bobbin Issues */}
         {activeSubTab === "issues" && (
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[800px]">
+            <table className="w-full text-left border-collapse min-w-[800px] text-xs">
               <thead>
-                <tr className="bg-slate-100/80 border-b border-slate-200 text-[11px] font-bold text-slate-700 uppercase tracking-wider">
-                  <th className="py-3 px-4 w-12 text-center">#</th>
-                  <th className="py-3 px-4">Slip Ref</th>
-                  <th className="py-3 px-4">Date & Shift</th>
-                  <th className="py-3 px-4">Quality Name</th>
-                  <th className="py-3 px-4">Destination Loom</th>
-                  <th className="py-3 px-4 text-right bg-purple-50/60 text-purple-900 border-x border-purple-100">
-                    Crates Issued
-                  </th>
-                  <th className="py-3 px-4 text-right bg-blue-50/60 text-blue-900 border-r border-blue-100">
-                    Bobbins (@ 8)
-                  </th>
-                  <th className="py-3 px-4 text-right bg-emerald-50/60 text-emerald-900 border-r border-emerald-100">
-                    Weight (KG)
-                  </th>
-                  <th className="py-3 px-4">Issuer / Receiver</th>
-                  <th className="py-3 px-4 text-center w-28">Actions</th>
+                <tr className="bg-slate-50/75 border-b border-slate-200 text-[11px] font-medium text-slate-600 uppercase tracking-wider">
+                  <th className="py-2.5 px-3 w-10 text-center">#</th>
+                  <th className="py-2.5 px-3">Slip Ref</th>
+                  <th className="py-2.5 px-3">Date & Shift</th>
+                  <th className="py-2.5 px-3">Quality Name</th>
+                  <th className="py-2.5 px-3">Loom Target</th>
+                  <th className="py-2.5 px-3 text-right">Crates</th>
+                  <th className="py-2.5 px-3 text-right">Bobbins</th>
+                  <th className="py-2.5 px-3 text-right">Weight</th>
+                  <th className="py-2.5 px-3">Issuer / Receiver</th>
+                  <th className="py-2.5 px-3 text-center w-20">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 text-xs text-slate-700 font-medium">
+              <tbody className="divide-y divide-slate-100 text-xs text-slate-700">
                 {loading ? (
                   <tr>
                     <td colSpan={10} className="py-12 text-center text-slate-500">
                       <div className="inline-flex items-center gap-2">
-                        <RefreshCw className="h-5 w-5 animate-spin text-primary" />
+                        <RefreshCw className="h-4 w-4 animate-spin text-slate-600" />
                         <span>Loading issue records...</span>
                       </div>
                     </td>
@@ -698,19 +691,19 @@ export function BobbinIssueSection({ onNavigateToBobbinStock }: BobbinIssueSecti
                   <tr>
                     <td colSpan={10} className="py-12 text-center">
                       <div className="max-w-md mx-auto flex flex-col items-center justify-center p-4">
-                        <div className="p-3 bg-slate-100 text-slate-400 rounded-full mb-3">
-                          <Package className="h-8 w-8" />
+                        <div className="p-3 bg-slate-100 text-slate-400 rounded-xl mb-2.5">
+                          <Package className="h-6 w-6" />
                         </div>
-                        <h3 className="text-sm font-bold text-slate-800">No Bobbin Issues Found</h3>
-                        <p className="text-xs text-slate-500 mt-1 text-center">
+                        <h3 className="text-xs font-semibold text-slate-800">No Bobbin Issues Recorded</h3>
+                        <p className="text-[11px] text-slate-500 mt-0.5 text-center">
                           {searchTerm
                             ? `No records matching "${searchTerm}".`
-                            : "No crates have been issued for the selected period."}
+                            : "No crates have been issued for the selected filter scope."}
                         </p>
                         <button
                           type="button"
                           onClick={() => setIssueModalOpen(true)}
-                          className="mt-4 inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm"
+                          className="mt-3.5 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-slate-900 hover:bg-slate-800 rounded-lg shadow-xs"
                         >
                           <Plus className="h-3.5 w-3.5" />
                           <span>Issue Bobbins to Loom</span>
@@ -720,63 +713,61 @@ export function BobbinIssueSection({ onNavigateToBobbinStock }: BobbinIssueSecti
                   </tr>
                 ) : (
                   issues.map((item) => (
-                    <tr key={item.id} className="hover:bg-slate-50/80 transition-colors group">
-                      <td className="py-3 px-4 text-center font-bold text-slate-500">{item.slNo}</td>
+                    <tr key={item.id} className="hover:bg-slate-50/70 transition-colors group">
+                      <td className="py-2.5 px-3 text-center text-slate-400 font-mono text-[11px]">{item.slNo}</td>
 
-                      <td className="py-3 px-4">
-                        <span className="font-mono font-extrabold text-blue-900 bg-blue-50 px-2 py-0.5 rounded border border-blue-200 text-[11px]">
-                          {item.slipNumber}
-                        </span>
+                      <td className="py-2.5 px-3 font-mono text-slate-900 font-semibold text-[11px]">
+                        {item.slipNumber}
                       </td>
 
-                      <td className="py-3 px-4">
-                        <div className="font-semibold text-slate-900">{item.date}</div>
-                        <div className="text-[10px] text-slate-500 uppercase">{item.shiftName}</div>
+                      <td className="py-2.5 px-3">
+                        <div className="font-medium text-slate-900">{item.date}</div>
+                        <div className="text-[10px] text-slate-400">{item.shiftName}</div>
                       </td>
 
-                      <td className="py-3 px-4">
+                      <td className="py-2.5 px-3">
                         <RecipeQualityBadge value={item.recipeQuality} />
                       </td>
 
-                      <td className="py-3 px-4 font-mono font-bold text-slate-800">
+                      <td className="py-2.5 px-3 font-mono font-medium text-slate-800">
                         {item.loomIdentifier || (item.loomNumber ? `Loom #${item.loomNumber}` : "Loom Shed")}
                       </td>
 
-                      <td className="py-3 px-4 text-right font-extrabold text-purple-900 bg-purple-50/30 border-x border-purple-100/70">
+                      <td className="py-2.5 px-3 text-right font-mono font-semibold text-slate-900">
                         {item.crateCount.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 })}{" "}
-                        <span className="text-[10px] font-semibold text-purple-600">crates</span>
+                        <span className="text-[10px] font-normal text-slate-400">crates</span>
                       </td>
 
-                      <td className="py-3 px-4 text-right font-extrabold text-blue-900 bg-blue-50/30 border-r border-blue-100/70">
+                      <td className="py-2.5 px-3 text-right font-mono font-semibold text-slate-900">
                         {item.bobbinCount.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 })}{" "}
-                        <span className="text-[10px] font-semibold text-blue-600">pcs</span>
+                        <span className="text-[10px] font-normal text-slate-400">pcs</span>
                       </td>
 
-                      <td className="py-3 px-4 text-right font-extrabold text-emerald-900 bg-emerald-50/30 border-r border-emerald-100/70">
+                      <td className="py-2.5 px-3 text-right font-mono font-semibold text-slate-900">
                         {item.weightKg.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{" "}
-                        <span className="text-[10px] font-semibold text-emerald-600">kg</span>
+                        <span className="text-[10px] font-normal text-slate-400">kg</span>
                       </td>
 
-                      <td className="py-3 px-4 text-xs text-slate-600">
-                        <div>By: <strong className="text-slate-800">{item.issuedBy || "—"}</strong></div>
+                      <td className="py-2.5 px-3 text-[11px] text-slate-600">
+                        <div>By: <span className="font-medium text-slate-800">{item.issuedBy || "—"}</span></div>
                         <div>To: <span className="text-slate-500">{item.receivedBy || "—"}</span></div>
                       </td>
 
-                      <td className="py-3 px-4 text-center">
-                        <div className="flex items-center justify-center gap-1.5">
+                      <td className="py-2.5 px-3 text-center">
+                        <div className="flex items-center justify-center gap-1">
                           <button
                             type="button"
                             onClick={() => handlePrintExistingIssueSlip(item)}
-                            className="p-1.5 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                            className="p-1 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors cursor-pointer"
                             title="Print / View Issue Slip"
                           >
-                            <Printer className="h-4 w-4" />
+                            <Printer className="h-3.5 w-3.5" />
                           </button>
                           <button
                             type="button"
                             onClick={() => handleCancelIssue(item.id, item.slipNumber)}
-                            className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                            title="Cancel Issue and Return Stock"
+                            className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors cursor-pointer"
+                            title="Cancel Issue"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
@@ -789,33 +780,33 @@ export function BobbinIssueSection({ onNavigateToBobbinStock }: BobbinIssueSecti
 
               {issues.length > 0 && (
                 <tfoot>
-                  <tr className="bg-slate-100 border-t-2 border-slate-300 font-extrabold text-xs text-slate-900">
-                    <td colSpan={5} className="py-3.5 px-4 text-right uppercase tracking-wider">
-                      Total Dispatched:
+                  <tr className="bg-slate-50/90 border-t border-slate-200 font-semibold text-xs text-slate-900">
+                    <td colSpan={5} className="py-2.5 px-3 text-right text-slate-500 text-[11px] uppercase tracking-wider">
+                      Total Issued:
                     </td>
-                    <td className="py-3.5 px-4 text-right text-purple-900 bg-purple-100 border-x border-purple-200">
+                    <td className="py-2.5 px-3 text-right font-mono">
                       {issueTotals.totalCratesIssued.toLocaleString(undefined, {
                         minimumFractionDigits: 1,
                         maximumFractionDigits: 2,
                       })}{" "}
-                      <span className="text-[10px] font-bold">crates</span>
+                      <span className="text-[10px] font-normal text-slate-500">crates</span>
                     </td>
-                    <td className="py-3.5 px-4 text-right text-blue-900 bg-blue-100 border-r border-blue-200">
+                    <td className="py-2.5 px-3 text-right font-mono">
                       {issueTotals.totalBobbinsIssued.toLocaleString(undefined, {
                         minimumFractionDigits: 1,
                         maximumFractionDigits: 2,
                       })}{" "}
-                      <span className="text-[10px] font-bold">pcs</span>
+                      <span className="text-[10px] font-normal text-slate-500">pcs</span>
                     </td>
-                    <td className="py-3.5 px-4 text-right text-emerald-900 bg-emerald-100 border-r border-emerald-200">
+                    <td className="py-2.5 px-3 text-right font-mono">
                       {issueTotals.totalWeightIssuedKg.toLocaleString(undefined, {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2,
                       })}{" "}
-                      <span className="text-[10px] font-bold">kg</span>
+                      <span className="text-[10px] font-normal text-slate-500">kg</span>
                     </td>
-                    <td colSpan={2} className="py-3.5 px-4 text-xs text-slate-500 font-normal">
-                      {issues.length} total issue slips
+                    <td colSpan={2} className="py-2.5 px-3 text-[11px] text-slate-400 font-normal">
+                      {issues.length} total dispatches
                     </td>
                   </tr>
                 </tfoot>
@@ -827,25 +818,25 @@ export function BobbinIssueSection({ onNavigateToBobbinStock }: BobbinIssueSecti
         {/* Tab View 2: Consolidated Transactions Ledger */}
         {activeSubTab === "ledger" && (
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[800px]">
+            <table className="w-full text-left border-collapse min-w-[800px] text-xs">
               <thead>
-                <tr className="bg-slate-100/80 border-b border-slate-200 text-[11px] font-bold text-slate-700 uppercase tracking-wider">
-                  <th className="py-3 px-4 w-24">Type</th>
-                  <th className="py-3 px-4">Ref Number</th>
-                  <th className="py-3 px-4">Date & Shift</th>
-                  <th className="py-3 px-4">Quality Name</th>
-                  <th className="py-3 px-4">Movement / Destination</th>
-                  <th className="py-3 px-4 text-right">Net KG</th>
-                  <th className="py-3 px-4 text-right">Bobbins</th>
-                  <th className="py-3 px-4 text-right">Crates</th>
-                  <th className="py-3 px-4">Operator / Sign</th>
-                  <th className="py-3 px-4 text-center w-24">Slip Action</th>
+                <tr className="bg-slate-50/75 border-b border-slate-200 text-[11px] font-medium text-slate-600 uppercase tracking-wider">
+                  <th className="py-2.5 px-3 w-20">Type</th>
+                  <th className="py-2.5 px-3">Ref Number</th>
+                  <th className="py-2.5 px-3">Date & Shift</th>
+                  <th className="py-2.5 px-3">Quality</th>
+                  <th className="py-2.5 px-3">Movement / Target</th>
+                  <th className="py-2.5 px-3 text-right">Net KG</th>
+                  <th className="py-2.5 px-3 text-right">Bobbins</th>
+                  <th className="py-2.5 px-3 text-right">Crates</th>
+                  <th className="py-2.5 px-3">Operator</th>
+                  <th className="py-2.5 px-3 text-center w-20">Slip</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 text-xs text-slate-700 font-medium">
+              <tbody className="divide-y divide-slate-100 text-xs text-slate-700">
                 {transactions.length === 0 ? (
                   <tr>
-                    <td colSpan={10} className="py-12 text-center text-slate-500 italic">
+                    <td colSpan={10} className="py-12 text-center text-slate-500 italic text-[11px]">
                       No stock movement transactions recorded for the selected scope.
                     </td>
                   </tr>
@@ -853,89 +844,80 @@ export function BobbinIssueSection({ onNavigateToBobbinStock }: BobbinIssueSecti
                   transactions.map((tx) => {
                     const isInward = tx.type === "INWARD";
                     return (
-                      <tr key={tx.id} className="hover:bg-slate-50/80 transition-colors">
-                        <td className="py-3 px-4">
+                      <tr key={tx.id} className="hover:bg-slate-50/70 transition-colors">
+                        <td className="py-2.5 px-3">
                           {isInward ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300">
-                              <ArrowDownLeft className="h-3 w-3" />
-                              <span>IN (Recv)</span>
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-800 border border-emerald-200/80">
+                              <ArrowDownLeft className="h-3 w-3 text-emerald-600" />
+                              <span>IN</span>
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-black bg-purple-100 text-purple-800 border border-purple-300">
-                              <ArrowUpRight className="h-3 w-3" />
-                              <span>OUT (Issue)</span>
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-800 border border-slate-200/80">
+                              <ArrowUpRight className="h-3 w-3 text-slate-600" />
+                              <span>OUT</span>
                             </span>
                           )}
                         </td>
 
-                        <td className="py-3 px-4 font-mono font-bold text-slate-800 text-[11px]">
+                        <td className="py-2.5 px-3 font-mono font-medium text-slate-800 text-[11px]">
                           {tx.referenceNo}
                         </td>
 
-                        <td className="py-3 px-4">
-                          <div className="font-semibold text-slate-900">{tx.date}</div>
-                          <div className="text-[10px] text-slate-500 uppercase">{tx.shiftName}</div>
+                        <td className="py-2.5 px-3">
+                          <div className="font-medium text-slate-900">{tx.date}</div>
+                          <div className="text-[10px] text-slate-400">{tx.shiftName}</div>
                         </td>
 
-                        <td className="py-3 px-4">
+                        <td className="py-2.5 px-3">
                           <RecipeQualityBadge value={tx.recipeQuality} />
                         </td>
 
-                        <td className="py-3 px-4 text-xs font-semibold">
+                        <td className="py-2.5 px-3 text-[11px] text-slate-600">
                           {isInward ? (
-                            <span className="text-emerald-700">Tape Plant Output (Post-Prod)</span>
+                            <span>Post-Production Output</span>
                           ) : (
-                            <span className="text-purple-700">
+                            <span className="font-mono text-slate-800">
                               {tx.loomIdentifier || (tx.loomNumber ? `Loom #${tx.loomNumber}` : "Loom Shed")}
                             </span>
                           )}
                         </td>
 
                         <td
-                          className={`py-3 px-4 text-right font-mono font-black ${
-                            isInward ? "text-emerald-700" : "text-purple-700"
+                          className={`py-2.5 px-3 text-right font-mono font-semibold ${
+                            isInward ? "text-emerald-700" : "text-slate-800"
                           }`}
                         >
                           {isInward ? "+" : "−"}
                           {tx.netKg.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{" "}
-                          <span className="text-[10px] font-normal text-slate-500">kg</span>
+                          <span className="text-[10px] font-normal text-slate-400">kg</span>
                         </td>
 
-                        <td
-                          className={`py-3 px-4 text-right font-mono font-black ${
-                            isInward ? "text-blue-700" : "text-purple-700"
-                          }`}
-                        >
+                        <td className="py-2.5 px-3 text-right font-mono font-semibold text-slate-800">
                           {isInward ? "+" : "−"}
                           {tx.bobbins.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 })}{" "}
-                          <span className="text-[10px] font-normal text-slate-500">pcs</span>
+                          <span className="text-[10px] font-normal text-slate-400">pcs</span>
                         </td>
 
-                        <td
-                          className={`py-3 px-4 text-right font-mono font-black ${
-                            isInward ? "text-slate-800" : "text-purple-700"
-                          }`}
-                        >
+                        <td className="py-2.5 px-3 text-right font-mono font-semibold text-slate-800">
                           {isInward ? "+" : "−"}
                           {tx.crates.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 })}{" "}
-                          <span className="text-[10px] font-normal text-slate-500">crates</span>
+                          <span className="text-[10px] font-normal text-slate-400">crates</span>
                         </td>
 
-                        <td className="py-3 px-4 text-xs text-slate-600">
+                        <td className="py-2.5 px-3 text-[11px] text-slate-600">
                           {tx.operator || "—"}
                           {tx.receiver && <span className="text-slate-400 block text-[10px]">To: {tx.receiver}</span>}
                         </td>
 
-                        <td className="py-3 px-4 text-center">
+                        <td className="py-2.5 px-3 text-center">
                           {isInward ? (
                             <button
                               type="button"
                               onClick={() => handlePrintInwardSlip(tx)}
-                              className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-bold text-emerald-700 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 rounded border border-emerald-200 transition-colors cursor-pointer"
-                              title="Print Inward Production Slip"
+                              className="p-1 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors cursor-pointer"
+                              title="Print Inward Slip"
                             >
-                              <Printer className="h-3 w-3" />
-                              <span>Inward Slip</span>
+                              <Printer className="h-3.5 w-3.5" />
                             </button>
                           ) : (
                             <button
@@ -957,11 +939,10 @@ export function BobbinIssueSection({ onNavigateToBobbinStock }: BobbinIssueSecti
                                 });
                                 setIssueSlipModalOpen(true);
                               }}
-                              className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-bold text-blue-700 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 rounded border border-blue-200 transition-colors cursor-pointer"
-                              title="Print Bobbin Issue Slip"
+                              className="p-1 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors cursor-pointer"
+                              title="Print Issue Slip"
                             >
-                              <Printer className="h-3 w-3" />
-                              <span>Issue Slip</span>
+                              <Printer className="h-3.5 w-3.5" />
                             </button>
                           )}
                         </td>
