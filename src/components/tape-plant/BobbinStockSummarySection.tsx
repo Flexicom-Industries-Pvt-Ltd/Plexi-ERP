@@ -23,6 +23,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { RecipeQualityBadge } from "./RecipeQualityBadge";
+import { BobbinStockPrintPreviewModal } from "./BobbinStockPrintPreviewModal";
 import {
   BobbinStockItem,
   BOBBIN_WEIGHT_KG,
@@ -69,6 +70,7 @@ export function BobbinStockSummarySection({
   const [selectedShiftId, setSelectedShiftId] = useState<string>("ALL");
 
   const [items, setItems] = useState<BobbinStockItem[]>([]);
+  const [previewModalOpen, setPreviewModalOpen] = useState(false);
 
   // Fetch available shifts master list
   useEffect(() => {
@@ -205,12 +207,7 @@ export function BobbinStockSummarySection({
       toast.error("No bobbin stock entries to print");
       return;
     }
-    printBobbinStockSummary({
-      dateDescription: periodDescription,
-      shiftDescription,
-      items: filteredItems,
-      totals,
-    });
+    setPreviewModalOpen(true);
   };
 
   return (
@@ -683,6 +680,16 @@ export function BobbinStockSummarySection({
           </div>
         </div>
       </div>
+
+      {/* Interactive Bobbin Stock Print Preview Modal */}
+      <BobbinStockPrintPreviewModal
+        open={previewModalOpen}
+        onClose={() => setPreviewModalOpen(false)}
+        dateDescription={periodDescription}
+        shiftDescription={shiftDescription}
+        items={filteredItems}
+        totals={totals}
+      />
     </div>
   );
 }
