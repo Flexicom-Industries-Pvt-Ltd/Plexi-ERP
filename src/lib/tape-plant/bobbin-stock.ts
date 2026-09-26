@@ -26,6 +26,13 @@ export interface BobbinStockTotals {
   uniqueQualitiesCount: number;
 }
 
+export interface BobbinStockPrintData {
+  dateDescription?: string;
+  shiftDescription?: string;
+  items: BobbinStockItem[];
+  totals: BobbinStockTotals;
+}
+
 /**
  * Calculates net production output in KG after deducting wastage.
  */
@@ -165,158 +172,271 @@ export function exportBobbinStockExcel({
 }
 
 /**
- * Triggers clean print view for Bobbin Stock Summary without Shift and Remarks
+ * Generates high-contrast, professional HTML for Bobbin Stock Summary print
+ * matching the Tape Plant Planning layout with Flexicom logo and 3-column sign-offs.
  */
-export function printBobbinStockSummary({
+export function generateBobbinStockSheetHtml({
   dateDescription,
   shiftDescription,
   items,
   totals,
-}: {
-  dateDescription?: string;
-  shiftDescription?: string;
-  items: BobbinStockItem[];
-  totals: BobbinStockTotals;
-}) {
-  const printWindow = window.open("", "_blank");
-  if (!printWindow) {
-    alert("Please allow popups to print the Bobbin Stock Summary.");
-    return;
-  }
+}: BobbinStockPrintData): string {
+  const period = dateDescription || `All Time (Till ${new Date().toISOString().slice(0, 10)})`;
+  const shift = shiftDescription || "All Shifts";
+  const docRef = `TP-BSTK-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}`;
+  const printTimestamp = new Date().toLocaleString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
 
-  const tableRowsHtml = items
-    .map(
-      (item) => `
+  const tableRowsHtml = items.length > 0
+    ? items.map(
+        (item) => `
+        <tr>
+          <td style="text-align: center; font-weight: 700; width: 28px;">${item.slNo}</td>
+          <td style="font-weight: 700; font-family: monospace; font-size: 8pt; color: #0f172a;">${item.recipeQuality}</td>
+          <td style="text-align: right; font-family: monospace;">${item.productionDoneKg.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+          <td style="text-align: right; font-family: monospace; color: #b91c1c; font-weight: 600;">${item.wasteKg.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+          <td style="text-align: right; font-weight: 800; font-family: monospace; color: #047857; background-color: #f0fdf4;">${item.netProductionKg.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} KG</td>
+          <td style="text-align: right; font-weight: 800; font-family: monospace; color: #1e40af; background-color: #eff6ff;">${item.bobbinStock.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} PCS</td>
+          <td style="text-align: right; font-weight: 800; font-family: monospace; color: #6b21a8; background-color: #faf5ff;">${item.crateStock.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} CRATES</td>
+        </tr>`
+      ).join("")
+    : `
       <tr>
-        <td style="text-align: center; font-weight: bold;">${item.slNo}</td>
-        <td style="font-weight: 600; color: #0f172a;">${item.recipeQuality}</td>
-        <td style="text-align: right;">${item.productionDoneKg.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-        <td style="text-align: right; color: #dc2626;">${item.wasteKg.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-        <td style="text-align: right; font-weight: bold; color: #047857; background-color: #f0fdf4;">${item.netProductionKg.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-        <td style="text-align: right; font-weight: bold; color: #1e40af; background-color: #eff6ff;">${item.bobbinStock.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-        <td style="text-align: right; font-weight: bold; color: #6b21a8; background-color: #faf5ff;">${item.crateStock.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-      </tr>`
-    )
-    .join("");
+        <td colspan="7" style="text-align: center; color: #64748b; font-style: italic; padding: 12px;">
+          No bobbin stock records found for the selected period.
+        </td>
+      </tr>
+    `;
 
-  const html = `<!DOCTYPE html>
-<html>
+  return `<!DOCTYPE html>
+<html lang="en">
 <head>
-  <title>Tape Plant - Bobbin Stock Summary</title>
+  <meta charset="UTF-8">
+  <title>Tape Plant - Bobbin Stock Summary (${docRef})</title>
   <style>
     @page {
       size: A4 portrait;
-      margin: 12mm 12mm 12mm 12mm;
+      margin: 8mm 8mm 8mm 8mm;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
     }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      margin: 0;
-      padding: 16px;
+      font-size: 8pt;
+      line-height: 1.25;
       color: #0f172a;
       background: #ffffff;
-      font-size: 12px;
+      padding: 0;
+      width: 100%;
     }
-    .header-box {
+    .sheet-container {
+      width: 100%;
+      max-width: 100%;
+      margin: 0 auto;
+    }
+
+    /* Minimalist Centered Header with Top-Left Corner Vivid Flexicom Logo */
+    .header-container {
       border-bottom: 2px solid #0f172a;
-      padding-bottom: 12px;
-      margin-bottom: 16px;
+      padding-bottom: 6px;
+      margin-bottom: 8px;
+    }
+    .header-top {
       display: flex;
+      align-items: center;
       justify-content: space-between;
-      align-items: flex-start;
+      margin-bottom: 4px;
+    }
+    .logo-box {
+      width: 70px;
+      text-align: left;
+      display: flex;
+      align-items: center;
+      flex-shrink: 0;
+    }
+    .logo-box img {
+      height: 48px;
+      width: auto;
+      object-fit: contain;
+      filter: contrast(1.25) saturate(1.25);
     }
     .company-title {
-      font-size: 18px;
-      font-weight: 800;
-      letter-spacing: -0.5px;
-      color: #0f172a;
+      font-size: 14pt;
+      font-weight: 900;
+      letter-spacing: 0.6px;
+      color: #000000;
       text-transform: uppercase;
+      text-align: center;
     }
-    .sheet-title {
-      font-size: 14px;
-      font-weight: 700;
-      color: #2563eb;
-      margin-top: 2px;
-    }
-    .meta-box {
-      font-size: 11px;
+    .company-sub {
+      font-size: 7.5pt;
       color: #475569;
-      text-align: right;
-      line-height: 1.4;
+      margin-top: 1px;
+      text-align: center;
     }
-    .kpi-cards {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 10px;
-      margin-bottom: 16px;
-    }
-    .kpi-card {
-      border: 1px solid #e2e8f0;
-      border-radius: 6px;
-      padding: 8px 12px;
+    .doc-main-heading {
+      display: inline-block;
+      border: 1.5px solid #0f172a;
       background: #f8fafc;
-    }
-    .kpi-label {
-      font-size: 10px;
+      padding: 2.5px 14px;
+      font-size: 9pt;
+      font-weight: 900;
       text-transform: uppercase;
-      font-weight: 700;
-      color: #64748b;
+      letter-spacing: 0.8px;
+      margin-top: 4px;
+      margin-bottom: 2px;
+      text-align: center;
     }
-    .kpi-val {
-      font-size: 15px;
-      font-weight: 800;
-      color: #0f172a;
-      margin-top: 2px;
+    .doc-meta-strip {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-items: center;
+      gap: 12px;
+      font-size: 7.5pt;
+      color: #334155;
+      margin-top: 4px;
+      text-align: center;
     }
-    table {
+    .doc-meta-strip strong {
+      color: #000000;
+    }
+
+    /* KPI Summary Row */
+    .kpi-table {
       width: 100%;
       border-collapse: collapse;
-      margin-bottom: 16px;
-    }
-    th {
-      background-color: #f1f5f9;
-      color: #334155;
-      font-weight: 700;
-      font-size: 11px;
-      text-transform: uppercase;
-      padding: 8px 6px;
-      border: 1px solid #cbd5e1;
-      text-align: left;
-    }
-    td {
-      padding: 6px;
-      border: 1px solid #e2e8f0;
-      font-size: 11.5px;
-    }
-    tfoot td {
+      margin-bottom: 8px;
       background-color: #f8fafc;
+      border: 1px solid #94a3b8;
+    }
+    .kpi-table td {
+      padding: 4px 6px;
+      border: 1px solid #cbd5e1;
+      vertical-align: middle;
+      text-align: center;
+    }
+    .kpi-label {
+      font-size: 6.5pt;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: #475569;
+      letter-spacing: 0.4px;
+    }
+    .kpi-val {
+      font-size: 10pt;
       font-weight: 800;
-      border-top: 2px solid #0f172a;
-      padding: 8px 6px;
+      font-family: monospace;
+      color: #0f172a;
+      margin-top: 1px;
     }
+
+    /* Section Title */
+    .section-title {
+      font-size: 8pt;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      text-align: center;
+      background-color: #e2e8f0;
+      border: 1px solid #94a3b8;
+      border-bottom: none;
+      padding: 3px 6px;
+      color: #0f172a;
+    }
+
+    /* Data Tables */
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 8px;
+      font-size: 7.5pt;
+    }
+    .data-table th {
+      background-color: #f1f5f9;
+      border: 1px solid #94a3b8;
+      padding: 4px 5px;
+      font-weight: 700;
+      font-size: 7pt;
+      text-transform: uppercase;
+      text-align: center;
+      color: #0f172a;
+    }
+    .data-table td {
+      border: 1px solid #cbd5e1;
+      padding: 4px 5px;
+      font-size: 7.5pt;
+      color: #0f172a;
+    }
+    .data-table tfoot td {
+      background-color: #f1f5f9;
+      border: 1px solid #94a3b8;
+      font-weight: 800;
+      padding: 5px 6px;
+    }
+
+    /* Conversion note */
     .conversion-note {
-      font-size: 10.5px;
-      color: #64748b;
-      margin-top: 8px;
+      font-size: 7pt;
+      color: #334155;
+      margin-bottom: 12px;
       background: #f8fafc;
-      padding: 8px 12px;
-      border-radius: 4px;
-      border-left: 3px solid #3b82f6;
+      padding: 5px 8px;
+      border-radius: 3px;
+      border: 1px solid #cbd5e1;
+      border-left: 3px solid #2563eb;
     }
-    .footer {
-      margin-top: 30px;
+
+    /* Sign-off section */
+    .sign-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 8px;
+      border: 1px solid #94a3b8;
+    }
+    .sign-table td {
+      width: 33.33%;
+      border: 1px solid #94a3b8;
+      padding: 5px 8px;
+      text-align: center;
+      vertical-align: top;
+    }
+    .sign-title {
+      font-weight: 700;
+      font-size: 7pt;
+      text-transform: uppercase;
+      margin-bottom: 24px;
+      color: #334155;
+    }
+    .sign-line {
+      border-top: 1px dotted #64748b;
+      padding-top: 3px;
+      font-size: 6.5pt;
+      color: #64748b;
+    }
+
+    /* Footer */
+    .footer-note {
+      margin-top: 6px;
+      font-size: 6.5pt;
+      color: #64748b;
       display: flex;
       justify-content: space-between;
-      font-size: 11px;
-      color: #64748b;
-      padding-top: 15px;
-      border-top: 1px dashed #cbd5e1;
+      border-top: 1px solid #e2e8f0;
+      padding-top: 3px;
     }
-    .signature-line {
-      margin-top: 40px;
-      border-top: 1px solid #94a3b8;
-      width: 180px;
-      text-align: center;
-      padding-top: 4px;
+    .avoid-break {
+      break-inside: avoid;
+      page-break-inside: avoid;
     }
     @media print {
       body {
@@ -326,89 +446,177 @@ export function printBobbinStockSummary({
   </style>
 </head>
 <body>
-  <div class="header-box">
-    <div>
-      <div class="company-title">Flexicom Industries Pvt. Ltd.</div>
-      <div class="sheet-title">Tape Plant - Bobbin Stock Summary Report</div>
+  <div class="sheet-container">
+    <!-- MAIN HEADER WITH TOP-LEFT VIVID FLEXICOM LOGO -->
+    <div class="header-container">
+      <div class="header-top">
+        <div class="logo-box">
+          <img src="${typeof window !== "undefined" ? window.location.origin : ""}/logo.png" alt="Flexicom Logo" style="height: 48px; width: auto; object-fit: contain; filter: contrast(1.25) saturate(1.25);" />
+        </div>
+        <div style="flex: 1; text-align: center;">
+          <div class="company-title">Flexicom Industries Pvt. Ltd.</div>
+          <div class="company-sub">Tape Plant Extrusion & Winding Division • Kathua Industrial Complex, Phase-II, Kathua (J&K)</div>
+          <div class="doc-main-heading">BOBBIN & CRATE STOCK SUMMARY REPORT</div>
+        </div>
+        <div style="width: 70px;" aria-hidden="true"></div>
+      </div>
+      <div class="doc-meta-strip">
+        <span>Doc Ref: <strong>${docRef}</strong></span>
+        <span>•</span>
+        <span>Period: <strong>${period}</strong></span>
+        <span>•</span>
+        <span>Shift: <strong>${shift}</strong></span>
+        <span>•</span>
+        <span>Active Qualities: <strong>${items.length}</strong></span>
+        <span>•</span>
+        <span>Printed: <strong>${printTimestamp}</strong></span>
+      </div>
     </div>
-    <div class="meta-box">
-      <div><strong>Period:</strong> ${dateDescription || "All Time (Till Date)"}</div>
-      <div><strong>Shift:</strong> ${shiftDescription || "All Shifts"}</div>
-      <div><strong>Generated:</strong> ${new Date().toLocaleString()}</div>
-    </div>
-  </div>
 
-  <div class="kpi-cards">
-    <div class="kpi-card">
-      <div class="kpi-label">Total Net Output (KG)</div>
-      <div class="kpi-val" style="color: #047857;">${totals.totalNetProductionKg.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kg</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-label">Total Bobbins (@ 1.6 kg)</div>
-      <div class="kpi-val" style="color: #1e40af;">${totals.totalBobbinStock.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-label">Total Crates (@ 12.8 kg)</div>
-      <div class="kpi-val" style="color: #6b21a8;">${totals.totalCrateStock.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-label">Active Qualities</div>
-      <div class="kpi-val">${totals.uniqueQualitiesCount}</div>
-    </div>
-  </div>
-
-  <table>
-    <thead>
+    <!-- KEY KPI SUMMARY STRIP -->
+    <table class="kpi-table">
       <tr>
-        <th style="width: 40px; text-align: center;">#</th>
-        <th>Quality Name</th>
-        <th style="text-align: right;">Gross (kg)</th>
-        <th style="text-align: right;">Waste (kg)</th>
-        <th style="text-align: right; background-color: #e2fbe8; color: #047857;">Net Output (kg)</th>
-        <th style="text-align: right; background-color: #dbeafe; color: #1e40af;">Bobbin Stock (@ 1.6 kg)</th>
-        <th style="text-align: right; background-color: #f3e8ff; color: #6b21a8;">Crate Stock (@ 12.8 kg)</th>
+        <td style="width: 25%;">
+          <div class="kpi-label">Total Net Output (KG)</div>
+          <div class="kpi-val" style="color: #047857;">${totals.totalNetProductionKg.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} KG</div>
+        </td>
+        <td style="width: 25%;">
+          <div class="kpi-label">Total Bobbins (@ 1.6 KG)</div>
+          <div class="kpi-val" style="color: #1e40af;">${totals.totalBobbinStock.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} PCS</div>
+        </td>
+        <td style="width: 25%;">
+          <div class="kpi-label">Total Crates (@ 12.8 KG)</div>
+          <div class="kpi-val" style="color: #6b21a8;">${totals.totalCrateStock.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} CRATES</div>
+        </td>
+        <td style="width: 25%;">
+          <div class="kpi-label">Active Qualities</div>
+          <div class="kpi-val">${totals.uniqueQualitiesCount} Recipes</div>
+        </td>
       </tr>
-    </thead>
-    <tbody>
-      ${tableRowsHtml}
-    </tbody>
-    <tfoot>
-      <tr>
-        <td colspan="2" style="text-align: right;">TOTAL:</td>
-        <td style="text-align: right;">${totals.totalGrossDoneKg.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-        <td style="text-align: right; color: #dc2626;">${totals.totalWasteKg.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-        <td style="text-align: right; color: #047857;">${totals.totalNetProductionKg.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-        <td style="text-align: right; color: #1e40af;">${totals.totalBobbinStock.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-        <td style="text-align: right; color: #6b21a8;">${totals.totalCrateStock.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-      </tr>
-    </tfoot>
-  </table>
+    </table>
 
-  <div class="conversion-note">
-    <strong>Formula & Standard Packing:</strong> Bobbin Count = Net Output (kg) ÷ 1.6 kg/bobbin. Crate Count = Net Output (kg) ÷ 12.8 kg/crate (8 bobbins per crate). Net Output = Gross Production Done minus Wastage.
+    <!-- 1. FINISHED BOBBIN & CRATE STOCK SUMMARY -->
+    <div class="section-title">1. FINISHED BOBBIN & CRATE STOCK SUMMARY</div>
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th style="width: 28px; text-align: center;">#</th>
+          <th style="text-align: left;">Quality Name / Recipe Code</th>
+          <th style="text-align: right; width: 85px;">Gross Prod (KG)</th>
+          <th style="text-align: right; width: 75px;">Wastage (KG)</th>
+          <th style="text-align: right; width: 110px; background-color: #dcfce7; color: #065f46;">Net Output (KG)</th>
+          <th style="text-align: right; width: 110px; background-color: #dbeafe; color: #1e40af;">Bobbin Stock (@ 1.6 KG)</th>
+          <th style="text-align: right; width: 110px; background-color: #f3e8ff; color: #6b21a8;">Crate Stock (@ 12.8 KG)</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${tableRowsHtml}
+      </tbody>
+      <tfoot>
+        <tr>
+          <td colspan="2" style="text-align: right; text-transform: uppercase; font-size: 7pt; letter-spacing: 0.5px;">Grand Total:</td>
+          <td style="text-align: right; font-family: monospace;">${totals.totalGrossDoneKg.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+          <td style="text-align: right; font-family: monospace; color: #b91c1c;">${totals.totalWasteKg.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+          <td style="text-align: right; font-family: monospace; color: #047857; background-color: #dcfce7;">${totals.totalNetProductionKg.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} KG</td>
+          <td style="text-align: right; font-family: monospace; color: #1e40af; background-color: #dbeafe;">${totals.totalBobbinStock.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} PCS</td>
+          <td style="text-align: right; font-family: monospace; color: #6b21a8; background-color: #f3e8ff;">${totals.totalCrateStock.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} CRATES</td>
+        </tr>
+      </tfoot>
+    </table>
+
+    <!-- CONVERSION NOTES -->
+    <div class="conversion-note">
+      <strong>Standard Packing & Formulas:</strong> Bobbin Count = Net Output (KG) ÷ 1.6 kg/bobbin. Crate Count = Net Output (KG) ÷ 12.8 kg/crate (8 bobbins per crate). Net Output = Gross Production Done minus Wastage.
+    </div>
+
+    <!-- SIGN-OFF AUTHORIZATION -->
+    <div class="avoid-break">
+      <table class="sign-table">
+        <tr>
+          <td>
+            <div class="sign-title">Prepared By (Shift Operator / In-Charge)</div>
+            <div class="sign-line">Signature & Date</div>
+          </td>
+          <td>
+            <div class="sign-title">Verified By (Quality Control / Lab)</div>
+            <div class="sign-line">Signature & Stamp</div>
+          </td>
+          <td>
+            <div class="sign-title">Approved By (Plant Supervisor / Manager)</div>
+            <div class="sign-line">Signature & Date</div>
+          </td>
+        </tr>
+      </table>
+
+      <div class="footer-note">
+        <span>Flexicom ERP • Tape Plant Extrusion System • Document: ${docRef}</span>
+        <span>Printed: ${printTimestamp} • Page 1 of 1</span>
+      </div>
+    </div>
   </div>
-
-  <div class="footer">
-    <div>
-      <div class="signature-line">Plant Operator / Incharge</div>
-    </div>
-    <div>
-      <div class="signature-line">Quality Control Manager</div>
-    </div>
-    <div>
-      <div class="signature-line">Authorized Signatory</div>
-    </div>
-  </div>
-
-  <script>
-    window.onload = function() {
-      window.print();
-    };
-  </script>
 </body>
 </html>`;
+}
 
-  printWindow.document.open();
-  printWindow.document.write(html);
-  printWindow.document.close();
+/**
+ * Directly prints the bobbin stock summary sheet in a clean, isolated iframe.
+ * Completely immune to modal overflow or blank about:blank tabs.
+ */
+export function printBobbinStockSummary(data: BobbinStockPrintData): void {
+  const html = generateBobbinStockSheetHtml(data);
+
+  let iframe = document.getElementById("tape-plant-bobbin-stock-print-iframe") as HTMLIFrameElement | null;
+  if (!iframe) {
+    iframe = document.createElement("iframe");
+    iframe.id = "tape-plant-bobbin-stock-print-iframe";
+    iframe.style.position = "fixed";
+    iframe.style.right = "0";
+    iframe.style.bottom = "0";
+    iframe.style.width = "0";
+    iframe.style.height = "0";
+    iframe.style.border = "0";
+    document.body.appendChild(iframe);
+  }
+
+  const doc = iframe.contentWindow?.document || iframe.contentDocument;
+  if (doc && iframe.contentWindow) {
+    doc.open();
+    doc.write(html);
+    doc.close();
+
+    const triggerPrint = () => {
+      try {
+        iframe?.contentWindow?.focus();
+        iframe?.contentWindow?.print();
+      } catch (err) {
+        console.error("Iframe print failed, falling back to window.open", err);
+        fallbackWindowPrint(html);
+      }
+    };
+
+    const logoImg = doc.querySelector("img");
+    if (logoImg && !logoImg.complete) {
+      logoImg.onload = () => setTimeout(triggerPrint, 100);
+      logoImg.onerror = () => setTimeout(triggerPrint, 100);
+      // Fallback timeout in case image events don't fire
+      setTimeout(triggerPrint, 400);
+    } else {
+      setTimeout(triggerPrint, 200);
+    }
+  } else {
+    fallbackWindowPrint(html);
+  }
+}
+
+function fallbackWindowPrint(html: string): void {
+  const win = window.open("", "_blank", "width=1000,height=750");
+  if (win) {
+    win.document.open();
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    setTimeout(() => {
+      win.print();
+    }, 300);
+  }
 }
