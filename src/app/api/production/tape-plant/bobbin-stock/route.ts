@@ -7,6 +7,8 @@ import {
   computeCrateStockCount,
   computeBobbinStockTotals,
   BobbinStockItem,
+  CRATE_WEIGHT_KG,
+  BOBBINS_PER_CRATE,
 } from "@/lib/tape-plant/bobbin-stock";
 
 export const dynamic = "force-dynamic";
@@ -19,38 +21,58 @@ export async function GET(request: NextRequest) {
   }
 
   const { searchParams } = new URL(request.url);
-  const date = searchParams.get("date"); // Specific date if filtered
+  const date = searchParams.get("date");
   const dateFrom = searchParams.get("dateFrom");
   const dateTo = searchParams.get("dateTo");
-  const shiftId = searchParams.get("shiftId"); // Optional shift filter
-  const scope = searchParams.get("scope"); // "all" (default till date) or "single"
+  const shiftId = searchParams.get("shiftId");
+  const scope = searchParams.get("scope"); // "all" (default till date) or "single" | "range"
 
   try {
-    const whereClause: any = {};
+    const postWhereClause: any = {};
+    const issueWhereClause: any = {
+      status: { not: "CANCELLED" },
+    };
 
     if (scope === "single" && date) {
-      whereClause.date = date;
+      postWhereClause.date = date;
+      issueWhereClause.date = date;
     } else if (dateFrom && dateTo) {
-      whereClause.date = { gte: dateFrom, lte: dateTo };
+      postWhereClause.date = { gte: dateFrom, lte: dateTo };
+      issueWhereClause.date = { gte: dateFrom, lte: dateTo };
     } else if (dateFrom) {
-      whereClause.date = { gte: dateFrom };
+      postWhereClause.date = { gte: dateFrom };
+      issueWhereClause.date = { gte: dateFrom };
     } else if (dateTo) {
-      whereClause.date = { lte: dateTo };
+      postWhereClause.date = { lte: dateTo };
+      issueWhereClause.date = { lte: dateTo };
     } else if (date && !scope) {
-      whereClause.date = date;
+      postWhereClause.date = date;
+      issueWhereClause.date = date;
     }
-    // If scope is "all" or default and no date bounds given, all records till date are fetched
 
     if (shiftId && shiftId.toUpperCase() !== "ALL") {
-      whereClause.shiftId = shiftId;
+      postWhereClause.shiftId = shiftId;
+      issueWhereClause.shiftId = shiftId;
     }
 
+    // 1. Fetch Post Production records
     const postProductions = await db.tapePlantPostProduction.findMany({
-      where: whereClause,
+      where: postWhereClause,
       include: {
         shift: true,
       },
       orderBy: [{ date: "asc" }, { createdAt: "asc" }],
+    });
+
+    // 2. Fetch Bobbin Issue records (Loom dispatches)
+    const bobbinIssues = await db.tapePlantBobbinIssue.findMany({
+      where: issueWhereClause,
+      select: {
+        recipeQuality: true,
+        crateCount: true,
+        bobbinCount: true,
+        weightKg: true,
+      },
     });
 
     // Quality aggregation map: key = normalized recipeQuality
@@ -61,10 +83,13 @@ export async function GET(request: NextRequest) {
         grossDoneKg: number;
         wasteKg: number;
         netProductionKg: number;
-        occurrenceCount: number;
+        issuedCrates: number;
+        issuedBobbins: number;
+        issuedKg: number;
       }
     >();
 
+    // Process Post-Production outputs
     for (const record of postProductions) {
       const recordEntries = Array.isArray(record.entries) ? (record.entries as any[]) : [];
 
@@ -83,13 +108,14 @@ export async function GET(request: NextRequest) {
             grossDoneKg: 0,
             wasteKg: 0,
             netProductionKg: 0,
-            occurrenceCount: 0,
+            issuedCrates: 0,
+            issuedBobbins: 0,
+            issuedKg: 0,
           };
 
           existing.grossDoneKg += gross;
           existing.wasteKg += waste;
           existing.netProductionKg += net;
-          existing.occurrenceCount += 1;
 
           qualityMap.set(key, existing);
         }
@@ -105,16 +131,44 @@ export async function GET(request: NextRequest) {
           grossDoneKg: 0,
           wasteKg: 0,
           netProductionKg: 0,
-          occurrenceCount: 0,
+          issuedCrates: 0,
+          issuedBobbins: 0,
+          issuedKg: 0,
         };
 
         existing.grossDoneKg += gross;
         existing.wasteKg += waste;
         existing.netProductionKg += net;
-        existing.occurrenceCount += 1;
 
         qualityMap.set(key, existing);
       }
+    }
+
+    // Process Loom Bobbin Issues (deductions)
+    for (const issue of bobbinIssues) {
+      const rawQuality = (issue.recipeQuality || "").trim();
+      if (!rawQuality) continue;
+
+      const key = rawQuality.toUpperCase();
+      const crates = Number(issue.crateCount) || 0;
+      const bobbins = Number(issue.bobbinCount) || crates * BOBBINS_PER_CRATE;
+      const weight = Number(issue.weightKg) || crates * CRATE_WEIGHT_KG;
+
+      const existing = qualityMap.get(key) || {
+        recipeQuality: rawQuality,
+        grossDoneKg: 0,
+        wasteKg: 0,
+        netProductionKg: 0,
+        issuedCrates: 0,
+        issuedBobbins: 0,
+        issuedKg: 0,
+      };
+
+      existing.issuedCrates += crates;
+      existing.issuedBobbins += bobbins;
+      existing.issuedKg += weight;
+
+      qualityMap.set(key, existing);
     }
 
     // Convert aggregated map into BobbinStockItems sorted by Quality Name
@@ -122,8 +176,17 @@ export async function GET(request: NextRequest) {
       .sort((a, b) => a.recipeQuality.localeCompare(b.recipeQuality))
       .map((agg, idx) => {
         const netKg = Number(agg.netProductionKg.toFixed(2));
-        const bobbinStock = computeBobbinStockCount(netKg);
-        const crateStock = computeCrateStockCount(netKg);
+        const producedBobbins = computeBobbinStockCount(netKg);
+        const producedCrates = computeCrateStockCount(netKg);
+
+        const issuedCrates = Number(agg.issuedCrates.toFixed(2));
+        const issuedBobbins = Number(agg.issuedBobbins.toFixed(2));
+        const issuedKg = Number(agg.issuedKg.toFixed(2));
+
+        // Available stock after subtracting issued crates/bobbins
+        const availableKg = Math.max(0, Number((netKg - issuedKg).toFixed(2)));
+        const availableBobbins = Math.max(0, Number((producedBobbins - issuedBobbins).toFixed(2)));
+        const availableCrates = Math.max(0, Number((producedCrates - issuedCrates).toFixed(2)));
 
         return {
           slNo: idx + 1,
@@ -132,8 +195,14 @@ export async function GET(request: NextRequest) {
           productionDoneKg: Number(agg.grossDoneKg.toFixed(2)),
           wasteKg: Number(agg.wasteKg.toFixed(2)),
           netProductionKg: netKg,
-          bobbinStock,
-          crateStock,
+          producedBobbins,
+          producedCrates,
+          issuedCrates,
+          issuedBobbins,
+          issuedKg,
+          bobbinStock: availableBobbins,
+          crateStock: availableCrates,
+          availableKg,
         };
       });
 
