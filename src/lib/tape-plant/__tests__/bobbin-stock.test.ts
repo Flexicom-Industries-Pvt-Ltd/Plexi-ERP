@@ -89,4 +89,37 @@ describe("Bobbin Stock Summary calculations", () => {
     expect(totals.totalCrateStock).toBe(200);
     expect(totals.uniqueQualitiesCount).toBe(2);
   });
+
+  it("generates Bobbin Stock printable HTML sheet with logo, KPI strip, table, and 3-column sign-offs", async () => {
+    const { generateBobbinStockSheetHtml } = await import("../bobbin-stock");
+    const items: BobbinStockItem[] = [
+      {
+        slNo: 1,
+        recipeQuality: "1000D White Standard",
+        productionDoneKg: 1600,
+        wasteKg: 0,
+        netProductionKg: 1600,
+        bobbinStock: 1000,
+        crateStock: 125,
+      },
+    ];
+    const totals = computeBobbinStockTotals(items);
+
+    const html = generateBobbinStockSheetHtml({
+      dateDescription: "All Time (Till 2026-09-26)",
+      shiftDescription: "All Shifts",
+      items,
+      totals,
+    });
+
+    expect(html).toContain("Flexicom Industries Pvt. Ltd.");
+    expect(html).toContain("BOBBIN & CRATE STOCK SUMMARY REPORT");
+    expect(html).toContain("logo.png");
+    expect(html).toContain("1000D White Standard");
+    expect(html).toContain("Total Net Output (KG)");
+    expect(html).toContain("Prepared By (Shift Operator / In-Charge)");
+    expect(html).toContain("Verified By (Quality Control / Lab)");
+    expect(html).toContain("Approved By (Plant Supervisor / Manager)");
+    expect(html).toContain("Standard Packing & Formulas:");
+  });
 });
