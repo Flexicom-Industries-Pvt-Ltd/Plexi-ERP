@@ -187,16 +187,7 @@ export function generateBobbinIssueSlipHtml(data: BobbinIssueSlipData): string {
       font-family: monospace;
     }
 
-    /* Note & Signatures */
-    .formula-note {
-      font-size: 6.5pt;
-      color: #475569;
-      background: #f8fafc;
-      padding: 4px 8px;
-      border: 1px solid #e2e8f0;
-      border-radius: 3px;
-      margin-bottom: 12px;
-    }
+    /* Signatures */
     .sign-grid {
       display: grid;
       grid-template-columns: 1fr 1fr 1fr;
@@ -285,11 +276,6 @@ export function generateBobbinIssueSlipHtml(data: BobbinIssueSlipData): string {
     </table>
 
     ${remarks ? `<div style="font-size: 7pt; color: #475569; margin-bottom: 6px;"><strong>Remarks / Notes:</strong> ${remarks}</div>` : ""}
-
-    <!-- Conversion note -->
-    <div class="formula-note">
-      <strong>Standard Rules:</strong> 1 Crate = 8 Bobbins = 12.8 KG • Standard Bobbin = 1.6 KG. Stock deducted from Tape Plant Bobbin Inventory.
-    </div>
 
     <!-- Sign-offs -->
     <div class="sign-grid">

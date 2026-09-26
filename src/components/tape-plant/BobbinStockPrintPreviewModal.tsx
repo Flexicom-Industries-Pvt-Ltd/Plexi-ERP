@@ -384,18 +384,6 @@ export function BobbinStockPrintPreviewModal({
               </div>
             </div>
 
-            {/* Standard Packing & Formula Box */}
-            <div className="bg-slate-50 border border-slate-300 border-l-4 border-l-blue-600 p-2.5 rounded text-xs text-slate-700">
-              <p className="font-semibold text-slate-900 mb-0.5">Standard Packing & Conversion Rules:</p>
-              <p className="text-[11px] text-slate-600 leading-relaxed">
-                • <strong>Bobbin Count:</strong> Net Output (KG) ÷ {BOBBIN_WEIGHT_KG} kg/bobbin.
-                <br />
-                • <strong>Crate Count:</strong> Net Output (KG) ÷ {CRATE_WEIGHT_KG} kg/crate ({BOBBINS_PER_CRATE} bobbins per crate).
-                <br />
-                • <strong>Net Output:</strong> Gross Production Done minus Wastage.
-              </p>
-            </div>
-
             {/* Authorizations & Signatures Footer (3 columns) */}
             <div className="pt-4 border-t border-slate-300 grid grid-cols-3 gap-6 text-center text-xs text-slate-700">
               <div className="space-y-6">
