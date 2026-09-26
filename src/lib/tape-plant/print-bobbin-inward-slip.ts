@@ -176,15 +176,6 @@ export function generateBobbinInwardSlipHtml(data: BobbinInwardSlipData): string
       font-family: monospace;
     }
 
-    .formula-note {
-      font-size: 6.5pt;
-      color: #475569;
-      background: #f8fafc;
-      padding: 4px 8px;
-      border: 1px solid #e2e8f0;
-      border-radius: 3px;
-      margin-bottom: 12px;
-    }
     .sign-grid {
       display: grid;
       grid-template-columns: 1fr 1fr 1fr;
@@ -262,10 +253,6 @@ export function generateBobbinInwardSlipHtml(data: BobbinInwardSlipData): string
     </table>
 
     ${remarks ? `<div style="font-size: 7pt; color: #475569; margin-bottom: 6px;"><strong>Batch Remarks:</strong> ${remarks}</div>` : ""}
-
-    <div class="formula-note">
-      <strong>Inward Confirmation:</strong> Net Output = Gross Production − Wastage. Bobbins = Net KG ÷ ${BOBBIN_WEIGHT_KG} kg. Crates = Net KG ÷ ${CRATE_WEIGHT_KG} kg. Credited directly to Bobbin Stock.
-    </div>
 
     <div class="sign-grid">
       <div>
