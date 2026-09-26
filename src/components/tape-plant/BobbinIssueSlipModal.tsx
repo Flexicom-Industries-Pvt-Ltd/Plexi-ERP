@@ -98,9 +98,9 @@ export function BobbinIssueSlipModal({ open, onClose, data, slipData }: BobbinIs
               <table className="w-full text-center text-xs border-collapse">
                 <thead className="bg-slate-50 border-b border-slate-200 text-[10px] font-medium uppercase text-slate-600">
                   <tr>
-                    <th className="p-2 border-r border-slate-200">Crates Issued</th>
-                    <th className="p-2 border-r border-slate-200">Bobbins (@ 8/crate)</th>
-                    <th className="p-2">Weight (@ 12.8 kg/crate)</th>
+                    <th className="p-2 border-r border-slate-200">Total Crates Issued</th>
+                    <th className="p-2 border-r border-slate-200">Total Bobbins (@ 8/crate)</th>
+                    <th className="p-2">Total Weight (@ 12.8 kg/crate)</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -118,6 +118,41 @@ export function BobbinIssueSlipModal({ open, onClose, data, slipData }: BobbinIs
                 </tbody>
               </table>
             </div>
+
+            {/* Optional Multi-Loom Allocation Breakdown */}
+            {Array.isArray(activeData.allocations) && activeData.allocations.length > 0 && (
+              <div className="border border-slate-200 rounded-lg overflow-hidden">
+                <div className="bg-slate-50 px-3 py-1.5 border-b border-slate-200 text-[10px] font-bold uppercase text-slate-700">
+                  Loom-wise Allocation Breakdown ({activeData.allocations.length} Looms)
+                </div>
+                <table className="w-full text-xs text-left border-collapse">
+                  <thead className="bg-slate-50/50 border-b border-slate-200 text-[9px] font-semibold text-slate-500 uppercase">
+                    <tr>
+                      <th className="py-1 px-2.5">Loom #</th>
+                      <th className="py-1 px-2.5 text-center">Crates</th>
+                      <th className="py-1 px-2.5 text-center">Bobbins</th>
+                      <th className="py-1 px-2.5 text-right">Weight (KG)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {activeData.allocations.map((alloc, idx) => (
+                      <tr key={idx} className="font-mono text-[11px]">
+                        <td className="py-1 px-2.5 font-medium text-slate-900">
+                          {alloc.loomIdentifier || (alloc.loomNumber ? `Loom #${alloc.loomNumber}` : `Loom ${idx + 1}`)}
+                        </td>
+                        <td className="py-1 px-2.5 text-center font-bold text-slate-900">{alloc.crateCount}</td>
+                        <td className="py-1 px-2.5 text-center text-slate-600">
+                          {alloc.bobbinCount ?? alloc.crateCount * 8}
+                        </td>
+                        <td className="py-1 px-2.5 text-right font-medium text-slate-900">
+                          {(alloc.weightKg ?? alloc.crateCount * 12.8).toFixed(2)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
 
             {activeData.remarks && (
               <div className="text-[11px] text-slate-600 bg-slate-50 p-2.5 rounded-lg border border-slate-200">
