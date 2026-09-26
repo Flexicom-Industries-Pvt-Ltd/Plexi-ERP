@@ -110,18 +110,10 @@ export function TapePlantClient() {
   const searchParams = useSearchParams();
   const tabParam = searchParams.get("tab") as TapePlantTab | null;
 
-  const [activeTab, setActiveTab] = useState<TapePlantTab>(
-    tabParam && TABS.some((t) => t.id === tabParam) ? tabParam : "planning"
-  );
-
-  useEffect(() => {
-    if (tabParam && TABS.some((t) => t.id === tabParam)) {
-      setActiveTab(tabParam);
-    }
-  }, [tabParam]);
+  const activeTab: TapePlantTab =
+    tabParam && TABS.some((t) => t.id === tabParam) ? tabParam : "planning";
 
   const handleTabChange = (tabId: TapePlantTab) => {
-    setActiveTab(tabId);
     router.replace(`/dashboard/production/tape-plant?tab=${tabId}`, { scroll: false });
   };
 
