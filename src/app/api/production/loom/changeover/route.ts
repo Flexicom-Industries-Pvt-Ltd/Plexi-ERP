@@ -19,14 +19,17 @@ export async function GET(request: NextRequest) {
   const search = searchParams.get("search");
 
   try {
-    // 1. Fetch Loom Machine Mappings (Current factory master allocations)
-    const mappings = await db.loomMachineMapping.findMany({
-      where: { isActive: true },
-      orderBy: [{ colorGroup: "asc" }, { qualityCode: "asc" }],
+    // 1. Fetch live Bobbin Issue allocations (Authoritative live shop-floor assignments)
+    const bobbinIssues = await db.tapePlantBobbinIssue.findMany({
+      where: { status: { not: "CANCELLED" } },
+      include: {
+        shift: { select: { id: true, name: true } },
+      },
+      orderBy: [{ date: "desc" }, { createdAt: "desc" }],
     });
 
-    // 2. Fetch all Tape Plant Recipes & Active Mappings for next quality selection
-    const [tapeRecipes, shifts, changeovers] = await Promise.all([
+    // 2. Fetch all Tape Plant Recipes, Shifts, and Changeover persistence records
+    const [tapeRecipes, shifts, changeovers, mappings] = await Promise.all([
       db.tapePlantRecipe.findMany({
         where: { isActive: true },
         orderBy: { code: "asc" },
@@ -38,14 +41,77 @@ export async function GET(request: NextRequest) {
       db.loomChangeover.findMany({
         orderBy: [{ sequence: "asc" }, { loomNumber: "asc" }],
       }),
+      db.loomMachineMapping.findMany({
+        where: { isActive: true },
+        orderBy: [{ colorGroup: "asc" }, { qualityCode: "asc" }],
+      }),
     ]);
 
-    // Build map of existing changeover records by loom number
-    const changeoverMap = new Map<number, typeof changeovers[0]>();
-    changeovers.forEach((co) => changeoverMap.set(co.loomNumber, co));
+    // Build map of recipes for spec lookup
+    const recipeSpecMap = new Map<string, typeof tapeRecipes[0]>();
+    tapeRecipes.forEach((r) => {
+      recipeSpecMap.set(r.code.toLowerCase().trim(), r);
+    });
 
-    // Map each loom #1..91 to find current quality from LoomMachineMapping
-    const currentAllocationMap = new Map<number, {
+    // Map each loom #1..91 to find live running quality from TapePlantBobbinIssue
+    const liveLoomAllocationMap = new Map<number, {
+      qualityCode: string;
+      colorGroup: string;
+      colour: string;
+      denier: number | null;
+      reedSpaceCm: number | null;
+      bobbinMarking: string;
+      mesh: string;
+      latestDate: string;
+      shiftName: string;
+    }>();
+
+    for (const issue of bobbinIssues) {
+      const recipeCode = (issue.recipeQuality || "").trim();
+      if (!recipeCode) continue;
+
+      const shiftName = issue.shift?.name || issue.shiftName || "General Shift";
+      const matchedRecipe = recipeSpecMap.get(recipeCode.toLowerCase());
+
+      const multiAllocations = Array.isArray(issue.loomAllocations) ? (issue.loomAllocations as any[]) : [];
+
+      if (multiAllocations.length > 0) {
+        for (const alloc of multiAllocations) {
+          const lNum = alloc.loomNumber ? Number(alloc.loomNumber) : null;
+          if (lNum && lNum >= 1 && lNum <= TOTAL_FACTORY_LOOMS && !liveLoomAllocationMap.has(lNum)) {
+            liveLoomAllocationMap.set(lNum, {
+              qualityCode: recipeCode,
+              colorGroup: matchedRecipe?.colorGroup || "Standard",
+              colour: matchedRecipe?.colour || "White",
+              denier: matchedRecipe?.denier ?? null,
+              reedSpaceCm: null,
+              bobbinMarking: matchedRecipe?.bobbinMarking || "Bobbin Issue",
+              mesh: "Standard",
+              latestDate: issue.date,
+              shiftName,
+            });
+          }
+        }
+      } else {
+        const lNum = issue.loomNumber ? Number(issue.loomNumber) : null;
+        if (lNum && lNum >= 1 && lNum <= TOTAL_FACTORY_LOOMS && !liveLoomAllocationMap.has(lNum)) {
+          liveLoomAllocationMap.set(lNum, {
+            qualityCode: recipeCode,
+            colorGroup: matchedRecipe?.colorGroup || "Standard",
+            colour: matchedRecipe?.colour || "White",
+            denier: matchedRecipe?.denier ?? null,
+            reedSpaceCm: null,
+            bobbinMarking: matchedRecipe?.bobbinMarking || "Bobbin Issue",
+            mesh: "Standard",
+            latestDate: issue.date,
+            shiftName,
+          });
+        }
+      }
+    }
+
+    // Fallback mapping map from LoomMachineMapping if no live issue found
+    const staticMappingMap = new Map<number, {
       qualityCode: string;
       colorGroup: string;
       colour: string;
@@ -57,7 +123,7 @@ export async function GET(request: NextRequest) {
 
     mappings.forEach((m) => {
       (m.loomNumbers || []).forEach((loomNo) => {
-        currentAllocationMap.set(loomNo, {
+        staticMappingMap.set(loomNo, {
           qualityCode: m.qualityCode,
           colorGroup: m.colorGroup || "Unassigned",
           colour: m.colour || "—",
@@ -69,7 +135,7 @@ export async function GET(request: NextRequest) {
       });
     });
 
-    // Available quality options list combining TapePlantRecipe & LoomMachineMapping
+    // Build comprehensive available quality options list combining TapePlantRecipe & LoomMachineMapping
     const qualityOptionsMap = new Map<string, {
       code: string;
       colour: string;
@@ -80,28 +146,28 @@ export async function GET(request: NextRequest) {
       mesh: string;
     }>();
 
-    mappings.forEach((m) => {
-      qualityOptionsMap.set(m.qualityCode, {
-        code: m.qualityCode,
-        colour: m.colour || "—",
-        colorGroup: m.colorGroup || "Unassigned",
-        denier: m.denier ?? null,
-        reedSpaceCm: m.reedSpaceCm ?? null,
-        bobbinMarking: m.bobbinMarking || "—",
-        mesh: m.mesh || "—",
+    tapeRecipes.forEach((r) => {
+      qualityOptionsMap.set(r.code, {
+        code: r.code,
+        colour: r.colour || "—",
+        colorGroup: r.colorGroup || "Standard",
+        denier: r.denier ?? null,
+        reedSpaceCm: null,
+        bobbinMarking: r.bobbinMarking || "—",
+        mesh: "Standard",
       });
     });
 
-    tapeRecipes.forEach((r) => {
-      if (!qualityOptionsMap.has(r.code)) {
-        qualityOptionsMap.set(r.code, {
-          code: r.code,
-          colour: r.colour || "—",
-          colorGroup: r.colorGroup || "Unassigned",
-          denier: r.denier ?? null,
-          reedSpaceCm: null,
-          bobbinMarking: r.bobbinMarking || "—",
-          mesh: "—",
+    mappings.forEach((m) => {
+      if (!qualityOptionsMap.has(m.qualityCode)) {
+        qualityOptionsMap.set(m.qualityCode, {
+          code: m.qualityCode,
+          colour: m.colour || "—",
+          colorGroup: m.colorGroup || "Unassigned",
+          denier: m.denier ?? null,
+          reedSpaceCm: m.reedSpaceCm ?? null,
+          bobbinMarking: m.bobbinMarking || "—",
+          mesh: m.mesh || "—",
         });
       }
     });
@@ -110,22 +176,27 @@ export async function GET(request: NextRequest) {
       a.code.localeCompare(b.code)
     );
 
+    // Build changeover record lookup
+    const changeoverMap = new Map<number, typeof changeovers[0]>();
+    changeovers.forEach((co) => changeoverMap.set(co.loomNumber, co));
+
     // Build comprehensive 1-91 loom changeover items
     const allLoomItems = Array.from({ length: TOTAL_FACTORY_LOOMS }, (_, i) => {
       const loomNo = i + 1;
-      const current = currentAllocationMap.get(loomNo);
+      const liveAlloc = liveLoomAllocationMap.get(loomNo);
+      const staticAlloc = staticMappingMap.get(loomNo);
       const co = changeoverMap.get(loomNo);
 
-      // Current running values
-      const currentQuality = co?.currentQuality || current?.qualityCode || "UNALLOCATED";
-      const currentColor = co?.currentColor || current?.colour || "—";
-      const currentColorGroup = co?.currentColorGroup || current?.colorGroup || "Unallocated";
-      const currentDenier = co?.currentDenier ?? current?.denier ?? null;
-      const currentReedSpace = co?.currentReedSpace ?? current?.reedSpaceCm ?? null;
-      const currentBobbinMark = co?.currentBobbinMark || current?.bobbinMarking || "—";
-      const currentMesh = co?.currentMesh || current?.mesh || "—";
+      // Current running values (Live Bobbin Issue is top priority)
+      const currentQuality = liveAlloc?.qualityCode || co?.currentQuality || staticAlloc?.qualityCode || "UNALLOCATED";
+      const currentColor = liveAlloc?.colour || co?.currentColor || staticAlloc?.colour || "—";
+      const currentColorGroup = liveAlloc?.colorGroup || co?.currentColorGroup || staticAlloc?.colorGroup || "Unallocated";
+      const currentDenier = liveAlloc?.denier ?? co?.currentDenier ?? staticAlloc?.denier ?? null;
+      const currentReedSpace = co?.currentReedSpace ?? staticAlloc?.reedSpaceCm ?? null;
+      const currentBobbinMark = liveAlloc?.bobbinMarking || co?.currentBobbinMark || staticAlloc?.bobbinMarking || "—";
+      const currentMesh = liveAlloc?.mesh || co?.currentMesh || staticAlloc?.mesh || "—";
 
-      // Next scheduled values
+      // Next scheduled values from LoomChangeover
       const nextQualityCode = co?.nextQualityCode || null;
       const nextColor = co?.nextColor || null;
       const nextColorGroup = co?.nextColorGroup || null;
@@ -218,7 +289,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Sort items: Items with active sequence (> 0) come first ordered by sequence, then remaining looms ordered by loomNumber
+    // Sort items: items with active sequence (> 0) come first ordered by sequence, then remaining looms ordered by loomNumber
     const sortedFilteredItems = [...filteredItems].sort((a, b) => {
       if (a.sequence > 0 && b.sequence > 0) return a.sequence - b.sequence;
       if (a.sequence > 0) return -1;
@@ -283,7 +354,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { updates } = body; // Array of LoomChangeover update payload or single object
+    const { updates } = body;
 
     const itemsToUpdate = Array.isArray(updates) ? updates : [body];
 
