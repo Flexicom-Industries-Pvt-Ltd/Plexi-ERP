@@ -244,23 +244,26 @@ export function BobbinStockPrintPreviewModal({
                     <tr className="bg-slate-100 text-slate-900 text-[10px] font-bold uppercase tracking-wider border-b border-slate-300">
                       <th className="p-2 border-r border-slate-300 text-center w-8">#</th>
                       <th className="p-2 border-r border-slate-300">Quality Name / Recipe Code</th>
-                      <th className="p-2 border-r border-slate-300 text-right w-24">Gross Prod (KG)</th>
-                      <th className="p-2 border-r border-slate-300 text-right w-20">Wastage (KG)</th>
-                      <th className="p-2 border-r border-slate-300 text-right font-bold bg-emerald-50 text-emerald-900 w-28">
-                        Net Output (KG)
+                      <th className="p-2 border-r border-slate-300 text-right w-20">Gross (KG)</th>
+                      <th className="p-2 border-r border-slate-300 text-right w-16">Waste (KG)</th>
+                      <th className="p-2 border-r border-slate-300 text-right font-bold text-emerald-900 w-24">
+                        Produced Net
                       </th>
-                      <th className="p-2 border-r border-slate-300 text-right font-bold bg-blue-50 text-blue-900 w-32">
-                        Bobbin Stock (@ 1.6 KG)
+                      <th className="p-2 border-r border-slate-300 text-right font-bold bg-purple-50 text-purple-900 w-28">
+                        Issued to Looms
                       </th>
-                      <th className="p-2 border-slate-300 text-right font-bold bg-purple-50 text-purple-900 w-32">
-                        Crate Stock (@ 12.8 KG)
+                      <th className="p-2 border-r border-slate-300 text-right font-bold bg-blue-50 text-blue-900 w-28">
+                        Avail Bobbins (@ 1.6)
+                      </th>
+                      <th className="p-2 border-slate-300 text-right font-bold bg-emerald-50 text-emerald-900 w-28">
+                        Avail Crates (@ 12.8)
                       </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200">
                     {items.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="p-4 text-center text-slate-500 italic">
+                        <td colSpan={8} className="p-4 text-center text-slate-500 italic">
                           No bobbin stock records found for the selected period.
                         </td>
                       </tr>
@@ -285,12 +288,19 @@ export function BobbinStockPrintPreviewModal({
                               maximumFractionDigits: 2,
                             })}
                           </td>
-                          <td className="p-2 border-r border-slate-200 text-right font-mono font-extrabold text-emerald-800 bg-emerald-50/50">
+                          <td className="p-2 border-r border-slate-200 text-right font-mono font-bold text-slate-900">
                             {item.netProductionKg.toLocaleString(undefined, {
                               minimumFractionDigits: 2,
                               maximumFractionDigits: 2,
                             })}{" "}
-                            <span className="text-[10px] font-medium text-emerald-600">KG</span>
+                            <span className="text-[10px] font-medium text-slate-500">KG</span>
+                          </td>
+                          <td className="p-2 border-r border-slate-200 text-right font-mono font-bold text-purple-900 bg-purple-50/40">
+                            {(item.issuedCrates || 0).toLocaleString(undefined, {
+                              minimumFractionDigits: 1,
+                              maximumFractionDigits: 2,
+                            })}{" "}
+                            <span className="text-[10px] font-medium text-purple-600">crates</span>
                           </td>
                           <td className="p-2 border-r border-slate-200 text-right font-mono font-extrabold text-blue-900 bg-blue-50/50">
                             {item.bobbinStock.toLocaleString(undefined, {
@@ -299,12 +309,12 @@ export function BobbinStockPrintPreviewModal({
                             })}{" "}
                             <span className="text-[10px] font-medium text-blue-600">PCS</span>
                           </td>
-                          <td className="p-2 border-slate-200 text-right font-mono font-extrabold text-purple-900 bg-purple-50/50">
+                          <td className="p-2 border-slate-200 text-right font-mono font-extrabold text-emerald-900 bg-emerald-50/50">
                             {item.crateStock.toLocaleString(undefined, {
                               minimumFractionDigits: 2,
                               maximumFractionDigits: 2,
                             })}{" "}
-                            <span className="text-[10px] font-medium text-purple-600">CRATES</span>
+                            <span className="text-[10px] font-medium text-emerald-600">CRATES</span>
                           </td>
                         </tr>
                       ))
@@ -328,12 +338,19 @@ export function BobbinStockPrintPreviewModal({
                             maximumFractionDigits: 2,
                           })}
                         </td>
-                        <td className="p-2 text-right font-mono font-black text-emerald-900 bg-emerald-100">
+                        <td className="p-2 text-right font-mono font-bold text-slate-900">
                           {totals.totalNetProductionKg.toLocaleString(undefined, {
                             minimumFractionDigits: 2,
                             maximumFractionDigits: 2,
                           })}{" "}
                           KG
+                        </td>
+                        <td className="p-2 text-right font-mono font-bold text-purple-900 bg-purple-100">
+                          {totals.totalIssuedCrates.toLocaleString(undefined, {
+                            minimumFractionDigits: 1,
+                            maximumFractionDigits: 2,
+                          })}{" "}
+                          crates
                         </td>
                         <td className="p-2 text-right font-mono font-black text-blue-950 bg-blue-100">
                           {totals.totalBobbinStock.toLocaleString(undefined, {
@@ -342,7 +359,7 @@ export function BobbinStockPrintPreviewModal({
                           })}{" "}
                           PCS
                         </td>
-                        <td className="p-2 text-right font-mono font-black text-purple-950 bg-purple-100">
+                        <td className="p-2 text-right font-mono font-black text-emerald-950 bg-emerald-100">
                           {totals.totalCrateStock.toLocaleString(undefined, {
                             minimumFractionDigits: 2,
                             maximumFractionDigits: 2,

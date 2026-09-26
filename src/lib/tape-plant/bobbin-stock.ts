@@ -11,8 +11,16 @@ export interface BobbinStockItem {
   productionDoneKg: number;
   wasteKg: number;
   netProductionKg: number;
-  bobbinStock: number;
-  crateStock: number;
+  producedBobbins?: number;
+  producedCrates?: number;
+  issuedCrates?: number;
+  issuedBobbins?: number;
+  issuedKg?: number;
+  bobbinStock: number; // Available Bobbin Stock (Produced - Issued)
+  crateStock: number;  // Available Crate Stock (Produced - Issued)
+  availableKg?: number; // Available KG Stock (Net Produced - Issued KG)
+  availableBobbins?: number; // Available Bobbin Stock (Net Produced - Issued Bobbins)
+  availableCrates?: number;  // Available Crate Stock (Net Produced - Issued Crates)
   shiftName?: string;
   remarks?: string;
 }
@@ -21,8 +29,16 @@ export interface BobbinStockTotals {
   totalGrossDoneKg: number;
   totalWasteKg: number;
   totalNetProductionKg: number;
-  totalBobbinStock: number;
-  totalCrateStock: number;
+  totalProducedBobbins: number;
+  totalProducedCrates: number;
+  totalIssuedCrates: number;
+  totalIssuedBobbins: number;
+  totalIssuedKg: number;
+  totalBobbinStock: number; // Available Bobbins
+  totalCrateStock: number;  // Available Crates
+  totalAvailableKg: number; // Available KG
+  totalAvailableBobbinStock: number; // Total Available Bobbins
+  totalAvailableCrateStock: number;  // Total Available Crates
   uniqueQualitiesCount: number;
 }
 
@@ -70,22 +86,48 @@ export function computeBobbinStockTotals(items: BobbinStockItem[]): BobbinStockT
   const totalGrossDoneKg = items.reduce((sum, item) => sum + (item.productionDoneKg || 0), 0);
   const totalWasteKg = items.reduce((sum, item) => sum + (item.wasteKg || 0), 0);
   const totalNetProductionKg = items.reduce((sum, item) => sum + (item.netProductionKg || 0), 0);
-  const totalBobbinStock = items.reduce((sum, item) => sum + (item.bobbinStock || 0), 0);
-  const totalCrateStock = items.reduce((sum, item) => sum + (item.crateStock || 0), 0);
+  const totalProducedBobbins = computeBobbinStockCount(totalNetProductionKg);
+  const totalProducedCrates = computeCrateStockCount(totalNetProductionKg);
+
+  const totalIssuedCrates = items.reduce((sum, item) => sum + (item.issuedCrates || 0), 0);
+  const totalIssuedBobbins = items.reduce((sum, item) => sum + (item.issuedBobbins || 0), 0);
+  const totalIssuedKg = items.reduce((sum, item) => sum + (item.issuedKg || 0), 0);
+
+  const totalAvailableKg = Math.max(0, totalNetProductionKg - totalIssuedKg);
+  const totalAvailableBobbinStock = computeBobbinStockCount(totalAvailableKg);
+  const totalAvailableCrateStock = computeCrateStockCount(totalAvailableKg);
+
+  const totalBobbinStock = items.reduce(
+    (sum, item) => sum + (item.availableBobbins !== undefined ? item.availableBobbins : item.bobbinStock || 0),
+    0
+  );
+  const totalCrateStock = items.reduce(
+    (sum, item) => sum + (item.availableCrates !== undefined ? item.availableCrates : item.crateStock || 0),
+    0
+  );
+
   const uniqueQualities = new Set(items.map((i) => (i.recipeQuality || "").trim()).filter(Boolean));
 
   return {
     totalGrossDoneKg: Number(totalGrossDoneKg.toFixed(2)),
     totalWasteKg: Number(totalWasteKg.toFixed(2)),
     totalNetProductionKg: Number(totalNetProductionKg.toFixed(2)),
+    totalProducedBobbins: Number(totalProducedBobbins.toFixed(2)),
+    totalProducedCrates: Number(totalProducedCrates.toFixed(2)),
+    totalIssuedCrates: Number(totalIssuedCrates.toFixed(2)),
+    totalIssuedBobbins: Number(totalIssuedBobbins.toFixed(2)),
+    totalIssuedKg: Number(totalIssuedKg.toFixed(2)),
     totalBobbinStock: Number(totalBobbinStock.toFixed(2)),
     totalCrateStock: Number(totalCrateStock.toFixed(2)),
+    totalAvailableKg: Number(totalAvailableKg.toFixed(2)),
+    totalAvailableBobbinStock: Number(totalAvailableBobbinStock.toFixed(2)),
+    totalAvailableCrateStock: Number(totalAvailableCrateStock.toFixed(2)),
     uniqueQualitiesCount: uniqueQualities.size,
   };
 }
 
 /**
- * Exports Bobbin Stock Summary to Excel (.xlsx) without Shift and Remarks
+ * Exports Bobbin Stock Summary to Excel (.xlsx) with Produced, Issued, and Available Stock
  */
 export function exportBobbinStockExcel({
   dateDescription,
@@ -116,9 +158,12 @@ export function exportBobbinStockExcel({
     "Quality Name",
     "Gross Production (kg)",
     "Wastage (kg)",
-    "Production Done in KG (Net Output)",
-    "Stock of Bobbins (@ 1.6 kg)",
-    "Stock of Crates (@ 12.8 kg)",
+    "Produced Net (kg)",
+    "Issued to Looms (Crates)",
+    "Issued to Looms (kg)",
+    "Available Stock (Bobbins @ 1.6 kg)",
+    "Available Stock (Crates @ 12.8 kg)",
+    "Available Balance (kg)",
   ];
 
   const dataRows = items.map((item) => [
@@ -127,8 +172,11 @@ export function exportBobbinStockExcel({
     item.productionDoneKg,
     item.wasteKg,
     item.netProductionKg,
+    item.issuedCrates || 0,
+    item.issuedKg || 0,
     item.bobbinStock,
     item.crateStock,
+    item.availableKg !== undefined ? item.availableKg : item.netProductionKg - (item.issuedKg || 0),
   ]);
 
   const totalsRow = [
@@ -137,8 +185,11 @@ export function exportBobbinStockExcel({
     totals.totalGrossDoneKg,
     totals.totalWasteKg,
     totals.totalNetProductionKg,
+    totals.totalIssuedCrates,
+    totals.totalIssuedKg,
     totals.totalBobbinStock,
     totals.totalCrateStock,
+    totals.totalAvailableKg,
   ];
 
   const wsData = [
@@ -156,11 +207,14 @@ export function exportBobbinStockExcel({
   ws["!cols"] = [
     { wch: 8 },  // Sl No
     { wch: 32 }, // Quality Name
-    { wch: 22 }, // Gross Production (kg)
-    { wch: 16 }, // Wastage (kg)
-    { wch: 34 }, // Production Done in KG (Net Output)
-    { wch: 26 }, // Stock of Bobbins (@ 1.6 kg)
-    { wch: 26 }, // Stock of Crates (@ 12.8 kg)
+    { wch: 20 }, // Gross Production (kg)
+    { wch: 15 }, // Wastage (kg)
+    { wch: 20 }, // Produced Net (kg)
+    { wch: 24 }, // Issued to Looms (Crates)
+    { wch: 20 }, // Issued to Looms (kg)
+    { wch: 30 }, // Available Stock (Bobbins @ 1.6 kg)
+    { wch: 30 }, // Available Stock (Crates @ 12.8 kg)
+    { wch: 22 }, // Available Balance (kg)
   ];
 
   XLSX.utils.book_append_sheet(wb, ws, "Bobbin Stock Summary");
@@ -201,14 +255,15 @@ export function generateBobbinStockSheetHtml({
           <td style="font-weight: 700; font-family: monospace; font-size: 8pt; color: #0f172a;">${item.recipeQuality}</td>
           <td style="text-align: right; font-family: monospace;">${item.productionDoneKg.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
           <td style="text-align: right; font-family: monospace; color: #b91c1c; font-weight: 600;">${item.wasteKg.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-          <td style="text-align: right; font-weight: 800; font-family: monospace; color: #047857; background-color: #f0fdf4;">${item.netProductionKg.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} KG</td>
-          <td style="text-align: right; font-weight: 800; font-family: monospace; color: #1e40af; background-color: #eff6ff;">${item.bobbinStock.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} PCS</td>
-          <td style="text-align: right; font-weight: 800; font-family: monospace; color: #6b21a8; background-color: #faf5ff;">${item.crateStock.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} CRATES</td>
+          <td style="text-align: right; font-weight: 700; font-family: monospace; color: #047857;">${item.netProductionKg.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} KG</td>
+          <td style="text-align: right; font-weight: 700; font-family: monospace; color: #6b21a8; background-color: #faf5ff;">${(item.issuedCrates || 0).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 })} Crates</td>
+          <td style="text-align: right; font-weight: 800; font-family: monospace; color: #1e40af; background-color: #eff6ff;">${item.bobbinStock.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 })} PCS</td>
+          <td style="text-align: right; font-weight: 800; font-family: monospace; color: #047857; background-color: #f0fdf4;">${item.crateStock.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 })} CRATES</td>
         </tr>`
       ).join("")
     : `
       <tr>
-        <td colspan="7" style="text-align: center; color: #64748b; font-style: italic; padding: 12px;">
+        <td colspan="8" style="text-align: center; color: #64748b; font-style: italic; padding: 12px;">
           No bobbin stock records found for the selected period.
         </td>
       </tr>
@@ -477,36 +532,37 @@ export function generateBobbinStockSheetHtml({
     <table class="kpi-table">
       <tr>
         <td style="width: 25%;">
-          <div class="kpi-label">Total Net Output (KG)</div>
+          <div class="kpi-label">Total Produced Net (KG)</div>
           <div class="kpi-val" style="color: #047857;">${totals.totalNetProductionKg.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} KG</div>
         </td>
         <td style="width: 25%;">
-          <div class="kpi-label">Total Bobbins (@ 1.6 KG)</div>
-          <div class="kpi-val" style="color: #1e40af;">${totals.totalBobbinStock.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} PCS</div>
+          <div class="kpi-label">Total Issued to Looms</div>
+          <div class="kpi-val" style="color: #6b21a8;">${totals.totalIssuedCrates.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 })} Crates (${totals.totalIssuedKg.toFixed(1)} kg)</div>
         </td>
         <td style="width: 25%;">
-          <div class="kpi-label">Total Crates (@ 12.8 KG)</div>
-          <div class="kpi-val" style="color: #6b21a8;">${totals.totalCrateStock.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} CRATES</div>
+          <div class="kpi-label">Available Bobbin Stock</div>
+          <div class="kpi-val" style="color: #1e40af;">${totals.totalBobbinStock.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 })} PCS</div>
         </td>
         <td style="width: 25%;">
-          <div class="kpi-label">Active Qualities</div>
-          <div class="kpi-val">${totals.uniqueQualitiesCount} Recipes</div>
+          <div class="kpi-label">Available Crate Stock</div>
+          <div class="kpi-val" style="color: #047857;">${totals.totalCrateStock.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 })} CRATES</div>
         </td>
       </tr>
     </table>
 
     <!-- 1. FINISHED BOBBIN & CRATE STOCK SUMMARY -->
-    <div class="section-title">1. FINISHED BOBBIN & CRATE STOCK SUMMARY</div>
+    <div class="section-title">1. FINISHED BOBBIN & CRATE STOCK SUMMARY (PRODUCED − ISSUED)</div>
     <table class="data-table">
       <thead>
         <tr>
           <th style="width: 28px; text-align: center;">#</th>
           <th style="text-align: left;">Quality Name / Recipe Code</th>
-          <th style="text-align: right; width: 85px;">Gross Prod (KG)</th>
-          <th style="text-align: right; width: 75px;">Wastage (KG)</th>
-          <th style="text-align: right; width: 110px; background-color: #dcfce7; color: #065f46;">Net Output (KG)</th>
-          <th style="text-align: right; width: 110px; background-color: #dbeafe; color: #1e40af;">Bobbin Stock (@ 1.6 KG)</th>
-          <th style="text-align: right; width: 110px; background-color: #f3e8ff; color: #6b21a8;">Crate Stock (@ 12.8 KG)</th>
+          <th style="text-align: right; width: 80px;">Gross (KG)</th>
+          <th style="text-align: right; width: 70px;">Waste (KG)</th>
+          <th style="text-align: right; width: 90px; color: #065f46;">Produced Net</th>
+          <th style="text-align: right; width: 95px; background-color: #faf5ff; color: #6b21a8;">Issued to Looms</th>
+          <th style="text-align: right; width: 105px; background-color: #dbeafe; color: #1e40af;">Avail Bobbins (@ 1.6)</th>
+          <th style="text-align: right; width: 105px; background-color: #dcfce7; color: #065f46;">Avail Crates (@ 12.8)</th>
         </tr>
       </thead>
       <tbody>
@@ -517,16 +573,17 @@ export function generateBobbinStockSheetHtml({
           <td colspan="2" style="text-align: right; text-transform: uppercase; font-size: 7pt; letter-spacing: 0.5px;">Grand Total:</td>
           <td style="text-align: right; font-family: monospace;">${totals.totalGrossDoneKg.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
           <td style="text-align: right; font-family: monospace; color: #b91c1c;">${totals.totalWasteKg.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-          <td style="text-align: right; font-family: monospace; color: #047857; background-color: #dcfce7;">${totals.totalNetProductionKg.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} KG</td>
-          <td style="text-align: right; font-family: monospace; color: #1e40af; background-color: #dbeafe;">${totals.totalBobbinStock.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} PCS</td>
-          <td style="text-align: right; font-family: monospace; color: #6b21a8; background-color: #f3e8ff;">${totals.totalCrateStock.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} CRATES</td>
+          <td style="text-align: right; font-family: monospace; color: #047857;">${totals.totalNetProductionKg.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} KG</td>
+          <td style="text-align: right; font-family: monospace; color: #6b21a8; background-color: #faf5ff;">${totals.totalIssuedCrates.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 })} Crates</td>
+          <td style="text-align: right; font-family: monospace; color: #1e40af; background-color: #dbeafe;">${totals.totalBobbinStock.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 })} PCS</td>
+          <td style="text-align: right; font-family: monospace; color: #047857; background-color: #dcfce7;">${totals.totalCrateStock.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 })} CRATES</td>
         </tr>
       </tfoot>
     </table>
 
     <!-- CONVERSION NOTES -->
     <div class="conversion-note">
-      <strong>Standard Packing & Formulas:</strong> Bobbin Count = Net Output (KG) ÷ 1.6 kg/bobbin. Crate Count = Net Output (KG) ÷ 12.8 kg/crate (8 bobbins per crate). Net Output = Gross Production Done minus Wastage.
+      <strong>Stock Accounting:</strong> Available Stock = Produced Net Output − Dispatched Bobbin Issues. 1 Crate = 8 Bobbins = 12.8 KG • Standard Bobbin = 1.6 KG.
     </div>
 
     <!-- SIGN-OFF AUTHORIZATION -->
@@ -598,7 +655,6 @@ export function printBobbinStockSummary(data: BobbinStockPrintData): void {
     if (logoImg && !logoImg.complete) {
       logoImg.onload = () => setTimeout(triggerPrint, 100);
       logoImg.onerror = () => setTimeout(triggerPrint, 100);
-      // Fallback timeout in case image events don't fire
       setTimeout(triggerPrint, 400);
     } else {
       setTimeout(triggerPrint, 200);
