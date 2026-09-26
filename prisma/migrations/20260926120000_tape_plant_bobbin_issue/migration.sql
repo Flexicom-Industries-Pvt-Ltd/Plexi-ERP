@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS "TapePlantBobbinIssue" (
     "recipeQuality" TEXT NOT NULL,
     "loomNumber" INTEGER,
     "loomIdentifier" TEXT,
+    "loomAllocations" JSONB,
     "crateCount" DOUBLE PRECISION NOT NULL,
     "bobbinCount" DOUBLE PRECISION NOT NULL,
     "weightKg" DOUBLE PRECISION NOT NULL,

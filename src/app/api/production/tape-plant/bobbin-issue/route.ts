@@ -91,6 +91,7 @@ export async function GET(request: NextRequest) {
       recipeQuality: i.recipeQuality,
       loomNumber: i.loomNumber,
       loomIdentifier: i.loomIdentifier || (i.loomNumber ? `Loom #${i.loomNumber}` : null),
+      loomAllocations: i.loomAllocations || null,
       crateCount: Number(i.crateCount),
       bobbinCount: Number(i.bobbinCount),
       weightKg: Number(i.weightKg),
@@ -138,6 +139,7 @@ export async function POST(request: NextRequest) {
       recipeQuality,
       loomNumber,
       loomIdentifier,
+      loomAllocations,
       crateCount,
       issuedBy,
       receivedBy,
@@ -226,6 +228,38 @@ export async function POST(request: NextRequest) {
     const bobbinCount = Number((crates * BOBBINS_PER_CRATE).toFixed(2));
     const weightKg = Number((crates * CRATE_WEIGHT_KG).toFixed(2));
 
+    // Handle Loom Identifier & Allocations
+    let finalLoomIdentifier = loomIdentifier;
+    let finalLoomNumber = parsedLoomNumber;
+    let allocationsPayload: any = null;
+
+    if (Array.isArray(loomAllocations) && loomAllocations.length > 0) {
+      const validAllocations = loomAllocations.map((a: any) => ({
+        loomNumber: a.loomNumber ? Number(a.loomNumber) : null,
+        loomIdentifier: a.loomIdentifier || (a.loomNumber ? `Loom #${a.loomNumber}` : "Loom"),
+        crateCount: Number(a.crateCount) || 0,
+        bobbinCount: a.bobbinCount ? Number(a.bobbinCount) : Number(((Number(a.crateCount) || 0) * BOBBINS_PER_CRATE).toFixed(2)),
+        weightKg: a.weightKg ? Number(a.weightKg) : Number(((Number(a.crateCount) || 0) * CRATE_WEIGHT_KG).toFixed(2)),
+        remarks: a.remarks ? String(a.remarks).trim() : null,
+      }));
+      allocationsPayload = validAllocations;
+
+      if (!finalLoomIdentifier) {
+        if (validAllocations.length === 1) {
+          finalLoomIdentifier = validAllocations[0].loomIdentifier;
+          finalLoomNumber = validAllocations[0].loomNumber;
+        } else {
+          const loomNames = validAllocations.map((a: any) => a.loomIdentifier).slice(0, 3).join(", ");
+          finalLoomIdentifier = `${validAllocations.length} Looms (${loomNames}${validAllocations.length > 3 ? "..." : ""})`;
+          finalLoomNumber = validAllocations[0].loomNumber;
+        }
+      }
+    }
+
+    if (!finalLoomIdentifier) {
+      finalLoomIdentifier = finalLoomNumber ? `Loom #${finalLoomNumber}` : "Loom Shed";
+    }
+
     // Safely resolve Shift FK without throwing constraint violation
     let resolvedShiftId: string | null = null;
     let resolvedShiftName: string = body.shiftName ? String(body.shiftName).trim() : "";
@@ -294,8 +328,9 @@ export async function POST(request: NextRequest) {
         shiftId: resolvedShiftId,
         shiftName: resolvedShiftName,
         recipeQuality: cleanQuality,
-        loomNumber: parsedLoomNumber,
-        loomIdentifier: loomIdentifier || (parsedLoomNumber ? `Loom #${parsedLoomNumber}` : null),
+        loomNumber: finalLoomNumber,
+        loomIdentifier: finalLoomIdentifier,
+        loomAllocations: allocationsPayload,
         crateCount: crates,
         bobbinCount,
         weightKg,
@@ -320,6 +355,7 @@ export async function POST(request: NextRequest) {
         recipeQuality: created.recipeQuality,
         loomNumber: created.loomNumber,
         loomIdentifier: created.loomIdentifier,
+        loomAllocations: created.loomAllocations,
         crateCount: Number(created.crateCount),
         bobbinCount: Number(created.bobbinCount),
         weightKg: Number(created.weightKg),
