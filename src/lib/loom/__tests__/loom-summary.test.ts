@@ -109,58 +109,23 @@ describe("Loom Summary Export & Print Engine", () => {
         recentIssues: [],
       },
     ],
-    qualities: [
-      {
-        id: "q-1",
-        qualityCode: "1000D White Standard",
-        colorGroup: "Standard",
-        colour: "White",
-        denier: null,
-        tapeWidth: null,
-        bobbinMarking: "Bobbin Issue",
-        reedSpaceCm: null,
-        mesh: "Standard",
-        targetPpm: null,
-        remarks: null,
-        loomNumbers: [4, 12, 45],
-        totalLooms: 3,
-        status: "RUNNING",
-        lastRunDate: "2026-09-26",
-        latestOperator: "Rajesh Kumar",
-        activeShifts: ["Day Shift"],
-        actualOutputKg: 192,
-      },
-    ],
-    loomMatrix: [
-      {
-        loomNumber: 4,
-        isAllocated: true,
-        qualityId: "q-1",
-        qualityCode: "1000D White Standard",
-        colorGroup: "Active",
-        colour: "Assigned",
-        denier: null,
-        tapeWidth: null,
-        reedSpaceCm: null,
-        bobbinMarking: "5 Crates",
-        status: "RUNNING",
-      },
-    ],
+    qualities: [],
+    loomMatrix: [],
     kpis: {
       totalLooms: 91,
-      activeLoomsCount: 5,
-      idleLoomsCount: 86,
+      activeLoomsCount: 2,
+      idleLoomsCount: 89,
       uniqueRecipesCount: 2,
       totalCratesDispatched: 25,
       totalBobbinsDispatched: 200,
       totalWeightDispatchedKg: 320,
       totalIssueSlipsCount: 3,
       totalFactoryLooms: 91,
-      totalAllocatedLooms: 5,
-      totalRunningLooms: 5,
+      totalAllocatedLooms: 2,
+      totalRunningLooms: 2,
       totalPlannedLooms: 0,
-      totalStandbyLooms: 86,
-      totalUnallocatedLooms: 86,
+      totalStandbyLooms: 89,
+      totalUnallocatedLooms: 89,
       runningQualitiesCount: 2,
       plannedQualitiesCount: 0,
       totalQualitiesCount: 2,
@@ -183,12 +148,15 @@ describe("Loom Summary Export & Print Engine", () => {
     expect(wb.SheetNames).toContain("Looms 1-91 Matrix");
   });
 
-  it("should generate valid A4 landscape printable HTML document with Tape Planning layout", () => {
-    const html = generateLoomSummaryHtml(mockDataset);
+  it("should generate Recipe-Wise printable HTML when activeView is 'recipes'", () => {
+    const html = generateLoomSummaryHtml({
+      ...mockDataset,
+      activeView: "recipes",
+    });
 
     expect(html).toContain("<!DOCTYPE html>");
     expect(html).toContain("Flexicom Industries Pvt. Ltd.");
-    expect(html).toContain("LOOM MACHINE ALLOCATIONS & RECIPE SUMMARY");
+    expect(html).toContain("LOOM RECIPE FORMULATION & DISPENSE SCHEDULE");
     expect(html).toContain("1000D White Standard");
     expect(html).toContain("850D Milky White");
     expect(html).toContain("#4, #12, #45");
@@ -196,6 +164,39 @@ describe("Loom Summary Export & Print Engine", () => {
     expect(html).toContain("Prepared By (Loom Shed In-Charge)");
     expect(html).toContain("Verified By (Tape Plant Supervisor)");
     expect(html).toContain("Approved By (Plant Manager)");
+    // Should NOT contain the loom machines table title
+    expect(html).not.toContain("CIRCULAR LOOM MACHINES OPERATIONAL STATUS");
+  });
+
+  it("should generate Loom-Wise printable HTML when activeView is 'looms'", () => {
+    const html = generateLoomSummaryHtml({
+      ...mockDataset,
+      activeView: "looms",
+    });
+
+    expect(html).toContain("<!DOCTYPE html>");
+    expect(html).toContain("Flexicom Industries Pvt. Ltd.");
+    expect(html).toContain("CIRCULAR LOOM MACHINES STATUS & ALLOCATIONS");
+    expect(html).toContain("#1");
+    expect(html).toContain("#4");
+    expect(html).toContain("#91");
+    expect(html).toContain("IDLE");
+    expect(html).toContain("RUNNING");
+    // Should NOT contain the recipe table title
+    expect(html).not.toContain("RECIPE-WISE CIRCULAR LOOM ALLOCATIONS");
+  });
+
+  it("should respect showActiveOnly filter in Loom-Wise printout", () => {
+    const html = generateLoomSummaryHtml({
+      ...mockDataset,
+      activeView: "looms",
+      showActiveOnly: true,
+    });
+
+    expect(html).toContain("Active Running Looms Only");
+    expect(html).toContain("#1");
+    expect(html).toContain("#4");
+    expect(html).not.toContain("#91");
   });
 });
 
