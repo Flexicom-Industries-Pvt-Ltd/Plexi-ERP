@@ -16,6 +16,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Layers,
+  ArrowRightLeft,
 } from "lucide-react";
 import { TapePlantPlanningSection } from "@/components/tape-plant/TapePlantPlanningSection";
 import { ProcessTemperatureSection } from "@/components/tape-plant/ProcessTemperatureSection";
@@ -23,6 +24,7 @@ import { ProcessDriveParameterSection } from "@/components/tape-plant/ProcessDri
 import { RawMaterialSection } from "@/components/tape-plant/RawMaterialSection";
 import { PostProductionSection } from "@/components/tape-plant/PostProductionSection";
 import { BobbinStockSummarySection } from "@/components/tape-plant/BobbinStockSummarySection";
+import { BobbinIssueSection } from "@/components/tape-plant/BobbinIssueSection";
 import { TapePlantReportSection } from "@/components/tape-plant/TapePlantReportSection";
 
 export type TapePlantTab =
@@ -32,6 +34,7 @@ export type TapePlantTab =
   | "raw-material"
   | "post-production"
   | "bobbin-stock"
+  | "bobbin-issue"
   | "reports";
 
 const TABS = [
@@ -41,7 +44,8 @@ const TABS = [
   { id: "raw-material" as TapePlantTab, label: "4. Raw Material", icon: FlaskConical },
   { id: "post-production" as TapePlantTab, label: "5. Post Production & QC", icon: PackageCheck },
   { id: "bobbin-stock" as TapePlantTab, label: "6. Bobbin Stock Summary", icon: Boxes },
-  { id: "reports" as TapePlantTab, label: "7. Reports", icon: BarChart3 },
+  { id: "bobbin-issue" as TapePlantTab, label: "7. Bobbin Issue", icon: ArrowRightLeft },
+  { id: "reports" as TapePlantTab, label: "8. Reports", icon: BarChart3 },
 ];
 
 const TAB_META: Record<
@@ -91,9 +95,16 @@ const TAB_META: Record<
   },
   "bobbin-stock": {
     title: "Bobbin Stock Summary",
-    subtitle: "Cumulative finished bobbin stock and crate inventory derived from Post-Production Net Output.",
+    subtitle: "Cumulative finished bobbin stock and crate inventory derived from Post-Production Net Output minus Loom Issues.",
     badge: "Inventory Stock",
     icon: Boxes,
+    showRootDateShift: false,
+  },
+  "bobbin-issue": {
+    title: "Bobbin Issue to Looms & Transaction Ledger",
+    subtitle: "Issue finished crates and bobbins to circular looms with auto KG calculation, issue slips, and unified inward/outward ledger.",
+    badge: "Loom Issue",
+    icon: ArrowRightLeft,
     showRootDateShift: false,
   },
   reports: {
@@ -271,6 +282,12 @@ export function TapePlantClient() {
             shiftId={selectedShiftId}
             shiftName={shiftName}
             onNavigateToPostProduction={() => handleTabChange("post-production")}
+            onNavigateToBobbinIssue={() => handleTabChange("bobbin-issue")}
+          />
+        )}
+        {activeTab === "bobbin-issue" && (
+          <BobbinIssueSection
+            onNavigateToBobbinStock={() => handleTabChange("bobbin-stock")}
           />
         )}
         {activeTab === "reports" && <TapePlantReportSection shifts={shifts} />}
