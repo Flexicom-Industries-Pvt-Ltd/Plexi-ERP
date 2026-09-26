@@ -46,6 +46,7 @@ const tapePlantItems = [
   { title: "Raw Material", url: "/dashboard/production/tape-plant?tab=raw-material" },
   { title: "Post Production Entry", url: "/dashboard/production/tape-plant?tab=post-production" },
   { title: "Bobbin Stock Summary", url: "/dashboard/production/tape-plant?tab=bobbin-stock" },
+  { title: "Bobbin Issue", url: "/dashboard/production/tape-plant?tab=bobbin-issue" },
   { title: "Report", url: "/dashboard/production/tape-plant?tab=reports" },
 ];
 
