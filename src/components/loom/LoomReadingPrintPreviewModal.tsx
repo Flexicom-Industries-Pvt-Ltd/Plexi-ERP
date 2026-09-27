@@ -30,6 +30,8 @@ interface LoomReadingPrintPreviewModalProps {
     totalShiftMeters: number;
     totalShiftKg: number;
     totalWastageKg: number;
+    averageEfficiency?: number;
+    totalBreakdownMins?: number;
     intervalTotals?: IntervalKpiSummary[];
   };
   filterActiveOnly?: boolean;
@@ -81,6 +83,7 @@ export function LoomReadingPrintPreviewModal({
   const totalR5Prod = entries.reduce((s, e) => s + (e.r5Prod || 0), 0);
   const totalR6Prod = entries.reduce((s, e) => s + (e.r6Prod || 0), 0);
   const totalMeters = entries.reduce((s, e) => s + (e.totalProduction || 0), 0);
+  const totalBreakdownMins = entries.reduce((s, e) => s + (e.breakdownMinutes || 0), 0);
   const totalKg = Math.round(totalMeters * 0.16 * 100) / 100;
 
   const r1Count = entries.filter((e) => (e.r1Prod || 0) > 0 || e.r1Reading !== null).length;
@@ -100,6 +103,14 @@ export function LoomReadingPrintPreviewModal({
   const runningLooms = entries.filter((e) => e.status === "RUNNING" || (e.totalProduction && e.totalProduction > 0)).length;
   const idleLooms = entries.length - runningLooms;
 
+  const effValues = entries
+    .filter((e) => e.status === "RUNNING" || (e.totalProduction && e.totalProduction > 0))
+    .map((e) => e.efficiencyPct || 0)
+    .filter((v) => v > 0);
+  const averageEfficiency = effValues.length > 0
+    ? Math.round((effValues.reduce((a, b) => a + b, 0) / effValues.length) * 10) / 10
+    : kpis?.averageEfficiency || 0;
+
   const handlePrint = () => {
     printLoomReadingSheet({
       date,
@@ -117,6 +128,8 @@ export function LoomReadingPrintPreviewModal({
         totalShiftMeters: totalMeters,
         totalShiftKg: totalKg,
         totalWastageKg: kpis?.totalWastageKg || 0,
+        averageEfficiency,
+        totalBreakdownMins: kpis?.totalBreakdownMins ?? totalBreakdownMins,
         intervalTotals: [],
       },
       filterActiveOnly: false,
@@ -140,6 +153,8 @@ export function LoomReadingPrintPreviewModal({
         totalShiftMeters: totalMeters,
         totalShiftKg: totalKg,
         totalWastageKg: kpis?.totalWastageKg || 0,
+        averageEfficiency,
+        totalBreakdownMins: kpis?.totalBreakdownMins ?? totalBreakdownMins,
         intervalTotals: [],
       },
       filterActiveOnly: false,
@@ -262,7 +277,7 @@ export function LoomReadingPrintPreviewModal({
             </div>
 
             {/* Summary KPI Strip */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+            <div className="grid grid-cols-2 sm:grid-cols-6 gap-3 mb-4">
               <div className="p-2.5 rounded-lg border border-slate-200 bg-slate-50">
                 <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
                   Running Looms
@@ -279,17 +294,36 @@ export function LoomReadingPrintPreviewModal({
                 </div>
                 <div className="text-base font-black text-blue-700 mt-0.5">
                   {totalMeters.toLocaleString()}{" "}
-                  <span className="text-xs font-normal text-slate-500">Meters</span>
+                  <span className="text-xs font-normal text-slate-500">M</span>
                 </div>
               </div>
 
               <div className="p-2.5 rounded-lg border border-slate-200 bg-slate-50">
                 <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                  Shift Production (Kg)
+                  Output Weight (Est.)
                 </div>
                 <div className="text-base font-black text-slate-900 mt-0.5">
                   {totalKg.toLocaleString()}{" "}
                   <span className="text-xs font-normal text-slate-500">Kg</span>
+                </div>
+              </div>
+
+              <div className="p-2.5 rounded-lg border border-slate-200 bg-slate-50">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                  Avg Efficiency
+                </div>
+                <div className="text-base font-black text-sky-700 mt-0.5">
+                  {averageEfficiency}%
+                </div>
+              </div>
+
+              <div className="p-2.5 rounded-lg border border-slate-200 bg-slate-50">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                  Total Breakdown
+                </div>
+                <div className="text-base font-black text-amber-700 mt-0.5">
+                  {totalBreakdownMins}{" "}
+                  <span className="text-xs font-normal text-slate-500">Mins</span>
                 </div>
               </div>
 
@@ -313,7 +347,7 @@ export function LoomReadingPrintPreviewModal({
                     <th rowSpan={2} className="border border-slate-700 px-2 py-1.5 text-center w-12">
                       Loom #
                     </th>
-                    <th rowSpan={2} className="border border-slate-700 px-2 py-1.5 text-left min-w-[90px]">
+                    <th rowSpan={2} className="border border-slate-700 px-2 py-1.5 text-left min-w-[85px]">
                       Operator
                     </th>
                     <th rowSpan={2} className="border border-slate-700 px-1.5 py-1.5 text-center w-11">
@@ -322,7 +356,7 @@ export function LoomReadingPrintPreviewModal({
                     <th rowSpan={2} className="border border-slate-700 px-1.5 py-1.5 text-center w-11">
                       Denier
                     </th>
-                    <th rowSpan={2} className="border border-slate-700 px-2 py-1.5 text-left min-w-[110px]">
+                    <th rowSpan={2} className="border border-slate-700 px-2 py-1.5 text-left min-w-[100px]">
                       Quality Type
                     </th>
                     <th rowSpan={2} className="border border-slate-700 px-2 py-1.5 text-right w-16 bg-slate-800">
@@ -349,7 +383,13 @@ export function LoomReadingPrintPreviewModal({
                     <th rowSpan={2} className="border border-slate-700 px-2 py-1.5 text-right w-18 bg-emerald-900 text-white">
                       Shift Total (Mtr)
                     </th>
-                    <th rowSpan={2} className="border border-slate-700 px-2 py-1.5 text-left min-w-[90px]">
+                    <th rowSpan={2} className="border border-slate-700 px-2 py-1.5 text-left min-w-[80px]">
+                      Breakdown
+                    </th>
+                    <th rowSpan={2} className="border border-slate-700 px-1.5 py-1.5 text-center w-14 bg-sky-950 text-white">
+                      Eff %
+                    </th>
+                    <th rowSpan={2} className="border border-slate-700 px-2 py-1.5 text-left min-w-[80px]">
                       Remarks
                     </th>
                   </tr>
@@ -372,13 +412,14 @@ export function LoomReadingPrintPreviewModal({
                 <tbody>
                   {entries.length === 0 ? (
                     <tr>
-                      <td colSpan={20} className="px-4 py-8 text-center text-slate-500 font-medium bg-slate-50">
+                      <td colSpan={22} className="px-4 py-8 text-center text-slate-500 font-medium bg-slate-50">
                         No loom entries found for this filter criteria.
                       </td>
                     </tr>
                   ) : (
                     entries.map((e) => {
                       const isRunning = e.status === "RUNNING" || (e.totalProduction && e.totalProduction > 0);
+                      const eff = typeof e.efficiencyPct === "number" && e.efficiencyPct > 0 ? e.efficiencyPct : null;
                       return (
                         <tr
                           key={e.loomNumber}
@@ -391,7 +432,7 @@ export function LoomReadingPrintPreviewModal({
                           }`}>
                             #{e.loomNumber}
                           </td>
-                          <td className="border border-slate-200 px-2 py-1 font-medium truncate max-w-[100px]">
+                          <td className="border border-slate-200 px-2 py-1 font-medium truncate max-w-[90px]">
                             {e.operatorName || "—"}
                           </td>
                           <td className="border border-slate-200 px-1.5 py-1 text-center font-mono">
@@ -400,7 +441,7 @@ export function LoomReadingPrintPreviewModal({
                           <td className="border border-slate-200 px-1.5 py-1 text-center font-mono">
                             {e.denier || "—"}
                           </td>
-                          <td className={`border border-slate-200 px-2 py-1 font-bold truncate max-w-[120px] ${
+                          <td className={`border border-slate-200 px-2 py-1 font-bold truncate max-w-[110px] ${
                             isRunning ? "text-slate-900" : "text-slate-400"
                           }`}>
                             {e.qualityType || "—"}
@@ -461,7 +502,30 @@ export function LoomReadingPrintPreviewModal({
                           <td className="border border-slate-200 px-2 py-1 text-right font-mono font-black text-slate-950 bg-emerald-100/50">
                             {e.totalProduction ? e.totalProduction.toLocaleString() : "0"}
                           </td>
-                          <td className="border border-slate-200 px-2 py-1 text-xs truncate max-w-[100px] text-slate-500">
+                          {/* Breakdown */}
+                          <td className="border border-slate-200 px-1.5 py-1 text-xs truncate max-w-[90px] font-medium text-amber-800">
+                            {e.breakdownReason ? `${e.breakdownReason} (${e.breakdownMinutes || 0}m)` : e.breakdownMinutes ? `${e.breakdownMinutes}m` : "—"}
+                          </td>
+                          {/* Efficiency */}
+                          <td className="border border-slate-200 px-1 py-1 text-center font-mono font-bold text-xs">
+                            {eff !== null ? (
+                              <span
+                                className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                  eff >= 85
+                                    ? "bg-emerald-100 text-emerald-800"
+                                    : eff >= 70
+                                    ? "bg-amber-100 text-amber-800"
+                                    : "bg-rose-100 text-rose-800"
+                                }`}
+                              >
+                                {eff}%
+                              </span>
+                            ) : (
+                              <span className="text-slate-400">—</span>
+                            )}
+                          </td>
+                          {/* Remarks */}
+                          <td className="border border-slate-200 px-2 py-1 text-xs truncate max-w-[85px] text-slate-500">
                             {e.remarks || (isRunning ? "" : "STOP")}
                           </td>
                         </tr>
@@ -497,6 +561,12 @@ export function LoomReadingPrintPreviewModal({
                     <td className="border border-slate-300 px-2 py-1 text-right font-mono font-black text-slate-950 bg-emerald-200/80">
                       {totalMeters.toLocaleString()}
                     </td>
+                    <td className="border border-slate-300 px-1 text-center font-mono text-amber-800 bg-amber-50">
+                      {totalBreakdownMins > 0 ? `${totalBreakdownMins}m` : "—"}
+                    </td>
+                    <td className="border border-slate-300 px-1 text-center font-mono text-sky-800 bg-sky-50">
+                      {averageEfficiency}%
+                    </td>
                     <td className="border border-slate-300 bg-slate-100"></td>
                   </tr>
 
@@ -526,6 +596,8 @@ export function LoomReadingPrintPreviewModal({
                       {totalMeters.toLocaleString()}
                     </td>
                     <td className="border border-slate-300 bg-slate-50"></td>
+                    <td className="border border-slate-300 bg-slate-50"></td>
+                    <td className="border border-slate-300 bg-slate-50"></td>
                   </tr>
 
                   <tr className="bg-white border-t border-slate-300 font-bold text-[10px]">
@@ -553,6 +625,8 @@ export function LoomReadingPrintPreviewModal({
                     <td className="border border-slate-300 px-2 py-1 text-right font-mono font-bold text-slate-900">
                       {runningLooms}
                     </td>
+                    <td className="border border-slate-300 bg-white"></td>
+                    <td className="border border-slate-300 bg-white"></td>
                     <td className="border border-slate-300 bg-white"></td>
                   </tr>
                 </tfoot>

@@ -6,6 +6,7 @@ import {
   LoomReadingEntryItem,
   IntervalKpiSummary,
   computeIntervalDeltas,
+  computeLoomEfficiency,
   TOTAL_FACTORY_LOOMS,
   DEFAULT_TIME_SLOTS,
   DEFAULT_INITIAL_SLOT,
@@ -13,7 +14,7 @@ import {
 } from "@/lib/loom/loom-reading-types";
 
 export type { LoomReadingEntryItem, IntervalKpiSummary };
-export { computeIntervalDeltas };
+export { computeIntervalDeltas, computeLoomEfficiency };
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -88,13 +89,22 @@ export async function GET(request: NextRequest) {
         const alloc = loomAllocationMap.get(i);
 
         if (existing) {
+          const quality = existing.qualityType || alloc?.qualityCode || "";
+          const bdMinutes = existing.breakdownMinutes || 0;
+          const eff = computeLoomEfficiency(
+            existing.totalProduction || 0,
+            quality,
+            bdMinutes,
+            existingSheet.shiftHours || 12
+          );
+
           entries.push({
             id: existing.id,
             loomNumber: i,
             operatorName: existing.operatorName || "",
             size: existing.size || alloc?.size || "",
             denier: existing.denier || alloc?.denier || "",
-            qualityType: existing.qualityType || alloc?.qualityCode || "",
+            qualityType: quality,
             initialReading: existing.initialReading,
             r1Reading: existing.r1Reading,
             r1Prod: existing.r1Prod,
@@ -109,6 +119,9 @@ export async function GET(request: NextRequest) {
             r6Reading: existing.r6Reading,
             r6Prod: existing.r6Prod,
             totalProduction: existing.totalProduction || 0,
+            breakdownReason: existing.breakdownReason || null,
+            breakdownMinutes: bdMinutes,
+            efficiencyPct: existing.efficiencyPct !== null && existing.efficiencyPct !== undefined ? existing.efficiencyPct : eff.efficiencyPct,
             status: (existing.status as any) || "RUNNING",
             remarks: existing.remarks || "",
           });
@@ -133,6 +146,9 @@ export async function GET(request: NextRequest) {
             r6Reading: null,
             r6Prod: null,
             totalProduction: 0,
+            breakdownReason: null,
+            breakdownMinutes: 0,
+            efficiencyPct: 0,
             status: alloc ? "RUNNING" : "IDLE",
             remarks: "",
           });
@@ -162,6 +178,9 @@ export async function GET(request: NextRequest) {
           r6Reading: null,
           r6Prod: null,
           totalProduction: 0,
+          breakdownReason: null,
+          breakdownMinutes: 0,
+          efficiencyPct: 0,
           status: alloc ? "RUNNING" : "IDLE",
           remarks: "",
         });
@@ -175,6 +194,9 @@ export async function GET(request: NextRequest) {
     let totalShiftMeters = 0;
     let runningLoomsCount = 0;
     let idleLoomsCount = 0;
+    let totalBreakdownMins = 0;
+    let totalRunningEffSum = 0;
+    let runningWithEffCount = 0;
 
     const interval1Sum = entries.reduce((s, e) => s + (e.r1Prod || 0), 0);
     const interval2Sum = entries.reduce((s, e) => s + (e.r2Prod || 0), 0);
@@ -192,12 +214,22 @@ export async function GET(request: NextRequest) {
 
     entries.forEach((e) => {
       totalShiftMeters += e.totalProduction || 0;
-      if (e.status === "RUNNING" || (e.totalProduction && e.totalProduction > 0)) {
+      totalBreakdownMins += Number(e.breakdownMinutes) || 0;
+      const isRunning = e.status === "RUNNING" || (e.totalProduction && e.totalProduction > 0);
+      if (isRunning) {
         runningLoomsCount++;
+        if (typeof e.efficiencyPct === "number" && e.efficiencyPct > 0) {
+          totalRunningEffSum += e.efficiencyPct;
+          runningWithEffCount++;
+        }
       } else {
         idleLoomsCount++;
       }
     });
+
+    const averageEfficiency = runningWithEffCount > 0
+      ? Math.round((totalRunningEffSum / runningWithEffCount) * 10) / 10
+      : 0;
 
     const intervalSums = [interval1Sum, interval2Sum, interval3Sum, interval4Sum, interval5Sum, interval6Sum];
     const intervalCounts = [r1Count, r2Count, r3Count, r4Count, r5Count, r6Count];
@@ -227,6 +259,7 @@ export async function GET(request: NextRequest) {
         (e.qualityType && e.qualityType.toLowerCase().includes(search)) ||
         (e.size && e.size.toLowerCase().includes(search)) ||
         (e.denier && e.denier.toLowerCase().includes(search)) ||
+        (e.breakdownReason && e.breakdownReason.toLowerCase().includes(search)) ||
         (e.remarks && e.remarks.toLowerCase().includes(search))
       );
     }
@@ -248,6 +281,8 @@ export async function GET(request: NextRequest) {
         totalWastageKg: existingSheet?.totalWastageKg || 0,
         runningLoomsCount,
         idleLoomsCount,
+        averageEfficiency: existingSheet?.averageEfficiency ?? averageEfficiency,
+        totalBreakdownMins: existingSheet?.totalBreakdownMins ?? totalBreakdownMins,
         remarks: existingSheet?.remarks || "",
         status: existingSheet?.status || "DRAFT",
         createdAt: existingSheet?.createdAt?.toISOString(),
@@ -262,6 +297,8 @@ export async function GET(request: NextRequest) {
         totalShiftMeters: Math.round(totalShiftMeters * 100) / 100,
         totalShiftKg,
         totalWastageKg: existingSheet?.totalWastageKg || 0,
+        averageEfficiency,
+        totalBreakdownMins,
         intervalTotals,
       },
       availableShifts: shifts.map((s) => ({ id: s.id, name: s.name })),
@@ -304,20 +341,37 @@ export async function POST(request: NextRequest) {
         totalWastageKg = 0,
         remarks = "",
         status = "DRAFT",
+        shiftHours = 12,
       } = body;
 
       // Validate & re-calculate entries
       let sheetTotalMeters = 0;
       let runningCount = 0;
       let idleCount = 0;
+      let totalBreakdownMins = 0;
+      let totalRunningEffSum = 0;
+      let runningWithEffCount = 0;
 
       const processedEntries = (entries as LoomReadingEntryItem[]).map((e) => {
         const { r1Prod, r2Prod, r3Prod, r4Prod, r5Prod, r6Prod, totalProduction } = computeIntervalDeltas(e);
+        const bdMinutes = Number(e.breakdownMinutes) || 0;
+        const bdReason = e.breakdownReason?.trim() || null;
+        const effCalc = computeLoomEfficiency(totalProduction, e.qualityType, bdMinutes, shiftHours);
+        const efficiencyPct = effCalc.efficiencyPct;
 
         sheetTotalMeters += totalProduction;
+        totalBreakdownMins += bdMinutes;
+
         const isRunning = (e.status === "RUNNING" || totalProduction > 0) && e.status !== "STOP";
-        if (isRunning) runningCount++;
-        else idleCount++;
+        if (isRunning) {
+          runningCount++;
+          if (efficiencyPct > 0) {
+            totalRunningEffSum += efficiencyPct;
+            runningWithEffCount++;
+          }
+        } else {
+          idleCount++;
+        }
 
         return {
           loomNumber: Number(e.loomNumber),
@@ -339,10 +393,17 @@ export async function POST(request: NextRequest) {
           r6Reading: typeof e.r6Reading === "number" && !isNaN(e.r6Reading) ? e.r6Reading : null,
           r6Prod,
           totalProduction,
+          breakdownReason: bdReason,
+          breakdownMinutes: bdMinutes,
+          efficiencyPct,
           status: e.status || "RUNNING",
           remarks: e.remarks?.trim() || null,
         };
       });
+
+      const averageEfficiency = runningWithEffCount > 0
+        ? Math.round((totalRunningEffSum / runningWithEffCount) * 10) / 10
+        : 0;
 
       const totalShiftKg = Math.round(sheetTotalMeters * ESTIMATED_KG_PER_METER * 100) / 100;
 
@@ -364,6 +425,8 @@ export async function POST(request: NextRequest) {
             totalWastageKg: Number(totalWastageKg) || 0,
             runningLoomsCount: runningCount,
             idleLoomsCount: idleCount,
+            averageEfficiency,
+            totalBreakdownMins,
             remarks,
             status,
           },
@@ -378,6 +441,8 @@ export async function POST(request: NextRequest) {
             totalWastageKg: Number(totalWastageKg) || 0,
             runningLoomsCount: runningCount,
             idleLoomsCount: idleCount,
+            averageEfficiency,
+            totalBreakdownMins,
             remarks,
             status,
           },
@@ -411,6 +476,9 @@ export async function POST(request: NextRequest) {
               r6Reading: item.r6Reading,
               r6Prod: item.r6Prod,
               totalProduction: item.totalProduction,
+              breakdownReason: item.breakdownReason,
+              breakdownMinutes: item.breakdownMinutes,
+              efficiencyPct: item.efficiencyPct,
               status: item.status,
               remarks: item.remarks,
             },
@@ -435,6 +503,9 @@ export async function POST(request: NextRequest) {
               r6Reading: item.r6Reading,
               r6Prod: item.r6Prod,
               totalProduction: item.totalProduction,
+              breakdownReason: item.breakdownReason,
+              breakdownMinutes: item.breakdownMinutes,
+              efficiencyPct: item.efficiencyPct,
               status: item.status,
               remarks: item.remarks,
             },
@@ -449,7 +520,7 @@ export async function POST(request: NextRequest) {
         module: "LOOM",
         entityId: savedSheet.id,
         newValues: {
-          details: `Saved 2 Hours Loom Reading Sheet for ${date} (${shiftName}): ${sheetTotalMeters.toLocaleString()} meters, ${runningCount} running looms.`,
+          details: `Saved 2 Hours Loom Reading Sheet for ${date} (${shiftName}): ${sheetTotalMeters.toLocaleString()} meters, ${runningCount} running looms, Avg Eff: ${averageEfficiency}%.`,
         },
       });
 
@@ -459,6 +530,8 @@ export async function POST(request: NextRequest) {
         totalMeters: sheetTotalMeters,
         totalKg: totalShiftKg,
         runningCount,
+        averageEfficiency,
+        totalBreakdownMins,
         message: "Loom 2 Hours Reading Sheet saved successfully",
       });
     }
