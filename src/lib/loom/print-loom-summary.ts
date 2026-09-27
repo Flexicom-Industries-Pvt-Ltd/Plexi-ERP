@@ -458,6 +458,8 @@ export function generateLoomSummaryHtml(data: PrintLoomSummaryOptions): string {
         totalWeightKg: 0,
         latestDate: null,
         latestShiftName: m.activeShifts?.[0] || null,
+        activeShifts: m.activeShifts || [],
+        allocationDate: null,
         lastIssuedBy: m.latestOperator || null,
         lastReceivedBy: null,
         allocationsCount: m.isAllocated ? 1 : 0,
