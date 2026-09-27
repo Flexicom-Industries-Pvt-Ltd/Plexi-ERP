@@ -1974,6 +1974,8 @@ model LoomReadingSheet {
   totalWastageKg            Float              @default(0)
   runningLoomsCount         Int                @default(0)
   idleLoomsCount            Int                @default(0)
+  averageEfficiency         Float?             @default(0)
+  totalBreakdownMins        Int?               @default(0)
   remarks                   String?
   status                    String             @default("DRAFT") // "DRAFT" | "SUBMITTED" | "APPROVED"
   entries                   LoomReadingEntry[]
@@ -2009,6 +2011,9 @@ model LoomReadingEntry {
   r6Reading       Float?           // 08:00 (End) meter reading
   r6Prod          Float?           // Calculated 08:00 production (meters)
   totalProduction Float?           @default(0) // Total shift production (meters)
+  breakdownReason String?          // e.g. "Change Over", "Power Cut", "Full Maintenance", "Shuttle Mount", "Operator Shortage", "Full Shut Down", "Bobbin Shortage"
+  breakdownMinutes Int?            @default(0) // Downtime duration in minutes
+  efficiencyPct   Float?           @default(0) // Calculated Efficiency %
   status          String           @default("RUNNING") // "RUNNING" | "STOP" | "CLEANING" | "CHANGEOVER"
   remarks         String?          // e.g. "STOP", "Cleaning", "Winder emery cheese"
   createdAt       DateTime         @default(now())

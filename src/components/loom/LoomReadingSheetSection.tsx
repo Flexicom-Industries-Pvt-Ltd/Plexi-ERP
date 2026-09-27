@@ -1,5 +1,3 @@
-"use client";
-
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
   Calendar,
@@ -18,10 +16,14 @@ import {
   Filter,
   Check,
   X,
+  Gauge,
+  Timer,
 } from "lucide-react";
 import {
   LoomReadingEntryItem,
   computeIntervalDeltas,
+  computeLoomEfficiency,
+  LOOM_BREAKDOWN_REASONS,
   IntervalKpiSummary,
 } from "@/lib/loom/loom-reading-types";
 import { exportLoomReadingSheetExcel } from "@/lib/loom/loom-reading-export";
@@ -63,6 +65,8 @@ interface ReadingSheetData {
     totalWastageKg: number;
     runningLoomsCount: number;
     idleLoomsCount: number;
+    averageEfficiency?: number;
+    totalBreakdownMins?: number;
     remarks: string;
     status: string;
     createdAt?: string;
@@ -77,6 +81,8 @@ interface ReadingSheetData {
     totalShiftMeters: number;
     totalShiftKg: number;
     totalWastageKg: number;
+    averageEfficiency?: number;
+    totalBreakdownMins?: number;
     intervalTotals: IntervalKpiSummary[];
   };
   availableShifts: AvailableShift[];
@@ -98,9 +104,9 @@ export function LoomReadingSheetSection() {
   const [sheetRemarks, setSheetRemarks] = useState<string>("");
   const [sheetStatus, setSheetStatus] = useState<string>("DRAFT");
 
-  // Filters & Search
+  // Filters & Search - Default to active looms as requested
   const [searchTerm, setSearchTerm] = useState<string>("");
-  const [filterActiveOnly, setFilterActiveOnly] = useState<boolean>(false);
+  const [filterActiveOnly, setFilterActiveOnly] = useState<boolean>(true);
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
 
   // Modal States
@@ -154,7 +160,7 @@ export function LoomReadingSheetSection() {
     fetchSheetData(selectedDate, selectedShift);
   }, [selectedDate, selectedShift, fetchSheetData]);
 
-  // Handle live reading changes with instant recalculation
+  // Handle live reading and breakdown changes with instant recalculation
   const handleEntryChange = (loomNumber: number, field: keyof LoomReadingEntryItem, value: any) => {
     setEntries((prev) =>
       prev.map((item) => {
@@ -191,6 +197,16 @@ export function LoomReadingSheetSection() {
           updated.totalProduction = totalProduction;
         }
 
+        // Live calculate efficiency whenever meters, quality, or breakdown minutes change
+        const bdMinutes = Number(updated.breakdownMinutes) || 0;
+        const eff = computeLoomEfficiency(
+          updated.totalProduction || 0,
+          updated.qualityType,
+          bdMinutes,
+          data?.sheet?.shiftHours || 12
+        );
+        updated.efficiencyPct = eff.efficiencyPct;
+
         return updated;
       })
     );
@@ -209,9 +225,18 @@ export function LoomReadingSheetSection() {
     const totalR6Prod = entries.reduce((s, e) => s + (e.r6Prod || 0), 0);
     const totalShiftMeters = entries.reduce((s, e) => s + (e.totalProduction || 0), 0);
     const totalShiftKg = Math.round(totalShiftMeters * 0.16 * 100) / 100;
+    const totalBreakdownMins = entries.reduce((s, e) => s + (Number(e.breakdownMinutes) || 0), 0);
 
-    const runningLooms = entries.filter((e) => e.status === "RUNNING" || (e.totalProduction && e.totalProduction > 0)).length;
+    const runningEntries = entries.filter((e) => e.status === "RUNNING" || (e.totalProduction && e.totalProduction > 0));
+    const runningLooms = runningEntries.length;
     const idleLooms = entries.length - runningLooms;
+
+    const effValues = runningEntries
+      .map((e) => e.efficiencyPct || 0)
+      .filter((v) => v > 0);
+    const averageEfficiency = effValues.length > 0
+      ? Math.round((effValues.reduce((a, b) => a + b, 0) / effValues.length) * 10) / 10
+      : 0;
 
     const prog1 = totalR1Prod;
     const prog2 = prog1 + totalR2Prod;
@@ -229,6 +254,8 @@ export function LoomReadingSheetSection() {
       totalR6Prod,
       totalShiftMeters,
       totalShiftKg,
+      totalBreakdownMins,
+      averageEfficiency,
       runningLooms,
       idleLooms,
       progressiveTotals: [prog1, prog2, prog3, prog4, prog5, prog6],
@@ -253,6 +280,7 @@ export function LoomReadingSheetSection() {
           (e.qualityType && e.qualityType.toLowerCase().includes(term)) ||
           (e.size && e.size.toLowerCase().includes(term)) ||
           (e.denier && e.denier.toLowerCase().includes(term)) ||
+          (e.breakdownReason && e.breakdownReason.toLowerCase().includes(term)) ||
           (e.remarks && e.remarks.toLowerCase().includes(term));
         if (!match) return false;
       }
@@ -284,6 +312,7 @@ export function LoomReadingSheetSection() {
         totalWastageKg: parseFloat(totalWastageKg) || 0,
         remarks: sheetRemarks,
         status: sheetStatus,
+        shiftHours: data?.sheet?.shiftHours || 12,
       };
 
       const res = await fetch("/api/production/loom/reading-sheet", {
@@ -295,7 +324,7 @@ export function LoomReadingSheetSection() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Failed to save reading sheet");
 
-      showNotification(`Saved successfully: ${liveTotals.totalShiftMeters.toLocaleString()} m across ${liveTotals.runningLooms} running looms.`);
+      showNotification(`Saved successfully: ${liveTotals.totalShiftMeters.toLocaleString()} m across ${liveTotals.runningLooms} running looms (Avg Eff: ${liveTotals.averageEfficiency}%).`);
       fetchSheetData(selectedDate, selectedShift);
     } catch (err: any) {
       console.error("handleSaveSheet error:", err);
@@ -319,13 +348,21 @@ export function LoomReadingSheetSection() {
       setEntries((prev) =>
         prev.map((e) => {
           if (e.loomNumber >= start && e.loomNumber <= end) {
-            return {
+            const updated = {
               ...e,
               operatorName: bulkOperator !== "" ? bulkOperator : e.operatorName,
               qualityType: bulkQuality !== "" ? bulkQuality : e.qualityType,
               size: bulkSize !== "" ? bulkSize : e.size,
               denier: bulkDenier !== "" ? bulkDenier : e.denier,
             };
+            const eff = computeLoomEfficiency(
+              updated.totalProduction || 0,
+              updated.qualityType,
+              Number(updated.breakdownMinutes) || 0,
+              data?.sheet?.shiftHours || 12
+            );
+            updated.efficiencyPct = eff.efficiencyPct;
+            return updated;
           }
           return e;
         })
@@ -429,6 +466,8 @@ export function LoomReadingSheetSection() {
                     totalShiftMeters: liveTotals.totalShiftMeters,
                     totalShiftKg: liveTotals.totalShiftKg,
                     totalWastageKg: parseFloat(totalWastageKg) || 0,
+                    averageEfficiency: liveTotals.averageEfficiency,
+                    totalBreakdownMins: liveTotals.totalBreakdownMins,
                     intervalTotals: [],
                   },
                   filterActiveOnly: false,
@@ -566,7 +605,7 @@ export function LoomReadingSheetSection() {
                     : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
                 }`}
               >
-                {filterActiveOnly ? "Active Only" : "All 91 Looms"}
+                {filterActiveOnly ? "Active Only (Default)" : "All 91 Looms"}
               </button>
               <select
                 value={statusFilter}
@@ -584,7 +623,7 @@ export function LoomReadingSheetSection() {
       </div>
 
       {/* Live KPI Cards Strip */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-2xs">
           <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Running Looms</div>
           <div className="mt-1 flex items-baseline gap-1.5">
@@ -612,6 +651,40 @@ export function LoomReadingSheetSection() {
               {liveTotals.totalShiftKg.toLocaleString()}
             </span>
             <span className="text-xs text-slate-500 font-medium">KG</span>
+          </div>
+        </div>
+
+        <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-2xs">
+          <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 flex items-center justify-between">
+            <span>Avg Efficiency</span>
+            <Gauge className="h-3 w-3 text-sky-500" />
+          </div>
+          <div className="mt-1 flex items-baseline gap-1.5">
+            <span
+              className={`text-xl font-extrabold font-mono ${
+                liveTotals.averageEfficiency >= 85
+                  ? "text-emerald-600"
+                  : liveTotals.averageEfficiency >= 70
+                  ? "text-amber-600"
+                  : "text-slate-900"
+              }`}
+            >
+              {liveTotals.averageEfficiency}%
+            </span>
+            <span className="text-[10px] text-slate-400 font-medium">std speed</span>
+          </div>
+        </div>
+
+        <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-2xs">
+          <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 flex items-center justify-between">
+            <span>Total Breakdown</span>
+            <Timer className="h-3 w-3 text-amber-500" />
+          </div>
+          <div className="mt-1 flex items-baseline gap-1.5">
+            <span className="text-xl font-extrabold text-amber-700 font-mono">
+              {liveTotals.totalBreakdownMins}
+            </span>
+            <span className="text-xs text-slate-500 font-medium">Mins</span>
           </div>
         </div>
 
@@ -654,25 +727,25 @@ export function LoomReadingSheetSection() {
       {/* Interactive Bi-Hourly Reading Table */}
       <div className="bg-white border border-slate-200 rounded-2xl shadow-2xs overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse min-w-[1250px]">
+          <table className="w-full text-left text-xs border-collapse min-w-[1450px]">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200 text-slate-700 font-bold uppercase text-[10.5px]">
                 <th className="py-2.5 px-2 text-center w-12 border-r border-slate-200" rowSpan={2}>
                   Loom #
                 </th>
-                <th className="py-2.5 px-2.5 w-32 border-r border-slate-200" rowSpan={2}>
+                <th className="py-2.5 px-2.5 w-28 border-r border-slate-200" rowSpan={2}>
                   Operator Name
                 </th>
-                <th className="py-2.5 px-2 text-center w-16 border-r border-slate-200" rowSpan={2}>
+                <th className="py-2.5 px-2 text-center w-14 border-r border-slate-200" rowSpan={2}>
                   Size
                 </th>
-                <th className="py-2.5 px-2 text-center w-16 border-r border-slate-200" rowSpan={2}>
+                <th className="py-2.5 px-2 text-center w-14 border-r border-slate-200" rowSpan={2}>
                   DNR
                 </th>
-                <th className="py-2.5 px-2.5 w-40 border-r border-slate-200" rowSpan={2}>
+                <th className="py-2.5 px-2.5 w-36 border-r border-slate-200" rowSpan={2}>
                   Type / Quality
                 </th>
-                <th className="py-2.5 px-2 text-right w-24 bg-slate-100/70 border-r border-slate-200" rowSpan={2}>
+                <th className="py-2.5 px-2 text-right w-20 bg-slate-100/70 border-r border-slate-200" rowSpan={2}>
                   I/R {initialTimeSlot}
                 </th>
                 <th className="py-1 px-2 text-center border-r border-slate-200" colSpan={2}>
@@ -690,33 +763,39 @@ export function LoomReadingSheetSection() {
                 <th className="py-1 px-2 text-center border-r border-slate-200" colSpan={2}>
                   {timeSlots[4] || "06:00"}
                 </th>
-                <th className="py-2.5 px-2 text-right w-24 bg-slate-100/70 border-r border-slate-200" rowSpan={2}>
+                <th className="py-2.5 px-2 text-right w-20 bg-slate-100/70 border-r border-slate-200" rowSpan={2}>
                   {timeSlots[5] || "08:00"} End
                 </th>
-                <th className="py-2.5 px-2 text-right w-24 bg-blue-50/60 border-r border-slate-200" rowSpan={2}>
+                <th className="py-2.5 px-2 text-right w-20 bg-blue-50/60 border-r border-slate-200" rowSpan={2}>
                   T PROD
                 </th>
-                <th className="py-2.5 px-2.5 w-44" rowSpan={2}>
+                <th className="py-2.5 px-2 text-center w-48 border-r border-slate-200 bg-amber-50/40" rowSpan={2}>
+                  Breakdown (Reason / Min)
+                </th>
+                <th className="py-2.5 px-2 text-center w-20 border-r border-slate-200 bg-sky-50/50" rowSpan={2}>
+                  Efficiency
+                </th>
+                <th className="py-2.5 px-2.5 w-36" rowSpan={2}>
                   Remarks / Status
                 </th>
               </tr>
               <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-semibold text-[9.5px]">
-                <th className="py-1 px-1.5 text-right w-16">Read</th>
-                <th className="py-1 px-1.5 text-right w-14 bg-emerald-50 text-emerald-800 border-r border-slate-200">Prod</th>
-                <th className="py-1 px-1.5 text-right w-16">Read</th>
-                <th className="py-1 px-1.5 text-right w-14 bg-emerald-50 text-emerald-800 border-r border-slate-200">Prod</th>
-                <th className="py-1 px-1.5 text-right w-16">Read</th>
-                <th className="py-1 px-1.5 text-right w-14 bg-emerald-50 text-emerald-800 border-r border-slate-200">Prod</th>
-                <th className="py-1 px-1.5 text-right w-16">Read</th>
-                <th className="py-1 px-1.5 text-right w-14 bg-emerald-50 text-emerald-800 border-r border-slate-200">Prod</th>
-                <th className="py-1 px-1.5 text-right w-16">Read</th>
-                <th className="py-1 px-1.5 text-right w-14 bg-emerald-50 text-emerald-800 border-r border-slate-200">Prod</th>
+                <th className="py-1 px-1.5 text-right w-14">Read</th>
+                <th className="py-1 px-1.5 text-right w-12 bg-emerald-50 text-emerald-800 border-r border-slate-200">Prod</th>
+                <th className="py-1 px-1.5 text-right w-14">Read</th>
+                <th className="py-1 px-1.5 text-right w-12 bg-emerald-50 text-emerald-800 border-r border-slate-200">Prod</th>
+                <th className="py-1 px-1.5 text-right w-14">Read</th>
+                <th className="py-1 px-1.5 text-right w-12 bg-emerald-50 text-emerald-800 border-r border-slate-200">Prod</th>
+                <th className="py-1 px-1.5 text-right w-14">Read</th>
+                <th className="py-1 px-1.5 text-right w-12 bg-emerald-50 text-emerald-800 border-r border-slate-200">Prod</th>
+                <th className="py-1 px-1.5 text-right w-14">Read</th>
+                <th className="py-1 px-1.5 text-right w-12 bg-emerald-50 text-emerald-800 border-r border-slate-200">Prod</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {loading ? (
                 <tr>
-                  <td colSpan={19} className="py-12 text-center text-slate-400">
+                  <td colSpan={22} className="py-12 text-center text-slate-400">
                     <div className="inline-flex items-center gap-2 font-medium">
                       <div className="h-4 w-4 border-2 border-slate-300 border-t-slate-800 rounded-full animate-spin" />
                       <span>Loading Circular Loom 2-Hours Reading Sheet...</span>
@@ -725,13 +804,17 @@ export function LoomReadingSheetSection() {
                 </tr>
               ) : filteredEntries.length === 0 ? (
                 <tr>
-                  <td colSpan={19} className="py-8 text-center text-slate-400 font-medium italic">
+                  <td colSpan={22} className="py-8 text-center text-slate-400 font-medium italic">
                     No loom machines match the active filters.
                   </td>
                 </tr>
               ) : (
                 filteredEntries.map((e) => {
                   const isRunning = e.status === "RUNNING" || (e.totalProduction && e.totalProduction > 0);
+                  const isLpp = (e.qualityType || "").toUpperCase().includes("LPP");
+                  const stdSpeed = isLpp ? "2.50 m/m" : "2.01 m/m";
+                  const effVal = typeof e.efficiencyPct === "number" && e.efficiencyPct > 0 ? e.efficiencyPct : 0;
+
                   return (
                     <tr
                       key={e.loomNumber}
@@ -928,6 +1011,67 @@ export function LoomReadingSheetSection() {
                         {e.totalProduction > 0 ? e.totalProduction.toLocaleString() : "—"}
                       </td>
 
+                      {/* Breakdown Column: Reason dropdown + Downtime in minutes */}
+                      <td className="py-1 px-1.5 border-r border-slate-100 bg-amber-50/20">
+                        <div className="flex items-center gap-1">
+                          <select
+                            value={e.breakdownReason || ""}
+                            onChange={(ev) => handleEntryChange(e.loomNumber, "breakdownReason", ev.target.value || null)}
+                            className="flex-1 text-[10px] font-medium px-1 py-0.5 bg-white border border-amber-200/80 rounded outline-none text-slate-700 hover:border-amber-400"
+                          >
+                            <option value="">No Breakdown</option>
+                            {LOOM_BREAKDOWN_REASONS.map((r) => (
+                              <option key={r} value={r}>
+                                {r}
+                              </option>
+                            ))}
+                          </select>
+                          <div className="flex items-center gap-0.5 shrink-0">
+                            <input
+                              type="number"
+                              min="0"
+                              max="720"
+                              value={e.breakdownMinutes !== null && e.breakdownMinutes !== undefined ? e.breakdownMinutes : ""}
+                              onChange={(ev) =>
+                                handleEntryChange(
+                                  e.loomNumber,
+                                  "breakdownMinutes",
+                                  ev.target.value === "" ? 0 : Math.max(0, parseInt(ev.target.value, 10) || 0)
+                                )
+                              }
+                              placeholder="0"
+                              title="Downtime in minutes"
+                              className="w-12 px-1 py-0.5 text-xs text-right font-mono font-bold text-amber-900 bg-white border border-amber-200/80 rounded outline-none focus:border-amber-500"
+                            />
+                            <span className="text-[10px] text-slate-400">m</span>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Live Efficiency Column */}
+                      <td className="py-1 px-1.5 text-center font-mono border-r border-slate-100 bg-sky-50/20">
+                        {effVal > 0 ? (
+                          <div className="inline-flex flex-col items-center">
+                            <span
+                              className={`px-1.5 py-0.5 rounded text-[11px] font-extrabold ${
+                                effVal >= 85
+                                  ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                                  : effVal >= 70
+                                  ? "bg-amber-100 text-amber-800 border border-amber-200"
+                                  : "bg-rose-100 text-rose-800 border border-rose-200"
+                              }`}
+                            >
+                              {effVal}%
+                            </span>
+                            <span className="text-[8.5px] text-slate-400 scale-90 -mt-0.5">
+                              {stdSpeed}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-slate-400 font-normal text-xs">—</span>
+                        )}
+                      </td>
+
                       {/* Remarks / Status */}
                       <td className="py-1 px-2 flex items-center gap-1.5">
                         <select
@@ -954,7 +1098,7 @@ export function LoomReadingSheetSection() {
                           value={e.remarks || ""}
                           onChange={(ev) => handleEntryChange(e.loomNumber, "remarks", ev.target.value)}
                           placeholder="Notes..."
-                          className="flex-1 min-w-[80px] px-1 py-0.5 text-xs bg-transparent border-b border-transparent focus:border-slate-800 outline-none"
+                          className="flex-1 min-w-[70px] px-1 py-0.5 text-xs bg-transparent border-b border-transparent focus:border-slate-800 outline-none"
                         />
                       </td>
                     </tr>
@@ -991,6 +1135,12 @@ export function LoomReadingSheetSection() {
                 <td className="border-r border-slate-200"></td>
                 <td className="py-2 px-2 text-right font-mono font-extrabold text-blue-900 bg-blue-100 border-r border-slate-200">
                   {liveTotals.totalShiftMeters.toLocaleString()}
+                </td>
+                <td className="py-2 px-2 text-center font-mono font-bold text-amber-900 bg-amber-100/80 border-r border-slate-200">
+                  {liveTotals.totalBreakdownMins > 0 ? `${liveTotals.totalBreakdownMins} Mins` : "0 Mins"}
+                </td>
+                <td className="py-2 px-1 text-center font-mono font-extrabold text-sky-900 bg-sky-100/80 border-r border-slate-200">
+                  {liveTotals.averageEfficiency}%
                 </td>
                 <td></td>
               </tr>
@@ -1221,6 +1371,8 @@ export function LoomReadingSheetSection() {
           totalShiftMeters: liveTotals.totalShiftMeters,
           totalShiftKg: liveTotals.totalShiftKg,
           totalWastageKg: parseFloat(totalWastageKg) || 0,
+          averageEfficiency: liveTotals.averageEfficiency,
+          totalBreakdownMins: liveTotals.totalBreakdownMins,
         }}
         filterActiveOnly={filterActiveOnly}
         isFiltered={isFiltered}
