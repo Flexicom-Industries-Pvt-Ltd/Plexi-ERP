@@ -1907,6 +1907,8 @@ model LoomMachineMapping {
   bobbinMarking   String?  // e.g. "RED", "Black", "GREEN", "RED/GRN/YL"
   loomNumbers     Int[]    // Array of assigned integer loom numbers e.g. [6, 7, 8, 12, 14, 16...]
   totalLooms      Int      @default(0) // Count of looms assigned
+  allocationDate  String?  // Target allocation date YYYY-MM-DD
+  activeShifts    String[] @default([]) // Array of assigned shifts e.g. ["Day Shift", "Night Shift"]
   reedSpaceCm     Float?   // e.g. 48, 50, 54, 60, 67
   mesh            String?  // e.g. "10x10", "12x12"
   targetPpm       Int?     // Target Picks Per Minute e.g. 850, 900
@@ -1917,6 +1919,7 @@ model LoomMachineMapping {
 
   @@index([qualityCode])
   @@index([colorGroup])
+  @@index([allocationDate])
   @@index([isActive])
 }
 
