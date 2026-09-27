@@ -645,16 +645,6 @@ export function LoomReadingSheetSection() {
             </button>
 
             <button
-              onClick={() => handleSaveSheet("DRAFT")}
-              disabled={saving || autoSaving}
-              className="px-3 py-1.5 text-xs font-semibold rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 shadow-2xs transition-all inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-              title="Save current reading sheet as Draft"
-            >
-              <Save className="h-3.5 w-3.5 text-slate-600" />
-              <span>{saving && sheetStatus === "DRAFT" ? "Saving..." : "Save Draft"}</span>
-            </button>
-
-            <button
               onClick={() => handleSaveSheet("SUBMITTED")}
               disabled={saving || autoSaving}
               className="px-4 py-1.5 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm transition-all inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
