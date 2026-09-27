@@ -170,8 +170,11 @@ export function generateLoomReadingHtml(data: PrintLoomReadingOptions): string {
             <td style="text-align: right; font-family: monospace; font-size: 7.5pt; font-weight: 800; color: #0f172a; background: #eff6ff;">
               ${e.totalProduction > 0 ? e.totalProduction.toLocaleString() : "—"}
             </td>
-            <td style="font-size: 6.5pt; color: ${e.breakdownReason ? "#991b1b" : "#64748b"}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 80px;">
+            <td style="font-size: 6.5pt; color: ${e.breakdownReason ? "#991b1b" : "#64748b"}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 70px;">
               ${bdText}
+            </td>
+            <td style="font-size: 6.5pt; font-weight: 700; color: #b45309; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 60px;">
+              ${e.changeoverTargetQuality || "—"}
             </td>
             <td style="text-align: center; font-family: monospace; font-size: 7pt; font-weight: 700; color: ${effBadgeColor}; background: ${effBg};">
               ${effVal !== null ? `${effVal}%` : "—"}
@@ -184,7 +187,7 @@ export function generateLoomReadingHtml(data: PrintLoomReadingOptions): string {
       }).join("")
     : `
       <tr>
-        <td colspan="21" style="text-align: center; color: #64748b; font-style: italic; padding: 16px;">
+        <td colspan="22" style="text-align: center; color: #64748b; font-style: italic; padding: 16px;">
           No loom readings recorded for this date and shift.
         </td>
       </tr>
@@ -449,7 +452,8 @@ export function generateLoomReadingHtml(data: PrintLoomReadingOptions): string {
           <th colspan="2">${slot5}</th>
           <th style="width: 38px;" rowspan="2">${slot6}</th>
           <th style="width: 44px;" rowspan="2">T PROD</th>
-          <th style="width: 68px;" rowspan="2">Breakdown</th>
+          <th style="width: 64px;" rowspan="2">Breakdown</th>
+          <th style="width: 58px;" rowspan="2">Target (C/O)</th>
           <th style="width: 34px;" rowspan="2">Eff %</th>
           <th style="width: 58px;" rowspan="2">Remarks</th>
         </tr>
@@ -502,6 +506,7 @@ export function generateLoomReadingHtml(data: PrintLoomReadingOptions): string {
           <td style="text-align: center; font-family: monospace; font-size: 7pt; color: #9a3412;">
             ${totalBreakdownMins > 0 ? `${totalBreakdownMins}m` : "—"}
           </td>
+          <td style="background: #f1f5f9;"></td>
           <td style="text-align: center; font-family: monospace; font-size: 7pt; color: #0369a1;">
             ${kpis?.averageEfficiency ? `${kpis.averageEfficiency}%` : "—"}
           </td>
@@ -537,6 +542,7 @@ export function generateLoomReadingHtml(data: PrintLoomReadingOptions): string {
           <td style="text-align: right; font-family: monospace; font-size: 8pt; color: #0369a1; background: #e0f2fe;">
             ${totalMeters.toLocaleString()}
           </td>
+          <td></td>
           <td></td>
           <td></td>
           <td></td>

@@ -326,6 +326,17 @@ describe("2 Hours Loom Reading Export & Print Engine", () => {
       };
 
       expect(isLoomActive(entryWithBd)).toBe(true);
+
+      const entryWithChangeoverQuality: LoomReadingEntryItem = {
+        ...entryWithOp,
+        operatorName: "",
+        breakdownReason: "Change Over",
+        changeoverTargetQuality: "UTCL/LPP/Y/67",
+        breakdownMinutes: 60,
+        remarks: "",
+      };
+
+      expect(isLoomActive(entryWithChangeoverQuality)).toBe(true);
     });
 
     it("should return false for an unallocated, unstarted idle loom", () => {
@@ -351,6 +362,7 @@ describe("2 Hours Loom Reading Export & Print Engine", () => {
         totalProduction: 0,
         breakdownReason: null,
         breakdownMinutes: 0,
+        changeoverTargetQuality: null,
         efficiencyPct: 0,
         status: "IDLE",
         remarks: "",
@@ -359,4 +371,24 @@ describe("2 Hours Loom Reading Export & Print Engine", () => {
       expect(isLoomActive(blankEntry)).toBe(false);
     });
   });
+
+  describe("Changeover Target Quality Selection & Logs", () => {
+    it("should render changeoverTargetQuality in printable HTML and export", () => {
+      const coDataset = {
+        ...mockDataset,
+        entries: [
+          {
+            ...mockDataset.entries[0],
+            breakdownReason: "Change Over",
+            changeoverTargetQuality: "UTCL/LPP/Y/67",
+          },
+        ],
+      };
+
+      const html = generateLoomReadingHtml(coDataset);
+      expect(html).toContain("UTCL/LPP/Y/67");
+      expect(html).toContain("Target (C/O)");
+    });
+  });
 });
+

@@ -384,6 +384,20 @@ export function LoomReadingSheetSection() {
           }
         }
 
+        // If breakdownReason changed
+        if (field === "breakdownReason") {
+          if (value === "Change Over") {
+            if (updated.status === "RUNNING") {
+              updated.status = "CHANGEOVER";
+            }
+          } else if (item.breakdownReason === "Change Over") {
+            updated.changeoverTargetQuality = null;
+            if (updated.status === "CHANGEOVER") {
+              updated.status = "RUNNING";
+            }
+          }
+        }
+
         // Live calculate efficiency whenever meters, quality, or breakdown minutes change
         const bdMinutes = Number(updated.breakdownMinutes) || 0;
         const eff = computeLoomEfficiency(
@@ -1029,6 +1043,9 @@ export function LoomReadingSheetSection() {
                 <th className="py-2.5 px-2 text-center w-48 border-r border-slate-200 bg-amber-50/40" rowSpan={2}>
                   Breakdown (Reason / Min)
                 </th>
+                <th className="py-2.5 px-2 text-center w-36 border-r border-slate-200 bg-amber-100/40" rowSpan={2}>
+                  C/O Target Quality
+                </th>
                 <th className="py-2.5 px-2 text-center w-20 border-r border-slate-200 bg-sky-50/50" rowSpan={2}>
                   Efficiency
                 </th>
@@ -1052,7 +1069,7 @@ export function LoomReadingSheetSection() {
             <tbody className="divide-y divide-slate-100">
               {loading ? (
                 <tr>
-                  <td colSpan={22} className="py-12 text-center text-slate-400">
+                  <td colSpan={23} className="py-12 text-center text-slate-400">
                     <div className="inline-flex items-center gap-2 font-medium">
                       <div className="h-4 w-4 border-2 border-slate-300 border-t-slate-800 rounded-full animate-spin" />
                       <span>Loading Circular Loom 2-Hours Reading Sheet...</span>
@@ -1061,7 +1078,7 @@ export function LoomReadingSheetSection() {
                 </tr>
               ) : filteredEntries.length === 0 ? (
                 <tr>
-                  <td colSpan={22} className="py-8 text-center text-slate-400 font-medium italic">
+                  <td colSpan={23} className="py-8 text-center text-slate-400 font-medium italic">
                     No loom machines match the active filters.
                   </td>
                 </tr>
@@ -1318,6 +1335,33 @@ export function LoomReadingSheetSection() {
                         </div>
                       </td>
 
+                      {/* C/O Target Quality Column */}
+                      <td className="py-1 px-1.5 border-r border-slate-100 bg-amber-50/10">
+                        {e.breakdownReason === "Change Over" || e.changeoverTargetQuality ? (
+                          <select
+                            value={e.changeoverTargetQuality || ""}
+                            onChange={(ev) =>
+                              handleEntryChange(e.loomNumber, "changeoverTargetQuality", ev.target.value || null)
+                            }
+                            onBlur={() => triggerAutoSave(true)}
+                            className="w-full text-[10.5px] font-semibold px-1 py-0.5 bg-white border border-amber-300 text-amber-950 rounded outline-none focus:border-amber-600 shadow-2xs"
+                          >
+                            <option value="">Select Target Quality...</option>
+                            {(data?.availableQualities || []).map((q) => (
+                              <option key={q.code} value={q.code}>
+                                {q.code} {q.colorGroup ? `(${q.colorGroup})` : ""}
+                              </option>
+                            ))}
+                            {e.changeoverTargetQuality &&
+                              !data?.availableQualities?.some((q) => q.code === e.changeoverTargetQuality) && (
+                                <option value={e.changeoverTargetQuality}>{e.changeoverTargetQuality}</option>
+                              )}
+                          </select>
+                        ) : (
+                          <div className="text-center text-slate-300 text-xs font-mono select-none">—</div>
+                        )}
+                      </td>
+
                       {/* Live Efficiency Column */}
                       <td className="py-1 px-1.5 text-center font-mono border-r border-slate-100 bg-sky-50/20">
                         {effVal > 0 ? (
@@ -1411,6 +1455,7 @@ export function LoomReadingSheetSection() {
                 <td className="py-2 px-2 text-center font-mono font-bold text-amber-900 bg-amber-100/80 border-r border-slate-200">
                   {liveTotals.totalBreakdownMins > 0 ? `${liveTotals.totalBreakdownMins} Mins` : "0 Mins"}
                 </td>
+                <td className="border-r border-slate-200 bg-amber-50/30"></td>
                 <td className="py-2 px-1 text-center font-mono font-extrabold text-sky-900 bg-sky-100/80 border-r border-slate-200">
                   {liveTotals.averageEfficiency}%
                 </td>
