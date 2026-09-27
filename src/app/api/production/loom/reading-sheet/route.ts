@@ -53,19 +53,23 @@ export async function GET(request: NextRequest) {
   try {
     const candidateShiftNames = getNormalizedShiftCandidates(shiftNameParam);
 
-    // 1. Fetch available shifts, operators, active loom mappings, and existing sheet concurrently
-    const [shifts, operators, mappings, existingSheet] = await Promise.all([
+    // 1. Fetch available shifts, operators, active loom mappings, tape recipes, and existing sheet concurrently
+    const [shifts, operators, mappings, tapeRecipes, existingSheet] = await Promise.all([
       db.shift.findMany({
         where: { isActive: true },
         orderBy: { name: "asc" },
       }),
       db.operator.findMany({
         where: { isActive: true },
-        orderBy: { name: "asc" },
+        orderBy: [{ section: "asc" }, { name: "asc" }],
       }),
       db.loomMachineMapping.findMany({
         where: { isActive: true },
         orderBy: [{ colorGroup: "asc" }, { qualityCode: "asc" }],
+      }),
+      db.tapePlantRecipe.findMany({
+        where: { isActive: true },
+        orderBy: [{ colorGroup: "asc" }, { code: "asc" }],
       }),
       db.loomReadingSheet.findFirst({
         where: {
@@ -87,12 +91,22 @@ export async function GET(request: NextRequest) {
       size: string;
     }>();
 
+    // Map recipes by code for spec lookup
+    const recipeSpecMap = new Map<string, typeof tapeRecipes[0]>();
+    tapeRecipes.forEach((r) => {
+      recipeSpecMap.set(r.code.toLowerCase().trim(), r);
+    });
+
     for (const mapping of mappings) {
+      const spec = recipeSpecMap.get(mapping.qualityCode.toLowerCase().trim());
       for (const num of mapping.loomNumbers) {
+        const resolvedDenier = mapping.denier ? String(mapping.denier) : spec?.denier ? String(spec.denier) : "";
+        const resolvedSize = mapping.reedSpaceCm ? String(mapping.reedSpaceCm * 10) : mapping.tapeWidth ? String(mapping.tapeWidth) : spec?.spacerSize ? String(spec.spacerSize * 10) : spec?.tapeWidth ? String(spec.tapeWidth) : "";
+
         loomAllocationMap.set(num, {
           qualityCode: mapping.qualityCode,
-          denier: mapping.denier ? String(mapping.denier) : "",
-          size: mapping.reedSpaceCm ? String(mapping.reedSpaceCm * 10) : mapping.tapeWidth ? String(mapping.tapeWidth) : "",
+          denier: resolvedDenier,
+          size: resolvedSize,
         });
       }
     }
@@ -326,13 +340,48 @@ export async function GET(request: NextRequest) {
         intervalTotals,
       },
       availableShifts: shifts.map((s) => ({ id: s.id, name: s.name })),
-      availableOperators: operators.map((o) => ({ id: o.id, name: o.name, employeeCode: o.code })),
-      availableQualities: mappings.map((m) => ({
-        code: m.qualityCode,
-        colorGroup: m.colorGroup,
-        denier: m.denier,
-        reedSpaceCm: m.reedSpaceCm,
+      availableOperators: operators.map((o) => ({
+        id: o.id,
+        name: o.name,
+        employeeCode: o.code,
+        section: o.section,
+        designation: o.designation,
       })),
+      availableQualities: (() => {
+        const qualityMap = new Map<string, {
+          code: string;
+          colorGroup: string;
+          colour: string;
+          denier: number | null;
+          reedSpaceCm: number | null;
+          size: string;
+        }>();
+
+        tapeRecipes.forEach((r) => {
+          qualityMap.set(r.code, {
+            code: r.code,
+            colorGroup: r.colorGroup || "Standard",
+            colour: r.colour || "White",
+            denier: r.denier ?? null,
+            reedSpaceCm: r.spacerSize ?? null,
+            size: r.spacerSize ? String(r.spacerSize * 10) : r.tapeWidth ? String(r.tapeWidth) : "",
+          });
+        });
+
+        mappings.forEach((m) => {
+          const existing = qualityMap.get(m.qualityCode);
+          qualityMap.set(m.qualityCode, {
+            code: m.qualityCode,
+            colorGroup: m.colorGroup || existing?.colorGroup || "Standard",
+            colour: m.colour || existing?.colour || "White",
+            denier: m.denier ?? existing?.denier ?? null,
+            reedSpaceCm: m.reedSpaceCm ?? existing?.reedSpaceCm ?? null,
+            size: m.reedSpaceCm ? String(m.reedSpaceCm * 10) : m.tapeWidth ? String(m.tapeWidth) : existing?.size || "",
+          });
+        });
+
+        return Array.from(qualityMap.values()).sort((a, b) => a.code.localeCompare(b.code));
+      })(),
     });
   } catch (error: any) {
     console.error("GET /api/production/loom/reading-sheet error:", error);
@@ -518,6 +567,129 @@ export async function POST(request: NextRequest) {
             remarks: item.remarks,
           })),
         });
+
+        // -------------------------------------------------------------
+        // Automatic Changeover Execution & Roll Stock WIP Preservation
+        // -------------------------------------------------------------
+        const changeoverEntries = processedEntries.filter(
+          (e) =>
+            (e.breakdownReason === "Change Over" || e.status === "CHANGEOVER") &&
+            Boolean(e.changeoverTargetQuality && e.changeoverTargetQuality.trim())
+        );
+
+        for (const co of changeoverEntries) {
+          const targetQuality = co.changeoverTargetQuality!.trim();
+          const loomNum = co.loomNumber;
+          const prevQuality = co.qualityType || "Unassigned";
+
+          try {
+            // 1. Reassign loom machine mapping (free from previous, assign to target quality)
+            const otherMappings = await db.loomMachineMapping.findMany({
+              where: {
+                loomNumbers: { has: loomNum },
+                qualityCode: { not: targetQuality },
+              },
+            });
+
+            for (const om of otherMappings) {
+              const updatedLooms = om.loomNumbers.filter((n) => n !== loomNum);
+              await db.loomMachineMapping.update({
+                where: { id: om.id },
+                data: { loomNumbers: updatedLooms, totalLooms: updatedLooms.length },
+              });
+            }
+
+            let targetMapping = await db.loomMachineMapping.findUnique({
+              where: { qualityCode: targetQuality },
+            });
+
+            if (targetMapping) {
+              const updatedLooms = Array.from(new Set([...(targetMapping.loomNumbers || []), loomNum])).sort((a, b) => a - b);
+              await db.loomMachineMapping.update({
+                where: { id: targetMapping.id },
+                data: { loomNumbers: updatedLooms, totalLooms: updatedLooms.length, isActive: true },
+              });
+            } else {
+              const recipe = await db.tapePlantRecipe.findFirst({
+                where: { code: { equals: targetQuality, mode: "insensitive" } },
+              });
+              await db.loomMachineMapping.create({
+                data: {
+                  qualityCode: targetQuality,
+                  tapePlantRecipeId: recipe?.id || null,
+                  colorGroup: recipe?.colorGroup || "Standard",
+                  colour: recipe?.colour || "White",
+                  denier: recipe?.denier ?? null,
+                  tapeWidth: recipe?.tapeWidth ?? null,
+                  bobbinMarking: recipe?.bobbinMarking || "Changeover",
+                  loomNumbers: [loomNum],
+                  totalLooms: 1,
+                  allocationDate: date,
+                  activeShifts: [targetShiftName],
+                  isActive: true,
+                },
+              });
+            }
+
+            // 2. Save Roll Stock for previous quality if meters were produced
+            if (co.totalProduction > 0) {
+              const rollType = prevQuality.toUpperCase().includes("LPP") ? "LPP" : "PP";
+              const today = new Date();
+              const datePart = `${today.getFullYear()}${(today.getMonth() + 1).toString().padStart(2, "0")}${today.getDate().toString().padStart(2, "0")}`;
+              const rollNumber = `PR-${rollType}-${datePart}-L${loomNum}-${Date.now().toString().slice(-4)}`;
+
+              await db.productionRoll.create({
+                data: {
+                  rollNumber,
+                  rollType,
+                  weight: Math.round(co.totalProduction * ESTIMATED_KG_PER_METER * 100) / 100,
+                  length: co.totalProduction,
+                  qualityStatus: "PASSED",
+                  sourcePhase: "LOOM",
+                  characteristics: {
+                    loomNumber: loomNum,
+                    previousQuality: prevQuality,
+                    newQuality: targetQuality,
+                    size: co.size,
+                    denier: co.denier,
+                    date,
+                    shiftName: targetShiftName,
+                    operatorName: co.operatorName,
+                    downtimeMinutes: co.breakdownMinutes,
+                    rollStockSource: "LOOM_CHANGEOVER",
+                  },
+                  remarks: `Roll Stock from Loom #${loomNum} Changeover: ${prevQuality} -> ${targetQuality} (${co.totalProduction}m)`,
+                },
+              }).catch((rollErr) => console.error("Roll stock creation notice:", rollErr?.message));
+            }
+
+            // 3. Upsert LoomChangeover tracking record
+            await db.loomChangeover.upsert({
+              where: { loomNumber: loomNum },
+              create: {
+                loomNumber: loomNum,
+                currentQuality: prevQuality,
+                nextQualityCode: targetQuality,
+                status: "COMPLETED",
+                targetDate: date,
+                targetShiftName: targetShiftName,
+                remarks: co.remarks || `Changeover from ${prevQuality} to ${targetQuality}`,
+                updatedBy: preparedBy || userEmail || "Operator",
+              },
+              update: {
+                currentQuality: prevQuality,
+                nextQualityCode: targetQuality,
+                status: "COMPLETED",
+                targetDate: date,
+                targetShiftName: targetShiftName,
+                remarks: co.remarks || `Changeover from ${prevQuality} to ${targetQuality}`,
+                updatedBy: preparedBy || userEmail || "Operator",
+              },
+            }).catch((coErr) => console.error("Changeover log notice:", coErr?.message));
+          } catch (err) {
+            console.error(`Error processing changeover for Loom #${loomNum}:`, err);
+          }
+        }
       }
 
       await logAudit({
