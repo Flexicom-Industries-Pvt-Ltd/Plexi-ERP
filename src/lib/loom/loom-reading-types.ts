@@ -42,6 +42,7 @@ export interface LoomReadingEntryItem {
   totalProduction: number;
   breakdownReason?: string | null;
   breakdownMinutes?: number | null;
+  changeoverTargetQuality?: string | null;
   efficiencyPct?: number | null;
   status: "RUNNING" | "STOP" | "CLEANING" | "CHANGEOVER" | "IDLE" | string;
   remarks: string | null;
@@ -191,5 +192,6 @@ export function isLoomActive(entry: LoomReadingEntryItem): boolean {
   if (Boolean(entry.qualityType && entry.qualityType.trim())) return true;
   if ((Number(entry.breakdownMinutes) || 0) > 0) return true;
   if (Boolean(entry.breakdownReason && entry.breakdownReason.trim())) return true;
+  if (Boolean(entry.changeoverTargetQuality && entry.changeoverTargetQuality.trim())) return true;
   return false;
 }

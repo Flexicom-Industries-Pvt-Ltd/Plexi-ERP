@@ -383,13 +383,16 @@ export function LoomReadingPrintPreviewModal({
                     <th rowSpan={2} className="border border-slate-700 px-2 py-1.5 text-right w-18 bg-emerald-900 text-white">
                       Shift Total (Mtr)
                     </th>
-                    <th rowSpan={2} className="border border-slate-700 px-2 py-1.5 text-left min-w-[80px]">
+                    <th rowSpan={2} className="border border-slate-700 px-2 py-1.5 text-left min-w-[75px]">
                       Breakdown
+                    </th>
+                    <th rowSpan={2} className="border border-slate-700 px-2 py-1.5 text-left min-w-[75px] bg-amber-950 text-amber-200">
+                      Target (C/O)
                     </th>
                     <th rowSpan={2} className="border border-slate-700 px-1.5 py-1.5 text-center w-14 bg-sky-950 text-white">
                       Eff %
                     </th>
-                    <th rowSpan={2} className="border border-slate-700 px-2 py-1.5 text-left min-w-[80px]">
+                    <th rowSpan={2} className="border border-slate-700 px-2 py-1.5 text-left min-w-[75px]">
                       Remarks
                     </th>
                   </tr>
@@ -412,7 +415,7 @@ export function LoomReadingPrintPreviewModal({
                 <tbody>
                   {entries.length === 0 ? (
                     <tr>
-                      <td colSpan={22} className="px-4 py-8 text-center text-slate-500 font-medium bg-slate-50">
+                      <td colSpan={23} className="px-4 py-8 text-center text-slate-500 font-medium bg-slate-50">
                         No loom entries found for this filter criteria.
                       </td>
                     </tr>
@@ -506,6 +509,10 @@ export function LoomReadingPrintPreviewModal({
                           <td className="border border-slate-200 px-1.5 py-1 text-xs truncate max-w-[90px] font-medium text-amber-800">
                             {e.breakdownReason ? `${e.breakdownReason} (${e.breakdownMinutes || 0}m)` : e.breakdownMinutes ? `${e.breakdownMinutes}m` : "—"}
                           </td>
+                          {/* Target Quality (C/O) */}
+                          <td className="border border-slate-200 px-1.5 py-1 text-xs truncate max-w-[85px] font-bold text-amber-900 bg-amber-50/30">
+                            {e.changeoverTargetQuality || "—"}
+                          </td>
                           {/* Efficiency */}
                           <td className="border border-slate-200 px-1 py-1 text-center font-mono font-bold text-xs">
                             {eff !== null ? (
@@ -564,6 +571,7 @@ export function LoomReadingPrintPreviewModal({
                     <td className="border border-slate-300 px-1 text-center font-mono text-amber-800 bg-amber-50">
                       {totalBreakdownMins > 0 ? `${totalBreakdownMins}m` : "—"}
                     </td>
+                    <td className="border border-slate-300 bg-slate-100"></td>
                     <td className="border border-slate-300 px-1 text-center font-mono text-sky-800 bg-sky-50">
                       {averageEfficiency}%
                     </td>
@@ -598,6 +606,7 @@ export function LoomReadingPrintPreviewModal({
                     <td className="border border-slate-300 bg-slate-50"></td>
                     <td className="border border-slate-300 bg-slate-50"></td>
                     <td className="border border-slate-300 bg-slate-50"></td>
+                    <td className="border border-slate-300 bg-slate-50"></td>
                   </tr>
 
                   <tr className="bg-white border-t border-slate-300 font-bold text-[10px]">
@@ -625,6 +634,7 @@ export function LoomReadingPrintPreviewModal({
                     <td className="border border-slate-300 px-2 py-1 text-right font-mono font-bold text-slate-900">
                       {runningLooms}
                     </td>
+                    <td className="border border-slate-300 bg-white"></td>
                     <td className="border border-slate-300 bg-white"></td>
                     <td className="border border-slate-300 bg-white"></td>
                     <td className="border border-slate-300 bg-white"></td>

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
-import { exportLoomChangeoverExcel, LoomChangeoverDataset } from "../loom-changeover-export";
-import { generateLoomChangeoverHtml } from "../print-loom-changeover";
+import { exportLoomChangeoverExcel, LoomChangeoverExportOptions } from "../loom-changeover-export";
+import { generateLoomChangeoverHtml, PrintLoomChangeoverOptions } from "../print-loom-changeover";
 import * as XLSX from "xlsx";
 
 vi.mock("xlsx", async () => {
@@ -11,169 +11,56 @@ vi.mock("xlsx", async () => {
   };
 });
 
-describe("Loom Changeover Export & Print Engine", () => {
-  const mockChangeoverData: LoomChangeoverDataset = {
-    looms: [
+describe("Loom Changeover Log-Wise Export & Print Engine", () => {
+  const mockChangeoverLogs: LoomChangeoverExportOptions = {
+    logs: [
       {
-        id: "loom_1",
-        loomNumber: 1,
-        currentQuality: "850D Milky White",
-        currentColor: "White",
-        currentColorGroup: "Standard",
-        currentDenier: 850,
-        currentReedSpace: 54,
-        currentBobbinMark: "White Mark",
-        currentMesh: "Standard",
-        nextQualityCode: "1000D White Standard",
-        nextColor: "White",
-        nextColorGroup: "Standard",
-        nextDenier: 1000,
-        nextReedSpace: 56,
-        nextBobbinMark: "Double Line",
-        nextMesh: "Standard",
-        sequence: 1,
+        id: "rs_entry_1",
+        source: "READING_SHEET",
+        date: "2026-09-27",
+        shiftName: "Day Shift",
+        loomNumber: 31,
+        operatorName: "Ravinder Kumar",
+        fromQuality: "Mahal/LPP/W",
+        toQuality: "UTCL/LPP/Y/67",
+        downtimeMinutes: 45,
+        status: "CHANGEOVER",
+        remarks: "Swapped weft bobbins to yellow",
+        loggedBy: "Loom Incharge",
+        createdAt: new Date().toISOString(),
+      },
+      {
+        id: "sc_entry_2",
+        source: "SCHEDULED",
+        date: "2026-09-27",
+        shiftName: "Night Shift",
+        loomNumber: 42,
+        operatorName: "—",
+        fromQuality: "1000D White Standard",
+        toQuality: "850D Milky White",
+        downtimeMinutes: 0,
         status: "SCHEDULED",
-        targetDate: "2026-09-27",
-        targetShiftId: "shift_day",
-        targetShiftName: "Day Shift",
-        remarks: "Reed expansion to 56cm",
-        hasChangeover: true,
-        isReedSpaceChanged: true,
-        isColorChanged: false,
-        isBobbinMarkChanged: true,
-      },
-      {
-        id: "loom_2",
-        loomNumber: 2,
-        currentQuality: "1000D White Standard",
-        currentColor: "White",
-        currentColorGroup: "Standard",
-        currentDenier: 1000,
-        currentReedSpace: 56,
-        currentBobbinMark: "Standard",
-        currentMesh: "Standard",
-        nextQualityCode: null,
-        nextColor: null,
-        nextColorGroup: null,
-        nextDenier: null,
-        nextReedSpace: null,
-        nextBobbinMark: null,
-        nextMesh: null,
-        sequence: 0,
-        status: "PENDING",
-        targetDate: null,
-        targetShiftId: null,
-        targetShiftName: null,
-        remarks: null,
-        hasChangeover: false,
-        isReedSpaceChanged: false,
-        isColorChanged: false,
-        isBobbinMarkChanged: false,
-      },
-    ],
-    allLooms: [
-      {
-        id: "loom_1",
-        loomNumber: 1,
-        currentQuality: "850D Milky White",
-        currentColor: "White",
-        currentColorGroup: "Standard",
-        currentDenier: 850,
-        currentReedSpace: 54,
-        currentBobbinMark: "White Mark",
-        currentMesh: "Standard",
-        nextQualityCode: "1000D White Standard",
-        nextColor: "White",
-        nextColorGroup: "Standard",
-        nextDenier: 1000,
-        nextReedSpace: 56,
-        nextBobbinMark: "Double Line",
-        nextMesh: "Standard",
-        sequence: 1,
-        status: "SCHEDULED",
-        targetDate: "2026-09-27",
-        targetShiftId: "shift_day",
-        targetShiftName: "Day Shift",
-        remarks: "Reed expansion to 56cm",
-        hasChangeover: true,
-        isReedSpaceChanged: true,
-        isColorChanged: false,
-        isBobbinMarkChanged: true,
-      },
-      {
-        id: "loom_2",
-        loomNumber: 2,
-        currentQuality: "1000D White Standard",
-        currentColor: "White",
-        currentColorGroup: "Standard",
-        currentDenier: 1000,
-        currentReedSpace: 56,
-        currentBobbinMark: "Standard",
-        currentMesh: "Standard",
-        nextQualityCode: null,
-        nextColor: null,
-        nextColorGroup: null,
-        nextDenier: null,
-        nextReedSpace: null,
-        nextBobbinMark: null,
-        nextMesh: null,
-        sequence: 0,
-        status: "PENDING",
-        targetDate: null,
-        targetShiftId: null,
-        targetShiftName: null,
-        remarks: null,
-        hasChangeover: false,
-        isReedSpaceChanged: false,
-        isColorChanged: false,
-        isBobbinMarkChanged: false,
-      },
-    ],
-    changeoverQueue: [
-      {
-        id: "loom_1",
-        loomNumber: 1,
-        currentQuality: "850D Milky White",
-        currentColor: "White",
-        currentColorGroup: "Standard",
-        currentDenier: 850,
-        currentReedSpace: 54,
-        currentBobbinMark: "White Mark",
-        currentMesh: "Standard",
-        nextQualityCode: "1000D White Standard",
-        nextColor: "White",
-        nextColorGroup: "Standard",
-        nextDenier: 1000,
-        nextReedSpace: 56,
-        nextBobbinMark: "Double Line",
-        nextMesh: "Standard",
-        sequence: 1,
-        status: "SCHEDULED",
-        targetDate: "2026-09-27",
-        targetShiftId: "shift_day",
-        targetShiftName: "Day Shift",
-        remarks: "Reed expansion to 56cm",
-        hasChangeover: true,
-        isReedSpaceChanged: true,
-        isColorChanged: false,
-        isBobbinMarkChanged: true,
+        remarks: "Planned reed adjustment",
+        loggedBy: "Planner",
+        createdAt: new Date().toISOString(),
       },
     ],
     kpis: {
-      totalLooms: 91,
-      totalScheduled: 1,
-      totalInProgress: 0,
-      totalCompleted: 0,
-      totalPending: 90,
-      totalReedSpaceChanges: 1,
-      queueLength: 1,
+      totalLogs: 2,
+      totalDowntimeMinutes: 45,
+      totalDowntimeHours: 0.8,
+      avgDowntimeMinutes: 22.5,
+      uniqueLoomsCount: 2,
+      scheduledCount: 1,
+      factoryTotalLooms: 91,
     },
-    selectedStatus: "ALL",
+    filterDate: "2026-09-27",
+    filterShift: "All Shifts",
     searchQuery: "",
   };
 
-  it("should export Changeover Excel workbook correctly", () => {
-    exportLoomChangeoverExcel(mockChangeoverData);
+  it("should export Changeover Logs Excel workbook correctly", () => {
+    exportLoomChangeoverExcel(mockChangeoverLogs);
 
     expect(XLSX.writeFile).toHaveBeenCalled();
     const calls = vi.mocked(XLSX.writeFile).mock.calls;
@@ -181,23 +68,23 @@ describe("Loom Changeover Export & Print Engine", () => {
     const wb = lastCall[0];
     const filename = lastCall[1];
 
-    expect(filename).toContain("Loom_Changeover_Sheet_");
-    expect(wb.SheetNames).toContain("Changeover Queue");
-    expect(wb.SheetNames).toContain("1-91 All Looms");
+    expect(filename).toContain("Loom_Changeover_Logs_");
+    expect(wb.SheetNames).toContain("Changeover Logs");
   });
 
-  it("should generate valid Changeover printable HTML with Flexicom logo and signoffs", () => {
-    const html = generateLoomChangeoverHtml(mockChangeoverData);
+  it("should generate valid Changeover printable HTML with branding and signoffs", () => {
+    const html = generateLoomChangeoverHtml(mockChangeoverLogs as PrintLoomChangeoverOptions);
 
     expect(html).toContain("<!DOCTYPE html>");
-    expect(html).toContain("Flexicom Industries Pvt. Ltd.");
-    expect(html).toContain("LOOM MACHINE CHANGEOVER & SEQUENCE SCHEDULE");
-    expect(html).toContain("logo.png");
-    expect(html).toContain("Loom #1");
-    expect(html).toContain("850D Milky White");
-    expect(html).toContain("1000D White Standard");
-    expect(html).toContain("SCHEDULED");
-    expect(html).toContain("1. Prepared By (Loom Supervisor)");
-    expect(html).toContain("2. Mechanical (Loom Master)");
+    expect(html).toContain("Flexicom Industries Pvt. Limited");
+    expect(html).toContain("CIRCULAR LOOMS QUALITY CHANGEOVER AUDIT LOG");
+    expect(html).toContain("#31");
+    expect(html).toContain("Ravinder Kumar");
+    expect(html).toContain("Mahal/LPP/W");
+    expect(html).toContain("UTCL/LPP/Y/67");
+    expect(html).toContain("45m");
+    expect(html).toContain("Prepared By (Floor Operator)");
+    expect(html).toContain("Weaving Supervisor");
+    expect(html).toContain("Plant In-Charge");
   });
 });
