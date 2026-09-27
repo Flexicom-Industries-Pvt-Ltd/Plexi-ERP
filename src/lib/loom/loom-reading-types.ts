@@ -3,6 +3,22 @@ export const DEFAULT_TIME_SLOTS = ["10:00", "12:00", "02:00", "04:00", "06:00", 
 export const DEFAULT_INITIAL_SLOT = "08:00";
 export const ESTIMATED_KG_PER_METER = 0.16;
 
+// Standard Speed Rates (Meters / Minute)
+export const LOOM_STANDARD_SPEED_PP_MPM = 2.01;  // Standard speed for PP qualities (~1,447.2m / 12h)
+export const LOOM_STANDARD_SPEED_LPP_MPM = 2.50; // Standard speed for LPP qualities (~1,800.0m / 12h)
+
+export const LOOM_BREAKDOWN_REASONS = [
+  "Change Over",
+  "Power Cut",
+  "Full Maintenance",
+  "Shuttle Mount",
+  "Operator Shortage",
+  "Full Shut Down",
+  "Bobbin Shortage",
+] as const;
+
+export type LoomBreakdownReason = typeof LOOM_BREAKDOWN_REASONS[number];
+
 export interface LoomReadingEntryItem {
   id?: string;
   loomNumber: number;
@@ -24,6 +40,9 @@ export interface LoomReadingEntryItem {
   r6Reading: number | null;
   r6Prod: number | null;
   totalProduction: number;
+  breakdownReason?: string | null;
+  breakdownMinutes?: number | null;
+  efficiencyPct?: number | null;
   status: "RUNNING" | "STOP" | "CLEANING" | "CHANGEOVER" | "IDLE";
   remarks: string;
 }
@@ -34,6 +53,60 @@ export interface IntervalKpiSummary {
   intervalMeters: number;
   cumulativeMeters: number;
   runningCount: number;
+}
+
+/**
+ * Determine the standard production speed (in meters/min) for a given quality.
+ * If quality contains "LPP", standard speed is 2.50 m/min.
+ * Otherwise defaults to 2.01 m/min for PP.
+ */
+export function getLoomStandardSpeed(qualityType?: string | null): number {
+  if (!qualityType) return LOOM_STANDARD_SPEED_PP_MPM;
+  const q = qualityType.toUpperCase();
+  if (q.includes("LPP")) return LOOM_STANDARD_SPEED_LPP_MPM;
+  return LOOM_STANDARD_SPEED_PP_MPM;
+}
+
+/**
+ * Computes theoretical shift production and real-time efficiency percentage based on
+ * standard speed (PP: 2.01 m/min, LPP: 2.50 m/min), available running time, and actual meters.
+ */
+export function computeLoomEfficiency(
+  actualProductionMeters: number,
+  qualityType?: string | null,
+  breakdownMinutes: number = 0,
+  shiftHours: number = 12
+): {
+  standardSpeedMpm: number;
+  shiftMinutes: number;
+  runningMinutes: number;
+  theoreticalMeters: number;
+  efficiencyPct: number;
+} {
+  const standardSpeedMpm = getLoomStandardSpeed(qualityType);
+  const shiftMinutes = Math.max(0, shiftHours * 60);
+  const validBreakdownMins = Math.min(shiftMinutes, Math.max(0, Number(breakdownMinutes) || 0));
+  const runningMinutes = Math.max(0, shiftMinutes - validBreakdownMins);
+  const theoreticalMeters = Math.round(runningMinutes * standardSpeedMpm * 10) / 10;
+
+  if (theoreticalMeters <= 0 || actualProductionMeters <= 0) {
+    return {
+      standardSpeedMpm,
+      shiftMinutes,
+      runningMinutes,
+      theoreticalMeters,
+      efficiencyPct: 0,
+    };
+  }
+
+  const efficiencyPct = Math.min(150, Math.round((actualProductionMeters / theoreticalMeters) * 1000) / 10);
+  return {
+    standardSpeedMpm,
+    shiftMinutes,
+    runningMinutes,
+    theoreticalMeters,
+    efficiencyPct,
+  };
 }
 
 export function computeIntervalDeltas(entry: Partial<LoomReadingEntryItem>): {

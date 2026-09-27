@@ -16,6 +16,8 @@ export interface PrintLoomReadingOptions {
     totalShiftMeters: number;
     totalShiftKg: number;
     totalWastageKg: number;
+    averageEfficiency?: number;
+    totalBreakdownMins?: number;
     intervalTotals: IntervalKpiSummary[];
   };
   filterActiveOnly?: boolean;
@@ -65,6 +67,7 @@ export function generateLoomReadingHtml(data: PrintLoomReadingOptions): string {
   const totalR5Prod = activeEntries.reduce((s, e) => s + (e.r5Prod || 0), 0);
   const totalR6Prod = activeEntries.reduce((s, e) => s + (e.r6Prod || 0), 0);
   const totalMeters = activeEntries.reduce((s, e) => s + (e.totalProduction || 0), 0);
+  const totalBreakdownMins = activeEntries.reduce((s, e) => s + (e.breakdownMinutes || 0), 0);
   const totalKg = Math.round(totalMeters * 0.16 * 100) / 100;
 
   const prog1 = totalR1Prod;
@@ -77,6 +80,28 @@ export function generateLoomReadingHtml(data: PrintLoomReadingOptions): string {
   const rowsHtml = activeEntries.length > 0
     ? activeEntries.map((e) => {
         const isRunning = e.status === "RUNNING" || (e.totalProduction && e.totalProduction > 0);
+        const effVal = typeof e.efficiencyPct === "number" && e.efficiencyPct > 0 ? e.efficiencyPct : null;
+        let effBadgeColor = "#475569";
+        let effBg = "#f1f5f9";
+        if (effVal !== null) {
+          if (effVal >= 85) {
+            effBadgeColor = "#15803d";
+            effBg = "#dcfce7";
+          } else if (effVal >= 70) {
+            effBadgeColor = "#b45309";
+            effBg = "#fef3c7";
+          } else {
+            effBadgeColor = "#b91c1c";
+            effBg = "#fee2e2";
+          }
+        }
+
+        const bdText = e.breakdownReason
+          ? `${e.breakdownReason}${e.breakdownMinutes ? ` (${e.breakdownMinutes}m)` : ""}`
+          : e.breakdownMinutes
+          ? `${e.breakdownMinutes}m`
+          : "—";
+
         return `
           <tr style="${isRunning ? "background-color: #ffffff;" : "background-color: #f8fafc; color: #94a3b8;"}">
             <td style="text-align: center; font-weight: 800; font-family: monospace; font-size: 7.5pt; ${isRunning ? "color: #0f172a;" : "color: #94a3b8;"}">
@@ -91,7 +116,7 @@ export function generateLoomReadingHtml(data: PrintLoomReadingOptions): string {
             <td style="text-align: center; font-family: monospace; font-size: 7pt;">
               ${e.denier || "—"}
             </td>
-            <td style="font-size: 7pt; font-weight: 700; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 110px;">
+            <td style="font-size: 7pt; font-weight: 700; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 95px;">
               ${e.qualityType || "—"}
             </td>
             <td style="text-align: right; font-family: monospace; font-size: 7pt; font-weight: 600; color: #475569; background: #f8fafc;">
@@ -145,7 +170,13 @@ export function generateLoomReadingHtml(data: PrintLoomReadingOptions): string {
             <td style="text-align: right; font-family: monospace; font-size: 7.5pt; font-weight: 800; color: #0f172a; background: #eff6ff;">
               ${e.totalProduction > 0 ? e.totalProduction.toLocaleString() : "—"}
             </td>
-            <td style="font-size: 6.5pt; color: #64748b; white-space: nowrap;">
+            <td style="font-size: 6.5pt; color: ${e.breakdownReason ? "#991b1b" : "#64748b"}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 80px;">
+              ${bdText}
+            </td>
+            <td style="text-align: center; font-family: monospace; font-size: 7pt; font-weight: 700; color: ${effBadgeColor}; background: ${effBg};">
+              ${effVal !== null ? `${effVal}%` : "—"}
+            </td>
+            <td style="font-size: 6.5pt; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 65px;">
               ${e.status !== "RUNNING" ? `[${e.status}] ` : ""}${e.remarks || ""}
             </td>
           </tr>
@@ -153,7 +184,7 @@ export function generateLoomReadingHtml(data: PrintLoomReadingOptions): string {
       }).join("")
     : `
       <tr>
-        <td colspan="19" style="text-align: center; color: #64748b; font-style: italic; padding: 16px;">
+        <td colspan="21" style="text-align: center; color: #64748b; font-style: italic; padding: 16px;">
           No loom readings recorded for this date and shift.
         </td>
       </tr>
@@ -255,7 +286,7 @@ export function generateLoomReadingHtml(data: PrintLoomReadingOptions): string {
       color: #475569;
     }
     .kpi-val {
-      font-size: 9pt;
+      font-size: 8.5pt;
       font-weight: 800;
       font-family: monospace;
       color: #0f172a;
@@ -273,7 +304,7 @@ export function generateLoomReadingHtml(data: PrintLoomReadingOptions): string {
     .data-table th {
       background-color: #f1f5f9;
       border: 1px solid #94a3b8;
-      padding: 2.5px 3px;
+      padding: 2.5px 2px;
       font-weight: 700;
       font-size: 6.5pt;
       text-transform: uppercase;
@@ -282,7 +313,7 @@ export function generateLoomReadingHtml(data: PrintLoomReadingOptions): string {
     }
     .data-table td {
       border: 1px solid #cbd5e1;
-      padding: 2px 3px;
+      padding: 2px 2px;
       font-size: 7pt;
       color: #0f172a;
     }
@@ -290,7 +321,7 @@ export function generateLoomReadingHtml(data: PrintLoomReadingOptions): string {
       background-color: #f8fafc;
       border: 1px solid #94a3b8;
       font-weight: 700;
-      padding: 2.5px 3px;
+      padding: 2.5px 2px;
     }
 
     /* Sign-off section */
@@ -374,23 +405,27 @@ export function generateLoomReadingHtml(data: PrintLoomReadingOptions): string {
     <!-- METRICS STRIP -->
     <table class="kpi-table">
       <tr>
-        <td style="width: 20%;">
+        <td style="width: 16.6%;">
           <div class="kpi-label">Running Looms</div>
           <div class="kpi-val" style="color: #15803d;">${kpis?.runningLoomsCount ?? activeEntries.filter((e) => e.status === "RUNNING").length} <span style="font-size: 6.5pt; font-weight: normal;">/ 91</span></div>
         </td>
-        <td style="width: 20%;">
+        <td style="width: 16.6%;">
           <div class="kpi-label">Total Shift Production</div>
-          <div class="kpi-val" style="color: #1e40af;">${totalMeters.toLocaleString()} <span style="font-size: 6.5pt; font-weight: normal;">Meters</span></div>
+          <div class="kpi-val" style="color: #1e40af;">${totalMeters.toLocaleString()} <span style="font-size: 6.5pt; font-weight: normal;">M</span></div>
         </td>
-        <td style="width: 20%;">
-          <div class="kpi-label">Estimated Output Weight</div>
+        <td style="width: 16.6%;">
+          <div class="kpi-label">Output Weight (Est.)</div>
           <div class="kpi-val" style="color: #047857;">${totalKg.toLocaleString()} <span style="font-size: 6.5pt; font-weight: normal;">KG</span></div>
         </td>
-        <td style="width: 20%;">
-          <div class="kpi-label">Idle / Standby Looms</div>
-          <div class="kpi-val" style="color: #64748b;">${kpis?.idleLoomsCount ?? activeEntries.filter((e) => e.status !== "RUNNING").length} <span style="font-size: 6.5pt; font-weight: normal;">Looms</span></div>
+        <td style="width: 16.6%;">
+          <div class="kpi-label">Avg Efficiency</div>
+          <div class="kpi-val" style="color: #0284c7;">${kpis?.averageEfficiency || 0}%</div>
         </td>
-        <td style="width: 20%;">
+        <td style="width: 16.6%;">
+          <div class="kpi-label">Total Breakdown</div>
+          <div class="kpi-val" style="color: #ea580c;">${kpis?.totalBreakdownMins ?? totalBreakdownMins} <span style="font-size: 6.5pt; font-weight: normal;">Mins</span></div>
+        </td>
+        <td style="width: 16.6%;">
           <div class="kpi-label">Shift Wastage</div>
           <div class="kpi-val" style="color: #b91c1c;">${kpis?.totalWastageKg || 0} <span style="font-size: 6.5pt; font-weight: normal;">KG</span></div>
         </td>
@@ -401,32 +436,34 @@ export function generateLoomReadingHtml(data: PrintLoomReadingOptions): string {
     <table class="data-table">
       <thead>
         <tr>
-          <th style="width: 32px;" rowspan="2">L/No.</th>
-          <th style="width: 68px;" rowspan="2">Operator</th>
-          <th style="width: 30px;" rowspan="2">Size</th>
-          <th style="width: 30px;" rowspan="2">DNR</th>
-          <th style="width: 90px;" rowspan="2">Type / Quality</th>
-          <th style="width: 44px;" rowspan="2">I/R ${initialTimeSlot}</th>
+          <th style="width: 28px;" rowspan="2">L/No.</th>
+          <th style="width: 60px;" rowspan="2">Operator</th>
+          <th style="width: 26px;" rowspan="2">Size</th>
+          <th style="width: 26px;" rowspan="2">DNR</th>
+          <th style="width: 78px;" rowspan="2">Type / Quality</th>
+          <th style="width: 38px;" rowspan="2">I/R ${initialTimeSlot}</th>
           <th colspan="2">${slot1}</th>
           <th colspan="2">${slot2}</th>
           <th colspan="2">${slot3}</th>
           <th colspan="2">${slot4}</th>
           <th colspan="2">${slot5}</th>
-          <th style="width: 44px;" rowspan="2">${slot6}</th>
-          <th style="width: 48px;" rowspan="2">T PROD</th>
-          <th style="width: 75px;" rowspan="2">Remarks</th>
+          <th style="width: 38px;" rowspan="2">${slot6}</th>
+          <th style="width: 44px;" rowspan="2">T PROD</th>
+          <th style="width: 68px;" rowspan="2">Breakdown</th>
+          <th style="width: 34px;" rowspan="2">Eff %</th>
+          <th style="width: 58px;" rowspan="2">Remarks</th>
         </tr>
         <tr>
-          <th style="width: 40px;">Read</th>
-          <th style="width: 36px; background: #e2e8f0;">PROD</th>
-          <th style="width: 40px;">Read</th>
-          <th style="width: 36px; background: #e2e8f0;">PROD</th>
-          <th style="width: 40px;">Read</th>
-          <th style="width: 36px; background: #e2e8f0;">PROD</th>
-          <th style="width: 40px;">Read</th>
-          <th style="width: 36px; background: #e2e8f0;">PROD</th>
-          <th style="width: 40px;">Read</th>
-          <th style="width: 36px; background: #e2e8f0;">PROD</th>
+          <th style="width: 36px;">Read</th>
+          <th style="width: 32px; background: #e2e8f0;">PROD</th>
+          <th style="width: 36px;">Read</th>
+          <th style="width: 32px; background: #e2e8f0;">PROD</th>
+          <th style="width: 36px;">Read</th>
+          <th style="width: 32px; background: #e2e8f0;">PROD</th>
+          <th style="width: 36px;">Read</th>
+          <th style="width: 32px; background: #e2e8f0;">PROD</th>
+          <th style="width: 36px;">Read</th>
+          <th style="width: 32px; background: #e2e8f0;">PROD</th>
         </tr>
       </thead>
       <tbody>
@@ -462,6 +499,12 @@ export function generateLoomReadingHtml(data: PrintLoomReadingOptions): string {
           <td style="text-align: right; font-family: monospace; font-size: 8pt; color: #1e40af; background: #dbeafe;">
             ${totalMeters.toLocaleString()}
           </td>
+          <td style="text-align: center; font-family: monospace; font-size: 7pt; color: #9a3412;">
+            ${totalBreakdownMins > 0 ? `${totalBreakdownMins}m` : "—"}
+          </td>
+          <td style="text-align: center; font-family: monospace; font-size: 7pt; color: #0369a1;">
+            ${kpis?.averageEfficiency ? `${kpis.averageEfficiency}%` : "—"}
+          </td>
           <td></td>
         </tr>
 
@@ -494,6 +537,8 @@ export function generateLoomReadingHtml(data: PrintLoomReadingOptions): string {
           <td style="text-align: right; font-family: monospace; font-size: 8pt; color: #0369a1; background: #e0f2fe;">
             ${totalMeters.toLocaleString()}
           </td>
+          <td></td>
+          <td></td>
           <td></td>
         </tr>
       </tfoot>

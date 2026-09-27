@@ -17,6 +17,8 @@ export interface ExportLoomReadingOptions {
     totalShiftMeters: number;
     totalShiftKg: number;
     totalWastageKg: number;
+    averageEfficiency?: number;
+    totalBreakdownMins?: number;
     intervalTotals: IntervalKpiSummary[];
   };
   filterActiveOnly?: boolean;
@@ -90,6 +92,9 @@ export function exportLoomReadingSheetExcel(options: ExportLoomReadingOptions): 
     `${slot6} Reading`,
     "PROD 6 (m)",
     "T PROD (Meters)",
+    "Breakdown Reason",
+    "Downtime (Mins)",
+    "Efficiency (%)",
     "Status",
     "Remarks",
   ]);
@@ -116,6 +121,9 @@ export function exportLoomReadingSheetExcel(options: ExportLoomReadingOptions): 
       e.r6Reading !== null ? e.r6Reading : "",
       e.r6Prod !== null && e.r6Prod > 0 ? e.r6Prod : e.r6Prod === 0 ? 0 : "",
       e.totalProduction > 0 ? e.totalProduction : 0,
+      e.breakdownReason || "None",
+      e.breakdownMinutes || 0,
+      e.efficiencyPct !== undefined && e.efficiencyPct !== null ? `${e.efficiencyPct}%` : "—",
       e.status,
       e.remarks || "",
     ]);
@@ -129,6 +137,7 @@ export function exportLoomReadingSheetExcel(options: ExportLoomReadingOptions): 
   const totalR5Prod = activeEntries.reduce((s, e) => s + (e.r5Prod || 0), 0);
   const totalR6Prod = activeEntries.reduce((s, e) => s + (e.r6Prod || 0), 0);
   const totalMeters = activeEntries.reduce((s, e) => s + (e.totalProduction || 0), 0);
+  const totalBreakdownMins = activeEntries.reduce((s, e) => s + (e.breakdownMinutes || 0), 0);
 
   reportRows.push([]); // Empty row
   reportRows.push([
@@ -151,6 +160,9 @@ export function exportLoomReadingSheetExcel(options: ExportLoomReadingOptions): 
     "",
     totalR6Prod,
     totalMeters,
+    "",
+    totalBreakdownMins,
+    kpis?.averageEfficiency !== undefined ? `${kpis.averageEfficiency}%` : "",
     "",
     "",
   ]);
@@ -185,6 +197,9 @@ export function exportLoomReadingSheetExcel(options: ExportLoomReadingOptions): 
     totalMeters,
     "",
     "",
+    "",
+    "",
+    "",
   ]);
 
   reportRows.push([]);
@@ -195,6 +210,10 @@ export function exportLoomReadingSheetExcel(options: ExportLoomReadingOptions): 
     `TOTAL RUNNING LOOMS: ${kpis?.runningLoomsCount || activeEntries.filter((e) => e.status === "RUNNING").length}`,
     "",
     `TOTAL IDLE LOOMS: ${kpis?.idleLoomsCount || activeEntries.filter((e) => e.status !== "RUNNING").length}`,
+    "",
+    `AVG EFFICIENCY: ${kpis?.averageEfficiency || 0}%`,
+    "",
+    `TOTAL BREAKDOWN: ${kpis?.totalBreakdownMins || totalBreakdownMins} Mins`,
     "",
     `TOTAL WASTAGE: ${kpis?.totalWastageKg || 0} KG`,
   ]);
@@ -233,6 +252,9 @@ export function exportLoomReadingSheetExcel(options: ExportLoomReadingOptions): 
     { wch: 12 }, // R6
     { wch: 12 }, // P6
     { wch: 16 }, // Total Prod
+    { wch: 18 }, // Breakdown Reason
+    { wch: 14 }, // Downtime (Mins)
+    { wch: 14 }, // Efficiency (%)
     { wch: 12 }, // Status
     { wch: 24 }, // Remarks
   ];

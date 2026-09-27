@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { computeIntervalDeltas, LoomReadingEntryItem } from "../loom-reading-types";
+import { computeIntervalDeltas, computeLoomEfficiency, LoomReadingEntryItem } from "../loom-reading-types";
 import { exportLoomReadingSheetExcel } from "../loom-reading-export";
 import { generateLoomReadingHtml } from "../print-loom-reading";
 import * as XLSX from "xlsx";
@@ -78,6 +78,44 @@ describe("2 Hours Loom Reading Sheet Logic & Deltas", () => {
     expect(result.r6Prod).toBe(290);
     expect(result.totalProduction).toBe(2000);
   });
+
+  it("should compute standard speeds correctly for PP (2.01 m/min) and LPP (2.50 m/min)", () => {
+    // PP Quality standard speed is 2.01 m/min
+    const ppCalc = computeLoomEfficiency(1447.2, "PP/White/850D", 0, 12);
+    expect(ppCalc.standardSpeedMpm).toBe(2.01);
+    expect(ppCalc.shiftMinutes).toBe(720);
+    expect(ppCalc.runningMinutes).toBe(720);
+    expect(ppCalc.theoreticalMeters).toBe(1447.2);
+    expect(ppCalc.efficiencyPct).toBe(100);
+
+    // LPP Quality standard speed is 2.50 m/min
+    const lppCalc = computeLoomEfficiency(1800, "UTCL/LPP/Yellow", 0, 12);
+    expect(lppCalc.standardSpeedMpm).toBe(2.50);
+    expect(lppCalc.shiftMinutes).toBe(720);
+    expect(lppCalc.runningMinutes).toBe(720);
+    expect(lppCalc.theoreticalMeters).toBe(1800);
+    expect(lppCalc.efficiencyPct).toBe(100);
+  });
+
+  it("should adjust theoretical production and efficiency when breakdown downtime occurs", () => {
+    // 12h shift = 720 mins. Breakdown = 120 mins (2h). Running = 600 mins (10h).
+    // Standard PP speed: 2.01 m/min -> Theoretical: 600 * 2.01 = 1206.0 m
+    // Actual production: 1085.4 m -> Efficiency = (1085.4 / 1206.0) * 100 = 90.0%
+    const result = computeLoomEfficiency(1085.4, "Mahal/PP/W", 120, 12);
+    expect(result.runningMinutes).toBe(600);
+    expect(result.theoreticalMeters).toBe(1206);
+    expect(result.efficiencyPct).toBe(90);
+  });
+
+  it("should return 0% efficiency when machine had 0 production or full shutdown", () => {
+    const zeroProd = computeLoomEfficiency(0, "Mahal/PP/W", 0, 12);
+    expect(zeroProd.efficiencyPct).toBe(0);
+
+    const fullDowntime = computeLoomEfficiency(0, "Mahal/PP/W", 720, 12);
+    expect(fullDowntime.runningMinutes).toBe(0);
+    expect(fullDowntime.theoreticalMeters).toBe(0);
+    expect(fullDowntime.efficiencyPct).toBe(0);
+  });
 });
 
 describe("2 Hours Loom Reading Export & Print Engine", () => {
@@ -110,6 +148,9 @@ describe("2 Hours Loom Reading Export & Print Engine", () => {
         r6Reading: 8780,
         r6Prod: 340,
         totalProduction: 1560,
+        breakdownReason: "Change Over",
+        breakdownMinutes: 30,
+        efficiencyPct: 90.4,
         status: "RUNNING" as const,
         remarks: "",
       },
@@ -133,6 +174,9 @@ describe("2 Hours Loom Reading Export & Print Engine", () => {
         r6Reading: 7030,
         r6Prod: 0,
         totalProduction: 20,
+        breakdownReason: "Full Shut Down",
+        breakdownMinutes: 700,
+        efficiencyPct: 49.8,
         status: "STOP" as const,
         remarks: "STOP",
       },
@@ -144,6 +188,8 @@ describe("2 Hours Loom Reading Export & Print Engine", () => {
       totalShiftMeters: 1580,
       totalShiftKg: 252.8,
       totalWastageKg: 5,
+      averageEfficiency: 90.4,
+      totalBreakdownMins: 730,
       intervalTotals: [],
     },
   };
@@ -159,7 +205,7 @@ describe("2 Hours Loom Reading Export & Print Engine", () => {
     expect(filename).toContain("Flexicom_Loom_2Hours_Report_20260921_Day_Shift.xlsx");
   });
 
-  it("should generate official A4 landscape printable HTML", () => {
+  it("should generate official A4 landscape printable HTML with breakdown and efficiency", () => {
     const html = generateLoomReadingHtml(mockDataset);
 
     expect(html).toContain("<!DOCTYPE html>");
@@ -169,6 +215,8 @@ describe("2 Hours Loom Reading Export & Print Engine", () => {
     expect(html).toContain("Ravinder");
     expect(html).toContain("Mahal/LPP/W");
     expect(html).toContain("1,560");
+    expect(html).toContain("Change Over");
+    expect(html).toContain("90.4%");
     expect(html).toContain("Prepared By (Loom Shed In-Charge)");
     expect(html).toContain("Checked By (Shift Supervisor)");
     expect(html).toContain("Approved By (Plant Manager)");
