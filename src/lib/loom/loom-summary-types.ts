@@ -44,6 +44,9 @@ export interface LoomMachineSummaryItem {
   loomIdentifier: string;
   isActive: boolean;
   activeRecipe: string | null;
+  size?: string | null;
+  denier?: number | string | null;
+  reedSpaceCm?: number | null;
   allRecipes: string[];
   totalCrates: number;
   totalBobbins: number;
