@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
   Calendar,
   Clock,
@@ -18,6 +18,8 @@ import {
   X,
   Gauge,
   Timer,
+  Send,
+  CloudCheck,
 } from "lucide-react";
 import {
   LoomReadingEntryItem,
@@ -95,6 +97,11 @@ export function LoomReadingSheetSection() {
   const [selectedShift, setSelectedShift] = useState<string>("Day Shift");
   const [loading, setLoading] = useState<boolean>(true);
   const [saving, setSaving] = useState<boolean>(false);
+  const [autoSaving, setAutoSaving] = useState<boolean>(false);
+  const [lastAutoSavedAt, setLastAutoSavedAt] = useState<Date | null>(null);
+  const lastSavedPayloadRef = useRef<string>("");
+  const isInitialMountRef = useRef<boolean>(true);
+
   const [data, setData] = useState<ReadingSheetData | null>(null);
   const [entries, setEntries] = useState<LoomReadingEntryItem[]>([]);
   const [preparedBy, setPreparedBy] = useState<string>("");
@@ -130,6 +137,7 @@ export function LoomReadingSheetSection() {
   // Fetch sheet data from server
   const fetchSheetData = useCallback(async (date: string, shift: string) => {
     setLoading(true);
+    isInitialMountRef.current = true;
     try {
       const params = new URLSearchParams({
         date,
@@ -171,6 +179,22 @@ export function LoomReadingSheetSection() {
       setTotalWastageKg(String(json.sheet?.totalWastageKg || 0));
       setSheetRemarks(json.sheet?.remarks || "");
       setSheetStatus(json.sheet?.status || "DRAFT");
+
+      const initialPayload = {
+        action: "SAVE_SHEET",
+        date,
+        shiftName: shift,
+        entries: computedEntries,
+        preparedBy: json.sheet?.preparedBy || "",
+        checkedBy: json.sheet?.checkedBy || "",
+        approvedBy: json.sheet?.approvedBy || "",
+        totalWastageKg: parseFloat(String(json.sheet?.totalWastageKg || 0)) || 0,
+        remarks: json.sheet?.remarks || "",
+        status: json.sheet?.status || "DRAFT",
+        shiftHours: json.sheet?.shiftHours || 12,
+      };
+      lastSavedPayloadRef.current = JSON.stringify(initialPayload);
+      isInitialMountRef.current = false;
     } catch (err: any) {
       console.error("fetchSheetData error:", err);
       showNotification(err.message || "Failed to load reading sheet", "error");
@@ -182,6 +206,62 @@ export function LoomReadingSheetSection() {
   useEffect(() => {
     fetchSheetData(selectedDate, selectedShift);
   }, [selectedDate, selectedShift, fetchSheetData]);
+
+  // Real-time Auto-Save Effect (debounced 1000ms on any change)
+  useEffect(() => {
+    if (loading || isInitialMountRef.current || !data || entries.length === 0) return;
+
+    const payload = {
+      action: "SAVE_SHEET",
+      date: selectedDate,
+      shiftName: selectedShift,
+      entries,
+      preparedBy,
+      checkedBy,
+      approvedBy,
+      totalWastageKg: parseFloat(totalWastageKg) || 0,
+      remarks: sheetRemarks,
+      status: sheetStatus,
+      shiftHours: data?.sheet?.shiftHours || 12,
+    };
+
+    const serialized = JSON.stringify(payload);
+    if (serialized === lastSavedPayloadRef.current) return;
+
+    const timer = setTimeout(async () => {
+      setAutoSaving(true);
+      try {
+        const res = await fetch("/api/production/loom/reading-sheet", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: serialized,
+        });
+
+        if (res.ok) {
+          lastSavedPayloadRef.current = serialized;
+          setLastAutoSavedAt(new Date());
+        }
+      } catch (err) {
+        console.error("Auto-save error:", err);
+      } finally {
+        setAutoSaving(false);
+      }
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [
+    entries,
+    selectedDate,
+    selectedShift,
+    preparedBy,
+    checkedBy,
+    approvedBy,
+    totalWastageKg,
+    sheetRemarks,
+    sheetStatus,
+    loading,
+    data,
+  ]);
 
   // Handle live reading and breakdown changes with instant recalculation
   const handleEntryChange = (loomNumber: number, field: keyof LoomReadingEntryItem, value: any) => {
@@ -318,8 +398,8 @@ export function LoomReadingSheetSection() {
     ? `Search: "${searchTerm.trim()}"`
     : undefined;
 
-  // Save Sheet Handler
-  const handleSaveSheet = async () => {
+  // Save Sheet Handler (Manual Save Draft or Submit Sheet)
+  const handleSaveSheet = async (targetStatus: string = sheetStatus) => {
     setSaving(true);
     try {
       const payload = {
@@ -332,7 +412,7 @@ export function LoomReadingSheetSection() {
         approvedBy,
         totalWastageKg: parseFloat(totalWastageKg) || 0,
         remarks: sheetRemarks,
-        status: sheetStatus,
+        status: targetStatus,
         shiftHours: data?.sheet?.shiftHours || 12,
       };
 
@@ -345,8 +425,19 @@ export function LoomReadingSheetSection() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Failed to save reading sheet");
 
-      showNotification(`Saved successfully: ${liveTotals.totalShiftMeters.toLocaleString()} m across ${liveTotals.runningLooms} running looms (Avg Eff: ${liveTotals.averageEfficiency}%).`);
-      fetchSheetData(selectedDate, selectedShift);
+      setSheetStatus(targetStatus);
+      lastSavedPayloadRef.current = JSON.stringify(payload);
+      setLastAutoSavedAt(new Date());
+
+      if (targetStatus === "SUBMITTED") {
+        showNotification(
+          `Sheet submitted successfully: ${liveTotals.totalShiftMeters.toLocaleString()} m across ${liveTotals.runningLooms} running looms (Avg Eff: ${liveTotals.averageEfficiency}%).`
+        );
+      } else {
+        showNotification(
+          `Draft saved successfully: ${liveTotals.totalShiftMeters.toLocaleString()} m across ${liveTotals.runningLooms} running looms.`
+        );
+      }
     } catch (err: any) {
       console.error("handleSaveSheet error:", err);
       showNotification(err.message || "Failed to save sheet", "error");
@@ -449,9 +540,22 @@ export function LoomReadingSheetSection() {
                 2H
               </div>
               <div>
-                <h1 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight">
-                  2 Hours Reading Sheet
-                </h1>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight">
+                    2 Hours Reading Sheet
+                  </h1>
+                  <span
+                    className={`px-2 py-0.5 text-[10px] font-bold uppercase rounded-full border ${
+                      sheetStatus === "SUBMITTED"
+                        ? "bg-emerald-50 text-emerald-700 border-emerald-300"
+                        : sheetStatus === "APPROVED"
+                        ? "bg-blue-50 text-blue-700 border-blue-300"
+                        : "bg-slate-100 text-slate-700 border-slate-300"
+                    }`}
+                  >
+                    {sheetStatus === "SUBMITTED" ? "✓ Submitted" : sheetStatus === "APPROVED" ? "★ Approved" : "● Draft"}
+                  </span>
+                </div>
                 <p className="text-xs text-slate-500 font-medium">
                   Shop-floor bi-hourly circular loom meter log, progressive interval totals & shift production
                 </p>
@@ -461,6 +565,22 @@ export function LoomReadingSheetSection() {
 
           {/* Action Buttons */}
           <div className="flex flex-wrap items-center gap-2">
+            {/* Real-time Auto-Save Status Pill */}
+            {autoSaving ? (
+              <div className="flex items-center gap-1.5 text-xs text-amber-700 bg-amber-50 px-2.5 py-1.5 rounded-xl border border-amber-200 animate-pulse font-medium shadow-2xs">
+                <div className="h-2 w-2 rounded-full bg-amber-500 animate-ping" />
+                <span>Auto-saving...</span>
+              </div>
+            ) : lastAutoSavedAt ? (
+              <div className="flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50 px-2.5 py-1.5 rounded-xl border border-emerald-200 font-medium shadow-2xs">
+                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                <span className="hidden sm:inline">
+                  Auto-saved {lastAutoSavedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                </span>
+                <span className="sm:hidden">Auto-saved</span>
+              </div>
+            ) : null}
+
             <button
               onClick={() => setBulkModalOpen(true)}
               className="px-3 py-1.5 text-xs font-semibold rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition-all inline-flex items-center gap-1.5 shadow-2xs cursor-pointer"
@@ -525,12 +645,23 @@ export function LoomReadingSheetSection() {
             </button>
 
             <button
-              onClick={handleSaveSheet}
-              disabled={saving}
-              className="px-4 py-1.5 text-xs font-bold rounded-xl bg-slate-900 hover:bg-slate-800 text-white shadow-sm transition-all inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              onClick={() => handleSaveSheet("DRAFT")}
+              disabled={saving || autoSaving}
+              className="px-3 py-1.5 text-xs font-semibold rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 shadow-2xs transition-all inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              title="Save current reading sheet as Draft"
             >
-              <Save className="h-3.5 w-3.5 text-emerald-400" />
-              <span>{saving ? "Saving..." : "Save Sheet"}</span>
+              <Save className="h-3.5 w-3.5 text-slate-600" />
+              <span>{saving && sheetStatus === "DRAFT" ? "Saving..." : "Save Draft"}</span>
+            </button>
+
+            <button
+              onClick={() => handleSaveSheet("SUBMITTED")}
+              disabled={saving || autoSaving}
+              className="px-4 py-1.5 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm transition-all inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              title="Submit and finalize this shift reading sheet"
+            >
+              <Check className="h-3.5 w-3.5" />
+              <span>{saving && sheetStatus === "SUBMITTED" ? "Submitting..." : "Submit Sheet"}</span>
             </button>
           </div>
         </div>
