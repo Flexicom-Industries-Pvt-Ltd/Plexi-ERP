@@ -438,113 +438,82 @@ export async function POST(request: NextRequest) {
 
       const targetShiftName = existingSheet?.shiftName || shiftName;
 
-      // Upsert sheet record in transaction
-      const savedSheet = await db.$transaction(async (tx) => {
-        const sheet = await tx.loomReadingSheet.upsert({
-          where: {
-            date_shiftName: {
-              date,
-              shiftName: targetShiftName,
-            },
-          },
-          update: {
-            preparedBy,
-            checkedBy,
-            approvedBy,
-            totalLoomProductionMeters: sheetTotalMeters,
-            totalLoomProductionKg: totalShiftKg,
-            totalWastageKg: Number(totalWastageKg) || 0,
-            runningLoomsCount: runningCount,
-            idleLoomsCount: idleCount,
-            averageEfficiency,
-            totalBreakdownMins,
-            remarks,
-            status,
-          },
-          create: {
+      // Upsert sheet record directly
+      const savedSheet = await db.loomReadingSheet.upsert({
+        where: {
+          date_shiftName: {
             date,
             shiftName: targetShiftName,
-            preparedBy,
-            checkedBy,
-            approvedBy,
-            totalLoomProductionMeters: sheetTotalMeters,
-            totalLoomProductionKg: totalShiftKg,
-            totalWastageKg: Number(totalWastageKg) || 0,
-            runningLoomsCount: runningCount,
-            idleLoomsCount: idleCount,
-            averageEfficiency,
-            totalBreakdownMins,
-            remarks,
-            status,
           },
-        });
-
-        // Upsert all 1..91 entries
-        for (const item of processedEntries) {
-          await tx.loomReadingEntry.upsert({
-            where: {
-              sheetId_loomNumber: {
-                sheetId: sheet.id,
-                loomNumber: item.loomNumber,
-              },
-            },
-            update: {
-              operatorName: item.operatorName,
-              size: item.size,
-              denier: item.denier,
-              qualityType: item.qualityType,
-              initialReading: item.initialReading,
-              r1Reading: item.r1Reading,
-              r1Prod: item.r1Prod,
-              r2Reading: item.r2Reading,
-              r2Prod: item.r2Prod,
-              r3Reading: item.r3Reading,
-              r3Prod: item.r3Prod,
-              r4Reading: item.r4Reading,
-              r4Prod: item.r4Prod,
-              r5Reading: item.r5Reading,
-              r5Prod: item.r5Prod,
-              r6Reading: item.r6Reading,
-              r6Prod: item.r6Prod,
-              totalProduction: item.totalProduction,
-              breakdownReason: item.breakdownReason,
-              breakdownMinutes: item.breakdownMinutes,
-              efficiencyPct: item.efficiencyPct,
-              status: item.status,
-              remarks: item.remarks,
-            },
-            create: {
-              sheetId: sheet.id,
-              loomNumber: item.loomNumber,
-              operatorName: item.operatorName,
-              size: item.size,
-              denier: item.denier,
-              qualityType: item.qualityType,
-              initialReading: item.initialReading,
-              r1Reading: item.r1Reading,
-              r1Prod: item.r1Prod,
-              r2Reading: item.r2Reading,
-              r2Prod: item.r2Prod,
-              r3Reading: item.r3Reading,
-              r3Prod: item.r3Prod,
-              r4Reading: item.r4Reading,
-              r4Prod: item.r4Prod,
-              r5Reading: item.r5Reading,
-              r5Prod: item.r5Prod,
-              r6Reading: item.r6Reading,
-              r6Prod: item.r6Prod,
-              totalProduction: item.totalProduction,
-              breakdownReason: item.breakdownReason,
-              breakdownMinutes: item.breakdownMinutes,
-              efficiencyPct: item.efficiencyPct,
-              status: item.status,
-              remarks: item.remarks,
-            },
-          });
-        }
-
-        return sheet;
+        },
+        update: {
+          preparedBy,
+          checkedBy,
+          approvedBy,
+          totalLoomProductionMeters: sheetTotalMeters,
+          totalLoomProductionKg: totalShiftKg,
+          totalWastageKg: Number(totalWastageKg) || 0,
+          runningLoomsCount: runningCount,
+          idleLoomsCount: idleCount,
+          averageEfficiency,
+          totalBreakdownMins,
+          remarks,
+          status,
+        },
+        create: {
+          date,
+          shiftName: targetShiftName,
+          preparedBy,
+          checkedBy,
+          approvedBy,
+          totalLoomProductionMeters: sheetTotalMeters,
+          totalLoomProductionKg: totalShiftKg,
+          totalWastageKg: Number(totalWastageKg) || 0,
+          runningLoomsCount: runningCount,
+          idleLoomsCount: idleCount,
+          averageEfficiency,
+          totalBreakdownMins,
+          remarks,
+          status,
+        },
       });
+
+      // Fast batch replace entries in a single SQL statement
+      await db.loomReadingEntry.deleteMany({
+        where: { sheetId: savedSheet.id },
+      });
+
+      if (processedEntries.length > 0) {
+        await db.loomReadingEntry.createMany({
+          data: processedEntries.map((item) => ({
+            sheetId: savedSheet.id,
+            loomNumber: item.loomNumber,
+            operatorName: item.operatorName,
+            size: item.size,
+            denier: item.denier,
+            qualityType: item.qualityType,
+            initialReading: item.initialReading,
+            r1Reading: item.r1Reading,
+            r1Prod: item.r1Prod,
+            r2Reading: item.r2Reading,
+            r2Prod: item.r2Prod,
+            r3Reading: item.r3Reading,
+            r3Prod: item.r3Prod,
+            r4Reading: item.r4Reading,
+            r4Prod: item.r4Prod,
+            r5Reading: item.r5Reading,
+            r5Prod: item.r5Prod,
+            r6Reading: item.r6Reading,
+            r6Prod: item.r6Prod,
+            totalProduction: item.totalProduction,
+            breakdownReason: item.breakdownReason,
+            breakdownMinutes: item.breakdownMinutes,
+            efficiencyPct: item.efficiencyPct,
+            status: item.status,
+            remarks: item.remarks,
+          })),
+        });
+      }
 
       await logAudit({
         action: "UPDATE",
