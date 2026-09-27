@@ -19,6 +19,26 @@ export { computeIntervalDeltas, computeLoomEfficiency };
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+function getNormalizedShiftCandidates(shiftName: string): string[] {
+  const clean = (shiftName || "").trim();
+  const upper = clean.toUpperCase();
+  const candidates = new Set<string>([clean, upper, clean.toLowerCase()]);
+  if (upper === "DAY" || upper === "DAY SHIFT" || upper === "SHIFT A") {
+    candidates.add("DAY");
+    candidates.add("Day Shift");
+    candidates.add("Day");
+    candidates.add("Shift A");
+    candidates.add("DAY SHIFT");
+  } else if (upper === "NIGHT" || upper === "NIGHT SHIFT" || upper === "SHIFT B") {
+    candidates.add("NIGHT");
+    candidates.add("Night Shift");
+    candidates.add("Night");
+    candidates.add("Shift B");
+    candidates.add("NIGHT SHIFT");
+  }
+  return Array.from(candidates);
+}
+
 export async function GET(request: NextRequest) {
   const authResult = await requireLoomApiPermission("canRead");
   if (!authResult.ok) {
@@ -27,11 +47,13 @@ export async function GET(request: NextRequest) {
 
   const { searchParams } = new URL(request.url);
   const dateParam = searchParams.get("date") || new Date().toISOString().slice(0, 10);
-  const shiftNameParam = searchParams.get("shiftName") || "Day Shift";
+  const shiftNameParam = searchParams.get("shiftName") || "DAY";
   const search = searchParams.get("search")?.toLowerCase().trim() || "";
 
   try {
-    // 1. Fetch available shifts, operators, and active loom mappings concurrently
+    const candidateShiftNames = getNormalizedShiftCandidates(shiftNameParam);
+
+    // 1. Fetch available shifts, operators, active loom mappings, and existing sheet concurrently
     const [shifts, operators, mappings, existingSheet] = await Promise.all([
       db.shift.findMany({
         where: { isActive: true },
@@ -45,12 +67,10 @@ export async function GET(request: NextRequest) {
         where: { isActive: true },
         orderBy: [{ colorGroup: "asc" }, { qualityCode: "asc" }],
       }),
-      db.loomReadingSheet.findUnique({
+      db.loomReadingSheet.findFirst({
         where: {
-          date_shiftName: {
-            date: dateParam,
-            shiftName: shiftNameParam,
-          },
+          date: dateParam,
+          shiftName: { in: candidateShiftNames, mode: "insensitive" },
         },
         include: {
           entries: {
@@ -408,13 +428,23 @@ export async function POST(request: NextRequest) {
 
       const totalShiftKg = Math.round(sheetTotalMeters * ESTIMATED_KG_PER_METER * 100) / 100;
 
+      const candidateShiftNames = getNormalizedShiftCandidates(shiftName);
+      const existingSheet = await db.loomReadingSheet.findFirst({
+        where: {
+          date,
+          shiftName: { in: candidateShiftNames, mode: "insensitive" },
+        },
+      });
+
+      const targetShiftName = existingSheet?.shiftName || shiftName;
+
       // Upsert sheet record in transaction
       const savedSheet = await db.$transaction(async (tx) => {
         const sheet = await tx.loomReadingSheet.upsert({
           where: {
             date_shiftName: {
               date,
-              shiftName,
+              shiftName: targetShiftName,
             },
           },
           update: {
@@ -433,7 +463,7 @@ export async function POST(request: NextRequest) {
           },
           create: {
             date,
-            shiftName,
+            shiftName: targetShiftName,
             preparedBy,
             checkedBy,
             approvedBy,
