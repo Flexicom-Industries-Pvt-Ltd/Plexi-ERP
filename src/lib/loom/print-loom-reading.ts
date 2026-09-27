@@ -1,4 +1,4 @@
-import { LoomReadingEntryItem, IntervalKpiSummary } from "./loom-reading-types";
+import { LoomReadingEntryItem, IntervalKpiSummary, isLoomActive } from "./loom-reading-types";
 
 export interface PrintLoomReadingOptions {
   date: string;
@@ -38,7 +38,7 @@ export function generateLoomReadingHtml(data: PrintLoomReadingOptions): string {
   } = data;
 
   const activeEntries = filterActiveOnly
-    ? entries.filter((e) => e.status === "RUNNING" || (e.totalProduction && e.totalProduction > 0))
+    ? entries.filter((e) => isLoomActive(e))
     : entries;
 
   const docDate = date.replace(/[^a-zA-Z0-9]/g, "");

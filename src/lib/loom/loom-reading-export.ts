@@ -1,5 +1,5 @@
 import * as XLSX from "xlsx";
-import { LoomReadingEntryItem, IntervalKpiSummary } from "./loom-reading-types";
+import { LoomReadingEntryItem, IntervalKpiSummary, isLoomActive } from "./loom-reading-types";
 
 export interface ExportLoomReadingOptions {
   date: string;
@@ -39,7 +39,7 @@ export function exportLoomReadingSheetExcel(options: ExportLoomReadingOptions): 
   } = options;
 
   const activeEntries = filterActiveOnly
-    ? entries.filter((e) => e.status === "RUNNING" || (e.totalProduction && e.totalProduction > 0))
+    ? entries.filter((e) => isLoomActive(e))
     : entries;
 
   const wb = XLSX.utils.book_new();

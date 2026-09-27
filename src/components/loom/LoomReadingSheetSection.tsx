@@ -25,6 +25,7 @@ import {
   LoomReadingEntryItem,
   computeIntervalDeltas,
   computeLoomEfficiency,
+  isLoomActive,
   LOOM_BREAKDOWN_REASONS,
   IntervalKpiSummary,
 } from "@/lib/loom/loom-reading-types";
@@ -93,8 +94,18 @@ interface ReadingSheetData {
 }
 
 export function LoomReadingSheetSection() {
-  const [selectedDate, setSelectedDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
-  const [selectedShift, setSelectedShift] = useState<string>("Day Shift");
+  const [selectedDate, setSelectedDate] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("loom_reading_selected_date") || new Date().toISOString().slice(0, 10);
+    }
+    return new Date().toISOString().slice(0, 10);
+  });
+  const [selectedShift, setSelectedShift] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("loom_reading_selected_shift") || "DAY";
+    }
+    return "DAY";
+  });
   const [loading, setLoading] = useState<boolean>(true);
   const [saving, setSaving] = useState<boolean>(false);
   const [autoSaving, setAutoSaving] = useState<boolean>(false);
@@ -134,6 +145,21 @@ export function LoomReadingSheetSection() {
     setTimeout(() => setNotification(null), 4000);
   };
 
+  // Persist selected date & shift to localStorage
+  const handleDateChange = (newDate: string) => {
+    setSelectedDate(newDate);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("loom_reading_selected_date", newDate);
+    }
+  };
+
+  const handleShiftChange = (newShift: string) => {
+    setSelectedShift(newShift);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("loom_reading_selected_shift", newShift);
+    }
+  };
+
   // Fetch sheet data from server
   const fetchSheetData = useCallback(async (date: string, shift: string) => {
     setLoading(true);
@@ -149,6 +175,14 @@ export function LoomReadingSheetSection() {
       if (!res.ok) throw new Error("Failed to fetch loom reading sheet");
       const json: ReadingSheetData = await res.json();
       setData(json);
+
+      // Sync shift name if backend resolved a canonical shift
+      if (json.sheet?.shiftName && json.sheet.shiftName !== shift) {
+        setSelectedShift(json.sheet.shiftName);
+        if (typeof window !== "undefined") {
+          localStorage.setItem("loom_reading_selected_shift", json.sheet.shiftName);
+        }
+      }
 
       const computedEntries = (json.entries || []).map((entry) => {
         const { r1Prod, r2Prod, r3Prod, r4Prod, r5Prod, r6Prod, totalProduction } = computeIntervalDeltas(entry);
@@ -183,7 +217,7 @@ export function LoomReadingSheetSection() {
       const initialPayload = {
         action: "SAVE_SHEET",
         date,
-        shiftName: shift,
+        shiftName: json.sheet?.shiftName || shift,
         entries: computedEntries,
         preparedBy: json.sheet?.preparedBy || "",
         checkedBy: json.sheet?.checkedBy || "",
@@ -328,7 +362,7 @@ export function LoomReadingSheetSection() {
     const totalShiftKg = Math.round(totalShiftMeters * 0.16 * 100) / 100;
     const totalBreakdownMins = entries.reduce((s, e) => s + (Number(e.breakdownMinutes) || 0), 0);
 
-    const runningEntries = entries.filter((e) => e.status === "RUNNING" || (e.totalProduction && e.totalProduction > 0));
+    const runningEntries = entries.filter((e) => isLoomActive(e));
     const runningLooms = runningEntries.length;
     const idleLooms = entries.length - runningLooms;
 
@@ -366,7 +400,7 @@ export function LoomReadingSheetSection() {
   // Filtered entries for table rendering
   const filteredEntries = useMemo(() => {
     return entries.filter((e) => {
-      if (filterActiveOnly && !(e.status === "RUNNING" || (e.totalProduction && e.totalProduction > 0))) {
+      if (filterActiveOnly && !isLoomActive(e)) {
         return false;
       }
       if (statusFilter !== "ALL" && e.status !== statusFilter) {
@@ -668,12 +702,12 @@ export function LoomReadingSheetSection() {
               <input
                 type="date"
                 value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
+                onChange={(e) => handleDateChange(e.target.value)}
                 className="w-full px-2.5 py-1.5 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-lg outline-none focus:bg-white focus:border-slate-800 transition-all"
               />
               <button
                 type="button"
-                onClick={() => setSelectedDate(new Date().toISOString().slice(0, 10))}
+                onClick={() => handleDateChange(new Date().toISOString().slice(0, 10))}
                 className="px-2 py-1.5 text-[10px] font-bold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-lg border border-slate-200 transition-all"
               >
                 Today
@@ -689,17 +723,24 @@ export function LoomReadingSheetSection() {
             </label>
             <select
               value={selectedShift}
-              onChange={(e) => setSelectedShift(e.target.value)}
+              onChange={(e) => handleShiftChange(e.target.value)}
               className="w-full px-2.5 py-1.5 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-lg outline-none focus:bg-white focus:border-slate-800 transition-all"
             >
-              {(data?.availableShifts || [
-                { id: "shift_day", name: "Day Shift" },
-                { id: "shift_night", name: "Night Shift" },
-              ]).map((s) => (
+              {(data?.availableShifts && data.availableShifts.length > 0
+                ? data.availableShifts
+                : [
+                    { id: "shift_day", name: "DAY" },
+                    { id: "shift_night", name: "NIGHT" },
+                  ]
+              ).map((s) => (
                 <option key={s.id} value={s.name}>
                   {s.name}
                 </option>
               ))}
+              <option value="DAY">DAY</option>
+              <option value="NIGHT">NIGHT</option>
+              <option value="Day Shift">Day Shift</option>
+              <option value="Night Shift">Night Shift</option>
               <option value="Shift A">Shift A (08:00 - 20:00)</option>
               <option value="Shift B">Shift B (20:00 - 08:00)</option>
               <option value="Shift C">Shift C</option>
