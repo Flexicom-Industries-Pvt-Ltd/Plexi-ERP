@@ -22,10 +22,10 @@ export type LoomBreakdownReason = typeof LOOM_BREAKDOWN_REASONS[number];
 export interface LoomReadingEntryItem {
   id?: string;
   loomNumber: number;
-  operatorName: string;
-  size: string;
-  denier: string;
-  qualityType: string;
+  operatorName: string | null;
+  size: string | null;
+  denier: string | null;
+  qualityType: string | null;
   initialReading: number | null;
   r1Reading: number | null;
   r1Prod: number | null;
@@ -43,8 +43,8 @@ export interface LoomReadingEntryItem {
   breakdownReason?: string | null;
   breakdownMinutes?: number | null;
   efficiencyPct?: number | null;
-  status: "RUNNING" | "STOP" | "CLEANING" | "CHANGEOVER" | "IDLE";
-  remarks: string;
+  status: "RUNNING" | "STOP" | "CLEANING" | "CHANGEOVER" | "IDLE" | string;
+  remarks: string | null;
 }
 
 export interface IntervalKpiSummary {
@@ -109,7 +109,7 @@ export function computeLoomEfficiency(
   };
 }
 
-export function computeIntervalDeltas(entry: Partial<LoomReadingEntryItem>): {
+export function computeIntervalDeltas(entry: Partial<LoomReadingEntryItem> | Record<string, any>): {
   r1Prod: number | null;
   r2Prod: number | null;
   r3Prod: number | null;
@@ -140,19 +140,19 @@ export function computeIntervalDeltas(entry: Partial<LoomReadingEntryItem>): {
     return Math.round(diff * 100) / 100;
   };
 
-  const r1Prod = entry.r1Prod !== undefined && entry.r1Prod !== null ? entry.r1Prod : calcDiff(r1, init);
-  const r2Prod = entry.r2Prod !== undefined && entry.r2Prod !== null ? entry.r2Prod : calcDiff(r2, r1 ?? init);
-  const r3Prod = entry.r3Prod !== undefined && entry.r3Prod !== null ? entry.r3Prod : calcDiff(r3, r2 ?? r1 ?? init);
-  const r4Prod = entry.r4Prod !== undefined && entry.r4Prod !== null ? entry.r4Prod : calcDiff(r4, r3 ?? r2 ?? r1 ?? init);
-  const r5Prod = entry.r5Prod !== undefined && entry.r5Prod !== null ? entry.r5Prod : calcDiff(r5, r4 ?? r3 ?? r2 ?? r1 ?? init);
-  const r6Prod = entry.r6Prod !== undefined && entry.r6Prod !== null ? entry.r6Prod : calcDiff(r6, r5 ?? r4 ?? r3 ?? r2 ?? r1 ?? init);
+  const r1Prod = calcDiff(r1, init);
+  const r2Prod = calcDiff(r2, r1 ?? init);
+  const r3Prod = calcDiff(r3, r2 ?? r1 ?? init);
+  const r4Prod = calcDiff(r4, r3 ?? r2 ?? r1 ?? init);
+  const r5Prod = calcDiff(r5, r4 ?? r3 ?? r2 ?? r1 ?? init);
+  const r6Prod = calcDiff(r6, r5 ?? r4 ?? r3 ?? r2 ?? r1 ?? init);
 
   const prodList = [r1Prod, r2Prod, r3Prod, r4Prod, r5Prod, r6Prod].filter((p): p is number => p !== null && !isNaN(p) && p > 0);
   let totalProduction = prodList.reduce((sum, val) => sum + val, 0);
 
   // Fallback to (r6 - init) if individual intervals were not recorded separately
   if (totalProduction === 0 && r6 !== null && init !== null && r6 > init) {
-    totalProduction = r6 - init;
+    totalProduction = calcDiff(r6, init) ?? 0;
   }
 
   return {

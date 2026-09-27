@@ -91,8 +91,9 @@ export async function GET(request: NextRequest) {
         if (existing) {
           const quality = existing.qualityType || alloc?.qualityCode || "";
           const bdMinutes = existing.breakdownMinutes || 0;
+          const { r1Prod, r2Prod, r3Prod, r4Prod, r5Prod, r6Prod, totalProduction } = computeIntervalDeltas(existing);
           const eff = computeLoomEfficiency(
-            existing.totalProduction || 0,
+            totalProduction,
             quality,
             bdMinutes,
             existingSheet.shiftHours || 12
@@ -107,21 +108,21 @@ export async function GET(request: NextRequest) {
             qualityType: quality,
             initialReading: existing.initialReading,
             r1Reading: existing.r1Reading,
-            r1Prod: existing.r1Prod,
+            r1Prod,
             r2Reading: existing.r2Reading,
-            r2Prod: existing.r2Prod,
+            r2Prod,
             r3Reading: existing.r3Reading,
-            r3Prod: existing.r3Prod,
+            r3Prod,
             r4Reading: existing.r4Reading,
-            r4Prod: existing.r4Prod,
+            r4Prod,
             r5Reading: existing.r5Reading,
-            r5Prod: existing.r5Prod,
+            r5Prod,
             r6Reading: existing.r6Reading,
-            r6Prod: existing.r6Prod,
-            totalProduction: existing.totalProduction || 0,
+            r6Prod,
+            totalProduction,
             breakdownReason: existing.breakdownReason || null,
             breakdownMinutes: bdMinutes,
-            efficiencyPct: existing.efficiencyPct !== null && existing.efficiencyPct !== undefined ? existing.efficiencyPct : eff.efficiencyPct,
+            efficiencyPct: eff.efficiencyPct,
             status: (existing.status as any) || "RUNNING",
             remarks: existing.remarks || "",
           });
