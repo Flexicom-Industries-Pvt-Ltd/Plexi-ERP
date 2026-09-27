@@ -30,7 +30,7 @@ import {
 } from "@/lib/loom/loom-summary-export";
 import { printLoomSummary } from "@/lib/loom/print-loom-summary";
 import { RecipeQualityBadge } from "../tape-plant/RecipeQualityBadge";
-import { RecipeLoomSummaryItem, LoomMachineSummaryItem } from "@/app/api/production/loom/summary/route";
+import { RecipeLoomSummaryItem, LoomMachineSummaryItem } from "@/lib/loom/loom-summary-types";
 
 // Color group styling helper for changeover and matrix cards
 export const COLOR_GROUP_STYLES: Record<string, { bg: string; text: string; border: string; dot: string }> = {

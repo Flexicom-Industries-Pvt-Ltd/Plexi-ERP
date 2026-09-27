@@ -24,7 +24,7 @@ import {
   LoomReadingEntryItem,
   computeIntervalDeltas,
   IntervalKpiSummary,
-} from "@/app/api/production/loom/reading-sheet/route";
+} from "@/lib/loom/loom-reading-types";
 import { exportLoomReadingSheetExcel } from "@/lib/loom/loom-reading-export";
 import { printLoomReadingSheet } from "@/lib/loom/print-loom-reading";
 
