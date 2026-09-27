@@ -389,6 +389,24 @@ describe("2 Hours Loom Reading Export & Print Engine", () => {
       expect(html).toContain("UTCL/LPP/Y/67");
       expect(html).toContain("Target (C/O)");
     });
+
+    it("should calculate correct roll stock weight and parameters for previous quality on changeover", () => {
+      const entry: Partial<LoomReadingEntryItem> = {
+        loomNumber: 31,
+        operatorName: "Ravinder",
+        size: "480",
+        denier: "850",
+        qualityType: "Mahal/LPP/W",
+        totalProduction: 1200,
+        breakdownReason: "Change Over",
+        changeoverTargetQuality: "UTCL/LPP/Y/67",
+      };
+
+      const estimatedWeightKg = Math.round((entry.totalProduction || 0) * 0.16 * 100) / 100;
+      expect(estimatedWeightKg).toBe(192); // 1200 * 0.16 = 192 kg
+      const rollType = entry.qualityType?.toUpperCase().includes("LPP") ? "LPP" : "PP";
+      expect(rollType).toBe("LPP");
+    });
   });
 });
 

@@ -81,6 +81,8 @@ export interface LoomSummaryDataset {
     colorGroup?: string | null;
     colour?: string | null;
     denier?: number | null;
+    size?: string | null;
+    reedSpaceCm?: number | null;
     tapeWidth?: number | null;
     bobbinMarking?: string | null;
   }[];

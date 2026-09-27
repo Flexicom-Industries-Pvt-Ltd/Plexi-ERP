@@ -42,13 +42,17 @@ interface AvailableOperator {
   id: string;
   name: string;
   employeeCode?: string | null;
+  section?: string | null;
+  designation?: string | null;
 }
 
 interface AvailableQuality {
   code: string;
   colorGroup?: string | null;
+  colour?: string | null;
   denier?: number | null;
   reedSpaceCm?: number | null;
+  size?: string | null;
 }
 
 interface ReadingSheetData {
@@ -394,6 +398,24 @@ export function LoomReadingSheetSection() {
             updated.changeoverTargetQuality = null;
             if (updated.status === "CHANGEOVER") {
               updated.status = "RUNNING";
+            }
+          }
+        }
+
+        // Auto-fetch Size and Denier when qualityType changes
+        if (field === "qualityType") {
+          const rawQ = String(value || "").trim().toLowerCase();
+          const foundQ = (data?.availableQualities || []).find(
+            (q) => q.code.toLowerCase().trim() === rawQ
+          );
+          if (foundQ) {
+            if (foundQ.size) {
+              updated.size = foundQ.size;
+            } else if (foundQ.reedSpaceCm) {
+              updated.size = String(foundQ.reedSpaceCm * 10);
+            }
+            if (foundQ.denier) {
+              updated.denier = String(foundQ.denier);
             }
           }
         }
@@ -1122,52 +1144,72 @@ export function LoomReadingSheetSection() {
                         #{e.loomNumber}
                       </td>
 
-                      {/* Operator Name */}
+                      {/* Operator Name Dropdown (from Data Centre) */}
                       <td className="py-1.5 px-2.5 border-r border-slate-100">
-                        <input
-                          type="text"
+                        <select
                           value={e.operatorName || ""}
                           onChange={(ev) => handleEntryChange(e.loomNumber, "operatorName", ev.target.value)}
                           onBlur={() => triggerAutoSave(true)}
-                          placeholder="Operator Name"
-                          className="w-full px-2.5 py-1.5 text-xs bg-slate-50/40 group-hover:bg-white focus:bg-white border border-transparent hover:border-slate-200 focus:border-slate-800 rounded-lg outline-none font-medium text-slate-800 placeholder:text-slate-300 transition-all"
-                        />
+                          className="w-full px-2.5 py-1.5 text-xs bg-slate-50/60 group-hover:bg-white focus:bg-white border border-slate-200 focus:border-slate-800 rounded-lg outline-none font-medium text-slate-800 cursor-pointer transition-all truncate"
+                        >
+                          <option value="">-- Select Operator --</option>
+                          {(data?.availableOperators || []).map((op) => (
+                            <option key={op.id || op.name} value={op.name}>
+                              {op.name} {op.employeeCode ? `(${op.employeeCode})` : ""}
+                            </option>
+                          ))}
+                          {e.operatorName &&
+                            !(data?.availableOperators || []).some(
+                              (op) => op.name.toLowerCase() === e.operatorName?.toLowerCase()
+                            ) && <option value={e.operatorName}>{e.operatorName}</option>}
+                        </select>
                       </td>
 
-                      {/* Size */}
+                      {/* Size (Auto-derived from Quality) */}
                       <td className="py-1.5 px-2 border-r border-slate-100">
                         <input
                           type="text"
                           value={e.size || ""}
                           onChange={(ev) => handleEntryChange(e.loomNumber, "size", ev.target.value)}
                           onBlur={() => triggerAutoSave(true)}
-                          placeholder="Size (mm)"
-                          className="w-full px-2 py-1.5 text-xs text-center font-mono font-bold text-slate-800 bg-slate-50/40 group-hover:bg-white focus:bg-white border border-transparent hover:border-slate-200 focus:border-slate-800 rounded-lg outline-none placeholder:text-slate-300 transition-all"
+                          placeholder="Size"
+                          title="Auto-derived from assigned Quality"
+                          className="w-full px-2 py-1.5 text-xs text-center font-mono font-bold text-slate-800 bg-slate-100/60 group-hover:bg-white focus:bg-white border border-transparent hover:border-slate-300 focus:border-slate-800 rounded-lg outline-none placeholder:text-slate-300 transition-all"
                         />
                       </td>
 
-                      {/* Denier */}
+                      {/* Denier (Auto-derived from Quality) */}
                       <td className="py-1.5 px-2 border-r border-slate-100">
                         <input
                           type="text"
                           value={e.denier || ""}
                           onChange={(ev) => handleEntryChange(e.loomNumber, "denier", ev.target.value)}
                           onBlur={() => triggerAutoSave(true)}
-                          placeholder="Denier"
-                          className="w-full px-2 py-1.5 text-xs text-center font-mono font-bold text-slate-800 bg-slate-50/40 group-hover:bg-white focus:bg-white border border-transparent hover:border-slate-200 focus:border-slate-800 rounded-lg outline-none placeholder:text-slate-300 transition-all"
+                          placeholder="DNR"
+                          title="Auto-derived from assigned Quality"
+                          className="w-full px-2 py-1.5 text-xs text-center font-mono font-bold text-slate-800 bg-slate-100/60 group-hover:bg-white focus:bg-white border border-transparent hover:border-slate-300 focus:border-slate-800 rounded-lg outline-none placeholder:text-slate-300 transition-all"
                         />
                       </td>
 
-                      {/* Quality Type */}
+                      {/* Quality Type (Dropdown synced with Quality Master) */}
                       <td className="py-1.5 px-2.5 border-r border-slate-100">
-                        <input
-                          type="text"
+                        <select
                           value={e.qualityType || ""}
                           onChange={(ev) => handleEntryChange(e.loomNumber, "qualityType", ev.target.value)}
                           onBlur={() => triggerAutoSave(true)}
-                          placeholder="Recipe / Quality Code"
-                          className="w-full px-2.5 py-1.5 text-xs font-bold text-slate-900 bg-slate-50/40 group-hover:bg-white focus:bg-white border border-transparent hover:border-slate-200 focus:border-slate-800 rounded-lg outline-none placeholder:text-slate-300 transition-all"
-                        />
+                          className="w-full px-2.5 py-1.5 text-xs font-bold text-slate-900 bg-slate-50/60 group-hover:bg-white focus:bg-white border border-slate-200 focus:border-slate-800 rounded-lg outline-none cursor-pointer transition-all truncate"
+                        >
+                          <option value="">-- Select Quality --</option>
+                          {(data?.availableQualities || []).map((q) => (
+                            <option key={q.code} value={q.code}>
+                              {q.code} {q.denier ? `(${q.denier}D${q.size ? ` / ${q.size}mm` : ""})` : ""}
+                            </option>
+                          ))}
+                          {e.qualityType &&
+                            !(data?.availableQualities || []).some(
+                              (q) => q.code.toLowerCase() === e.qualityType?.toLowerCase()
+                            ) && <option value={e.qualityType}>{e.qualityType}</option>}
+                        </select>
                       </td>
 
                       {/* Initial Reading */}
@@ -1589,37 +1631,43 @@ export function LoomReadingSheetSection() {
             </div>
 
             <div>
-              <label className="block text-[11px] font-semibold text-slate-600 mb-1">Operator Name:</label>
-              <input
-                type="text"
+              <label className="block text-[11px] font-semibold text-slate-600 mb-1">Select Operator (from Data Centre):</label>
+              <select
                 value={bulkOperator}
                 onChange={(e) => setBulkOperator(e.target.value)}
-                placeholder="e.g. Ravinder"
-                list="plant-operators"
-                className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-slate-800"
-              />
-              <datalist id="plant-operators">
+                className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-slate-800 font-medium cursor-pointer"
+              >
+                <option value="">-- Choose Plant Operator --</option>
                 {(data?.availableOperators || []).map((o) => (
-                  <option key={o.id} value={o.name} />
+                  <option key={o.id} value={o.name}>
+                    {o.name} {o.employeeCode ? `(${o.employeeCode})` : ""}
+                  </option>
                 ))}
-              </datalist>
+              </select>
             </div>
 
             <div>
-              <label className="block text-[11px] font-semibold text-slate-600 mb-1">Quality / Type (Optional):</label>
-              <input
-                type="text"
+              <label className="block text-[11px] font-semibold text-slate-600 mb-1">Quality / Recipe (Optional):</label>
+              <select
                 value={bulkQuality}
-                onChange={(e) => setBulkQuality(e.target.value)}
-                placeholder="e.g. 1000D/LPP/W"
-                list="plant-qualities"
-                className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-slate-800"
-              />
-              <datalist id="plant-qualities">
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setBulkQuality(val);
+                  const found = (data?.availableQualities || []).find((q) => q.code === val);
+                  if (found) {
+                    setBulkSize(found.size || (found.reedSpaceCm ? String(found.reedSpaceCm * 10) : ""));
+                    setBulkDenier(found.denier ? String(found.denier) : "");
+                  }
+                }}
+                className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-slate-800 font-medium cursor-pointer"
+              >
+                <option value="">-- Leave Unchanged / Select Quality --</option>
                 {(data?.availableQualities || []).map((q) => (
-                  <option key={q.code} value={q.code} />
+                  <option key={q.code} value={q.code}>
+                    {q.code} {q.denier ? `(${q.denier}D${q.size ? ` / ${q.size}mm` : ""})` : ""}
+                  </option>
                 ))}
-              </datalist>
+              </select>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
@@ -1629,8 +1677,8 @@ export function LoomReadingSheetSection() {
                   type="text"
                   value={bulkSize}
                   onChange={(e) => setBulkSize(e.target.value)}
-                  placeholder="e.g. 500"
-                  className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-slate-800"
+                  placeholder="Auto / mm"
+                  className="w-full px-2.5 py-1.5 text-xs font-mono font-bold bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-slate-800"
                 />
               </div>
               <div>
@@ -1639,8 +1687,8 @@ export function LoomReadingSheetSection() {
                   type="text"
                   value={bulkDenier}
                   onChange={(e) => setBulkDenier(e.target.value)}
-                  placeholder="e.g. 850"
-                  className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-slate-800"
+                  placeholder="Auto / DNR"
+                  className="w-full px-2.5 py-1.5 text-xs font-mono font-bold bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-slate-800"
                 />
               </div>
             </div>
