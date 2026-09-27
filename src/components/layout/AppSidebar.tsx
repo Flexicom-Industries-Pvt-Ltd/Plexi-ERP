@@ -52,7 +52,6 @@ const tapePlantItems = [
 
 const loomItems = [
   { title: "Loom Summary", url: "/dashboard/production/loom?tab=summary" },
-  { title: "2 Hours Reading Sheet", url: "/dashboard/production/loom?tab=reading-sheet" },
   { title: "Change Over Sheet", url: "/dashboard/production/loom?tab=changeover" },
   { title: "2 Hours Reading Sheet", url: "/dashboard/production/loom?tab=reading-sheet" },
 ];
