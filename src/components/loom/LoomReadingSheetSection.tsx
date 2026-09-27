@@ -26,6 +26,7 @@ import {
 } from "@/lib/loom/loom-reading-types";
 import { exportLoomReadingSheetExcel } from "@/lib/loom/loom-reading-export";
 import { printLoomReadingSheet } from "@/lib/loom/print-loom-reading";
+import { LoomReadingPrintPreviewModal } from "./LoomReadingPrintPreviewModal";
 
 interface AvailableShift {
   id: string;
@@ -103,6 +104,7 @@ export function LoomReadingSheetSection() {
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
 
   // Modal States
+  const [previewModalOpen, setPreviewModalOpen] = useState<boolean>(false);
   const [bulkModalOpen, setBulkModalOpen] = useState<boolean>(false);
   const [bulkStartLoom, setBulkStartLoom] = useState<string>("31");
   const [bulkEndLoom, setBulkEndLoom] = useState<string>("34");
@@ -258,6 +260,15 @@ export function LoomReadingSheetSection() {
     });
   }, [entries, filterActiveOnly, statusFilter, searchTerm]);
 
+  const isFiltered = filterActiveOnly || statusFilter !== "ALL" || Boolean(searchTerm.trim());
+  const filterLabel = filterActiveOnly
+    ? "Active Running Looms Only"
+    : statusFilter !== "ALL"
+    ? `Status: ${statusFilter}`
+    : searchTerm.trim()
+    ? `Search: "${searchTerm.trim()}"`
+    : undefined;
+
   // Save Sheet Handler
   const handleSaveSheet = async () => {
     setSaving(true);
@@ -408,7 +419,9 @@ export function LoomReadingSheetSection() {
                   preparedBy,
                   checkedBy,
                   approvedBy,
-                  entries,
+                  timeSlots,
+                  initialTimeSlot,
+                  entries: filteredEntries,
                   kpis: {
                     totalLooms: 91,
                     runningLoomsCount: liveTotals.runningLooms,
@@ -418,40 +431,29 @@ export function LoomReadingSheetSection() {
                     totalWastageKg: parseFloat(totalWastageKg) || 0,
                     intervalTotals: [],
                   },
-                  filterActiveOnly,
+                  filterActiveOnly: false,
                 })
               }
               className="px-3 py-1.5 text-xs font-semibold rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition-all inline-flex items-center gap-1.5 shadow-2xs cursor-pointer"
+              title={isFiltered ? `Export filtered ${filteredEntries.length} looms to Excel` : "Export 2-hours reading sheet to Excel"}
             >
               <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600" />
               <span>Excel Export</span>
+              {isFiltered && (
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
+              )}
             </button>
 
             <button
-              onClick={() =>
-                printLoomReadingSheet({
-                  date: selectedDate,
-                  shiftName: selectedShift,
-                  preparedBy,
-                  checkedBy,
-                  approvedBy,
-                  entries,
-                  kpis: {
-                    totalLooms: 91,
-                    runningLoomsCount: liveTotals.runningLooms,
-                    idleLoomsCount: liveTotals.idleLooms,
-                    totalShiftMeters: liveTotals.totalShiftMeters,
-                    totalShiftKg: liveTotals.totalShiftKg,
-                    totalWastageKg: parseFloat(totalWastageKg) || 0,
-                    intervalTotals: [],
-                  },
-                  filterActiveOnly,
-                })
-              }
+              onClick={() => setPreviewModalOpen(true)}
               className="px-3 py-1.5 text-xs font-semibold rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition-all inline-flex items-center gap-1.5 shadow-2xs cursor-pointer"
+              title={isFiltered ? `Preview & print filtered ${filteredEntries.length} looms` : "Preview & print A4 sheet"}
             >
               <Printer className="h-3.5 w-3.5 text-slate-600" />
-              <span>Print A4</span>
+              <span>Print Preview</span>
+              {isFiltered && (
+                <span className="h-1.5 w-1.5 rounded-full bg-amber-500 shrink-0" />
+              )}
             </button>
 
             <button
@@ -1199,6 +1201,31 @@ export function LoomReadingSheetSection() {
           </div>
         </div>
       )}
+
+      {/* In-App Print Preview Modal */}
+      <LoomReadingPrintPreviewModal
+        open={previewModalOpen}
+        onClose={() => setPreviewModalOpen(false)}
+        date={selectedDate}
+        shiftName={selectedShift}
+        preparedBy={preparedBy}
+        checkedBy={checkedBy}
+        approvedBy={approvedBy}
+        timeSlots={timeSlots}
+        initialTimeSlot={initialTimeSlot}
+        entries={filteredEntries}
+        kpis={{
+          totalLooms: 91,
+          runningLoomsCount: liveTotals.runningLooms,
+          idleLoomsCount: liveTotals.idleLooms,
+          totalShiftMeters: liveTotals.totalShiftMeters,
+          totalShiftKg: liveTotals.totalShiftKg,
+          totalWastageKg: parseFloat(totalWastageKg) || 0,
+        }}
+        filterActiveOnly={filterActiveOnly}
+        isFiltered={isFiltered}
+        filterLabel={filterLabel}
+      />
     </div>
   );
 }
