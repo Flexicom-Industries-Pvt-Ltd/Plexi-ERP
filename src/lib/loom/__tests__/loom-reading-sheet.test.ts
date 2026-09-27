@@ -37,6 +37,29 @@ describe("2 Hours Loom Reading Sheet Logic & Deltas", () => {
     expect(result.totalProduction).toBe(1560);
   });
 
+  it("should auto-calculate interval production when user types initial reading (500) and 10:00 reading (650) even if prior prod was 0", () => {
+    const entry: Partial<LoomReadingEntryItem> = {
+      loomNumber: 1,
+      initialReading: 500,
+      r1Reading: 650,
+      r1Prod: 0, // Prior stale value in state/db
+      r2Reading: null,
+      r2Prod: null,
+      r3Reading: null,
+      r3Prod: null,
+      r4Reading: null,
+      r4Prod: null,
+      r5Reading: null,
+      r5Prod: null,
+      r6Reading: null,
+      r6Prod: null,
+    };
+
+    const result = computeIntervalDeltas(entry);
+    expect(result.r1Prod).toBe(150); // 650 - 500 = 150
+    expect(result.totalProduction).toBe(150);
+  });
+
   it("should handle partial intervals correctly", () => {
     const entry: Partial<LoomReadingEntryItem> = {
       loomNumber: 37,
