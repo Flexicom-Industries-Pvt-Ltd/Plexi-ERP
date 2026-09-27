@@ -165,3 +165,31 @@ export function computeIntervalDeltas(entry: Partial<LoomReadingEntryItem> | Rec
     totalProduction: Math.round(totalProduction * 100) / 100,
   };
 }
+
+/**
+ * Determines whether a loom has active activity/data in the reading sheet.
+ * A loom is considered active if:
+ * - its status is RUNNING
+ * - it has recorded production (> 0)
+ * - it has an initial reading entered
+ * - it has any interval readings entered (r1..r6)
+ * - it has an operator assigned
+ * - it has a quality type assigned
+ * - it has breakdown minutes or reasons logged
+ */
+export function isLoomActive(entry: LoomReadingEntryItem): boolean {
+  if (entry.status === "RUNNING") return true;
+  if ((entry.totalProduction ?? 0) > 0) return true;
+  if (typeof entry.initialReading === "number" && !isNaN(entry.initialReading)) return true;
+  if (typeof entry.r1Reading === "number" && !isNaN(entry.r1Reading)) return true;
+  if (typeof entry.r2Reading === "number" && !isNaN(entry.r2Reading)) return true;
+  if (typeof entry.r3Reading === "number" && !isNaN(entry.r3Reading)) return true;
+  if (typeof entry.r4Reading === "number" && !isNaN(entry.r4Reading)) return true;
+  if (typeof entry.r5Reading === "number" && !isNaN(entry.r5Reading)) return true;
+  if (typeof entry.r6Reading === "number" && !isNaN(entry.r6Reading)) return true;
+  if (Boolean(entry.operatorName && entry.operatorName.trim())) return true;
+  if (Boolean(entry.qualityType && entry.qualityType.trim())) return true;
+  if ((Number(entry.breakdownMinutes) || 0) > 0) return true;
+  if (Boolean(entry.breakdownReason && entry.breakdownReason.trim())) return true;
+  return false;
+}
