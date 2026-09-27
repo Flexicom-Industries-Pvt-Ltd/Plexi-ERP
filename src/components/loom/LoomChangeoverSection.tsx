@@ -5,82 +5,78 @@ import { toast } from "sonner";
 import {
   Search,
   Filter,
-  RefreshCw,
+  RotateCcw,
   Printer,
   FileSpreadsheet,
-  Grid,
   Layers,
-  LayoutGrid,
-  Table as TableIcon,
-  CheckCircle2,
-  Clock,
-  AlertCircle,
-  Activity,
-  Boxes,
-  Loader2,
-  ChevronRight,
-  Sparkles,
-  Calendar,
-  Zap,
   ArrowRight,
-  ArrowUpDown,
-  Edit3,
-  Check,
+  Clock,
+  CheckCircle2,
+  Calendar,
+  AlertCircle,
+  Plus,
   X,
-  AlertTriangle,
-  MoveUp,
-  MoveDown,
-  Save,
-  Sliders,
-  Settings2,
+  Sparkles,
+  SlidersHorizontal,
 } from "lucide-react";
 import {
-  LoomChangeoverItem,
-  LoomChangeoverDataset,
-  exportLoomChangeoverExcel,
-} from "@/lib/loom/loom-changeover-export";
+  LoomChangeoverLogItem,
+} from "@/app/api/production/loom/changeover/route";
+import { exportLoomChangeoverExcel } from "@/lib/loom/loom-changeover-export";
 import { printLoomChangeover } from "@/lib/loom/print-loom-changeover";
-import { COLOR_GROUP_STYLES } from "./LoomSummarySection";
+
+interface AvailableQuality {
+  code: string;
+  colorGroup?: string | null;
+  colour?: string | null;
+  denier?: number | null;
+}
+
+interface AvailableShift {
+  id: string;
+  name: string;
+  startTime?: string | null;
+  endTime?: string | null;
+}
 
 export function LoomChangeoverSection() {
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState("");
-  const [selectedStatus, setSelectedStatus] = useState<string>("ALL");
-  const [viewMode, setViewMode] = useState<"queue" | "table" | "matrix">("queue");
+  const [filterDate, setFilterDate] = useState("");
+  const [filterShift, setFilterShift] = useState("ALL");
+  const [filterStatus, setFilterStatus] = useState("ALL");
 
-  const [looms, setLooms] = useState<LoomChangeoverItem[]>([]);
-  const [availableQualities, setAvailableQualities] = useState<
-    {
-      code: string;
-      colour: string;
-      colorGroup: string;
-      denier: number | null;
-      reedSpaceCm: number | null;
-      bobbinMarking: string;
-      mesh: string;
-    }[]
-  >([]);
-  const [availableShifts, setAvailableShifts] = useState<
-    {
-      id: string;
-      name: string;
-      startTime: string;
-      endTime: string;
-    }[]
-  >([]);
+  const [logs, setLogs] = useState<LoomChangeoverLogItem[]>([]);
+  const [availableQualities, setAvailableQualities] = useState<AvailableQuality[]>([]);
+  const [availableShifts, setAvailableShifts] = useState<AvailableShift[]>([]);
+  const [kpis, setKpis] = useState({
+    totalLogs: 0,
+    totalDowntimeMinutes: 0,
+    totalDowntimeHours: 0,
+    avgDowntimeMinutes: 0,
+    uniqueLoomsCount: 0,
+    scheduledCount: 0,
+    factoryTotalLooms: 91,
+  });
 
-  // Editing state for modal / drawer
-  const [editingLoom, setEditingLoom] = useState<LoomChangeoverItem | null>(null);
-  const [dirtyLoomNumbers, setDirtyLoomNumbers] = useState<Set<number>>(new Set());
+  // Modal State for Quick Scheduling
+  const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
+  const [scheduling, setScheduling] = useState(false);
+  const [newScheduleLoom, setNewScheduleLoom] = useState("1");
+  const [newScheduleFrom, setNewScheduleFrom] = useState("");
+  const [newScheduleTo, setNewScheduleTo] = useState("");
+  const [newScheduleDate, setNewScheduleDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [newScheduleShift, setNewScheduleShift] = useState("Day Shift");
+  const [newScheduleRemarks, setNewScheduleRemarks] = useState("");
 
-  // Fetch changeover data
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
       if (search) params.set("search", search);
-      if (selectedStatus !== "ALL") params.set("status", selectedStatus);
+      if (filterDate) params.set("date", filterDate);
+      if (filterShift !== "ALL") params.set("shift", filterShift);
+      if (filterStatus !== "ALL") params.set("status", filterStatus);
       params.set("_t", String(Date.now()));
 
       const res = await fetch(`/api/production/loom/changeover?${params.toString()}`, {
@@ -93,1159 +89,531 @@ export function LoomChangeoverSection() {
 
       if (!res.ok) throw new Error("Failed to load Loom Changeover data");
       const json = await res.json();
-      setLooms(json.looms || []);
+      setLogs(json.logs || []);
       setAvailableQualities(json.availableQualities || []);
       setAvailableShifts(json.availableShifts || []);
-      setDirtyLoomNumbers(new Set());
+      if (json.kpis) setKpis(json.kpis);
     } catch {
       toast.error("Failed to load Loom Changeover data");
     } finally {
       setLoading(false);
     }
-  }, [search, selectedStatus]);
+  }, [search, filterDate, filterShift, filterStatus]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
-  // Compute live KPIs
-  const kpis = useMemo(() => {
-    const totalLooms = 91;
-    const totalScheduled = looms.filter(
-      (item) => item.status === "SCHEDULED" || (item.hasChangeover && item.status !== "COMPLETED")
-    ).length;
-    const totalInProgress = looms.filter((item) => item.status === "IN_PROGRESS").length;
-    const totalCompleted = looms.filter((item) => item.status === "COMPLETED").length;
-    const totalPending = looms.filter((item) => item.status === "PENDING" && !item.hasChangeover).length;
-    const totalReedSpaceChanges = looms.filter((item) => item.isReedSpaceChanged && item.hasChangeover).length;
-    const queueLength = looms.filter((item) => item.hasChangeover || item.sequence > 0).length;
-
-    return {
-      totalLooms,
-      totalScheduled,
-      totalInProgress,
-      totalCompleted,
-      totalPending,
-      totalReedSpaceChanges,
-      queueLength,
-    };
-  }, [looms]);
-
-  // Handle single loom field update in local state
-  const handleUpdateLoomField = (
-    loomNumber: number,
-    field: keyof LoomChangeoverItem,
-    value: any
-  ) => {
-    setLooms((prev) =>
-      prev.map((item) => {
-        if (item.loomNumber !== loomNumber) return item;
-
-        const updated = { ...item, [field]: value };
-
-        // If next quality code changed, auto-fill standard recipe parameters if matching recipe found
-        if (field === "nextQualityCode") {
-          const matched = availableQualities.find((q) => q.code === value);
-          if (matched) {
-            updated.nextColor = matched.colour;
-            updated.nextColorGroup = matched.colorGroup;
-            updated.nextDenier = matched.denier;
-            updated.nextReedSpace = matched.reedSpaceCm ?? updated.currentReedSpace;
-            updated.nextBobbinMark = matched.bobbinMarking;
-            updated.nextMesh = matched.mesh;
-            if (!updated.status || updated.status === "PENDING") {
-              updated.status = "SCHEDULED";
-            }
-          }
-        }
-
-        // Recompute diff flags
-        updated.hasChangeover = Boolean(
-          updated.nextQualityCode && updated.nextQualityCode !== updated.currentQuality
-        );
-        updated.isReedSpaceChanged = Boolean(
-          updated.nextReedSpace !== null &&
-            updated.currentReedSpace !== null &&
-            updated.nextReedSpace !== updated.currentReedSpace
-        );
-        updated.isColorChanged = Boolean(
-          updated.nextColor && updated.currentColor && updated.nextColor !== updated.currentColor
-        );
-        updated.isBobbinMarkChanged = Boolean(
-          updated.nextBobbinMark &&
-            updated.currentBobbinMark &&
-            updated.nextBobbinMark !== updated.currentBobbinMark
-        );
-
-        return updated;
-      })
-    );
-
-    setDirtyLoomNumbers((prev) => new Set(prev).add(loomNumber));
-  };
-
-  // Move sequence up or down
-  const handleShiftSequence = (loomNumber: number, direction: "up" | "down") => {
-    const queue = looms
-      .filter((l) => l.hasChangeover || l.sequence > 0)
-      .sort((a, b) => a.sequence - b.sequence);
-
-    const currentIndex = queue.findIndex((l) => l.loomNumber === loomNumber);
-    if (currentIndex === -1) return;
-
-    const targetIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
-    if (targetIndex < 0 || targetIndex >= queue.length) return;
-
-    const currentItem = queue[currentIndex];
-    const targetItem = queue[targetIndex];
-
-    const tempSeq = currentItem.sequence || currentIndex + 1;
-    const targetSeq = targetItem.sequence || targetIndex + 1;
-
-    handleUpdateLoomField(currentItem.loomNumber, "sequence", targetSeq);
-    handleUpdateLoomField(targetItem.loomNumber, "sequence", tempSeq);
-  };
-
-  // Save all modified changes to the server
-  const handleSaveAll = async () => {
-    if (dirtyLoomNumbers.size === 0) {
-      toast.info("No unsaved changes");
+  // Handle Quick Schedule Submit
+  const handleCreateSchedule = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newScheduleTo.trim()) {
+      toast.error("Please select or enter the Target Quality");
       return;
     }
 
-    setSaving(true);
+    setScheduling(true);
     try {
-      const itemsToSave = looms.filter((l) => dirtyLoomNumbers.has(l.loomNumber));
-
       const res = await fetch("/api/production/loom/changeover", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ updates: itemsToSave }),
+        body: JSON.stringify({
+          action: "QUICK_SCHEDULE",
+          loomNumber: Number(newScheduleLoom),
+          fromQuality: newScheduleFrom.trim() || null,
+          toQuality: newScheduleTo.trim(),
+          targetDate: newScheduleDate,
+          targetShiftName: newScheduleShift,
+          remarks: newScheduleRemarks.trim() || null,
+        }),
       });
 
-      if (!res.ok) {
-        const errJson = await res.json().catch(() => ({}));
-        throw new Error(errJson.error || "Failed to save changes");
-      }
-
-      toast.success(`Successfully saved ${itemsToSave.length} loom changeover record(s)`);
-      setDirtyLoomNumbers(new Set());
-      if (editingLoom) {
-        setEditingLoom(null);
-      }
+      if (!res.ok) throw new Error("Failed to schedule changeover");
+      toast.success(`Changeover scheduled for Loom #${newScheduleLoom}`);
+      setScheduleModalOpen(false);
+      setNewScheduleTo("");
+      setNewScheduleRemarks("");
       fetchData();
     } catch (err: any) {
-      toast.error(err.message || "Failed to save changeover changes");
+      toast.error(err?.message || "Failed to schedule changeover");
     } finally {
-      setSaving(false);
+      setScheduling(false);
     }
   };
 
-  // Export handlers
   const handleExportExcel = () => {
-    if (looms.length === 0) {
-      toast.error("No changeover data available to export");
-      return;
-    }
-
-    const changeoverQueue = looms
-      .filter((item) => item.hasChangeover || item.sequence > 0)
-      .sort((a, b) => {
-        if (a.sequence > 0 && b.sequence > 0) return a.sequence - b.sequence;
-        if (a.sequence > 0) return -1;
-        if (b.sequence > 0) return 1;
-        return a.loomNumber - b.loomNumber;
-      });
-
     exportLoomChangeoverExcel({
-      looms,
-      allLooms: looms,
-      changeoverQueue,
+      logs,
       kpis,
-      selectedStatus,
+      filterDate,
+      filterShift: filterShift === "ALL" ? "" : filterShift,
       searchQuery: search,
     });
-    toast.success("Changeover Excel workbook downloaded successfully");
   };
 
-  const handlePrintPdf = () => {
-    if (looms.length === 0) {
-      toast.error("No changeover data available to print");
-      return;
-    }
-
-    const changeoverQueue = looms
-      .filter((item) => item.hasChangeover || item.sequence > 0)
-      .sort((a, b) => {
-        if (a.sequence > 0 && b.sequence > 0) return a.sequence - b.sequence;
-        if (a.sequence > 0) return -1;
-        if (b.sequence > 0) return 1;
-        return a.loomNumber - b.loomNumber;
-      });
-
+  const handlePrint = () => {
     printLoomChangeover({
-      looms,
-      allLooms: looms,
-      changeoverQueue,
+      logs,
       kpis,
-      selectedStatus,
-      searchQuery: search,
+      filterDate,
+      filterShift: filterShift === "ALL" ? "" : filterShift,
     });
-    toast.success("Print dialog opened for Loom Changeover schedule");
   };
 
-  // Filtered changeover queue for the Priority Queue view
-  const changeoverQueueList = useMemo(() => {
-    return looms
-      .filter((item) => item.hasChangeover || item.sequence > 0 || item.status === "SCHEDULED" || item.status === "IN_PROGRESS")
-      .sort((a, b) => {
-        if (a.sequence > 0 && b.sequence > 0) return a.sequence - b.sequence;
-        if (a.sequence > 0) return -1;
-        if (b.sequence > 0) return 1;
-        return a.loomNumber - b.loomNumber;
-      });
-  }, [looms]);
+  // Preset quick date filters
+  const handleSetQuickDate = (type: "ALL" | "TODAY" | "YESTERDAY") => {
+    if (type === "ALL") {
+      setFilterDate("");
+    } else if (type === "TODAY") {
+      setFilterDate(new Date().toISOString().slice(0, 10));
+    } else if (type === "YESTERDAY") {
+      const y = new Date();
+      y.setDate(y.getDate() - 1);
+      setFilterDate(y.toISOString().slice(0, 10));
+    }
+  };
 
   return (
     <div className="space-y-5">
-      {/* Top Banner & Control Bar */}
-      <div className="bg-white border border-slate-200 rounded-xl p-4 sm:p-5 shadow-xs">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+      {/* Header & Actions Bar */}
+      <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-2xs">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900">
-                Loom Change Over Sheet
-              </h1>
-              <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-100 text-indigo-800 border border-indigo-200">
-                Loom Section v1.2
-              </span>
-              {dirtyLoomNumbers.size > 0 && (
-                <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-300 animate-pulse">
-                  {dirtyLoomNumbers.size} Unsaved Change(s)
-                </span>
-              )}
+            <div className="flex items-center gap-2.5">
+              <div className="h-9 w-9 rounded-xl bg-amber-50 border border-amber-200/60 flex items-center justify-center text-amber-700">
+                <Layers className="h-5 w-5" />
+              </div>
+              <div>
+                <h1 className="text-lg font-extrabold text-slate-900 tracking-tight">
+                  Loom Quality Changeover Logs
+                </h1>
+                <p className="text-xs text-slate-500">
+                  Live audit trail of fabric quality transitions recorded across factory circular looms.
+                </p>
+              </div>
             </div>
-            <p className="text-xs sm:text-sm text-slate-600 mt-1">
-              Select and sequence target quality formulations for Circular Looms #1–91. Monitor mechanical reed changes & bobbin markings.
-            </p>
           </div>
 
           {/* Action Buttons */}
           <div className="flex flex-wrap items-center gap-2">
-            {dirtyLoomNumbers.size > 0 && (
-              <button
-                type="button"
-                onClick={handleSaveAll}
-                disabled={saving}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shadow-xs cursor-pointer disabled:opacity-50"
-              >
-                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                <span>Save Changes ({dirtyLoomNumbers.size})</span>
-              </button>
-            )}
+            <button
+              onClick={() => setScheduleModalOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-xl transition-all shadow-2xs cursor-pointer"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Schedule Changeover</span>
+            </button>
 
             <button
-              type="button"
               onClick={handleExportExcel}
-              className="px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer"
-              title="Export Multi-Sheet Excel Workbook"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200/80 rounded-xl transition-all cursor-pointer"
+              title="Export Log Records to Excel"
             >
-              <FileSpreadsheet className="h-4 w-4 text-emerald-600" />
-              <span>Export Excel</span>
+              <FileSpreadsheet className="h-4 w-4 text-emerald-700" />
+              <span>Excel Export</span>
             </button>
 
             <button
-              type="button"
-              onClick={handlePrintPdf}
-              className="px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer"
-              title="Print A4 Landscape Changeover Schedule"
+              onClick={handlePrint}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl transition-all cursor-pointer"
+              title="Print Official Log Sheet"
             >
-              <Printer className="h-4 w-4 text-slate-800" />
-              <span>Print Schedule</span>
+              <Printer className="h-4 w-4 text-slate-700" />
+              <span>Print Report</span>
             </button>
 
             <button
-              type="button"
               onClick={fetchData}
               disabled={loading}
-              className="p-2 text-slate-600 hover:text-slate-900 border border-slate-200 rounded-lg hover:bg-slate-100 transition-all cursor-pointer disabled:opacity-50"
+              className="p-2 text-slate-600 hover:text-slate-900 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl transition-all cursor-pointer"
               title="Refresh Data"
             >
-              <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+              <RotateCcw className={`h-4 w-4 ${loading ? "animate-spin text-slate-400" : ""}`} />
             </button>
           </div>
         </div>
 
-        {/* Live Changeover KPIs */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mt-4 pt-4 border-t border-slate-100">
-          <div className="bg-slate-50 border border-slate-200 rounded-lg p-3">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-700 block">
-              Total Factory Looms
-            </span>
-            <div className="text-xl font-black text-slate-900 mt-0.5">{kpis.totalLooms}</div>
-            <span className="text-[10px] text-slate-700 mt-0.5 block">Loom #1 to #91</span>
-          </div>
-
-          <div className="bg-blue-50/70 border border-blue-200 rounded-lg p-3">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-blue-700 block">
-              Scheduled Queue
-            </span>
-            <div className="text-xl font-black text-blue-900 mt-0.5">{kpis.totalScheduled}</div>
-            <span className="text-[10px] text-blue-600 mt-0.5 block">Looms in sequence</span>
-          </div>
-
-          <div className="bg-amber-50/70 border border-amber-200 rounded-lg p-3">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700 block">
-              In-Progress
-            </span>
-            <div className="text-xl font-black text-amber-900 mt-0.5">{kpis.totalInProgress}</div>
-            <span className="text-[10px] text-amber-600 mt-0.5 block">Floor conversion</span>
-          </div>
-
-          <div className="bg-emerald-50/70 border border-emerald-200 rounded-lg p-3">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 block">
-              Completed
-            </span>
-            <div className="text-xl font-black text-emerald-900 mt-0.5">{kpis.totalCompleted}</div>
-            <span className="text-[10px] text-emerald-600 mt-0.5 block">Converted & verified</span>
-          </div>
-
-          <div className="bg-rose-50/70 border border-rose-200 rounded-lg p-3">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-rose-700 block">
-              Reed Modifications
-            </span>
-            <div className="text-xl font-black text-rose-900 mt-0.5">{kpis.totalReedSpaceChanges}</div>
-            <span className="text-[10px] text-rose-600 mt-0.5 block">Mechanical reed diff</span>
-          </div>
-
-          <div className="bg-slate-50 border border-slate-200 rounded-lg p-3">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-700 block">
-              Steady Running
-            </span>
-            <div className="text-xl font-black text-slate-700 mt-0.5">{kpis.totalPending}</div>
-            <span className="text-[10px] text-slate-700 mt-0.5 block">No changeover</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Filter and View Mode Switcher */}
-      <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2 flex-1">
-          {/* Search Box */}
-          <div className="relative min-w-[240px] flex-1 max-w-md">
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by loom #, quality, color, shift, remarks..."
-              className="w-full pl-9 pr-3 py-1.5 text-xs bg-white border border-slate-300 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-slate-900 focus:border-slate-900 text-slate-800"
-            />
-          </div>
-
-          {/* Status Filter */}
-          <div className="flex items-center gap-1.5">
-            <label className="text-xs font-bold text-slate-600">Status:</label>
-            <select
-              value={selectedStatus}
-              onChange={(e) => setSelectedStatus(e.target.value)}
-              aria-label="Filter by Status"
-              className="px-3 py-1.5 text-xs bg-white border border-slate-300 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-slate-900 text-slate-800 font-semibold"
-            >
-              <option value="ALL">All Looms ({looms.length})</option>
-              <option value="SCHEDULED">Scheduled / Queued ({kpis.totalScheduled})</option>
-              <option value="IN_PROGRESS">In Progress ({kpis.totalInProgress})</option>
-              <option value="COMPLETED">Completed ({kpis.totalCompleted})</option>
-              <option value="PENDING">Steady Running ({kpis.totalPending})</option>
-            </select>
-          </div>
-        </div>
-
-        {/* View Mode Toggle */}
-        <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-lg p-1 shadow-2xs self-start md:self-auto">
-          <button
-            type="button"
-            onClick={() => setViewMode("queue")}
-            className={`px-3 py-1.5 rounded-md text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-              viewMode === "queue"
-                ? "bg-slate-900 text-white shadow-2xs"
-                : "text-slate-600 hover:bg-slate-100"
-            }`}
-          >
-            <Layers className="h-3.5 w-3.5" />
-            <span>Priority Queue ({changeoverQueueList.length})</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setViewMode("table")}
-            className={`px-3 py-1.5 rounded-md text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-              viewMode === "table"
-                ? "bg-slate-900 text-white shadow-2xs"
-                : "text-slate-600 hover:bg-slate-100"
-            }`}
-          >
-            <TableIcon className="h-3.5 w-3.5" />
-            <span>ERP Dense Table (91)</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setViewMode("matrix")}
-            className={`px-3 py-1.5 rounded-md text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-              viewMode === "matrix"
-                ? "bg-slate-900 text-white shadow-2xs"
-                : "text-slate-600 hover:bg-slate-100"
-            }`}
-          >
-            <LayoutGrid className="h-3.5 w-3.5" />
-            <span>1-91 Matrix Grid</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Main Content Areas */}
-      {loading ? (
-        <div className="bg-white border border-slate-200 rounded-xl p-12 text-center shadow-xs">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto text-slate-600" />
-          <p className="text-sm font-semibold text-slate-700 mt-2">
-            Loading Loom Changeover specifications...
-          </p>
-        </div>
-      ) : (
-        <>
-          {/* ========================================================================= */}
-          {/* VIEW 1: PRIORITY CHANGEOVER QUEUE VIEW */}
-          {/* ========================================================================= */}
-          {viewMode === "queue" && (
-            <div className="space-y-3">
-              {changeoverQueueList.length === 0 ? (
-                <div className="bg-white border border-slate-200 rounded-xl p-10 text-center shadow-xs">
-                  <CheckCircle2 className="h-10 w-10 text-emerald-500 mx-auto mb-2" />
-                  <h3 className="text-base font-bold text-slate-800">No Changeovers Currently Queued</h3>
-                  <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
-                    All 91 circular looms are running on their steady master formulations. Switch to <strong>ERP Dense Table</strong> or <strong>1-91 Matrix Grid</strong> to schedule target qualities.
-                  </p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 gap-3">
-                  {changeoverQueueList.map((item, index) => {
-                    const seq = item.sequence > 0 ? item.sequence : index + 1;
-                    const isDirty = dirtyLoomNumbers.has(item.loomNumber);
-
-                    return (
-                      <div
-                        key={`queue_${item.loomNumber}`}
-                        className={`bg-white border rounded-xl p-4 transition-all shadow-xs ${
-                          isDirty
-                            ? "border-amber-400 ring-2 ring-amber-100"
-                            : item.status === "IN_PROGRESS"
-                            ? "border-amber-300 bg-amber-50/20"
-                            : item.status === "COMPLETED"
-                            ? "border-emerald-300 bg-emerald-50/20"
-                            : "border-slate-200 hover:border-slate-300"
-                        }`}
-                      >
-                        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                          {/* Left: Sequence & Loom Badge */}
-                          <div className="flex items-center gap-3">
-                            <div className="flex flex-col items-center justify-center bg-slate-900 text-white rounded-lg px-2.5 py-1.5 min-w-[50px] shadow-xs">
-                              <span className="text-[9px] font-bold text-slate-400 uppercase">Seq</span>
-                              <span className="text-lg font-black leading-none">#{seq}</span>
-                            </div>
-
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <span className="text-base font-black text-slate-900">
-                                  Loom #{item.loomNumber}
-                                </span>
-                                <span
-                                  className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                    item.status === "IN_PROGRESS"
-                                      ? "bg-amber-100 text-amber-800 border border-amber-300"
-                                      : item.status === "COMPLETED"
-                                      ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
-                                      : item.status === "SCHEDULED"
-                                      ? "bg-blue-100 text-blue-800 border border-blue-300"
-                                      : "bg-slate-100 text-slate-700 border border-slate-300"
-                                  }`}
-                                >
-                                  {item.status}
-                                </span>
-                                {item.targetShiftName && (
-                                  <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
-                                    {item.targetShiftName}
-                                  </span>
-                                )}
-                                {item.targetDate && (
-                                  <span className="text-xs text-slate-500 font-mono">
-                                    {item.targetDate}
-                                  </span>
-                                )}
-                              </div>
-                              {item.remarks && (
-                                <p className="text-xs text-slate-500 mt-0.5 italic">
-                                  Note: {item.remarks}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Center: Specs Diff Card (Current vs Next) */}
-                          <div className="flex-1 max-w-2xl bg-slate-50 border border-slate-200 rounded-lg p-2.5 flex items-center justify-between gap-3">
-                            {/* Current Running Specs */}
-                            <div className="flex-1 min-w-0">
-                              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                                Current Running Quality
-                              </div>
-                              <div className="text-xs font-black font-mono text-slate-800 truncate" title={item.currentQuality}>
-                                {item.currentQuality}
-                              </div>
-                              <div className="text-[11px] text-slate-600 mt-0.5 flex flex-wrap items-center gap-1.5 font-medium">
-                                <span>{item.currentColor}</span>
-                                <span>•</span>
-                                <span>{item.currentDenier ? `${item.currentDenier}D` : "—"}</span>
-                                <span>•</span>
-                                <span>Reed: {item.currentReedSpace ? `${item.currentReedSpace}cm` : "—"}</span>
-                                <span>•</span>
-                                <span className="px-1.5 py-0.2 bg-white rounded border text-[10px]">{item.currentBobbinMark}</span>
-                              </div>
-                            </div>
-
-                            {/* Arrow Indicator */}
-                            <div className="text-slate-400 px-1">
-                              <ArrowRight className="h-5 w-5 text-indigo-500" />
-                            </div>
-
-                            {/* Next Target Specs */}
-                            <div className="flex-1 min-w-0 bg-white border border-indigo-200 rounded-md p-1.5 shadow-2xs">
-                              <div className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 flex items-center justify-between">
-                                <span>Target Next Quality</span>
-                                {item.isReedSpaceChanged && (
-                                  <span className="px-1.5 py-0.2 rounded bg-rose-100 text-rose-800 font-black text-[9px] border border-rose-300">
-                                    Reed: {item.currentReedSpace} &rarr; {item.nextReedSpace}cm
-                                  </span>
-                                )}
-                              </div>
-                              <div className="text-xs font-black font-mono text-indigo-950 truncate" title={item.nextQualityCode || "—"}>
-                                {item.nextQualityCode || "Not Selected"}
-                              </div>
-                              <div className="text-[11px] text-slate-700 mt-0.5 flex flex-wrap items-center gap-1.5 font-semibold">
-                                <span className={item.isColorChanged ? "text-amber-700 font-bold" : ""}>
-                                  {item.nextColor || "—"}
-                                </span>
-                                <span>•</span>
-                                <span>{item.nextDenier ? `${item.nextDenier}D` : "—"}</span>
-                                <span>•</span>
-                                <span className={item.isReedSpaceChanged ? "text-rose-700 font-bold" : ""}>
-                                  Reed: {item.nextReedSpace ? `${item.nextReedSpace}cm` : "—"}
-                                </span>
-                                <span>•</span>
-                                <span className="px-1.5 py-0.2 bg-indigo-50 text-indigo-900 rounded border border-indigo-200 text-[10px]">
-                                  {item.nextBobbinMark || "—"}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Right: Actions & Reordering */}
-                          <div className="flex items-center gap-1.5 self-end lg:self-center">
-                            <button
-                              type="button"
-                              onClick={() => handleShiftSequence(item.loomNumber, "up")}
-                              disabled={index === 0}
-                              className="p-1.5 text-slate-600 hover:text-slate-900 border border-slate-200 rounded-md hover:bg-slate-100 disabled:opacity-30 cursor-pointer"
-                              title="Move Up in Sequence"
-                            >
-                              <MoveUp className="h-4 w-4" />
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => handleShiftSequence(item.loomNumber, "down")}
-                              disabled={index === changeoverQueueList.length - 1}
-                              className="p-1.5 text-slate-600 hover:text-slate-900 border border-slate-200 rounded-md hover:bg-slate-100 disabled:opacity-30 cursor-pointer"
-                              title="Move Down in Sequence"
-                            >
-                              <MoveDown className="h-4 w-4" />
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => setEditingLoom(item)}
-                              className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-md text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
-                            >
-                              <Edit3 className="h-3.5 w-3.5" />
-                              <span>Configure</span>
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+        {/* Filter Controls Strip */}
+        <div className="mt-4 pt-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2.5 flex-1 min-w-[280px]">
+            {/* Search Input */}
+            <div className="relative flex-1 min-w-[200px] max-w-sm">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search loom #, quality, operator..."
+                className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl outline-none focus:bg-white focus:border-slate-800 transition-all placeholder:text-slate-400"
+              />
+              {search && (
+                <button
+                  onClick={() => setSearch("")}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
               )}
             </div>
-          )}
 
-          {/* ========================================================================= */}
-          {/* VIEW 2: DENSE ERP TABLE VIEW (ALL 91 LOOMS) */}
-          {/* ========================================================================= */}
-          {viewMode === "table" && (
-            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse text-xs">
-                  <thead>
-                    <tr className="bg-slate-900 text-white uppercase text-[10px] tracking-wider font-bold">
-                      <th className="py-2.5 px-3 w-14 text-center">Loom #</th>
-                      <th className="py-2.5 px-3 min-w-[200px]">Current Running Quality</th>
-                      <th className="py-2.5 px-3">Current Specs</th>
-                      <th className="py-2.5 px-3 min-w-[240px]">Target Next Quality Formulation</th>
-                      <th className="py-2.5 px-3">Next Specs</th>
-                      <th className="py-2.5 px-3 w-20 text-center">Seq #</th>
-                      <th className="py-2.5 px-3 w-32">Status</th>
-                      <th className="py-2.5 px-3 w-28">Target Shift</th>
-                      <th className="py-2.5 px-3 min-w-[160px]">Remarks / Floor Notes</th>
-                      <th className="py-2.5 px-3 w-16 text-center">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200">
-                    {looms.map((item) => {
-                      const isDirty = dirtyLoomNumbers.has(item.loomNumber);
-                      return (
-                        <tr
-                          key={`row_${item.loomNumber}`}
-                          className={`hover:bg-slate-50/80 transition-colors ${
-                            isDirty
-                              ? "bg-amber-50/40"
-                              : item.hasChangeover
-                              ? "bg-blue-50/20"
-                              : ""
+            {/* Date Input & Quick Pills */}
+            <div className="flex items-center gap-1.5">
+              <div className="relative">
+                <input
+                  type="date"
+                  value={filterDate}
+                  onChange={(e) => setFilterDate(e.target.value)}
+                  className="px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl outline-none focus:bg-white focus:border-slate-800 text-slate-700 font-medium"
+                />
+              </div>
+              <div className="inline-flex rounded-lg border border-slate-200 p-0.5 bg-slate-50 text-[11px] font-medium">
+                <button
+                  onClick={() => handleSetQuickDate("ALL")}
+                  className={`px-2 py-0.5 rounded-md transition-all ${
+                    !filterDate ? "bg-white font-bold text-slate-900 shadow-2xs" : "text-slate-500 hover:text-slate-800"
+                  }`}
+                >
+                  All Dates
+                </button>
+                <button
+                  onClick={() => handleSetQuickDate("TODAY")}
+                  className={`px-2 py-0.5 rounded-md transition-all ${
+                    filterDate === new Date().toISOString().slice(0, 10)
+                      ? "bg-white font-bold text-slate-900 shadow-2xs"
+                      : "text-slate-500 hover:text-slate-800"
+                  }`}
+                >
+                  Today
+                </button>
+              </div>
+            </div>
+
+            {/* Shift Filter */}
+            <select
+              value={filterShift}
+              onChange={(e) => setFilterShift(e.target.value)}
+              className="px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl outline-none focus:bg-white focus:border-slate-800 text-slate-700 font-medium"
+            >
+              <option value="ALL">All Shifts</option>
+              <option value="DAY">Day Shift</option>
+              <option value="NIGHT">Night Shift</option>
+            </select>
+
+            {/* Status Filter */}
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              className="px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl outline-none focus:bg-white focus:border-slate-800 text-slate-700 font-medium"
+            >
+              <option value="ALL">All Statuses</option>
+              <option value="LOGGED">Logged (Reading Sheet)</option>
+              <option value="CHANGEOVER">In Changeover</option>
+              <option value="SCHEDULED">Master Scheduled</option>
+            </select>
+          </div>
+
+          <div className="text-xs text-slate-400 font-medium">
+            Showing <strong className="text-slate-800 font-bold">{logs.length}</strong> changeover event(s)
+          </div>
+        </div>
+      </div>
+
+      {/* KPI Metric Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-2xs">
+          <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+            Total Changeovers
+          </div>
+          <div className="text-2xl font-black font-mono text-slate-900">
+            {kpis.totalLogs}
+          </div>
+          <p className="text-[10px] text-slate-400 mt-0.5">Recorded events across all looms</p>
+        </div>
+
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-2xs">
+          <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+            Total Downtime
+          </div>
+          <div className="text-2xl font-black font-mono text-amber-700">
+            {kpis.totalDowntimeMinutes} <span className="text-xs font-semibold text-slate-400">mins ({kpis.totalDowntimeHours}h)</span>
+          </div>
+          <p className="text-[10px] text-slate-400 mt-0.5">Cumulative downtime duration</p>
+        </div>
+
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-2xs">
+          <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+            Avg Duration
+          </div>
+          <div className="text-2xl font-black font-mono text-sky-700">
+            {kpis.avgDowntimeMinutes} <span className="text-xs font-semibold text-slate-400">mins / event</span>
+          </div>
+          <p className="text-[10px] text-slate-400 mt-0.5">Average time per quality swap</p>
+        </div>
+
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-2xs">
+          <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+            Looms Involved
+          </div>
+          <div className="text-2xl font-black font-mono text-emerald-700">
+            {kpis.uniqueLoomsCount} <span className="text-xs font-semibold text-slate-400">/ {kpis.factoryTotalLooms}</span>
+          </div>
+          <p className="text-[10px] text-slate-400 mt-0.5">Looms with logged transitions</p>
+        </div>
+      </div>
+
+      {/* Log-Wise Changeover Records Table */}
+      <div className="bg-white border border-slate-200/80 rounded-2xl shadow-2xs overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs border-collapse min-w-[980px]">
+            <thead>
+              <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-600 font-bold uppercase text-[10.5px]">
+                <th className="py-3 px-3 text-center w-12 border-r border-slate-100">#</th>
+                <th className="py-3 px-3 text-center w-28 border-r border-slate-100">Date</th>
+                <th className="py-3 px-3 text-center w-24 border-r border-slate-100">Shift</th>
+                <th className="py-3 px-3 text-center w-20 border-r border-slate-100">Loom #</th>
+                <th className="py-3 px-3.5 w-36 border-r border-slate-100">Operator</th>
+                <th className="py-3 px-4 w-44 border-r border-slate-100">From Quality (Current)</th>
+                <th className="py-3 px-2 text-center w-8 border-r border-slate-100"></th>
+                <th className="py-3 px-4 w-48 border-r border-slate-100 bg-amber-50/40">To Quality (Target)</th>
+                <th className="py-3 px-3 text-right w-28 border-r border-slate-100">Downtime</th>
+                <th className="py-3 px-3 text-center w-28 border-r border-slate-100">Status</th>
+                <th className="py-3 px-3.5 min-w-[140px]">Remarks / Notes</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {loading ? (
+                <tr>
+                  <td colSpan={11} className="py-14 text-center text-slate-400">
+                    <div className="inline-flex items-center gap-2 font-medium">
+                      <div className="h-4 w-4 border-2 border-slate-300 border-t-slate-800 rounded-full animate-spin" />
+                      <span>Loading Changeover Logs...</span>
+                    </div>
+                  </td>
+                </tr>
+              ) : logs.length === 0 ? (
+                <tr>
+                  <td colSpan={11} className="py-12 text-center">
+                    <div className="flex flex-col items-center justify-center gap-2 max-w-sm mx-auto">
+                      <div className="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
+                        <Layers className="h-5 w-5" />
+                      </div>
+                      <p className="text-xs font-bold text-slate-700">No Changeover Logs Found</p>
+                      <p className="text-[11px] text-slate-400 text-center">
+                        Changeovers recorded during 2-hour reading sheets (when Breakdown is selected as Change Over) will automatically appear here.
+                      </p>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                logs.map((item, idx) => {
+                  return (
+                    <tr
+                      key={item.id}
+                      className="hover:bg-slate-50/70 transition-colors"
+                    >
+                      {/* Log Index */}
+                      <td className="py-2.5 px-3 text-center font-mono text-[11px] text-slate-400 border-r border-slate-100">
+                        {idx + 1}
+                      </td>
+
+                      {/* Date */}
+                      <td className="py-2.5 px-3 text-center font-mono font-medium text-slate-700 border-r border-slate-100">
+                        {item.date}
+                      </td>
+
+                      {/* Shift */}
+                      <td className="py-2.5 px-3 text-center border-r border-slate-100">
+                        <span className="inline-block px-2 py-0.5 rounded text-[10.5px] font-bold bg-slate-100 text-slate-700">
+                          {item.shiftName}
+                        </span>
+                      </td>
+
+                      {/* Loom Number */}
+                      <td className="py-2.5 px-3 text-center font-bold font-mono text-slate-900 border-r border-slate-100">
+                        #{item.loomNumber}
+                      </td>
+
+                      {/* Operator */}
+                      <td className="py-2.5 px-3.5 font-medium text-slate-800 border-r border-slate-100">
+                        {item.operatorName}
+                      </td>
+
+                      {/* From Quality */}
+                      <td className="py-2.5 px-4 border-r border-slate-100">
+                        <span className="inline-block px-2 py-0.5 rounded text-xs font-mono font-semibold text-slate-700 bg-slate-100 border border-slate-200">
+                          {item.fromQuality}
+                        </span>
+                      </td>
+
+                      {/* Arrow */}
+                      <td className="py-2.5 px-1 text-center text-amber-500 border-r border-slate-100">
+                        <ArrowRight className="h-3.5 w-3.5 mx-auto" />
+                      </td>
+
+                      {/* To Quality (Target) */}
+                      <td className="py-2.5 px-4 border-r border-slate-100 bg-amber-50/20">
+                        <span className="inline-block px-2.5 py-1 rounded text-xs font-mono font-extrabold text-amber-950 bg-amber-100/80 border border-amber-300">
+                          {item.toQuality}
+                        </span>
+                      </td>
+
+                      {/* Downtime Duration */}
+                      <td className="py-2.5 px-3 text-right font-mono font-bold text-amber-900 border-r border-slate-100">
+                        {item.downtimeMinutes > 0 ? (
+                          <span className="inline-flex items-center gap-1">
+                            <Clock className="h-3 w-3 text-amber-600" />
+                            {item.downtimeMinutes} mins
+                          </span>
+                        ) : (
+                          <span className="text-slate-300 font-normal">—</span>
+                        )}
+                      </td>
+
+                      {/* Status */}
+                      <td className="py-2.5 px-3 text-center border-r border-slate-100">
+                        <span
+                          className={`inline-block px-2 py-0.5 rounded text-[10px] font-extrabold border ${
+                            item.status === "CHANGEOVER" || item.status === "IN_PROGRESS"
+                              ? "bg-amber-50 text-amber-800 border-amber-200"
+                              : item.status === "COMPLETED"
+                              ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                              : item.status === "SCHEDULED"
+                              ? "bg-sky-50 text-sky-800 border-sky-200"
+                              : "bg-slate-50 text-slate-700 border-slate-200"
                           }`}
                         >
-                          {/* Loom # */}
-                          <td className="py-2 px-3 text-center font-black font-mono text-slate-900 bg-slate-50/50">
-                            #{item.loomNumber}
-                          </td>
-
-                          {/* Current Quality */}
-                          <td className="py-2 px-3 font-mono font-bold text-slate-800 text-[11px]">
-                            {item.currentQuality}
-                          </td>
-
-                          {/* Current Specs */}
-                          <td className="py-2 px-3 text-slate-600 text-[11px]">
-                            <div>
-                              <span className="font-semibold text-slate-700">{item.currentColor}</span> • {item.currentDenier ? `${item.currentDenier}D` : "—"}
-                            </div>
-                            <div className="text-[10px] text-slate-500 font-mono">
-                              Reed: {item.currentReedSpace ? `${item.currentReedSpace}cm` : "—"} | Mark: {item.currentBobbinMark}
-                            </div>
-                          </td>
-
-                          {/* Target Next Quality Dropdown */}
-                          <td className="py-2 px-3">
-                            <select
-                              value={item.nextQualityCode || ""}
-                              onChange={(e) =>
-                                handleUpdateLoomField(
-                                  item.loomNumber,
-                                  "nextQualityCode",
-                                  e.target.value ? e.target.value : null
-                                )
-                              }
-                              aria-label={`Target Next Quality for Loom #${item.loomNumber}`}
-                              className="w-full px-2 py-1 text-xs bg-white border border-slate-300 rounded font-mono font-semibold text-slate-800 focus:outline-hidden focus:ring-1 focus:ring-slate-900"
-                            >
-                              <option value="">— No Changeover Scheduled —</option>
-                              {availableQualities.map((q) => (
-                                <option key={`q_${q.code}`} value={q.code}>
-                                  {q.code} ({q.colour} • {q.denier}D • {q.bobbinMarking})
-                                </option>
-                              ))}
-                            </select>
-                          </td>
-
-                          {/* Next Specs Preview */}
-                          <td className="py-2 px-3 text-[11px]">
-                            {item.nextQualityCode ? (
-                              <div>
-                                <div className={`font-semibold ${item.isColorChanged ? "text-amber-700 font-bold" : "text-slate-800"}`}>
-                                  {item.nextColor || "—"} • {item.nextDenier ? `${item.nextDenier}D` : "—"}
-                                </div>
-                                <div className={`text-[10px] font-mono ${item.isReedSpaceChanged ? "text-rose-700 font-bold" : "text-slate-500"}`}>
-                                  Reed: {item.nextReedSpace ? `${item.nextReedSpace}cm` : "—"} | Mark: {item.nextBobbinMark || "—"}
-                                </div>
-                              </div>
-                            ) : (
-                              <span className="text-slate-400 italic text-[10px]">Unchanged</span>
-                            )}
-                          </td>
-
-                          {/* Sequence Input */}
-                          <td className="py-2 px-3 text-center">
-                            <input
-                              type="number"
-                              min="0"
-                              max="99"
-                              value={item.sequence || ""}
-                              onChange={(e) =>
-                                handleUpdateLoomField(
-                                  item.loomNumber,
-                                  "sequence",
-                                  e.target.value ? Number(e.target.value) : 0
-                                )
-                              }
-                              placeholder="0"
-                              aria-label={`Sequence for Loom #${item.loomNumber}`}
-                              className="w-14 px-1.5 py-1 text-center font-bold text-xs bg-white border border-slate-300 rounded focus:outline-hidden focus:ring-1 focus:ring-slate-900"
-                            />
-                          </td>
-
-                          {/* Status Selector */}
-                          <td className="py-2 px-3">
-                            <select
-                              value={item.status}
-                              onChange={(e) =>
-                                handleUpdateLoomField(item.loomNumber, "status", e.target.value)
-                              }
-                              aria-label={`Status for Loom #${item.loomNumber}`}
-                              className={`w-full px-2 py-1 text-[11px] font-bold rounded border focus:outline-hidden focus:ring-1 focus:ring-slate-900 ${
-                                item.status === "IN_PROGRESS"
-                                  ? "bg-amber-50 text-amber-900 border-amber-300"
-                                  : item.status === "COMPLETED"
-                                  ? "bg-emerald-50 text-emerald-900 border-emerald-300"
-                                  : item.status === "SCHEDULED"
-                                  ? "bg-blue-50 text-blue-900 border-blue-300"
-                                  : "bg-slate-50 text-slate-700 border-slate-300"
-                              }`}
-                            >
-                              <option value="PENDING">PENDING</option>
-                              <option value="SCHEDULED">SCHEDULED</option>
-                              <option value="IN_PROGRESS">IN_PROGRESS</option>
-                              <option value="COMPLETED">COMPLETED</option>
-                              <option value="CANCELLED">CANCELLED</option>
-                            </select>
-                          </td>
-
-                          {/* Target Shift */}
-                          <td className="py-2 px-3">
-                            <select
-                              value={item.targetShiftId || ""}
-                              onChange={(e) => {
-                                const sId = e.target.value;
-                                const sObj = availableShifts.find((s) => s.id === sId);
-                                handleUpdateLoomField(item.loomNumber, "targetShiftId", sId || null);
-                                handleUpdateLoomField(
-                                  item.loomNumber,
-                                  "targetShiftName",
-                                  sObj?.name || null
-                                );
-                              }}
-                              aria-label={`Target Shift for Loom #${item.loomNumber}`}
-                              className="w-full px-2 py-1 text-[11px] bg-white border border-slate-300 rounded text-slate-700 focus:outline-hidden focus:ring-1 focus:ring-slate-900"
-                            >
-                              <option value="">— Any Shift —</option>
-                              {availableShifts.map((s) => (
-                                <option key={`shift_${s.id}`} value={s.id}>
-                                  {s.name}
-                                </option>
-                              ))}
-                            </select>
-                          </td>
-
-                          {/* Remarks */}
-                          <td className="py-2 px-3">
-                            <input
-                              type="text"
-                              value={item.remarks || ""}
-                              onChange={(e) =>
-                                handleUpdateLoomField(item.loomNumber, "remarks", e.target.value)
-                              }
-                              placeholder="Add floor remarks..."
-                              aria-label={`Remarks for Loom #${item.loomNumber}`}
-                              className="w-full px-2 py-1 text-xs bg-white border border-slate-300 rounded text-slate-700 focus:outline-hidden focus:ring-1 focus:ring-slate-900"
-                            />
-                          </td>
-
-                          {/* Action Modal Trigger */}
-                          <td className="py-2 px-3 text-center">
-                            <button
-                              type="button"
-                              onClick={() => setEditingLoom(item)}
-                              className="p-1 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded cursor-pointer"
-                              title="Open Detailed Modal"
-                            >
-                              <Settings2 className="h-4 w-4" />
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          {/* ========================================================================= */}
-          {/* VIEW 3: 1-91 FACTORY FLOOR MATRIX GRID */}
-          {/* ========================================================================= */}
-          {viewMode === "matrix" && (
-            <div className="bg-white border border-slate-200 rounded-xl p-4 sm:p-5 shadow-xs space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
-                    Factory Floor 1-91 Loom Changeover Matrix
-                  </h3>
-                  <p className="text-xs text-slate-500">
-                    Click any loom tile to configure next quality formulation and priority sequence.
-                  </p>
-                </div>
-                <div className="flex flex-wrap items-center gap-3 text-xs">
-                  <span className="flex items-center gap-1.5">
-                    <span className="h-3 w-3 rounded-xs bg-blue-500 inline-block"></span>
-                    <span className="font-semibold text-slate-700">Scheduled Queue</span>
-                  </span>
-                  <span className="flex items-center gap-1.5">
-                    <span className="h-3 w-3 rounded-xs bg-amber-500 inline-block"></span>
-                    <span className="font-semibold text-slate-700">In-Progress</span>
-                  </span>
-                  <span className="flex items-center gap-1.5">
-                    <span className="h-3 w-3 rounded-xs bg-emerald-500 inline-block"></span>
-                    <span className="font-semibold text-slate-700">Completed</span>
-                  </span>
-                  <span className="flex items-center gap-1.5">
-                    <span className="h-3 w-3 rounded-xs bg-slate-200 inline-block"></span>
-                    <span className="font-semibold text-slate-700">Steady Running</span>
-                  </span>
-                </div>
-              </div>
-
-              {/* 91 Loom Tiles Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-9 gap-2.5">
-                {looms.map((item) => {
-                  const hasNext = Boolean(item.nextQualityCode);
-                  const isScheduled = item.status === "SCHEDULED" || hasNext;
-                  const isInProg = item.status === "IN_PROGRESS";
-                  const isDone = item.status === "COMPLETED";
-
-                  return (
-                    <button
-                      key={`matrix_loom_${item.loomNumber}`}
-                      type="button"
-                      onClick={() => setEditingLoom(item)}
-                      className={`p-2.5 rounded-lg border text-left transition-all relative cursor-pointer hover:shadow-md ${
-                        isInProg
-                          ? "bg-amber-50 border-amber-400 ring-1 ring-amber-300"
-                          : isDone
-                          ? "bg-emerald-50 border-emerald-400 ring-1 ring-emerald-300"
-                          : isScheduled
-                          ? "bg-blue-50 border-blue-400 ring-1 ring-blue-300"
-                          : "bg-slate-50/70 border-slate-200 hover:border-slate-300 hover:bg-white"
-                      }`}
-                    >
-                      {/* Sequence Badge if set */}
-                      {item.sequence > 0 && (
-                        <span className="absolute top-1.5 right-1.5 px-1.5 py-0.2 rounded text-[9px] font-black bg-slate-900 text-white">
-                          #{item.sequence}
+                          {item.status}
                         </span>
-                      )}
+                      </td>
 
-                      <div className="text-xs font-black text-slate-900 font-mono">
-                        Loom #{item.loomNumber}
-                      </div>
-
-                      {/* Current Quality */}
-                      <div className="text-[10px] font-mono font-bold text-slate-700 truncate mt-1" title={item.currentQuality}>
-                        {item.currentQuality}
-                      </div>
-
-                      {/* Next Quality or Status */}
-                      {hasNext ? (
-                        <div className="mt-1 pt-1 border-t border-slate-200">
-                          <span className="text-[9px] font-bold text-indigo-700 block uppercase">Next:</span>
-                          <span className="text-[10px] font-mono font-black text-indigo-950 truncate block" title={item.nextQualityCode!}>
-                            {item.nextQualityCode}
-                          </span>
-                        </div>
-                      ) : (
-                        <div className="text-[9px] text-slate-600 mt-1">Steady Running</div>
-                      )}
-                    </button>
+                      {/* Remarks */}
+                      <td className="py-2.5 px-3.5 text-slate-600 text-xs truncate max-w-[200px]" title={item.remarks}>
+                        {item.remarks || <span className="text-slate-300">—</span>}
+                      </td>
+                    </tr>
                   );
-                })}
-              </div>
-            </div>
-          )}
-        </>
-      )}
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
 
-      {/* ========================================================================= */}
-      {/* DETAILED LOOM CHANGEOVER CONFIGURATION MODAL / DRAWER */}
-      {/* ========================================================================= */}
-      {editingLoom && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 max-w-2xl w-full shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-            {/* Modal Header */}
-            <div className="bg-slate-900 text-white p-4 flex items-center justify-between">
-              <div>
-                <h3 className="text-base font-black tracking-tight">
-                  Configure Loom #{editingLoom.loomNumber} Changeover
-                </h3>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Set target quality formulation, sequence priority, target date & shift
-                </p>
+      {/* Schedule / Add Changeover Modal */}
+      {scheduleModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-md w-full p-5 space-y-4 animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <Layers className="h-4 w-4 text-amber-600" />
+                <h3 className="text-sm font-bold text-slate-900">Schedule Loom Changeover</h3>
               </div>
               <button
-                type="button"
-                onClick={() => setEditingLoom(null)}
-                className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
+                onClick={() => setScheduleModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 cursor-pointer"
               >
-                <X className="h-5 w-5" />
+                <X className="h-4 w-4" />
               </button>
             </div>
 
-            {/* Modal Body */}
-            <div className="p-5 space-y-4 overflow-y-auto flex-1">
-              {/* Current vs Next Side-by-Side Card */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {/* Current Specs */}
-                <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-2">
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                    Current Running Quality
-                  </div>
-                  <div className="text-xs font-mono font-black text-slate-900">
-                    {editingLoom.currentQuality}
-                  </div>
-                  <div className="text-xs text-slate-700 space-y-1 pt-1 border-t border-slate-200 font-medium">
-                    <div><strong>Colour:</strong> {editingLoom.currentColor} ({editingLoom.currentColorGroup})</div>
-                    <div><strong>Denier:</strong> {editingLoom.currentDenier ? `${editingLoom.currentDenier} D` : "—"}</div>
-                    <div><strong>Reed Space:</strong> {editingLoom.currentReedSpace ? `${editingLoom.currentReedSpace} cm` : "—"}</div>
-                    <div><strong>Bobbin Mark:</strong> {editingLoom.currentBobbinMark}</div>
-                    <div><strong>Mesh:</strong> {editingLoom.currentMesh}</div>
-                  </div>
-                </div>
-
-                {/* Next Target Specs */}
-                <div className="bg-indigo-50/50 border border-indigo-200 rounded-xl p-3.5 space-y-2">
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-indigo-700 flex items-center justify-between">
-                    <span>Target Next Quality</span>
-                    {editingLoom.isReedSpaceChanged && (
-                      <span className="px-1.5 py-0.2 rounded bg-rose-100 text-rose-800 font-black text-[9px]">
-                        Reed Diff: {editingLoom.currentReedSpace} &rarr; {editingLoom.nextReedSpace}cm
-                      </span>
-                    )}
-                  </div>
-                  <div className="text-xs font-mono font-black text-indigo-950">
-                    {editingLoom.nextQualityCode || "— No Target Quality Selected —"}
-                  </div>
-                  <div className="text-xs text-slate-700 space-y-1 pt-1 border-t border-indigo-100 font-medium">
-                    <div><strong>Colour:</strong> {editingLoom.nextColor || "—"} ({editingLoom.nextColorGroup || "—"})</div>
-                    <div><strong>Denier:</strong> {editingLoom.nextDenier ? `${editingLoom.nextDenier} D` : "—"}</div>
-                    <div><strong>Reed Space:</strong> {editingLoom.nextReedSpace ? `${editingLoom.nextReedSpace} cm` : "—"}</div>
-                    <div><strong>Bobbin Mark:</strong> {editingLoom.nextBobbinMark || "—"}</div>
-                    <div><strong>Mesh:</strong> {editingLoom.nextMesh || "—"}</div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Formulation Picker */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-800">
-                  Select Target Quality Formulation:
-                </label>
-                <select
-                  value={editingLoom.nextQualityCode || ""}
-                  onChange={(e) => {
-                    const val = e.target.value || null;
-                    handleUpdateLoomField(editingLoom.loomNumber, "nextQualityCode", val);
-                    const matched = availableQualities.find((q) => q.code === val);
-                    if (matched) {
-                      setEditingLoom((prev) =>
-                        prev
-                          ? {
-                              ...prev,
-                              nextQualityCode: val,
-                              nextColor: matched.colour,
-                              nextColorGroup: matched.colorGroup,
-                              nextDenier: matched.denier,
-                              nextReedSpace: matched.reedSpaceCm ?? prev.currentReedSpace,
-                              nextBobbinMark: matched.bobbinMarking,
-                              nextMesh: matched.mesh,
-                              hasChangeover: Boolean(val && val !== prev.currentQuality),
-                              isReedSpaceChanged: Boolean(
-                                matched.reedSpaceCm !== null &&
-                                  prev.currentReedSpace !== null &&
-                                  matched.reedSpaceCm !== prev.currentReedSpace
-                              ),
-                              isColorChanged: Boolean(
-                                matched.colour && prev.currentColor && matched.colour !== prev.currentColor
-                              ),
-                              isBobbinMarkChanged: Boolean(
-                                matched.bobbinMarking &&
-                                  prev.currentBobbinMark &&
-                                  matched.bobbinMarking !== prev.currentBobbinMark
-                              ),
-                            }
-                          : null
-                      );
-                    } else {
-                      setEditingLoom((prev) =>
-                        prev
-                          ? {
-                              ...prev,
-                              nextQualityCode: null,
-                              nextColor: null,
-                              nextColorGroup: null,
-                              nextDenier: null,
-                              nextReedSpace: null,
-                              nextBobbinMark: null,
-                              nextMesh: null,
-                              hasChangeover: false,
-                              isReedSpaceChanged: false,
-                              isColorChanged: false,
-                              isBobbinMarkChanged: false,
-                            }
-                          : null
-                      );
-                    }
-                  }}
-                  className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-lg font-mono font-semibold text-slate-900 focus:ring-2 focus:ring-slate-900"
-                >
-                  <option value="">— Clear / No Changeover (Steady Running) —</option>
-                  {availableQualities.map((q) => (
-                    <option key={`opt_${q.code}`} value={q.code}>
-                      {q.code} ({q.colour} • {q.denier}D • Reed: {q.reedSpaceCm ?? "—"}cm • Mark: {q.bobbinMarking})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Detailed editable overrides */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
+            <form onSubmit={handleCreateSchedule} className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-[10px] font-bold uppercase text-slate-600 block mb-1">
-                    Sequence Priority #
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="99"
-                    value={editingLoom.sequence || ""}
-                    onChange={(e) => {
-                      const val = e.target.value ? Number(e.target.value) : 0;
-                      handleUpdateLoomField(editingLoom.loomNumber, "sequence", val);
-                      setEditingLoom((prev) => (prev ? { ...prev, sequence: val } : null));
-                    }}
-                    placeholder="1, 2, 3..."
-                    className="w-full px-2.5 py-1.5 text-xs bg-white border border-slate-300 rounded-lg font-bold text-slate-900"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-bold uppercase text-slate-600 block mb-1">
-                    Status
+                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                    Loom Machine #:
                   </label>
                   <select
-                    value={editingLoom.status}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      handleUpdateLoomField(editingLoom.loomNumber, "status", val);
-                      setEditingLoom((prev) => (prev ? { ...prev, status: val } : null));
-                    }}
-                    className="w-full px-2 py-1.5 text-xs bg-white border border-slate-300 rounded-lg font-bold text-slate-900"
+                    value={newScheduleLoom}
+                    onChange={(e) => setNewScheduleLoom(e.target.value)}
+                    className="w-full px-2.5 py-1.5 text-xs font-mono font-bold bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-slate-800"
                   >
-                    <option value="PENDING">PENDING</option>
-                    <option value="SCHEDULED">SCHEDULED</option>
-                    <option value="IN_PROGRESS">IN_PROGRESS</option>
-                    <option value="COMPLETED">COMPLETED</option>
-                    <option value="CANCELLED">CANCELLED</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-bold uppercase text-slate-600 block mb-1">
-                    Target Date
-                  </label>
-                  <input
-                    type="date"
-                    value={editingLoom.targetDate || ""}
-                    onChange={(e) => {
-                      const val = e.target.value || null;
-                      handleUpdateLoomField(editingLoom.loomNumber, "targetDate", val);
-                      setEditingLoom((prev) => (prev ? { ...prev, targetDate: val } : null));
-                    }}
-                    className="w-full px-2 py-1.5 text-xs bg-white border border-slate-300 rounded-lg font-mono text-slate-900"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-bold uppercase text-slate-600 block mb-1">
-                    Target Shift
-                  </label>
-                  <select
-                    value={editingLoom.targetShiftId || ""}
-                    onChange={(e) => {
-                      const sId = e.target.value || null;
-                      const sObj = availableShifts.find((s) => s.id === sId);
-                      handleUpdateLoomField(editingLoom.loomNumber, "targetShiftId", sId);
-                      handleUpdateLoomField(editingLoom.loomNumber, "targetShiftName", sObj?.name || null);
-                      setEditingLoom((prev) =>
-                        prev ? { ...prev, targetShiftId: sId, targetShiftName: sObj?.name || null } : null
-                      );
-                    }}
-                    className="w-full px-2 py-1.5 text-xs bg-white border border-slate-300 rounded-lg text-slate-900"
-                  >
-                    <option value="">— Any Shift —</option>
-                    {availableShifts.map((s) => (
-                      <option key={`edit_shift_${s.id}`} value={s.id}>
-                        {s.name}
+                    {Array.from({ length: 91 }, (_, i) => i + 1).map((n) => (
+                      <option key={n} value={n}>
+                        Loom #{n}
                       </option>
                     ))}
                   </select>
                 </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                    Target Date:
+                  </label>
+                  <input
+                    type="date"
+                    value={newScheduleDate}
+                    onChange={(e) => setNewScheduleDate(e.target.value)}
+                    className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-slate-800"
+                  />
+                </div>
               </div>
 
-              {/* Remarks */}
               <div>
-                <label className="text-[10px] font-bold uppercase text-slate-600 block mb-1">
-                  Technician / Floor Remarks
+                <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                  Target / Next Quality:
+                </label>
+                <input
+                  type="text"
+                  list="target-qualities-list"
+                  value={newScheduleTo}
+                  onChange={(e) => setNewScheduleTo(e.target.value)}
+                  placeholder="e.g. UTCL/LPP/Y/67 or 1000D/LPP/W"
+                  required
+                  className="w-full px-2.5 py-1.5 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-slate-800"
+                />
+                <datalist id="target-qualities-list">
+                  {availableQualities.map((q) => (
+                    <option key={q.code} value={q.code}>
+                      {q.code} {q.colorGroup ? `(${q.colorGroup})` : ""}
+                    </option>
+                  ))}
+                </datalist>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                  Target Shift:
+                </label>
+                <select
+                  value={newScheduleShift}
+                  onChange={(e) => setNewScheduleShift(e.target.value)}
+                  className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-slate-800"
+                >
+                  <option value="Day Shift">Day Shift</option>
+                  <option value="Night Shift">Night Shift</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                  Remarks / Changeover Notes:
                 </label>
                 <textarea
                   rows={2}
-                  value={editingLoom.remarks || ""}
-                  onChange={(e) => {
-                    const val = e.target.value || null;
-                    handleUpdateLoomField(editingLoom.loomNumber, "remarks", val);
-                    setEditingLoom((prev) => (prev ? { ...prev, remarks: val } : null));
-                  }}
-                  placeholder="e.g. Creel cleaning required, verify tension on warp bobbins, adjust reed space to 54cm..."
-                  className="w-full px-3 py-2 text-xs bg-white border border-slate-300 rounded-lg text-slate-800 focus:ring-2 focus:ring-slate-900"
+                  value={newScheduleRemarks}
+                  onChange={(e) => setNewScheduleRemarks(e.target.value)}
+                  placeholder="Notes for floor operator..."
+                  className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-slate-800"
                 />
               </div>
-            </div>
 
-            {/* Modal Footer */}
-            <div className="bg-slate-50 border-t border-slate-200 p-4 flex items-center justify-between">
-              <button
-                type="button"
-                onClick={() => setEditingLoom(null)}
-                className="px-4 py-2 text-xs font-bold text-slate-600 hover:text-slate-900 cursor-pointer"
-              >
-                Close
-              </button>
-
-              <button
-                type="button"
-                onClick={handleSaveAll}
-                disabled={saving}
-                className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shadow-xs cursor-pointer disabled:opacity-50"
-              >
-                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                <span>Save Configuration</span>
-              </button>
-            </div>
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setScheduleModalOpen(false)}
+                  className="px-3 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-800 bg-slate-100 rounded-lg cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={scheduling}
+                  className="px-4 py-1.5 text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-lg cursor-pointer disabled:opacity-50"
+                >
+                  {scheduling ? "Saving..." : "Schedule Changeover"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

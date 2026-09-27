@@ -1,12 +1,26 @@
 /**
- * Minimalist Enterprise ERP Loom Changeover Sheet Print & PDF Engine
- * Formatted precisely as per Tape Planning standards with top-left Flexicom logo,
- * centered title, KPI summary cards, structured allocation tables, and official 4-column sign-offs.
+ * Enterprise ERP Loom Changeover Log Sheet Print Engine
+ * Clean, minimalist, professional output formatted for A4 landscape print.
  */
 
-import { LoomChangeoverDataset } from "./loom-changeover-export";
+import { LoomChangeoverLogItem } from "@/app/api/production/loom/changeover/route";
 
-export function generateLoomChangeoverHtml(data: LoomChangeoverDataset): string {
+export interface PrintLoomChangeoverOptions {
+  logs: LoomChangeoverLogItem[];
+  kpis?: {
+    totalLogs: number;
+    totalDowntimeMinutes: number;
+    totalDowntimeHours: number;
+    avgDowntimeMinutes: number;
+    uniqueLoomsCount: number;
+    scheduledCount: number;
+  };
+  filterDate?: string;
+  filterShift?: string;
+}
+
+export function generateLoomChangeoverHtml(options: PrintLoomChangeoverOptions): string {
+  const { logs, kpis, filterDate, filterShift } = options;
   const genTimestamp = new Date().toLocaleString("en-IN", {
     day: "2-digit",
     month: "short",
@@ -17,77 +31,75 @@ export function generateLoomChangeoverHtml(data: LoomChangeoverDataset): string 
   });
 
   const docDate = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-  const docRef = `LM-CO-${docDate}`;
-  const kpis = data.kpis;
+  const docRef = `LM-CO-LOG-${docDate}`;
 
-  const queueItems = data.changeoverQueue.length > 0 ? data.changeoverQueue : data.allLooms.filter((l) => l.hasChangeover || l.sequence > 0);
+  const totalDowntime = logs.reduce((sum, l) => sum + (l.downtimeMinutes || 0), 0);
+  const avgDowntime = logs.length > 0 ? Math.round((totalDowntime / logs.length) * 10) / 10 : 0;
 
-  const queueRows = queueItems.map((item, idx) => {
-    const seq = item.sequence > 0 ? item.sequence : idx + 1;
-    const isReedDiff = item.isReedSpaceChanged;
-    const isColorDiff = item.isColorChanged;
-
-    return `
+  const rowsHtml = logs.length > 0
+    ? logs.map((item, idx) => {
+        const isReadingSheet = item.source === "READING_SHEET";
+        return `
+          <tr>
+            <td style="text-align: center; font-weight: 800; font-size: 7.5pt; color: #475569; width: 30px;">
+              #${idx + 1}
+            </td>
+            <td style="text-align: center; font-family: monospace; font-size: 7.5pt; font-weight: 700; color: #0f172a;">
+              ${item.date}
+            </td>
+            <td style="text-align: center; font-size: 7pt; font-weight: 600; color: #334155;">
+              ${item.shiftName}
+            </td>
+            <td style="text-align: center; font-weight: 900; font-family: monospace; font-size: 8pt; color: #0f172a; background: #f8fafc;">
+              #${item.loomNumber}
+            </td>
+            <td style="font-size: 7pt; font-weight: 600; color: #334155;">
+              ${item.operatorName}
+            </td>
+            <td style="font-family: monospace; font-size: 7.5pt; font-weight: 700; color: #475569;">
+              ${item.fromQuality}
+            </td>
+            <td style="text-align: center; color: #94a3b8; font-weight: bold; font-size: 8pt;">
+              →
+            </td>
+            <td style="font-family: monospace; font-size: 7.5pt; font-weight: 800; color: #0f172a; background: #fffbeb;">
+              ${item.toQuality}
+            </td>
+            <td style="text-align: right; font-family: monospace; font-size: 7.5pt; font-weight: 800; color: #9a3412; background: #fef3c7;">
+              ${item.downtimeMinutes > 0 ? `${item.downtimeMinutes}m` : "—"}
+            </td>
+            <td style="text-align: center; font-size: 6.5pt; font-weight: 700;">
+              <span style="border: 1px solid ${
+                item.status === 'CHANGEOVER' || item.status === 'IN_PROGRESS'
+                  ? '#f59e0b; background-color: #fef3c7; color: #b45309;'
+                  : item.status === 'COMPLETED'
+                  ? '#10b981; background-color: #d1fae5; color: #047857;'
+                  : item.status === 'SCHEDULED'
+                  ? '#3b82f6; background-color: #dbeafe; color: #1d4ed8;'
+                  : '#cbd5e1; background-color: #f8fafc; color: #334155;'
+              } padding: 2px 6px; border-radius: 4px; display: inline-block;">
+                ${item.status}
+              </span>
+            </td>
+            <td style="font-size: 6.5pt; color: #475569;">
+              ${item.remarks || "—"}
+            </td>
+          </tr>
+        `;
+      }).join("")
+    : `
       <tr>
-        <td style="text-align: center; font-weight: 800; font-size: 8pt; background-color: #f1f5f9; width: 35px;">
-          #${seq}
-        </td>
-        <td style="text-align: center; font-weight: 800; font-family: monospace; font-size: 8pt;">
-          Loom #${item.loomNumber}
-        </td>
-        <td style="font-weight: 700; font-family: monospace; font-size: 7.5pt; color: #334155;">
-          ${item.currentQuality}
-        </td>
-        <td style="font-size: 7pt;">
-          ${item.currentColor} / ${item.currentDenier ? `${item.currentDenier}D` : "—"}
-        </td>
-        <td style="text-align: center; font-family: monospace; font-size: 7.5pt;">
-          ${item.currentReedSpace ? `${item.currentReedSpace} cm` : "—"}
-        </td>
-        <td style="font-size: 7pt; font-weight: 600;">
-          ${item.currentBobbinMark}
-        </td>
-        <td style="font-weight: 800; font-family: monospace; font-size: 8pt; color: #0f172a; background-color: #f8fafc;">
-          ${item.nextQualityCode || "—"}
-        </td>
-        <td style="font-size: 7pt; ${isColorDiff ? 'color: #b91c1c; font-weight: 700;' : ''}">
-          ${item.nextColor || "—"} / ${item.nextDenier ? `${item.nextDenier}D` : "—"}
-        </td>
-        <td style="text-align: center; font-family: monospace; font-size: 7.5pt; ${isReedDiff ? 'background-color: #fef2f2; color: #b91c1c; font-weight: 800; border: 1px dashed #ef4444;' : ''}">
-          ${item.nextReedSpace ? `${item.nextReedSpace} cm` : "—"}
-          ${isReedDiff ? `<span style="font-size: 6pt; display: block; color: #dc2626;">(Diff: ${(item.nextReedSpace! - item.currentReedSpace!) > 0 ? `+${item.nextReedSpace! - item.currentReedSpace!}` : (item.nextReedSpace! - item.currentReedSpace!)}cm)</span>` : ''}
-        </td>
-        <td style="font-size: 7pt; font-weight: 700;">
-          ${item.nextBobbinMark || "—"}
-        </td>
-        <td style="text-align: center; font-size: 6.5pt; font-weight: 700;">
-          <span style="border: 1px solid ${
-            item.status === 'IN_PROGRESS'
-              ? '#f59e0b; background-color: #fef3c7; color: #b45309;'
-              : item.status === 'COMPLETED'
-              ? '#10b981; background-color: #d1fae5; color: #047857;'
-              : item.status === 'SCHEDULED'
-              ? '#3b82f6; background-color: #dbeafe; color: #1d4ed8;'
-              : '#94a3b8; background-color: #f1f5f9; color: #475569;'
-          } padding: 2px 5px; border-radius: 3px; display: inline-block;">
-            ${item.status}
-          </span>
-        </td>
-        <td style="font-size: 6.5pt; text-align: center;">
-          ${item.targetShiftName ? `<strong>${item.targetShiftName}</strong><br/>` : ""}${item.targetDate || "—"}
-        </td>
-        <td style="font-size: 6.5pt; color: #475569;">
-          ${item.remarks || "—"}
+        <td colspan="11" style="text-align: center; color: #64748b; font-style: italic; padding: 24px;">
+          No changeover logs recorded for the selected criteria.
         </td>
       </tr>
     `;
-  }).join("");
 
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Loom Changeover Sheet - ${docRef}</title>
+  <title>Loom Changeover Log Report - ${docRef}</title>
   <style>
     @page {
       size: A4 landscape;
@@ -111,57 +123,50 @@ export function generateLoomChangeoverHtml(data: LoomChangeoverDataset): string 
       width: 100%;
       max-width: 100%;
       margin: 0 auto;
-      box-sizing: border-box;
     }
     .header-container {
       text-align: center;
       border-bottom: 2px solid #0f172a;
-      padding-bottom: 5px;
+      padding-bottom: 4px;
       margin-bottom: 6px;
     }
     .company-title {
-      font-size: 13.5pt;
+      font-size: 13pt;
       font-weight: 900;
-      letter-spacing: 0.6px;
+      letter-spacing: 0.5px;
       color: #000000;
       text-transform: uppercase;
-      text-align: center;
     }
     .company-sub {
-      font-size: 7pt;
+      font-size: 6.5pt;
       color: #475569;
       margin-top: 1px;
-      text-align: center;
     }
     .doc-main-heading {
       display: inline-block;
       border: 1.5px solid #0f172a;
       background: #f8fafc;
-      padding: 2.5px 14px;
+      padding: 2px 14px;
       font-size: 8.5pt;
       font-weight: 900;
       text-transform: uppercase;
       letter-spacing: 0.8px;
       margin-top: 3px;
       margin-bottom: 2px;
-      text-align: center;
     }
     .doc-meta-strip {
       display: flex;
       flex-wrap: wrap;
       justify-content: center;
       align-items: center;
-      gap: 10px;
-      font-size: 7pt;
+      gap: 12px;
+      font-size: 6.5pt;
       color: #334155;
       margin-top: 2px;
-      text-align: center;
     }
     .doc-meta-strip strong {
       color: #000000;
     }
-
-    /* KPI Summary Row */
     .kpi-table {
       width: 100%;
       border-collapse: collapse;
@@ -170,235 +175,177 @@ export function generateLoomChangeoverHtml(data: LoomChangeoverDataset): string 
       border: 1px solid #94a3b8;
     }
     .kpi-table td {
-      padding: 3.5px 5px;
+      padding: 3px 6px;
       border: 1px solid #cbd5e1;
       vertical-align: middle;
       text-align: center;
     }
     .kpi-label {
-      font-size: 6.5pt;
+      font-size: 5.5pt;
       font-weight: 700;
       text-transform: uppercase;
       color: #475569;
-      letter-spacing: 0.3px;
+      letter-spacing: 0.5px;
     }
     .kpi-val {
       font-size: 9.5pt;
-      font-weight: 800;
+      font-weight: 900;
       font-family: monospace;
       color: #0f172a;
-      margin-top: 1px;
     }
-
-    /* Section Titles */
-    .section-title {
-      font-size: 8pt;
-      font-weight: 900;
-      text-transform: uppercase;
-      letter-spacing: 0.6px;
-      text-align: center;
-      background-color: #e2e8f0;
-      border: 1px solid #94a3b8;
-      border-bottom: none;
-      padding: 3px 6px;
-      margin-top: 5px;
-      color: #0f172a;
-    }
-
-    /* Data Tables */
     .data-table {
       width: 100%;
       border-collapse: collapse;
-      margin-bottom: 6px;
-      font-size: 7pt;
-      table-layout: auto;
+      font-size: 7.5pt;
+      margin-bottom: 8px;
     }
     .data-table th {
-      background-color: #f1f5f9;
-      border: 1px solid #94a3b8;
+      background-color: #0f172a;
+      color: #ffffff;
       padding: 3px 4px;
       font-weight: 700;
-      font-size: 6.5pt;
       text-transform: uppercase;
-      text-align: center;
-      color: #0f172a;
+      font-size: 6.5pt;
+      border: 1px solid #334155;
+      text-align: left;
     }
     .data-table td {
+      padding: 2.5px 4px;
       border: 1px solid #cbd5e1;
-      padding: 3px 4px;
-      font-size: 7pt;
-      color: #0f172a;
+      vertical-align: middle;
     }
-
-    /* Sign-off section */
-    .sign-table {
+    .data-table tr:nth-child(even) {
+      background-color: #f8fafc;
+    }
+    .signoff-table {
       width: 100%;
       border-collapse: collapse;
-      margin-top: 6px;
-      border: 1px solid #94a3b8;
+      margin-top: 8px;
+      page-break-inside: avoid;
     }
-    .sign-table td {
+    .signoff-table td {
       width: 25%;
       border: 1px solid #94a3b8;
       padding: 4px 6px;
       text-align: center;
-      vertical-align: top;
+      background: #fdfdfd;
     }
     .sign-title {
-      font-weight: 700;
       font-size: 6.5pt;
+      font-weight: 800;
+      color: #334155;
       text-transform: uppercase;
       margin-bottom: 14px;
-      color: #334155;
     }
     .sign-line {
-      border-top: 1px dotted #64748b;
-      padding-top: 2px;
-      font-size: 6pt;
+      border-top: 1px dashed #64748b;
+      margin-top: 4px;
+      font-size: 5.5pt;
       color: #64748b;
-    }
-
-    /* Footer */
-    .footer-note {
-      margin-top: 3px;
-      font-size: 6pt;
-      color: #64748b;
-      display: flex;
-      justify-content: space-between;
-      border-top: 1px solid #e2e8f0;
       padding-top: 2px;
-    }
-    .avoid-break {
-      break-inside: avoid;
-      page-break-inside: avoid;
     }
   </style>
 </head>
 <body>
   <div class="sheet-container">
-    <!-- Header with Flexicom Logo -->
+    <!-- HEADER -->
     <div class="header-container">
-      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px;">
-        <div style="width: 65px; text-align: left; display: flex; align-items: center;">
-          <img src="/logo.png" alt="Flexicom Logo" style="height: 44px; width: auto; object-fit: contain; filter: contrast(1.25) saturate(1.25);" onerror="this.style.display='none'" />
-        </div>
-        <div style="flex: 1; text-align: center;">
-          <div class="company-title">Flexicom Industries Pvt. Ltd.</div>
-          <div class="company-sub">Circular Loom Weaving & Fabric Division • Kathua Industrial Complex, Phase-II, Kathua (J&K)</div>
-          <div class="doc-main-heading">LOOM MACHINE CHANGEOVER & SEQUENCE SCHEDULE</div>
-        </div>
-        <div style="width: 65px;" aria-hidden="true"></div>
-      </div>
+      <div class="company-title">Flexicom Industries Pvt. Limited</div>
+      <div class="company-sub">SIDCO INDUSTRIAL ESTATE, PHASE-II, KATHUA (J&K) 184143 • CIRCULAR WEAVING DIVISION</div>
+      <div class="doc-main-heading">CIRCULAR LOOMS QUALITY CHANGEOVER AUDIT LOG</div>
       <div class="doc-meta-strip">
         <span>Doc Ref: <strong>${docRef}</strong></span>
         <span>•</span>
-        <span>Scope: <strong>Looms #1–91 Changeover Queue</strong></span>
+        <span>Date: <strong>${filterDate || "All Recorded Dates"}</strong></span>
         <span>•</span>
-        <span>Printed: <strong>${genTimestamp}</strong></span>
+        <span>Shift: <strong>${filterShift || "All Shifts"}</strong></span>
+        <span>•</span>
+        <span>Generated: <strong>${genTimestamp}</strong></span>
       </div>
     </div>
 
-    <!-- KPI Summary Row -->
+    <!-- KPIS -->
     <table class="kpi-table">
       <tr>
-        <td style="width: 16.66%;">
-          <div class="kpi-label">Total Looms</div>
-          <div class="kpi-val">${kpis.totalLooms}</div>
+        <td style="width: 25%;">
+          <div class="kpi-label">Total Changeover Events</div>
+          <div class="kpi-val" style="color: #1e40af;">${logs.length}</div>
         </td>
-        <td style="width: 16.66%;">
-          <div class="kpi-label">Scheduled Queue</div>
-          <div class="kpi-val" style="color: #1d4ed8;">${kpis.totalScheduled}</div>
+        <td style="width: 25%;">
+          <div class="kpi-label">Total Recorded Downtime</div>
+          <div class="kpi-val" style="color: #ea580c;">${totalDowntime} <span style="font-size: 6.5pt; font-weight: normal;">Mins (${Math.round((totalDowntime / 60) * 10) / 10} Hrs)</span></div>
         </td>
-        <td style="width: 16.66%;">
-          <div class="kpi-label">In-Progress</div>
-          <div class="kpi-val" style="color: #b45309;">${kpis.totalInProgress}</div>
+        <td style="width: 25%;">
+          <div class="kpi-label">Average Downtime per Event</div>
+          <div class="kpi-val" style="color: #0284c7;">${avgDowntime} <span style="font-size: 6.5pt; font-weight: normal;">Mins</span></div>
         </td>
-        <td style="width: 16.66%;">
-          <div class="kpi-label">Completed</div>
-          <div class="kpi-val" style="color: #047857;">${kpis.totalCompleted}</div>
-        </td>
-        <td style="width: 16.66%;">
-          <div class="kpi-label">Reed Modifications</div>
-          <div class="kpi-val" style="color: #b91c1c;">${kpis.totalReedSpaceChanges}</div>
-        </td>
-        <td style="width: 16.66%;">
-          <div class="kpi-label">Steady Running</div>
-          <div class="kpi-val" style="color: #64748b;">${kpis.totalPending}</div>
+        <td style="width: 25%;">
+          <div class="kpi-label">Looms Involved</div>
+          <div class="kpi-val" style="color: #15803d;">${kpis?.uniqueLoomsCount ?? new Set(logs.map((l) => l.loomNumber)).size} <span style="font-size: 6.5pt; font-weight: normal;">Looms</span></div>
         </td>
       </tr>
     </table>
 
-    <!-- Priority Queue Section -->
-    <div class="section-title">CHANGEOVER PRIORITY EXECUTION QUEUE (${queueItems.length} MACHINES)</div>
+    <!-- TABLE -->
     <table class="data-table">
       <thead>
         <tr>
-          <th style="width: 32px; text-align: center;">Seq</th>
+          <th style="width: 28px; text-align: center;">#</th>
+          <th style="width: 60px; text-align: center;">Date</th>
+          <th style="width: 55px; text-align: center;">Shift</th>
           <th style="width: 48px; text-align: center;">Loom #</th>
-          <th style="text-align: left;">Current Quality</th>
-          <th style="text-align: left;">Color / Denier</th>
-          <th style="width: 45px; text-align: center;">Reed</th>
-          <th style="text-align: left;">Bobbin Mark</th>
-          <th style="text-align: left;">Target Next Quality</th>
-          <th style="text-align: left;">Next Color / Denier</th>
-          <th style="width: 50px; text-align: center;">Next Reed</th>
-          <th style="text-align: left;">Next Mark</th>
-          <th style="width: 55px; text-align: center;">Status</th>
-          <th style="width: 60px; text-align: center;">Target Shift</th>
-          <th style="text-align: left;">Floor Remarks</th>
+          <th style="width: 75px;">Operator</th>
+          <th style="width: 90px;">From Quality</th>
+          <th style="width: 18px; text-align: center;"></th>
+          <th style="width: 90px;">To Quality (Target)</th>
+          <th style="width: 55px; text-align: right;">Downtime</th>
+          <th style="width: 60px; text-align: center;">Status</th>
+          <th style="width: 110px;">Remarks</th>
         </tr>
       </thead>
       <tbody>
-        ${queueRows.length > 0 ? queueRows : `
-          <tr>
-            <td colspan="13" style="text-align: center; padding: 14px; color: #64748b; font-style: italic;">
-              No active changeovers currently queued. All 91 circular looms are operating on steady formulations.
-            </td>
-          </tr>
-        `}
+        ${rowsHtml}
       </tbody>
+      <tfoot>
+        <tr style="background: #f1f5f9; font-weight: 800;">
+          <td colspan="8" style="text-align: right; text-transform: uppercase; font-size: 6.5pt;">Total Downtime:</td>
+          <td style="text-align: right; font-family: monospace; font-size: 7.5pt; color: #9a3412;">${totalDowntime}m</td>
+          <td colspan="2"></td>
+        </tr>
+      </tfoot>
     </table>
 
-    <!-- 4-Column Official Sign-Off Strip -->
-    <div class="avoid-break">
-      <table class="sign-table">
-        <tr>
-          <td>
-            <div class="sign-title">1. Prepared By (Loom Supervisor)</div>
-            <div class="sign-line">Signature & Date</div>
-          </td>
-          <td>
-            <div class="sign-title">2. Mechanical (Loom Master)</div>
-            <div class="sign-line">Creel & Reed Verified</div>
-          </td>
-          <td>
-            <div class="sign-title">3. QC Passed (Inspector)</div>
-            <div class="sign-line">Fabric Sample Approved</div>
-          </td>
-          <td>
-            <div class="sign-title">4. Approved By (Production Head)</div>
-            <div class="sign-line">Authorized</div>
-          </td>
-        </tr>
-      </table>
-
-      <!-- Footer Note -->
-      <div class="footer-note">
-        <span>Flexicom ERP • Loom Weaving & Tape Plant Sync</span>
-        <span>Confidential & Proprietary • Flexicom Industries Pvt. Ltd.</span>
-        <span>Page 1 of 1</span>
-      </div>
-    </div>
+    <!-- SIGN-OFFS -->
+    <table class="signoff-table">
+      <tr>
+        <td>
+          <div class="sign-title">Prepared By (Floor Operator)</div>
+          <div class="sign-line">Signature & Date</div>
+        </td>
+        <td>
+          <div class="sign-title">Weaving Supervisor</div>
+          <div class="sign-line">Signature & Date</div>
+        </td>
+        <td>
+          <div class="sign-title">Production Manager</div>
+          <div class="sign-line">Signature & Date</div>
+        </td>
+        <td>
+          <div class="sign-title">Plant In-Charge</div>
+          <div class="sign-line">Signature & Date</div>
+        </td>
+      </tr>
+    </table>
   </div>
 </body>
 </html>`;
 }
 
-export function printLoomChangeover(data: LoomChangeoverDataset): void {
-  const html = generateLoomChangeoverHtml(data);
-  const printWindow = window.open("", "_blank");
+export function printLoomChangeover(options: PrintLoomChangeoverOptions): void {
+  const html = generateLoomChangeoverHtml(options);
+  const printWindow = window.open("", "_blank", "width=1200,height=800");
   if (!printWindow) {
-    alert("Please allow popups for printable reports.");
+    alert("Please allow popups to print Loom Changeover Logs");
     return;
   }
   printWindow.document.open();
@@ -407,5 +354,5 @@ export function printLoomChangeover(data: LoomChangeoverDataset): void {
   printWindow.focus();
   setTimeout(() => {
     printWindow.print();
-  }, 350);
+  }, 400);
 }

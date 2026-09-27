@@ -8,6 +8,22 @@ export const revalidate = 0;
 
 const TOTAL_FACTORY_LOOMS = 91;
 
+export interface LoomChangeoverLogItem {
+  id: string;
+  source: "READING_SHEET" | "SCHEDULED" | "MANUAL";
+  date: string;
+  shiftName: string;
+  loomNumber: number;
+  operatorName: string;
+  fromQuality: string;
+  toQuality: string;
+  downtimeMinutes: number;
+  status: "LOGGED" | "SCHEDULED" | "IN_PROGRESS" | "COMPLETED" | "CHANGEOVER" | string;
+  remarks: string;
+  loggedBy: string;
+  createdAt: string;
+}
+
 export async function GET(request: NextRequest) {
   const authResult = await requireLoomApiPermission("canRead");
   if (!authResult.ok) {
@@ -15,21 +31,40 @@ export async function GET(request: NextRequest) {
   }
 
   const { searchParams } = new URL(request.url);
-  const statusFilter = searchParams.get("status"); // ALL | SCHEDULED | IN_PROGRESS | COMPLETED | PENDING
-  const search = searchParams.get("search");
+  const search = (searchParams.get("search") || "").toLowerCase().trim();
+  const filterDate = searchParams.get("date") || "";
+  const filterShift = searchParams.get("shift") || "";
+  const filterStatus = searchParams.get("status") || "ALL";
 
   try {
-    // 1. Fetch live Bobbin Issue allocations (Authoritative live shop-floor assignments)
-    const bobbinIssues = await db.tapePlantBobbinIssue.findMany({
-      where: { status: { not: "CANCELLED" } },
-      include: {
-        shift: { select: { id: true, name: true } },
+    // 1. Fetch live changeovers logged from 2-Hour Reading Sheets
+    const readingSheetEntries = await db.loomReadingEntry.findMany({
+      where: {
+        OR: [
+          { breakdownReason: { equals: "Change Over", mode: "insensitive" } },
+          { changeoverTargetQuality: { not: null } },
+          { status: { equals: "CHANGEOVER", mode: "insensitive" } },
+        ],
       },
-      orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+      include: {
+        sheet: {
+          select: {
+            id: true,
+            date: true,
+            shiftName: true,
+            preparedBy: true,
+            checkedBy: true,
+          },
+        },
+      },
+      orderBy: [{ sheet: { date: "desc" } }, { loomNumber: "asc" }],
     });
 
-    // 2. Fetch all Tape Plant Recipes, Shifts, and Changeover persistence records
-    const [tapeRecipes, shifts, changeovers, mappings] = await Promise.all([
+    // 2. Fetch master scheduled changeovers, recipes, shifts, and mappings in parallel
+    const [changeovers, tapeRecipes, shifts, mappings] = await Promise.all([
+      db.loomChangeover.findMany({
+        orderBy: [{ sequence: "asc" }, { loomNumber: "asc" }],
+      }),
       db.tapePlantRecipe.findMany({
         where: { isActive: true },
         orderBy: { code: "asc" },
@@ -38,280 +73,124 @@ export async function GET(request: NextRequest) {
         where: { isActive: true },
         orderBy: { name: "asc" },
       }),
-      db.loomChangeover.findMany({
-        orderBy: [{ sequence: "asc" }, { loomNumber: "asc" }],
-      }),
       db.loomMachineMapping.findMany({
         where: { isActive: true },
         orderBy: [{ colorGroup: "asc" }, { qualityCode: "asc" }],
       }),
     ]);
 
-    // Build map of recipes for spec lookup
-    const recipeSpecMap = new Map<string, typeof tapeRecipes[0]>();
+    // Build available qualities list
+    const qualityMap = new Map<string, { code: string; colorGroup?: string | null; colour?: string | null; denier?: number | null }>();
     tapeRecipes.forEach((r) => {
-      recipeSpecMap.set(r.code.toLowerCase().trim(), r);
+      qualityMap.set(r.code, {
+        code: r.code,
+        colorGroup: r.colorGroup || "Standard",
+        colour: r.colour || "—",
+        denier: r.denier ?? null,
+      });
     });
-
-    // Map each loom #1..91 to find live running quality from TapePlantBobbinIssue
-    const liveLoomAllocationMap = new Map<number, {
-      qualityCode: string;
-      colorGroup: string;
-      colour: string;
-      denier: number | null;
-      reedSpaceCm: number | null;
-      bobbinMarking: string;
-      mesh: string;
-      latestDate: string;
-      shiftName: string;
-    }>();
-
-    for (const issue of bobbinIssues) {
-      const recipeCode = (issue.recipeQuality || "").trim();
-      if (!recipeCode) continue;
-
-      const shiftName = issue.shift?.name || issue.shiftName || "General Shift";
-      const matchedRecipe = recipeSpecMap.get(recipeCode.toLowerCase());
-
-      const multiAllocations = Array.isArray(issue.loomAllocations) ? (issue.loomAllocations as any[]) : [];
-
-      if (multiAllocations.length > 0) {
-        for (const alloc of multiAllocations) {
-          const lNum = alloc.loomNumber ? Number(alloc.loomNumber) : null;
-          if (lNum && lNum >= 1 && lNum <= TOTAL_FACTORY_LOOMS && !liveLoomAllocationMap.has(lNum)) {
-            liveLoomAllocationMap.set(lNum, {
-              qualityCode: recipeCode,
-              colorGroup: matchedRecipe?.colorGroup || "Standard",
-              colour: matchedRecipe?.colour || "White",
-              denier: matchedRecipe?.denier ?? null,
-              reedSpaceCm: null,
-              bobbinMarking: matchedRecipe?.bobbinMarking || "Bobbin Issue",
-              mesh: "Standard",
-              latestDate: issue.date,
-              shiftName,
-            });
-          }
-        }
-      } else {
-        const lNum = issue.loomNumber ? Number(issue.loomNumber) : null;
-        if (lNum && lNum >= 1 && lNum <= TOTAL_FACTORY_LOOMS && !liveLoomAllocationMap.has(lNum)) {
-          liveLoomAllocationMap.set(lNum, {
-            qualityCode: recipeCode,
-            colorGroup: matchedRecipe?.colorGroup || "Standard",
-            colour: matchedRecipe?.colour || "White",
-            denier: matchedRecipe?.denier ?? null,
-            reedSpaceCm: null,
-            bobbinMarking: matchedRecipe?.bobbinMarking || "Bobbin Issue",
-            mesh: "Standard",
-            latestDate: issue.date,
-            shiftName,
-          });
-        }
+    mappings.forEach((m) => {
+      if (!qualityMap.has(m.qualityCode)) {
+        qualityMap.set(m.qualityCode, {
+          code: m.qualityCode,
+          colorGroup: m.colorGroup || "Standard",
+          colour: m.colour || "—",
+          denier: m.denier ?? null,
+        });
       }
+    });
+    const availableQualities = Array.from(qualityMap.values()).sort((a, b) => a.code.localeCompare(b.code));
+
+    // Map reading sheet changeover entries into clean log items
+    const readingSheetLogs: LoomChangeoverLogItem[] = readingSheetEntries.map((e) => ({
+      id: `rs_${e.id}`,
+      source: "READING_SHEET",
+      date: e.sheet?.date || "—",
+      shiftName: e.sheet?.shiftName || "—",
+      loomNumber: e.loomNumber,
+      operatorName: e.operatorName || "—",
+      fromQuality: e.qualityType || "Unassigned",
+      toQuality: e.changeoverTargetQuality || "Pending Spec",
+      downtimeMinutes: e.breakdownMinutes || 0,
+      status: e.status === "CHANGEOVER" ? "CHANGEOVER" : "LOGGED",
+      remarks: e.remarks || "",
+      loggedBy: e.sheet?.preparedBy || "Loom Operator",
+      createdAt: e.createdAt.toISOString(),
+    }));
+
+    // Map master scheduled changeovers into scheduled items
+    const scheduledLogs: LoomChangeoverLogItem[] = changeovers
+      .filter((co) => Boolean(co.nextQualityCode && co.nextQualityCode.trim()))
+      .map((co) => ({
+        id: `sc_${co.id}`,
+        source: "SCHEDULED",
+        date: co.targetDate || "Scheduled",
+        shiftName: co.targetShiftName || "General",
+        loomNumber: co.loomNumber,
+        operatorName: "—",
+        fromQuality: co.currentQuality || "Unallocated",
+        toQuality: co.nextQualityCode || "—",
+        downtimeMinutes: 0,
+        status: co.status || "SCHEDULED",
+        remarks: co.remarks || "",
+        loggedBy: co.updatedBy || "Planner",
+        createdAt: co.updatedAt.toISOString(),
+      }));
+
+    // Combine all logs
+    const allLogs: LoomChangeoverLogItem[] = [...readingSheetLogs, ...scheduledLogs];
+
+    // Filter logs
+    let filteredLogs = allLogs;
+
+    if (filterDate) {
+      filteredLogs = filteredLogs.filter((item) => item.date === filterDate);
     }
 
-    // Fallback mapping map from LoomMachineMapping if no live issue found
-    const staticMappingMap = new Map<number, {
-      qualityCode: string;
-      colorGroup: string;
-      colour: string;
-      denier: number | null;
-      reedSpaceCm: number | null;
-      bobbinMarking: string;
-      mesh: string;
-    }>();
-
-    mappings.forEach((m) => {
-      (m.loomNumbers || []).forEach((loomNo) => {
-        staticMappingMap.set(loomNo, {
-          qualityCode: m.qualityCode,
-          colorGroup: m.colorGroup || "Unassigned",
-          colour: m.colour || "—",
-          denier: m.denier ?? null,
-          reedSpaceCm: m.reedSpaceCm ?? null,
-          bobbinMarking: m.bobbinMarking || "—",
-          mesh: m.mesh || "—",
-        });
-      });
-    });
-
-    // Build comprehensive available quality options list combining TapePlantRecipe & LoomMachineMapping
-    const qualityOptionsMap = new Map<string, {
-      code: string;
-      colour: string;
-      colorGroup: string;
-      denier: number | null;
-      reedSpaceCm: number | null;
-      bobbinMarking: string;
-      mesh: string;
-    }>();
-
-    tapeRecipes.forEach((r) => {
-      qualityOptionsMap.set(r.code, {
-        code: r.code,
-        colour: r.colour || "—",
-        colorGroup: r.colorGroup || "Standard",
-        denier: r.denier ?? null,
-        reedSpaceCm: null,
-        bobbinMarking: r.bobbinMarking || "—",
-        mesh: "Standard",
-      });
-    });
-
-    mappings.forEach((m) => {
-      if (!qualityOptionsMap.has(m.qualityCode)) {
-        qualityOptionsMap.set(m.qualityCode, {
-          code: m.qualityCode,
-          colour: m.colour || "—",
-          colorGroup: m.colorGroup || "Unassigned",
-          denier: m.denier ?? null,
-          reedSpaceCm: m.reedSpaceCm ?? null,
-          bobbinMarking: m.bobbinMarking || "—",
-          mesh: m.mesh || "—",
-        });
-      }
-    });
-
-    const availableQualities = Array.from(qualityOptionsMap.values()).sort((a, b) =>
-      a.code.localeCompare(b.code)
-    );
-
-    // Build changeover record lookup
-    const changeoverMap = new Map<number, typeof changeovers[0]>();
-    changeovers.forEach((co) => changeoverMap.set(co.loomNumber, co));
-
-    // Build comprehensive 1-91 loom changeover items
-    const allLoomItems = Array.from({ length: TOTAL_FACTORY_LOOMS }, (_, i) => {
-      const loomNo = i + 1;
-      const liveAlloc = liveLoomAllocationMap.get(loomNo);
-      const staticAlloc = staticMappingMap.get(loomNo);
-      const co = changeoverMap.get(loomNo);
-
-      // Current running values (Live Bobbin Issue is top priority)
-      const currentQuality = liveAlloc?.qualityCode || co?.currentQuality || staticAlloc?.qualityCode || "UNALLOCATED";
-      const currentColor = liveAlloc?.colour || co?.currentColor || staticAlloc?.colour || "—";
-      const currentColorGroup = liveAlloc?.colorGroup || co?.currentColorGroup || staticAlloc?.colorGroup || "Unallocated";
-      const currentDenier = liveAlloc?.denier ?? co?.currentDenier ?? staticAlloc?.denier ?? null;
-      const currentReedSpace = co?.currentReedSpace ?? staticAlloc?.reedSpaceCm ?? null;
-      const currentBobbinMark = liveAlloc?.bobbinMarking || co?.currentBobbinMark || staticAlloc?.bobbinMarking || "—";
-      const currentMesh = liveAlloc?.mesh || co?.currentMesh || staticAlloc?.mesh || "—";
-
-      // Next scheduled values from LoomChangeover
-      const nextQualityCode = co?.nextQualityCode || null;
-      const nextColor = co?.nextColor || null;
-      const nextColorGroup = co?.nextColorGroup || null;
-      const nextDenier = co?.nextDenier ?? null;
-      const nextReedSpace = co?.nextReedSpace ?? null;
-      const nextBobbinMark = co?.nextBobbinMark || null;
-      const nextMesh = co?.nextMesh || null;
-
-      const sequence = co?.sequence ?? 0;
-      const status = co?.status || (nextQualityCode ? "SCHEDULED" : "PENDING");
-      const targetDate = co?.targetDate || null;
-      const targetShiftId = co?.targetShiftId || null;
-      const targetShiftName = co?.targetShiftName || null;
-      const remarks = co?.remarks || null;
-      const updatedAt = co?.updatedAt || null;
-
-      const hasChangeover = Boolean(nextQualityCode && nextQualityCode !== currentQuality);
-      const isReedSpaceChanged = Boolean(
-        nextReedSpace !== null && currentReedSpace !== null && nextReedSpace !== currentReedSpace
+    if (filterShift) {
+      filteredLogs = filteredLogs.filter((item) =>
+        item.shiftName.toLowerCase().includes(filterShift.toLowerCase())
       );
-      const isColorChanged = Boolean(nextColor && currentColor && nextColor !== currentColor);
-      const isBobbinMarkChanged = Boolean(
-        nextBobbinMark && currentBobbinMark && nextBobbinMark !== currentBobbinMark
-      );
+    }
 
-      return {
-        id: co?.id || `loom_${loomNo}`,
-        loomNumber: loomNo,
-        currentQuality,
-        currentColor,
-        currentColorGroup,
-        currentDenier,
-        currentReedSpace,
-        currentBobbinMark,
-        currentMesh,
-        nextQualityCode,
-        nextColor,
-        nextColorGroup,
-        nextDenier,
-        nextReedSpace,
-        nextBobbinMark,
-        nextMesh,
-        sequence,
-        status,
-        targetDate,
-        targetShiftId,
-        targetShiftName,
-        remarks,
-        hasChangeover,
-        isReedSpaceChanged,
-        isColorChanged,
-        isBobbinMarkChanged,
-        updatedAt,
-      };
-    });
-
-    // KPI Metrics calculation
-    const totalScheduled = allLoomItems.filter(
-      (item) => item.status === "SCHEDULED" || (item.hasChangeover && item.status !== "COMPLETED")
-    ).length;
-    const totalInProgress = allLoomItems.filter((item) => item.status === "IN_PROGRESS").length;
-    const totalCompleted = allLoomItems.filter((item) => item.status === "COMPLETED").length;
-    const totalPending = allLoomItems.filter((item) => item.status === "PENDING" && !item.hasChangeover).length;
-    const totalReedSpaceChanges = allLoomItems.filter((item) => item.isReedSpaceChanged && item.hasChangeover).length;
-
-    // Filter items
-    let filteredItems = allLoomItems;
-
-    if (statusFilter && statusFilter !== "ALL") {
-      filteredItems = filteredItems.filter((item) => {
-        if (statusFilter === "SCHEDULED") return item.status === "SCHEDULED" || item.hasChangeover;
-        return item.status === statusFilter;
-      });
+    if (filterStatus && filterStatus !== "ALL") {
+      filteredLogs = filteredLogs.filter((item) => item.status.toUpperCase() === filterStatus.toUpperCase());
     }
 
     if (search) {
-      const q = search.toLowerCase().trim();
-      filteredItems = filteredItems.filter(
-        (item) =>
-          String(item.loomNumber) === q ||
-          `loom ${item.loomNumber}` === q ||
-          `#${item.loomNumber}` === q ||
-          item.currentQuality.toLowerCase().includes(q) ||
-          (item.nextQualityCode && item.nextQualityCode.toLowerCase().includes(q)) ||
-          item.currentColor.toLowerCase().includes(q) ||
-          (item.nextColor && item.nextColor.toLowerCase().includes(q)) ||
-          item.currentBobbinMark.toLowerCase().includes(q) ||
-          (item.targetShiftName && item.targetShiftName.toLowerCase().includes(q)) ||
-          (item.remarks && item.remarks.toLowerCase().includes(q))
-      );
+      filteredLogs = filteredLogs.filter((item) => {
+        const str = `${item.loomNumber} loom #${item.loomNumber} ${item.operatorName} ${item.fromQuality} ${item.toQuality} ${item.shiftName} ${item.date} ${item.remarks}`.toLowerCase();
+        return str.includes(search);
+      });
     }
 
-    // Sort items: items with active sequence (> 0) come first ordered by sequence, then remaining looms ordered by loomNumber
-    const sortedFilteredItems = [...filteredItems].sort((a, b) => {
-      if (a.sequence > 0 && b.sequence > 0) return a.sequence - b.sequence;
-      if (a.sequence > 0) return -1;
-      if (b.sequence > 0) return 1;
+    // Sort logs: Date descending, Shift descending, Loom ascending
+    filteredLogs.sort((a, b) => {
+      if (a.date !== b.date) return b.date.localeCompare(a.date);
+      if (a.shiftName !== b.shiftName) return a.shiftName.localeCompare(b.shiftName);
       return a.loomNumber - b.loomNumber;
     });
 
-    // Changeover queue (only looms that have next quality scheduled or in progress, sorted by sequence)
-    const changeoverQueue = allLoomItems
-      .filter((item) => item.hasChangeover || item.sequence > 0 || item.status === "SCHEDULED" || item.status === "IN_PROGRESS")
-      .sort((a, b) => {
-        if (a.sequence > 0 && b.sequence > 0) return a.sequence - b.sequence;
-        if (a.sequence > 0) return -1;
-        if (b.sequence > 0) return 1;
-        return a.loomNumber - b.loomNumber;
-      });
+    // Compute summary KPI metrics
+    const totalLogsCount = filteredLogs.length;
+    const totalDowntimeMinutes = filteredLogs.reduce((acc, l) => acc + (l.downtimeMinutes || 0), 0);
+    const avgDowntimeMinutes = totalLogsCount > 0 ? Math.round((totalDowntimeMinutes / totalLogsCount) * 10) / 10 : 0;
+    const uniqueLoomsCount = new Set(filteredLogs.map((l) => l.loomNumber)).size;
+    const scheduledCount = scheduledLogs.length;
 
     return NextResponse.json(
       {
-        looms: sortedFilteredItems,
-        allLooms: allLoomItems,
-        changeoverQueue,
+        logs: filteredLogs,
+        allLogsCount: allLogs.length,
+        kpis: {
+          totalLogs: totalLogsCount,
+          totalDowntimeMinutes,
+          totalDowntimeHours: Math.round((totalDowntimeMinutes / 60) * 10) / 10,
+          avgDowntimeMinutes,
+          uniqueLoomsCount,
+          scheduledCount,
+          factoryTotalLooms: TOTAL_FACTORY_LOOMS,
+        },
         availableQualities,
         availableShifts: shifts.map((s) => ({
           id: s.id,
@@ -319,16 +198,6 @@ export async function GET(request: NextRequest) {
           startTime: s.startTime,
           endTime: s.endTime,
         })),
-        kpis: {
-          totalLooms: TOTAL_FACTORY_LOOMS,
-          totalScheduled,
-          totalInProgress,
-          totalCompleted,
-          totalPending,
-          totalReedSpaceChanges,
-          queueLength: changeoverQueue.length,
-        },
-        count: sortedFilteredItems.length,
       },
       {
         headers: {
@@ -339,7 +208,7 @@ export async function GET(request: NextRequest) {
       }
     );
   } catch (error) {
-    console.error("Error fetching Loom Changeover Sheet:", error);
+    console.error("Error fetching Loom Changeover logs:", error);
     return NextResponse.json({ error: "Failed to fetch Loom Changeover data" }, { status: 500 });
   }
 }
@@ -354,10 +223,44 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { updates } = body;
+    const { updates, action } = body;
 
+    // ACTION: QUICK_SCHEDULE_CHANGEOVER
+    if (action === "QUICK_SCHEDULE") {
+      const { loomNumber, fromQuality, toQuality, targetDate, targetShiftName, remarks } = body;
+      const lNum = Number(loomNumber);
+      if (!lNum || lNum < 1 || lNum > TOTAL_FACTORY_LOOMS) {
+        return NextResponse.json({ error: "Invalid Loom Number" }, { status: 400 });
+      }
+
+      const upserted = await db.loomChangeover.upsert({
+        where: { loomNumber: lNum },
+        create: {
+          loomNumber: lNum,
+          currentQuality: fromQuality || null,
+          nextQualityCode: toQuality || null,
+          targetDate: targetDate || new Date().toISOString().slice(0, 10),
+          targetShiftName: targetShiftName || "Day Shift",
+          status: "SCHEDULED",
+          remarks: remarks || null,
+          updatedBy: authResult.session?.user?.name || "Floor Admin",
+        },
+        update: {
+          currentQuality: fromQuality || undefined,
+          nextQualityCode: toQuality || undefined,
+          targetDate: targetDate || undefined,
+          targetShiftName: targetShiftName || undefined,
+          status: "SCHEDULED",
+          remarks: remarks || undefined,
+          updatedBy: authResult.session?.user?.name || "Floor Admin",
+        },
+      });
+
+      return NextResponse.json({ success: true, record: upserted });
+    }
+
+    // Standard batch updates for master changeovers
     const itemsToUpdate = Array.isArray(updates) ? updates : [body];
-
     if (!itemsToUpdate || itemsToUpdate.length === 0) {
       return NextResponse.json({ error: "No changeover updates provided" }, { status: 400 });
     }
@@ -429,7 +332,7 @@ export async function POST(request: NextRequest) {
       updatedRecords: updatedResults,
     });
   } catch (error) {
-    console.error("Error saving Loom Changeover Sheet:", error);
+    console.error("Error saving Loom Changeover data:", error);
     return NextResponse.json({ error: "Failed to save Loom Changeover changes" }, { status: 500 });
   }
 }
