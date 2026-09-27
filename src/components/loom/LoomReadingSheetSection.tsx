@@ -111,6 +111,7 @@ export function LoomReadingSheetSection() {
   const [autoSaving, setAutoSaving] = useState<boolean>(false);
   const [lastAutoSavedAt, setLastAutoSavedAt] = useState<Date | null>(null);
   const lastSavedPayloadRef = useRef<string>("");
+  const latestPayloadRef = useRef<any>(null);
   const isInitialMountRef = useRef<boolean>(true);
 
   const [data, setData] = useState<ReadingSheetData | null>(null);
@@ -227,6 +228,7 @@ export function LoomReadingSheetSection() {
         status: json.sheet?.status || "DRAFT",
         shiftHours: json.sheet?.shiftHours || 12,
       };
+      latestPayloadRef.current = initialPayload;
       lastSavedPayloadRef.current = JSON.stringify(initialPayload);
       isInitialMountRef.current = false;
     } catch (err: any) {
@@ -241,7 +243,38 @@ export function LoomReadingSheetSection() {
     fetchSheetData(selectedDate, selectedShift);
   }, [selectedDate, selectedShift, fetchSheetData]);
 
-  // Real-time Auto-Save Effect (debounced 1000ms on any change)
+  // Immediate or debounced auto-save function
+  const triggerAutoSave = useCallback(async (isImmediate: boolean = false, keepalive: boolean = false) => {
+    if (!latestPayloadRef.current || isInitialMountRef.current) return;
+    const serialized = JSON.stringify(latestPayloadRef.current);
+    if (serialized === lastSavedPayloadRef.current) return;
+
+    if (!isImmediate) {
+      setAutoSaving(true);
+    }
+
+    try {
+      const res = await fetch("/api/production/loom/reading-sheet", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: serialized,
+        keepalive,
+      });
+
+      if (res.ok) {
+        lastSavedPayloadRef.current = serialized;
+        setLastAutoSavedAt(new Date());
+      }
+    } catch (err) {
+      console.error("Auto-save error:", err);
+    } finally {
+      if (!isImmediate) {
+        setAutoSaving(false);
+      }
+    }
+  }, []);
+
+  // Sync latestPayloadRef and debounce auto-save (400ms)
   useEffect(() => {
     if (loading || isInitialMountRef.current || !data || entries.length === 0) return;
 
@@ -259,28 +292,13 @@ export function LoomReadingSheetSection() {
       shiftHours: data?.sheet?.shiftHours || 12,
     };
 
+    latestPayloadRef.current = payload;
     const serialized = JSON.stringify(payload);
     if (serialized === lastSavedPayloadRef.current) return;
 
-    const timer = setTimeout(async () => {
-      setAutoSaving(true);
-      try {
-        const res = await fetch("/api/production/loom/reading-sheet", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: serialized,
-        });
-
-        if (res.ok) {
-          lastSavedPayloadRef.current = serialized;
-          setLastAutoSavedAt(new Date());
-        }
-      } catch (err) {
-        console.error("Auto-save error:", err);
-      } finally {
-        setAutoSaving(false);
-      }
-    }, 1000);
+    const timer = setTimeout(() => {
+      triggerAutoSave(false);
+    }, 400);
 
     return () => clearTimeout(timer);
   }, [
@@ -295,7 +313,41 @@ export function LoomReadingSheetSection() {
     sheetStatus,
     loading,
     data,
+    triggerAutoSave,
   ]);
+
+  // Immediate flush on page reload, tab close, or navigation hide
+  useEffect(() => {
+    const handleUnloadOrHide = () => {
+      if (latestPayloadRef.current && !isInitialMountRef.current) {
+        const serialized = JSON.stringify(latestPayloadRef.current);
+        if (serialized !== lastSavedPayloadRef.current) {
+          fetch("/api/production/loom/reading-sheet", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: serialized,
+            keepalive: true,
+          }).catch(() => {});
+          lastSavedPayloadRef.current = serialized;
+        }
+      }
+    };
+
+    window.addEventListener("beforeunload", handleUnloadOrHide);
+    window.addEventListener("pagehide", handleUnloadOrHide);
+    const handleVisibility = () => {
+      if (document.visibilityState === "hidden") {
+        handleUnloadOrHide();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      window.removeEventListener("beforeunload", handleUnloadOrHide);
+      window.removeEventListener("pagehide", handleUnloadOrHide);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, []);
 
   // Handle live reading and breakdown changes with instant recalculation
   const handleEntryChange = (loomNumber: number, field: keyof LoomReadingEntryItem, value: any) => {
@@ -545,6 +597,40 @@ export function LoomReadingSheetSection() {
     }
   };
 
+  // Clean, deduplicated shift options based on database master shifts
+  const shiftOptions = useMemo(() => {
+    const raw = data?.availableShifts && data.availableShifts.length > 0
+      ? data.availableShifts
+      : [
+          { id: "shift_day", name: "DAY" },
+          { id: "shift_night", name: "NIGHT" },
+        ];
+
+    const seen = new Set<string>();
+    const result: { id: string; name: string; label: string }[] = [];
+
+    for (const s of raw) {
+      const upper = (s.name || "").toUpperCase().trim();
+      const normKey = upper.replace(/\s+/g, "");
+      if (!seen.has(normKey)) {
+        seen.add(normKey);
+        let label = s.name;
+        if (normKey === "DAY" || normKey === "DAYSHIFT" || normKey === "SHIFTA") {
+          label = "DAY (08:00 - 20:00)";
+        } else if (normKey === "NIGHT" || normKey === "NIGHTSHIFT" || normKey === "SHIFTB") {
+          label = "NIGHT (20:00 - 08:00)";
+        }
+        result.push({
+          id: s.id,
+          name: s.name,
+          label,
+        });
+      }
+    }
+
+    return result;
+  }, [data?.availableShifts]);
+
   return (
     <div className="space-y-4">
       {/* Toast Notification */}
@@ -726,24 +812,11 @@ export function LoomReadingSheetSection() {
               onChange={(e) => handleShiftChange(e.target.value)}
               className="w-full px-2.5 py-1.5 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-lg outline-none focus:bg-white focus:border-slate-800 transition-all"
             >
-              {(data?.availableShifts && data.availableShifts.length > 0
-                ? data.availableShifts
-                : [
-                    { id: "shift_day", name: "DAY" },
-                    { id: "shift_night", name: "NIGHT" },
-                  ]
-              ).map((s) => (
+              {shiftOptions.map((s) => (
                 <option key={s.id} value={s.name}>
-                  {s.name}
+                  {s.label}
                 </option>
               ))}
-              <option value="DAY">DAY</option>
-              <option value="NIGHT">NIGHT</option>
-              <option value="Day Shift">Day Shift</option>
-              <option value="Night Shift">Night Shift</option>
-              <option value="Shift A">Shift A (08:00 - 20:00)</option>
-              <option value="Shift B">Shift B (20:00 - 08:00)</option>
-              <option value="Shift C">Shift C</option>
             </select>
           </div>
 
@@ -878,6 +951,7 @@ export function LoomReadingSheetSection() {
               type="number"
               value={totalWastageKg}
               onChange={(e) => setTotalWastageKg(e.target.value)}
+              onBlur={() => triggerAutoSave(true)}
               className="w-20 px-2 py-0.5 text-base font-extrabold text-rose-700 font-mono bg-rose-50/50 border border-rose-200 rounded-lg outline-none focus:bg-white focus:border-rose-400"
               placeholder="0"
             />
@@ -1022,6 +1096,7 @@ export function LoomReadingSheetSection() {
                           type="text"
                           value={e.operatorName || ""}
                           onChange={(ev) => handleEntryChange(e.loomNumber, "operatorName", ev.target.value)}
+                          onBlur={() => triggerAutoSave(true)}
                           placeholder="Operator"
                           className="w-full px-1.5 py-0.5 text-xs bg-transparent border-b border-transparent focus:border-slate-800 outline-none hover:bg-slate-50/80 rounded"
                         />
@@ -1033,6 +1108,7 @@ export function LoomReadingSheetSection() {
                           type="text"
                           value={e.size || ""}
                           onChange={(ev) => handleEntryChange(e.loomNumber, "size", ev.target.value)}
+                          onBlur={() => triggerAutoSave(true)}
                           placeholder="Size"
                           className="w-full px-1 py-0.5 text-xs text-center font-mono bg-transparent border-b border-transparent focus:border-slate-800 outline-none rounded"
                         />
@@ -1044,6 +1120,7 @@ export function LoomReadingSheetSection() {
                           type="text"
                           value={e.denier || ""}
                           onChange={(ev) => handleEntryChange(e.loomNumber, "denier", ev.target.value)}
+                          onBlur={() => triggerAutoSave(true)}
                           placeholder="DNR"
                           className="w-full px-1 py-0.5 text-xs text-center font-mono bg-transparent border-b border-transparent focus:border-slate-800 outline-none rounded"
                         />
@@ -1055,6 +1132,7 @@ export function LoomReadingSheetSection() {
                           type="text"
                           value={e.qualityType || ""}
                           onChange={(ev) => handleEntryChange(e.loomNumber, "qualityType", ev.target.value)}
+                          onBlur={() => triggerAutoSave(true)}
                           placeholder="Recipe / Quality"
                           className="w-full px-1.5 py-0.5 text-xs font-semibold text-slate-800 bg-transparent border-b border-transparent focus:border-slate-800 outline-none rounded"
                         />
@@ -1072,6 +1150,7 @@ export function LoomReadingSheetSection() {
                               ev.target.value === "" ? null : parseFloat(ev.target.value)
                             )
                           }
+                          onBlur={() => triggerAutoSave(true)}
                           placeholder="I/R"
                           className="w-full px-1 py-0.5 text-xs text-right font-mono font-bold text-slate-700 bg-transparent border-b border-transparent focus:border-slate-800 outline-none"
                         />
@@ -1089,6 +1168,7 @@ export function LoomReadingSheetSection() {
                               ev.target.value === "" ? null : parseFloat(ev.target.value)
                             )
                           }
+                          onBlur={() => triggerAutoSave(true)}
                           className="w-full px-1 py-0.5 text-xs text-right font-mono bg-transparent border-b border-transparent focus:border-slate-800 outline-none"
                         />
                       </td>
@@ -1108,6 +1188,7 @@ export function LoomReadingSheetSection() {
                               ev.target.value === "" ? null : parseFloat(ev.target.value)
                             )
                           }
+                          onBlur={() => triggerAutoSave(true)}
                           className="w-full px-1 py-0.5 text-xs text-right font-mono bg-transparent border-b border-transparent focus:border-slate-800 outline-none"
                         />
                       </td>
@@ -1127,6 +1208,7 @@ export function LoomReadingSheetSection() {
                               ev.target.value === "" ? null : parseFloat(ev.target.value)
                             )
                           }
+                          onBlur={() => triggerAutoSave(true)}
                           className="w-full px-1 py-0.5 text-xs text-right font-mono bg-transparent border-b border-transparent focus:border-slate-800 outline-none"
                         />
                       </td>
@@ -1146,6 +1228,7 @@ export function LoomReadingSheetSection() {
                               ev.target.value === "" ? null : parseFloat(ev.target.value)
                             )
                           }
+                          onBlur={() => triggerAutoSave(true)}
                           className="w-full px-1 py-0.5 text-xs text-right font-mono bg-transparent border-b border-transparent focus:border-slate-800 outline-none"
                         />
                       </td>
@@ -1165,6 +1248,7 @@ export function LoomReadingSheetSection() {
                               ev.target.value === "" ? null : parseFloat(ev.target.value)
                             )
                           }
+                          onBlur={() => triggerAutoSave(true)}
                           className="w-full px-1 py-0.5 text-xs text-right font-mono bg-transparent border-b border-transparent focus:border-slate-800 outline-none"
                         />
                       </td>
@@ -1184,6 +1268,7 @@ export function LoomReadingSheetSection() {
                               ev.target.value === "" ? null : parseFloat(ev.target.value)
                             )
                           }
+                          onBlur={() => triggerAutoSave(true)}
                           placeholder="End"
                           className="w-full px-1 py-0.5 text-xs text-right font-mono font-bold text-slate-700 bg-transparent border-b border-transparent focus:border-slate-800 outline-none"
                         />
@@ -1200,6 +1285,7 @@ export function LoomReadingSheetSection() {
                           <select
                             value={e.breakdownReason || ""}
                             onChange={(ev) => handleEntryChange(e.loomNumber, "breakdownReason", ev.target.value || null)}
+                            onBlur={() => triggerAutoSave(true)}
                             className="flex-1 text-[10px] font-medium px-1 py-0.5 bg-white border border-amber-200/80 rounded outline-none text-slate-700 hover:border-amber-400"
                           >
                             <option value="">No Breakdown</option>
@@ -1222,6 +1308,7 @@ export function LoomReadingSheetSection() {
                                   ev.target.value === "" ? 0 : Math.max(0, parseInt(ev.target.value, 10) || 0)
                                 )
                               }
+                              onBlur={() => triggerAutoSave(true)}
                               placeholder="0"
                               title="Downtime in minutes"
                               className="w-12 px-1 py-0.5 text-xs text-right font-mono font-bold text-amber-900 bg-white border border-amber-200/80 rounded outline-none focus:border-amber-500"
@@ -1260,6 +1347,7 @@ export function LoomReadingSheetSection() {
                         <select
                           value={e.status}
                           onChange={(ev) => handleEntryChange(e.loomNumber, "status", ev.target.value)}
+                          onBlur={() => triggerAutoSave(true)}
                           className={`text-[10px] font-bold px-1.5 py-0.5 rounded border outline-none ${
                             e.status === "RUNNING"
                               ? "bg-emerald-50 text-emerald-800 border-emerald-200"
@@ -1280,6 +1368,7 @@ export function LoomReadingSheetSection() {
                           type="text"
                           value={e.remarks || ""}
                           onChange={(ev) => handleEntryChange(e.loomNumber, "remarks", ev.target.value)}
+                          onBlur={() => triggerAutoSave(true)}
                           placeholder="Notes..."
                           className="flex-1 min-w-[70px] px-1 py-0.5 text-xs bg-transparent border-b border-transparent focus:border-slate-800 outline-none"
                         />
@@ -1346,6 +1435,7 @@ export function LoomReadingSheetSection() {
               type="text"
               value={preparedBy}
               onChange={(e) => setPreparedBy(e.target.value)}
+              onBlur={() => triggerAutoSave(true)}
               placeholder="e.g. Ravinder Kumar"
               className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg outline-none focus:bg-white focus:border-slate-800 transition-all font-medium"
             />
@@ -1359,6 +1449,7 @@ export function LoomReadingSheetSection() {
               type="text"
               value={checkedBy}
               onChange={(e) => setCheckedBy(e.target.value)}
+              onBlur={() => triggerAutoSave(true)}
               placeholder="e.g. Suresh Sharma"
               className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg outline-none focus:bg-white focus:border-slate-800 transition-all font-medium"
             />
@@ -1372,6 +1463,7 @@ export function LoomReadingSheetSection() {
               type="text"
               value={approvedBy}
               onChange={(e) => setApprovedBy(e.target.value)}
+              onBlur={() => triggerAutoSave(true)}
               placeholder="e.g. Plant Manager"
               className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg outline-none focus:bg-white focus:border-slate-800 transition-all font-medium"
             />
