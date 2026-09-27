@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { computeIntervalDeltas, computeLoomEfficiency, LoomReadingEntryItem } from "../loom-reading-types";
+import { computeIntervalDeltas, computeLoomEfficiency, isLoomActive, LoomReadingEntryItem } from "../loom-reading-types";
 import { exportLoomReadingSheetExcel } from "../loom-reading-export";
 import { generateLoomReadingHtml } from "../print-loom-reading";
 import * as XLSX from "xlsx";
@@ -253,5 +253,110 @@ describe("2 Hours Loom Reading Export & Print Engine", () => {
 
     expect(html).toContain("Active Running Looms Only");
     expect(html).toContain("#31");
+  });
+
+  describe("isLoomActive helper", () => {
+    it("should consider loom active if initial reading is entered even with 0 delta", () => {
+      const entry: LoomReadingEntryItem = {
+        loomNumber: 5,
+        operatorName: "",
+        size: "",
+        denier: "",
+        qualityType: "",
+        initialReading: 1200,
+        r1Reading: null,
+        r1Prod: null,
+        r2Reading: null,
+        r2Prod: null,
+        r3Reading: null,
+        r3Prod: null,
+        r4Reading: null,
+        r4Prod: null,
+        r5Reading: null,
+        r5Prod: null,
+        r6Reading: null,
+        r6Prod: null,
+        totalProduction: 0,
+        breakdownReason: null,
+        breakdownMinutes: 0,
+        efficiencyPct: 0,
+        status: "IDLE",
+        remarks: "",
+      };
+
+      expect(isLoomActive(entry)).toBe(true);
+    });
+
+    it("should consider loom active if operator or breakdown is logged", () => {
+      const entryWithOp: LoomReadingEntryItem = {
+        loomNumber: 10,
+        operatorName: "Rajesh",
+        size: "",
+        denier: "",
+        qualityType: "",
+        initialReading: null,
+        r1Reading: null,
+        r1Prod: null,
+        r2Reading: null,
+        r2Prod: null,
+        r3Reading: null,
+        r3Prod: null,
+        r4Reading: null,
+        r4Prod: null,
+        r5Reading: null,
+        r5Prod: null,
+        r6Reading: null,
+        r6Prod: null,
+        totalProduction: 0,
+        breakdownReason: null,
+        breakdownMinutes: 0,
+        efficiencyPct: 0,
+        status: "IDLE",
+        remarks: "",
+      };
+
+      expect(isLoomActive(entryWithOp)).toBe(true);
+
+      const entryWithBd: LoomReadingEntryItem = {
+        ...entryWithOp,
+        operatorName: "",
+        breakdownReason: "Power Cut",
+        breakdownMinutes: 45,
+        remarks: "",
+      };
+
+      expect(isLoomActive(entryWithBd)).toBe(true);
+    });
+
+    it("should return false for an unallocated, unstarted idle loom", () => {
+      const blankEntry: LoomReadingEntryItem = {
+        loomNumber: 90,
+        operatorName: "",
+        size: "",
+        denier: "",
+        qualityType: "",
+        initialReading: null,
+        r1Reading: null,
+        r1Prod: null,
+        r2Reading: null,
+        r2Prod: null,
+        r3Reading: null,
+        r3Prod: null,
+        r4Reading: null,
+        r4Prod: null,
+        r5Reading: null,
+        r5Prod: null,
+        r6Reading: null,
+        r6Prod: null,
+        totalProduction: 0,
+        breakdownReason: null,
+        breakdownMinutes: 0,
+        efficiencyPct: 0,
+        status: "IDLE",
+        remarks: "",
+      };
+
+      expect(isLoomActive(blankEntry)).toBe(false);
+    });
   });
 });
