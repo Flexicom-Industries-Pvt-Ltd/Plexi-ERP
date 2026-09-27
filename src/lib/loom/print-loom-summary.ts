@@ -9,7 +9,7 @@
  */
 
 import { LoomSummaryDataset } from "./loom-summary-export";
-import { RecipeLoomSummaryItem, LoomMachineSummaryItem } from "@/app/api/production/loom/summary/route";
+import { RecipeLoomSummaryItem, LoomMachineSummaryItem } from "./loom-summary-types";
 
 export interface PrintLoomSummaryOptions extends Partial<LoomSummaryDataset> {
   activeView?: "recipes" | "looms";
