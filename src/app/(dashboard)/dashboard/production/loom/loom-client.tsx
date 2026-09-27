@@ -4,6 +4,7 @@ import React from "react";
 import { useSearchParams } from "next/navigation";
 import { LoomSummarySection } from "@/components/loom/LoomSummarySection";
 import { LoomChangeoverSection } from "@/components/loom/LoomChangeoverSection";
+import { LoomReadingSheetSection } from "@/components/loom/LoomReadingSheetSection";
 
 export function LoomClient() {
   const searchParams = useSearchParams();
@@ -11,7 +12,13 @@ export function LoomClient() {
 
   return (
     <div className="space-y-5 p-4 sm:p-6 max-w-7xl mx-auto min-w-0">
-      {tabParam === "changeover" ? <LoomChangeoverSection /> : <LoomSummarySection />}
+      {tabParam === "changeover" ? (
+        <LoomChangeoverSection />
+      ) : tabParam === "reading-sheet" || tabParam === "2-hours" || tabParam === "reading" ? (
+        <LoomReadingSheetSection />
+      ) : (
+        <LoomSummarySection />
+      )}
     </div>
   );
 }

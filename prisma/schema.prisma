@@ -1958,4 +1958,65 @@ model LoomChangeover {
   @@index([sequence])
 }
 
+model LoomReadingSheet {
+  id                        String             @id @default(cuid())
+  date                      String             // YYYY-MM-DD
+  shiftName                 String             // "Shift A", "Shift B", "Day Shift", "Night Shift"
+  shiftId                   String?            // Optional ID of shift
+  shiftHours                Int                @default(12)
+  timeSlots                 String[]           @default(["10:00", "12:00", "02:00", "04:00", "06:00", "08:00"])
+  initialTimeSlot           String             @default("08:00")
+  preparedBy                String?
+  checkedBy                 String?
+  approvedBy                String?
+  totalLoomProductionMeters Float              @default(0)
+  totalLoomProductionKg     Float              @default(0)
+  totalWastageKg            Float              @default(0)
+  runningLoomsCount         Int                @default(0)
+  idleLoomsCount            Int                @default(0)
+  remarks                   String?
+  status                    String             @default("DRAFT") // "DRAFT" | "SUBMITTED" | "APPROVED"
+  entries                   LoomReadingEntry[]
+  createdAt                 DateTime           @default(now())
+  updatedAt                 DateTime           @updatedAt
+
+  @@unique([date, shiftName])
+  @@index([date])
+  @@index([shiftName])
+  @@index([status])
+}
+
+model LoomReadingEntry {
+  id              String           @id @default(cuid())
+  sheetId         String
+  sheet           LoomReadingSheet @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+  loomNumber      Int              // 1 to 91
+  operatorName    String?
+  size            String?          // e.g. "480", "500", "485"
+  denier          String?          // e.g. "850", "1000"
+  qualityType     String?          // e.g. "Mahal/LPP/W", "UTCL/LPP/Y/67"
+  initialReading  Float?           // Initial meter reading (e.g. 7220)
+  r1Reading       Float?           // 10:00 meter reading
+  r1Prod          Float?           // Calculated 10:00 production (meters)
+  r2Reading       Float?           // 12:00 meter reading
+  r2Prod          Float?           // Calculated 12:00 production (meters)
+  r3Reading       Float?           // 02:00 meter reading
+  r3Prod          Float?           // Calculated 02:00 production (meters)
+  r4Reading       Float?           // 04:00 meter reading
+  r4Prod          Float?           // Calculated 04:00 production (meters)
+  r5Reading       Float?           // 06:00 meter reading
+  r5Prod          Float?           // Calculated 06:00 production (meters)
+  r6Reading       Float?           // 08:00 (End) meter reading
+  r6Prod          Float?           // Calculated 08:00 production (meters)
+  totalProduction Float?           @default(0) // Total shift production (meters)
+  status          String           @default("RUNNING") // "RUNNING" | "STOP" | "CLEANING" | "CHANGEOVER"
+  remarks         String?          // e.g. "STOP", "Cleaning", "Winder emery cheese"
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@unique([sheetId, loomNumber])
+  @@index([loomNumber])
+  @@index([status])
+}
+
 
