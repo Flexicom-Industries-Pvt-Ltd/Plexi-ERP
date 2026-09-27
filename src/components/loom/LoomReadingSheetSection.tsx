@@ -141,7 +141,30 @@ export function LoomReadingSheetSection() {
       if (!res.ok) throw new Error("Failed to fetch loom reading sheet");
       const json: ReadingSheetData = await res.json();
       setData(json);
-      setEntries(json.entries || []);
+
+      const computedEntries = (json.entries || []).map((entry) => {
+        const { r1Prod, r2Prod, r3Prod, r4Prod, r5Prod, r6Prod, totalProduction } = computeIntervalDeltas(entry);
+        const bdMinutes = Number(entry.breakdownMinutes) || 0;
+        const eff = computeLoomEfficiency(
+          totalProduction,
+          entry.qualityType,
+          bdMinutes,
+          json.sheet?.shiftHours || 12
+        );
+        return {
+          ...entry,
+          r1Prod,
+          r2Prod,
+          r3Prod,
+          r4Prod,
+          r5Prod,
+          r6Prod,
+          totalProduction,
+          efficiencyPct: eff.efficiencyPct,
+        };
+      });
+
+      setEntries(computedEntries);
       setPreparedBy(json.sheet?.preparedBy || "");
       setCheckedBy(json.sheet?.checkedBy || "");
       setApprovedBy(json.sheet?.approvedBy || "");
@@ -171,7 +194,7 @@ export function LoomReadingSheetSection() {
           [field]: value,
         };
 
-        // Recalculate deltas if a reading changed
+        // Recalculate deltas if any reading field changed
         if (
           field === "initialReading" ||
           field === "r1Reading" ||
@@ -179,13 +202,7 @@ export function LoomReadingSheetSection() {
           field === "r3Reading" ||
           field === "r4Reading" ||
           field === "r5Reading" ||
-          field === "r6Reading" ||
-          field === "r1Prod" ||
-          field === "r2Prod" ||
-          field === "r3Prod" ||
-          field === "r4Prod" ||
-          field === "r5Prod" ||
-          field === "r6Prod"
+          field === "r6Reading"
         ) {
           const { r1Prod, r2Prod, r3Prod, r4Prod, r5Prod, r6Prod, totalProduction } = computeIntervalDeltas(updated);
           updated.r1Prod = r1Prod;
@@ -195,6 +212,10 @@ export function LoomReadingSheetSection() {
           updated.r5Prod = r5Prod;
           updated.r6Prod = r6Prod;
           updated.totalProduction = totalProduction;
+
+          if (totalProduction > 0 && updated.status === "IDLE") {
+            updated.status = "RUNNING";
+          }
         }
 
         // Live calculate efficiency whenever meters, quality, or breakdown minutes change
