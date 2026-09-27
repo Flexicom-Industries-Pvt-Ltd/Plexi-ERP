@@ -961,7 +961,16 @@ export function LoomSummarySection() {
                       <td className="py-2.5 px-3.5">
                         {loom.activeRecipe ? (
                           <div className="space-y-0.5">
-                            <RecipeQualityBadge value={loom.activeRecipe} />
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <RecipeQualityBadge value={loom.activeRecipe} />
+                              {(loom.size || loom.denier) && (
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 text-[10px] font-mono font-bold border border-slate-200">
+                                  {loom.size && <span>{loom.size}mm</span>}
+                                  {loom.size && loom.denier && <span>•</span>}
+                                  {loom.denier && <span>{loom.denier}D</span>}
+                                </span>
+                              )}
+                            </div>
                             {(loom.allocationDate || (loom.activeShifts && loom.activeShifts.length > 0)) && (
                               <div className="flex flex-wrap items-center gap-1.5">
                                 {loom.allocationDate && (
@@ -1073,6 +1082,34 @@ export function LoomSummarySection() {
                     ))}
                 </select>
               </div>
+
+              {/* Dynamic Auto-Fetched Quality Specs */}
+              {(() => {
+                const selectedSpec = availableRecipes.find((r) => r.code === assigningQualityCode);
+                if (!selectedSpec) return null;
+                return (
+                  <div className="flex items-center gap-3 p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs">
+                    <div className="flex-1">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Auto Size (Width)</span>
+                      <span className="font-mono font-bold text-slate-800">
+                        {selectedSpec.size ? `${selectedSpec.size} mm` : selectedSpec.reedSpaceCm ? `${selectedSpec.reedSpaceCm} cm` : "—"}
+                      </span>
+                    </div>
+                    <div className="flex-1">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Auto Denier (DNR)</span>
+                      <span className="font-mono font-bold text-slate-800">
+                        {selectedSpec.denier ? `${selectedSpec.denier} D` : "—"}
+                      </span>
+                    </div>
+                    <div className="flex-1">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Color Group</span>
+                      <span className="font-semibold text-slate-700">
+                        {selectedSpec.colorGroup || "Standard"}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Date & Multi-Shift Selection (Single Loom Modal) */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl">
@@ -1222,6 +1259,34 @@ export function LoomSummarySection() {
                     ))}
                 </select>
               </div>
+
+              {/* Dynamic Auto-Fetched Specs for Bulk Selected Recipe */}
+              {(() => {
+                const selectedSpec = availableRecipes.find((r) => r.code === bulkSelectedRecipe);
+                if (!selectedSpec) return null;
+                return (
+                  <div className="flex items-center gap-3 p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs">
+                    <div className="flex-1">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Auto Size (Width)</span>
+                      <span className="font-mono font-bold text-slate-800">
+                        {selectedSpec.size ? `${selectedSpec.size} mm` : selectedSpec.reedSpaceCm ? `${selectedSpec.reedSpaceCm} cm` : "—"}
+                      </span>
+                    </div>
+                    <div className="flex-1">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Auto Denier (DNR)</span>
+                      <span className="font-mono font-bold text-slate-800">
+                        {selectedSpec.denier ? `${selectedSpec.denier} D` : "—"}
+                      </span>
+                    </div>
+                    <div className="flex-1">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Color Group</span>
+                      <span className="font-semibold text-slate-700">
+                        {selectedSpec.colorGroup || "Standard"}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Date & Multi-Shift Selection (Bulk Modal) */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl">

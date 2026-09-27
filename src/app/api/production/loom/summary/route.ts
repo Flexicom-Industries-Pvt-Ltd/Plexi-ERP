@@ -283,11 +283,17 @@ export async function GET(request: NextRequest) {
 
       const latestAlloc = loomAllocs[0] || null;
 
+      const resolvedDenier = assignedMapping?.denier ?? (assignedMapping ? recipeSpecMap.get(assignedMapping.qualityCode.toLowerCase().trim())?.denier : null);
+      const resolvedSize = assignedMapping?.reedSpaceCm ? `${assignedMapping.reedSpaceCm * 10}` : assignedMapping?.tapeWidth ? `${assignedMapping.tapeWidth}` : (assignedMapping ? (recipeSpecMap.get(assignedMapping.qualityCode.toLowerCase().trim())?.spacerSize ? `${recipeSpecMap.get(assignedMapping.qualityCode.toLowerCase().trim())!.spacerSize! * 10}` : recipeSpecMap.get(assignedMapping.qualityCode.toLowerCase().trim())?.tapeWidth ? `${recipeSpecMap.get(assignedMapping.qualityCode.toLowerCase().trim())!.tapeWidth}` : null) : null);
+
       loomSummaries.push({
         loomNumber: loomNo,
         loomIdentifier: `Loom #${loomNo}`,
         isActive,
         activeRecipe,
+        size: resolvedSize,
+        denier: resolvedDenier ?? null,
+        reedSpaceCm: assignedMapping?.reedSpaceCm ?? null,
         allocationDate: assignedMapping?.allocationDate || null,
         activeShifts: assignedMapping?.activeShifts || [],
         allRecipes,
@@ -401,16 +407,24 @@ export async function GET(request: NextRequest) {
         startTime: s.startTime,
         endTime: s.endTime,
       })),
-      availableRecipes: tapeRecipes.map((r) => ({
-        id: r.id,
-        code: r.code,
-        tapeType: r.tapeType,
-        colorGroup: r.colorGroup,
-        colour: r.colour,
-        denier: r.denier,
-        tapeWidth: r.tapeWidth,
-        bobbinMarking: r.bobbinMarking,
-      })),
+      availableRecipes: tapeRecipes.map((r) => {
+        const matchingMapping = mappings.find((m) => m.qualityCode.toLowerCase() === r.code.toLowerCase());
+        const resolvedSize = matchingMapping?.reedSpaceCm ? `${matchingMapping.reedSpaceCm * 10}` : r.spacerSize ? `${r.spacerSize * 10}` : r.tapeWidth ? `${r.tapeWidth}` : "";
+        const resolvedReedSpace = matchingMapping?.reedSpaceCm ?? r.spacerSize ?? null;
+        return {
+          id: r.id,
+          code: r.code,
+          tapeType: r.tapeType,
+          colorGroup: r.colorGroup,
+          colour: r.colour,
+          denier: r.denier,
+          tapeWidth: r.tapeWidth,
+          spacerSize: r.spacerSize,
+          reedSpaceCm: resolvedReedSpace,
+          size: resolvedSize,
+          bobbinMarking: r.bobbinMarking,
+        };
+      }),
       recipeSummaries: filteredRecipes,
       loomSummaries: filteredLooms,
       qualities: backwardQualities,
