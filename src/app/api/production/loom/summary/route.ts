@@ -10,72 +10,13 @@ import {
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-export interface LoomIssueAllocationEntry {
-  issueId: string;
-  slipNumber: string;
-  date: string;
-  shiftId: string;
-  shiftName: string;
-  recipeQuality: string;
-  loomNumber: number | null;
-  loomIdentifier: string;
-  crateCount: number;
-  bobbinCount: number;
-  weightKg: number;
-  issuedBy?: string | null;
-  receivedBy?: string | null;
-  remarks?: string | null;
-}
+import {
+  LoomIssueAllocationEntry,
+  RecipeLoomSummaryItem,
+  LoomMachineSummaryItem,
+} from "@/lib/loom/loom-summary-types";
 
-export interface RecipeLoomSummaryItem {
-  recipeQuality: string;
-  totalLoomsCount: number;
-  assignedLooms: number[];
-  assignedLoomIdentifiers: string[];
-  allocationDate?: string | null;
-  activeShifts: string[];
-  totalCratesIssued: number;
-  totalBobbinsIssued: number;
-  totalWeightIssuedKg: number;
-  latestIssueDate: string;
-  issuesCount: number;
-  issuers: string[];
-  receivers: string[];
-  recentIssues: {
-    slipNumber: string;
-    date: string;
-    shiftName: string;
-    crateCount: number;
-    weightKg: number;
-    loomIdentifier: string;
-  }[];
-}
-
-export interface LoomMachineSummaryItem {
-  loomNumber: number;
-  loomIdentifier: string;
-  isActive: boolean;
-  activeRecipe: string | null;
-  allocationDate?: string | null;
-  activeShifts: string[];
-  allRecipes: string[];
-  totalCrates: number;
-  totalBobbins: number;
-  totalWeightKg: number;
-  latestDate: string | null;
-  latestShiftName: string | null;
-  lastIssuedBy: string | null;
-  lastReceivedBy: string | null;
-  allocationsCount: number;
-  recentIssues: {
-    slipNumber: string;
-    date: string;
-    shiftName: string;
-    recipeQuality: string;
-    crateCount: number;
-    weightKg: number;
-  }[];
-}
+export type { LoomIssueAllocationEntry, RecipeLoomSummaryItem, LoomMachineSummaryItem };
 
 export async function GET(request: NextRequest) {
   const authResult = await requireLoomApiPermission("canRead");

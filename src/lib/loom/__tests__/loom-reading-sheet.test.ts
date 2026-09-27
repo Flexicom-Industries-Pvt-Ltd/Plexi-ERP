@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { computeIntervalDeltas, LoomReadingEntryItem } from "@/app/api/production/loom/reading-sheet/route";
+import { computeIntervalDeltas, LoomReadingEntryItem } from "../loom-reading-types";
 import { exportLoomReadingSheetExcel } from "../loom-reading-export";
 import { generateLoomReadingHtml } from "../print-loom-reading";
 import * as XLSX from "xlsx";

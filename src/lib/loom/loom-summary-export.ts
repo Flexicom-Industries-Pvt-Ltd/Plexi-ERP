@@ -1,5 +1,5 @@
 import * as XLSX from "xlsx";
-import { RecipeLoomSummaryItem, LoomMachineSummaryItem } from "@/app/api/production/loom/summary/route";
+import { RecipeLoomSummaryItem, LoomMachineSummaryItem } from "./loom-summary-types";
 
 export interface LoomQualityShiftEntry {
   shiftId: string;
