@@ -2013,6 +2013,7 @@ model LoomReadingEntry {
   totalProduction Float?           @default(0) // Total shift production (meters)
   breakdownReason String?          // e.g. "Change Over", "Power Cut", "Full Maintenance", "Shuttle Mount", "Operator Shortage", "Full Shut Down", "Bobbin Shortage"
   breakdownMinutes Int?            @default(0) // Downtime duration in minutes
+  changeoverTargetQuality String?  // Target quality selected when breakdownReason is "Change Over"
   efficiencyPct   Float?           @default(0) // Calculated Efficiency %
   status          String           @default("RUNNING") // "RUNNING" | "STOP" | "CLEANING" | "CHANGEOVER"
   remarks         String?          // e.g. "STOP", "Cleaning", "Winder emery cheese"
