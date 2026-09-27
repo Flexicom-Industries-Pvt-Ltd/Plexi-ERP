@@ -12,7 +12,6 @@ import {
   Users,
   CheckCircle2,
   AlertCircle,
-  Sparkles,
   Layers,
   ChevronDown,
   ChevronRight,
@@ -352,32 +351,6 @@ export function LoomReadingSheetSection() {
     }
   };
 
-  // Seed Sample 21/09/26 Data
-  const handleSeedSample = async () => {
-    try {
-      setLoading(true);
-      const res = await fetch("/api/production/loom/reading-sheet", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "SEED_SAMPLE_DATA",
-          date: selectedDate || "2026-09-21",
-          shiftName: selectedShift || "Day Shift",
-        }),
-      });
-
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "Failed to seed sample");
-
-      showNotification("Loaded 21/09/26 Shop Floor 2-Hours Loom Production Report!");
-      fetchSheetData(selectedDate, selectedShift);
-    } catch (err: any) {
-      showNotification(err.message || "Failed to load sample", "error");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
     <div className="space-y-4">
       {/* Toast Notification */}
@@ -419,16 +392,6 @@ export function LoomReadingSheetSection() {
 
           {/* Action Buttons */}
           <div className="flex flex-wrap items-center gap-2">
-            <button
-              onClick={handleSeedSample}
-              disabled={loading || saving}
-              className="px-3 py-1.5 text-xs font-semibold rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition-all inline-flex items-center gap-1.5 shadow-2xs cursor-pointer"
-              title="Load exact sample report from 21/09/26 (Looms 31-62)"
-            >
-              <Sparkles className="h-3.5 w-3.5 text-amber-500" />
-              <span>Load 21/09/26 Sample</span>
-            </button>
-
             <button
               onClick={() => setBulkModalOpen(true)}
               className="px-3 py-1.5 text-xs font-semibold rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition-all inline-flex items-center gap-1.5 shadow-2xs cursor-pointer"
