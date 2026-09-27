@@ -359,7 +359,13 @@ export function generateLoomReadingHtml(data: PrintLoomReadingOptions): string {
         <span>•</span>
         <span>Shift: <strong>${shiftName}</strong></span>
         <span>•</span>
-        <span>Scope: <strong>${filterActiveOnly ? "Active Running Looms Only" : "All Circular Looms (1-91)"}</strong></span>
+        <span>Scope: <strong>${
+          filterActiveOnly
+            ? "Active Running Looms Only"
+            : activeEntries.length < 91
+            ? `Filtered Report (${activeEntries.length} of 91 Looms)`
+            : "All Circular Looms (1-91)"
+        }</strong></span>
         <span>•</span>
         <span>Generated: <strong>${genTimestamp}</strong></span>
       </div>
@@ -528,16 +534,51 @@ export function generateLoomReadingHtml(data: PrintLoomReadingOptions): string {
 
 export function printLoomReadingSheet(options: PrintLoomReadingOptions): void {
   const html = generateLoomReadingHtml(options);
-  const printWindow = window.open("", "_blank");
-  if (!printWindow) {
-    alert("Please allow popups for printable reports.");
-    return;
+
+  // Use hidden iframe to trigger system print dialog on the current window without leaving blank tabs open
+  const iframeId = "__loom_reading_print_frame__";
+  let iframe = document.getElementById(iframeId) as HTMLIFrameElement | null;
+  if (!iframe) {
+    iframe = document.createElement("iframe");
+    iframe.id = iframeId;
+    iframe.style.position = "fixed";
+    iframe.style.right = "0";
+    iframe.style.bottom = "0";
+    iframe.style.width = "0";
+    iframe.style.height = "0";
+    iframe.style.border = "0";
+    document.body.appendChild(iframe);
   }
-  printWindow.document.open();
-  printWindow.document.write(html);
-  printWindow.document.close();
-  printWindow.focus();
-  setTimeout(() => {
-    printWindow.print();
-  }, 350);
+
+  const doc = iframe.contentWindow?.document || iframe.contentDocument;
+  if (doc && iframe.contentWindow) {
+    doc.open();
+    doc.write(html);
+    doc.close();
+
+    setTimeout(() => {
+      try {
+        iframe?.contentWindow?.focus();
+        iframe?.contentWindow?.print();
+      } catch (err) {
+        console.error("Iframe print failed, falling back to window print", err);
+        fallbackWindowPrint(html);
+      }
+    }, 250);
+  } else {
+    fallbackWindowPrint(html);
+  }
+}
+
+function fallbackWindowPrint(html: string): void {
+  const win = window.open("", "_blank", "width=1100,height=800");
+  if (win) {
+    win.document.open();
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    setTimeout(() => {
+      win.print();
+    }, 300);
+  }
 }
