@@ -32,11 +32,12 @@ export interface RecipeLoomSummaryItem {
   totalLoomsCount: number;
   assignedLooms: number[];
   assignedLoomIdentifiers: string[];
+  allocationDate?: string | null;
+  activeShifts: string[];
   totalCratesIssued: number;
   totalBobbinsIssued: number;
   totalWeightIssuedKg: number;
   latestIssueDate: string;
-  activeShifts: string[];
   issuesCount: number;
   issuers: string[];
   receivers: string[];
@@ -55,6 +56,8 @@ export interface LoomMachineSummaryItem {
   loomIdentifier: string;
   isActive: boolean;
   activeRecipe: string | null;
+  allocationDate?: string | null;
+  activeShifts: string[];
   allRecipes: string[];
   totalCrates: number;
   totalBobbins: number;
@@ -214,11 +217,12 @@ export async function GET(request: NextRequest) {
       mesh: string;
       assignedLoomsSet: Set<number>;
       assignedLoomIdentsSet: Set<string>;
+      allocationDate: string | null;
+      activeShiftsSet: Set<string>;
       totalCrates: number;
       totalBobbins: number;
       totalWeightKg: number;
       latestDate: string;
-      activeShiftsSet: Set<string>;
       issuesCount: number;
       issuersSet: Set<string>;
       receiversSet: Set<string>;
@@ -243,11 +247,12 @@ export async function GET(request: NextRequest) {
         mesh: mapping.mesh || "Standard",
         assignedLoomsSet: new Set<number>(looms),
         assignedLoomIdentsSet: new Set<string>(looms.map((n) => `Loom #${n}`)),
+        allocationDate: mapping.allocationDate || null,
+        activeShiftsSet: new Set<string>(mapping.activeShifts || []),
         totalCrates: 0,
         totalBobbins: 0,
         totalWeightKg: 0,
         latestDate: "",
-        activeShiftsSet: new Set<string>(),
         issuesCount: 0,
         issuersSet: new Set<string>(),
         receiversSet: new Set<string>(),
@@ -295,11 +300,12 @@ export async function GET(request: NextRequest) {
         totalLoomsCount: r.assignedLoomsSet.size,
         assignedLooms: Array.from(r.assignedLoomsSet).sort((a, b) => a - b),
         assignedLoomIdentifiers: Array.from(r.assignedLoomsSet).sort((a, b) => a - b).map((n) => `Loom #${n}`),
+        allocationDate: r.allocationDate,
+        activeShifts: Array.from(r.activeShiftsSet),
         totalCratesIssued: Number(r.totalCrates.toFixed(2)),
         totalBobbinsIssued: Number(r.totalBobbins.toFixed(2)),
         totalWeightIssuedKg: Number(r.totalWeightKg.toFixed(2)),
-        latestIssueDate: r.latestDate || "Assigned",
-        activeShifts: Array.from(r.activeShiftsSet),
+        latestIssueDate: r.latestDate || r.allocationDate || "Assigned",
         issuesCount: r.issuesCount,
         issuers: Array.from(r.issuersSet),
         receivers: Array.from(r.receiversSet),
@@ -341,12 +347,14 @@ export async function GET(request: NextRequest) {
         loomIdentifier: `Loom #${loomNo}`,
         isActive,
         activeRecipe,
+        allocationDate: assignedMapping?.allocationDate || null,
+        activeShifts: assignedMapping?.activeShifts || [],
         allRecipes,
         totalCrates: Number(totalCrates.toFixed(2)),
         totalBobbins: Number(totalBobbins.toFixed(2)),
         totalWeightKg: Number(totalWeightKg.toFixed(2)),
-        latestDate: latestAlloc ? latestAlloc.date : (assignedMapping ? "Assigned" : null),
-        latestShiftName: latestAlloc ? latestAlloc.shiftName : null,
+        latestDate: latestAlloc ? latestAlloc.date : (assignedMapping?.allocationDate || (assignedMapping ? "Assigned" : null)),
+        latestShiftName: latestAlloc ? latestAlloc.shiftName : (assignedMapping?.activeShifts?.length ? assignedMapping.activeShifts.join(", ") : null),
         lastIssuedBy: latestAlloc?.issuedBy || null,
         lastReceivedBy: latestAlloc?.receivedBy || null,
         allocationsCount: loomAllocs.length,
@@ -505,13 +513,20 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { action, loomNumber, qualityCode, loomNumbers } = body;
+    const { action, loomNumber, qualityCode, loomNumbers, date, shifts } = body;
     const TOTAL_LOOMS = 91;
+
+    const cleanDate = typeof date === "string" && date.trim() ? date.trim() : null;
+    const cleanShifts = Array.isArray(shifts)
+      ? shifts.map((s: any) => String(s).trim()).filter(Boolean)
+      : typeof shifts === "string" && shifts.trim()
+      ? [shifts.trim()]
+      : [];
 
     // Action: Reset all loom assignments to blank
     if (action === "RESET_ALL_MAPPINGS") {
       await db.loomMachineMapping.updateMany({
-        data: { loomNumbers: [], totalLooms: 0 },
+        data: { loomNumbers: [], totalLooms: 0, allocationDate: null, activeShifts: [] },
       });
       return NextResponse.json({
         success: true,
@@ -528,7 +543,7 @@ export async function POST(request: NextRequest) {
       const cleanCode = qualityCode.trim();
       await db.loomMachineMapping.updateMany({
         where: { qualityCode: { equals: cleanCode, mode: "insensitive" } },
-        data: { loomNumbers: [], totalLooms: 0 },
+        data: { loomNumbers: [], totalLooms: 0, allocationDate: null, activeShifts: [] },
       });
 
       return NextResponse.json({
@@ -601,19 +616,25 @@ export async function POST(request: NextRequest) {
             bobbinMarking: recipe?.bobbinMarking || "Bobbin Issue",
             loomNumbers: [lNum],
             totalLooms: 1,
+            allocationDate: cleanDate,
+            activeShifts: cleanShifts,
             isActive: true,
           },
         });
       } else {
         // Add lNum to targetMapping
         const targetLooms = Array.from(new Set([...(targetMapping.loomNumbers || []), lNum])).sort((a, b) => a - b);
+        const updateData: any = {
+          loomNumbers: targetLooms,
+          totalLooms: targetLooms.length,
+          isActive: true,
+        };
+        if (cleanDate !== null) updateData.allocationDate = cleanDate;
+        if (cleanShifts.length > 0) updateData.activeShifts = cleanShifts;
+
         await db.loomMachineMapping.update({
           where: { id: targetMapping.id },
-          data: {
-            loomNumbers: targetLooms,
-            totalLooms: targetLooms.length,
-            isActive: true,
-          },
+          data: updateData,
         });
       }
 
@@ -702,17 +723,23 @@ export async function POST(request: NextRequest) {
             bobbinMarking: recipe?.bobbinMarking || "Bobbin Issue",
             loomNumbers: sanitizedLooms,
             totalLooms: sanitizedLooms.length,
+            allocationDate: cleanDate,
+            activeShifts: cleanShifts,
             isActive: true,
           },
         });
       } else {
+        const updateData: any = {
+          loomNumbers: sanitizedLooms,
+          totalLooms: sanitizedLooms.length,
+          isActive: true,
+        };
+        if (cleanDate !== null) updateData.allocationDate = cleanDate;
+        if (cleanShifts.length > 0) updateData.activeShifts = cleanShifts;
+
         await db.loomMachineMapping.update({
           where: { id: targetMapping.id },
-          data: {
-            loomNumbers: sanitizedLooms,
-            totalLooms: sanitizedLooms.length,
-            isActive: true,
-          },
+          data: updateData,
         });
       }
 

@@ -65,12 +65,16 @@ export function LoomSummarySection() {
   const [singleLoomModalOpen, setSingleLoomModalOpen] = useState(false);
   const [assigningLoomNumber, setAssigningLoomNumber] = useState<number | null>(null);
   const [assigningQualityCode, setAssigningQualityCode] = useState<string>("");
+  const [assigningDate, setAssigningDate] = useState<string>("");
+  const [assigningShifts, setAssigningShifts] = useState<string[]>([]);
   const [isSubmittingSingleAssign, setIsSubmittingSingleAssign] = useState(false);
 
   // Recipe Bulk Loom Allocator Modal State
   const [bulkRecipeModalOpen, setBulkRecipeModalOpen] = useState(false);
   const [bulkSelectedRecipe, setBulkSelectedRecipe] = useState<string>("");
   const [bulkSelectedLooms, setBulkSelectedLooms] = useState<number[]>([]);
+  const [bulkDate, setBulkDate] = useState<string>("");
+  const [bulkShifts, setBulkShifts] = useState<string[]>([]);
   const [isSubmittingBulkAssign, setIsSubmittingBulkAssign] = useState(false);
 
   // Reset All Confirmation Modal State
@@ -130,8 +134,16 @@ export function LoomSummarySection() {
   // Single Loom Assign Handlers
   const handleOpenSingleLoomModal = (loomNo: number) => {
     const current = rawLoomList.find((l) => l.loomNumber === loomNo);
+    const todayStr = new Date().toISOString().split("T")[0];
     setAssigningLoomNumber(loomNo);
     setAssigningQualityCode(current?.activeRecipe || availableRecipes[0]?.code || "");
+    setAssigningDate(
+      current?.allocationDate || (selectedDate !== "ALL" ? selectedDate : todayStr)
+    );
+    const defaultShifts = current?.activeShifts && current.activeShifts.length > 0
+      ? current.activeShifts
+      : (data?.availableShifts?.map((s) => s.name) || ["Day Shift", "Night Shift"]);
+    setAssigningShifts(defaultShifts);
     setSingleLoomModalOpen(true);
   };
 
@@ -162,6 +174,8 @@ export function LoomSummarySection() {
           action: "ASSIGN_LOOM",
           loomNumber: assigningLoomNumber,
           qualityCode: targetCode,
+          date: assigningDate,
+          shifts: assigningShifts,
         }),
       });
       const result = await res.json();
@@ -211,6 +225,14 @@ export function LoomSummarySection() {
     setBulkSelectedRecipe(targetCode);
     const existing = recipeList.find((r) => r.recipeQuality.toLowerCase() === targetCode?.toLowerCase());
     setBulkSelectedLooms(existing ? [...existing.assignedLooms] : []);
+    const todayStr = new Date().toISOString().split("T")[0];
+    setBulkDate(
+      existing?.allocationDate || (selectedDate !== "ALL" ? selectedDate : todayStr)
+    );
+    const defaultShifts = existing?.activeShifts && existing.activeShifts.length > 0
+      ? existing.activeShifts
+      : (data?.availableShifts?.map((s) => s.name) || ["Day Shift", "Night Shift"]);
+    setBulkShifts(defaultShifts);
     setBulkRecipeModalOpen(true);
   };
 
@@ -218,6 +240,12 @@ export function LoomSummarySection() {
     setBulkSelectedRecipe(code);
     const existing = recipeList.find((r) => r.recipeQuality.toLowerCase() === code.toLowerCase());
     setBulkSelectedLooms(existing ? [...existing.assignedLooms] : []);
+    if (existing?.allocationDate) {
+      setBulkDate(existing.allocationDate);
+    }
+    if (existing?.activeShifts && existing.activeShifts.length > 0) {
+      setBulkShifts(existing.activeShifts);
+    }
   };
 
   const handleToggleBulkLoom = (loomNo: number) => {
@@ -294,6 +322,8 @@ export function LoomSummarySection() {
           action: "ASSIGN_RECIPE_LOOMS",
           qualityCode: bulkSelectedRecipe.trim(),
           loomNumbers: bulkSelectedLooms,
+          date: bulkDate,
+          shifts: bulkShifts,
         }),
       });
       const result = await res.json();
@@ -728,7 +758,25 @@ export function LoomSummarySection() {
                       </td>
 
                       <td className="py-3 px-3.5">
-                        <RecipeQualityBadge value={item.recipeQuality} />
+                        <div className="space-y-1">
+                          <RecipeQualityBadge value={item.recipeQuality} />
+                          {(item.allocationDate || (item.activeShifts && item.activeShifts.length > 0)) && (
+                            <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                              {item.allocationDate && (
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 text-[10px] font-mono">
+                                  <Calendar className="h-2.5 w-2.5 text-slate-400" />
+                                  <span>{item.allocationDate}</span>
+                                </span>
+                              )}
+                              {item.activeShifts && item.activeShifts.length > 0 && (
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 text-[10px]">
+                                  <Clock className="h-2.5 w-2.5 text-slate-400" />
+                                  <span>{item.activeShifts.join(", ")}</span>
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       </td>
 
                       <td className="py-3 px-3 text-center">
@@ -912,7 +960,25 @@ export function LoomSummarySection() {
 
                       <td className="py-2.5 px-3.5">
                         {loom.activeRecipe ? (
-                          <RecipeQualityBadge value={loom.activeRecipe} />
+                          <div className="space-y-0.5">
+                            <RecipeQualityBadge value={loom.activeRecipe} />
+                            {(loom.allocationDate || (loom.activeShifts && loom.activeShifts.length > 0)) && (
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                {loom.allocationDate && (
+                                  <span className="inline-flex items-center gap-0.5 text-[10px] font-mono text-slate-500">
+                                    <Calendar className="h-2.5 w-2.5 text-slate-400" />
+                                    <span>{loom.allocationDate}</span>
+                                  </span>
+                                )}
+                                {loom.activeShifts && loom.activeShifts.length > 0 && (
+                                  <span className="inline-flex items-center gap-0.5 text-[10px] text-slate-500">
+                                    <Clock className="h-2.5 w-2.5 text-slate-400" />
+                                    <span>{loom.activeShifts.join(", ")}</span>
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         ) : (
                           <span className="text-slate-400 italic text-[11px]">Unassigned</span>
                         )}
@@ -1007,6 +1073,73 @@ export function LoomSummarySection() {
                     ))}
                 </select>
               </div>
+
+              {/* Date & Multi-Shift Selection (Single Loom Modal) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
+                    <Calendar className="h-3.5 w-3.5 text-slate-500" />
+                    <span>Allocation Date:</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={assigningDate}
+                    onChange={(e) => setAssigningDate(e.target.value)}
+                    className="w-full px-2.5 py-1.5 text-xs font-medium bg-white border border-slate-200 rounded-lg outline-none focus:border-slate-800"
+                  />
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                      <Clock className="h-3.5 w-3.5 text-slate-500" />
+                      <span>Active Shift(s):</span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const allShiftNames = (data?.availableShifts || []).map((s) => s.name);
+                        if (assigningShifts.length === allShiftNames.length) {
+                          setAssigningShifts([]);
+                        } else {
+                          setAssigningShifts(allShiftNames);
+                        }
+                      }}
+                      className="text-[10px] text-slate-600 hover:text-slate-900 underline cursor-pointer"
+                    >
+                      {assigningShifts.length === (data?.availableShifts?.length || 2) ? "Deselect All" : "Select All"}
+                    </button>
+                  </div>
+
+                  <div className="flex flex-wrap gap-1.5">
+                    {(data?.availableShifts || [
+                      { id: "shift_day", name: "Day Shift" },
+                      { id: "shift_night", name: "Night Shift" },
+                    ]).map((s) => {
+                      const isSelected = assigningShifts.includes(s.name);
+                      return (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onClick={() => {
+                            setAssigningShifts((prev) =>
+                              prev.includes(s.name) ? prev.filter((name) => name !== s.name) : [...prev, s.name]
+                            );
+                          }}
+                          className={`px-2 py-1 text-[11px] font-medium rounded-lg border transition-all cursor-pointer inline-flex items-center gap-1 ${
+                            isSelected
+                              ? "bg-slate-900 text-white border-slate-900 shadow-2xs font-semibold"
+                              : "bg-white text-slate-600 border-slate-200 hover:bg-slate-100"
+                          }`}
+                        >
+                          {isSelected && <Check className="h-3 w-3" />}
+                          <span>{s.name}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
             </div>
 
             <div className="px-5 py-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-2">
@@ -1088,6 +1221,73 @@ export function LoomSummarySection() {
                       </option>
                     ))}
                 </select>
+              </div>
+
+              {/* Date & Multi-Shift Selection (Bulk Modal) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
+                    <Calendar className="h-3.5 w-3.5 text-slate-500" />
+                    <span>Allocation Date:</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={bulkDate}
+                    onChange={(e) => setBulkDate(e.target.value)}
+                    className="w-full px-2.5 py-1.5 text-xs font-medium bg-white border border-slate-200 rounded-lg outline-none focus:border-slate-800"
+                  />
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                      <Clock className="h-3.5 w-3.5 text-slate-500" />
+                      <span>Active Shift(s):</span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const allShiftNames = (data?.availableShifts || []).map((s) => s.name);
+                        if (bulkShifts.length === allShiftNames.length) {
+                          setBulkShifts([]);
+                        } else {
+                          setBulkShifts(allShiftNames);
+                        }
+                      }}
+                      className="text-[10px] text-slate-600 hover:text-slate-900 underline cursor-pointer"
+                    >
+                      {bulkShifts.length === (data?.availableShifts?.length || 2) ? "Deselect All" : "Select All"}
+                    </button>
+                  </div>
+
+                  <div className="flex flex-wrap gap-1.5">
+                    {(data?.availableShifts || [
+                      { id: "shift_day", name: "Day Shift" },
+                      { id: "shift_night", name: "Night Shift" },
+                    ]).map((s) => {
+                      const isSelected = bulkShifts.includes(s.name);
+                      return (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onClick={() => {
+                            setBulkShifts((prev) =>
+                              prev.includes(s.name) ? prev.filter((name) => name !== s.name) : [...prev, s.name]
+                            );
+                          }}
+                          className={`px-2 py-1 text-[11px] font-medium rounded-lg border transition-all cursor-pointer inline-flex items-center gap-1 ${
+                            isSelected
+                              ? "bg-slate-900 text-white border-slate-900 shadow-2xs font-semibold"
+                              : "bg-white text-slate-600 border-slate-200 hover:bg-slate-100"
+                          }`}
+                        >
+                          {isSelected && <Check className="h-3 w-3" />}
+                          <span>{s.name}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
 
               {/* Looms Interactive Grid */}
