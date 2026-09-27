@@ -997,88 +997,95 @@ export function LoomReadingSheetSection() {
 
       {/* Interactive Bi-Hourly Reading Table */}
       <div className="bg-white border border-slate-200 rounded-2xl shadow-2xs overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse min-w-[1450px]">
+        {/* Horizontal Scroll Guidance Header */}
+        <div className="px-5 py-2.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between text-xs text-slate-500">
+          <span className="font-bold text-slate-800">Circular Loom 2-Hours Shift Log Grid (Looms #1 to #91)</span>
+          <span className="text-[11px] font-medium text-slate-400 bg-white px-2.5 py-1 rounded-lg border border-slate-200">
+            ← Scroll horizontally to view all intervals, breakdown reasons, and target changeover qualities →
+          </span>
+        </div>
+        <div className="overflow-x-auto max-h-[75vh]">
+          <table className="w-full text-left text-xs border-collapse min-w-[2550px]">
             <thead>
-              <tr className="bg-slate-50 border-b border-slate-200 text-slate-700 font-bold uppercase text-[10.5px]">
-                <th className="py-2.5 px-2 text-center w-12 border-r border-slate-200" rowSpan={2}>
+              <tr className="bg-slate-100/90 border-b border-slate-200 text-slate-700 font-bold uppercase text-[11px]">
+                <th className="sticky left-0 bg-slate-100 z-20 py-3 px-3 text-center w-20 min-w-[80px] border-r-2 border-slate-300 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)]" rowSpan={2}>
                   Loom #
                 </th>
-                <th className="py-2.5 px-2.5 w-28 border-r border-slate-200" rowSpan={2}>
+                <th className="py-3 px-3.5 w-48 min-w-[180px] border-r border-slate-200" rowSpan={2}>
                   Operator Name
                 </th>
-                <th className="py-2.5 px-2 text-center w-14 border-r border-slate-200" rowSpan={2}>
-                  Size
+                <th className="py-3 px-2 text-center w-28 min-w-[100px] border-r border-slate-200" rowSpan={2}>
+                  Size (mm)
                 </th>
-                <th className="py-2.5 px-2 text-center w-14 border-r border-slate-200" rowSpan={2}>
-                  DNR
+                <th className="py-3 px-2 text-center w-28 min-w-[100px] border-r border-slate-200" rowSpan={2}>
+                  Denier (DNR)
                 </th>
-                <th className="py-2.5 px-2.5 w-36 border-r border-slate-200" rowSpan={2}>
+                <th className="py-3 px-3.5 w-64 min-w-[240px] border-r border-slate-200" rowSpan={2}>
                   Type / Quality
                 </th>
-                <th className="py-2.5 px-2 text-right w-20 bg-slate-100/70 border-r border-slate-200" rowSpan={2}>
+                <th className="py-3 px-3 text-right w-32 min-w-[120px] bg-slate-200/60 border-r border-slate-200" rowSpan={2}>
                   I/R {initialTimeSlot}
                 </th>
-                <th className="py-1 px-2 text-center border-r border-slate-200" colSpan={2}>
+                <th className="py-1.5 px-2 text-center border-r border-slate-200" colSpan={2}>
                   {timeSlots[0] || "10:00"}
                 </th>
-                <th className="py-1 px-2 text-center border-r border-slate-200" colSpan={2}>
+                <th className="py-1.5 px-2 text-center border-r border-slate-200" colSpan={2}>
                   {timeSlots[1] || "12:00"}
                 </th>
-                <th className="py-1 px-2 text-center border-r border-slate-200" colSpan={2}>
+                <th className="py-1.5 px-2 text-center border-r border-slate-200" colSpan={2}>
                   {timeSlots[2] || "02:00"}
                 </th>
-                <th className="py-1 px-2 text-center border-r border-slate-200" colSpan={2}>
+                <th className="py-1.5 px-2 text-center border-r border-slate-200" colSpan={2}>
                   {timeSlots[3] || "04:00"}
                 </th>
-                <th className="py-1 px-2 text-center border-r border-slate-200" colSpan={2}>
+                <th className="py-1.5 px-2 text-center border-r border-slate-200" colSpan={2}>
                   {timeSlots[4] || "06:00"}
                 </th>
-                <th className="py-2.5 px-2 text-right w-20 bg-slate-100/70 border-r border-slate-200" rowSpan={2}>
+                <th className="py-3 px-3 text-right w-32 min-w-[120px] bg-slate-200/60 border-r border-slate-200" rowSpan={2}>
                   {timeSlots[5] || "08:00"} End
                 </th>
-                <th className="py-2.5 px-2 text-right w-20 bg-blue-50/60 border-r border-slate-200" rowSpan={2}>
-                  T PROD
+                <th className="py-3 px-3 text-right w-36 min-w-[130px] bg-blue-50/80 border-r border-slate-200 text-blue-950 font-black" rowSpan={2}>
+                  T PROD (M)
                 </th>
-                <th className="py-2.5 px-2 text-center w-48 border-r border-slate-200 bg-amber-50/40" rowSpan={2}>
+                <th className="py-3 px-3 text-center w-64 min-w-[260px] border-r border-slate-200 bg-amber-50/50" rowSpan={2}>
                   Breakdown (Reason / Min)
                 </th>
-                <th className="py-2.5 px-2 text-center w-36 border-r border-slate-200 bg-amber-100/40" rowSpan={2}>
+                <th className="py-3 px-3 text-center w-60 min-w-[240px] border-r border-slate-200 bg-amber-100/50" rowSpan={2}>
                   C/O Target Quality
                 </th>
-                <th className="py-2.5 px-2 text-center w-20 border-r border-slate-200 bg-sky-50/50" rowSpan={2}>
+                <th className="py-3 px-3 text-center w-32 min-w-[120px] border-r border-slate-200 bg-sky-50/60" rowSpan={2}>
                   Efficiency
                 </th>
-                <th className="py-2.5 px-2.5 w-36" rowSpan={2}>
+                <th className="py-3 px-3.5 w-64 min-w-[250px]" rowSpan={2}>
                   Remarks / Status
                 </th>
               </tr>
-              <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-500 font-semibold text-[9.5px]">
-                <th className="py-1 px-1.5 text-right w-14">Read</th>
-                <th className="py-1 px-1.5 text-right w-12 bg-emerald-50 text-emerald-800 border-r border-slate-200">Prod</th>
-                <th className="py-1 px-1.5 text-right w-14">Read</th>
-                <th className="py-1 px-1.5 text-right w-12 bg-emerald-50 text-emerald-800 border-r border-slate-200">Prod</th>
-                <th className="py-1 px-1.5 text-right w-14">Read</th>
-                <th className="py-1 px-1.5 text-right w-12 bg-emerald-50 text-emerald-800 border-r border-slate-200">Prod</th>
-                <th className="py-1 px-1.5 text-right w-14">Read</th>
-                <th className="py-1 px-1.5 text-right w-12 bg-emerald-50 text-emerald-800 border-r border-slate-200">Prod</th>
-                <th className="py-1 px-1.5 text-right w-14">Read</th>
-                <th className="py-1 px-1.5 text-right w-12 bg-emerald-50 text-emerald-800 border-r border-slate-200">Prod</th>
+              <tr className="bg-slate-100/70 border-b border-slate-200 text-slate-600 font-bold text-[10px]">
+                <th className="py-1 px-2 text-right w-28 min-w-[105px]">Read</th>
+                <th className="py-1 px-2 text-right w-24 min-w-[90px] bg-emerald-50 text-emerald-800 border-r border-slate-200 font-black">Prod</th>
+                <th className="py-1 px-2 text-right w-28 min-w-[105px]">Read</th>
+                <th className="py-1 px-2 text-right w-24 min-w-[90px] bg-emerald-50 text-emerald-800 border-r border-slate-200 font-black">Prod</th>
+                <th className="py-1 px-2 text-right w-28 min-w-[105px]">Read</th>
+                <th className="py-1 px-2 text-right w-24 min-w-[90px] bg-emerald-50 text-emerald-800 border-r border-slate-200 font-black">Prod</th>
+                <th className="py-1 px-2 text-right w-28 min-w-[105px]">Read</th>
+                <th className="py-1 px-2 text-right w-24 min-w-[90px] bg-emerald-50 text-emerald-800 border-r border-slate-200 font-black">Prod</th>
+                <th className="py-1 px-2 text-right w-28 min-w-[105px]">Read</th>
+                <th className="py-1 px-2 text-right w-24 min-w-[90px] bg-emerald-50 text-emerald-800 border-r border-slate-200 font-black">Prod</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {loading ? (
                 <tr>
-                  <td colSpan={23} className="py-12 text-center text-slate-400">
-                    <div className="inline-flex items-center gap-2 font-medium">
-                      <div className="h-4 w-4 border-2 border-slate-300 border-t-slate-800 rounded-full animate-spin" />
+                  <td colSpan={23} className="py-16 text-center text-slate-400">
+                    <div className="inline-flex items-center gap-2.5 font-semibold text-sm">
+                      <div className="h-5 w-5 border-2 border-slate-300 border-t-slate-800 rounded-full animate-spin" />
                       <span>Loading Circular Loom 2-Hours Reading Sheet...</span>
                     </div>
                   </td>
                 </tr>
               ) : filteredEntries.length === 0 ? (
                 <tr>
-                  <td colSpan={23} className="py-8 text-center text-slate-400 font-medium italic">
+                  <td colSpan={23} className="py-12 text-center text-slate-400 font-medium italic text-sm">
                     No loom machines match the active filters.
                   </td>
                 </tr>
@@ -1092,71 +1099,79 @@ export function LoomReadingSheetSection() {
                   return (
                     <tr
                       key={e.loomNumber}
-                      className={`hover:bg-slate-50/70 transition-colors ${
+                      className={`hover:bg-slate-50 transition-colors group ${
                         e.status === "STOP"
                           ? "bg-rose-50/30"
                           : e.status === "CLEANING"
                           ? "bg-amber-50/30"
                           : isRunning
                           ? "bg-white"
-                          : "bg-slate-50/40 text-slate-400"
+                          : "bg-slate-50/50 text-slate-400"
                       }`}
                     >
-                      {/* Loom Number */}
-                      <td className="py-1.5 px-2 text-center font-bold font-mono text-slate-900 border-r border-slate-100">
+                      {/* Sticky Loom Number Column */}
+                      <td className={`sticky left-0 z-10 py-2 px-3 text-center font-black font-mono text-sm border-r-2 border-slate-300 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)] ${
+                        e.status === "STOP"
+                          ? "bg-rose-100/80 text-rose-950"
+                          : e.status === "CLEANING"
+                          ? "bg-amber-100/80 text-amber-950"
+                          : isRunning
+                          ? "bg-white text-slate-950 group-hover:bg-slate-50"
+                          : "bg-slate-100 text-slate-500 group-hover:bg-slate-100"
+                      }`}>
                         #{e.loomNumber}
                       </td>
 
                       {/* Operator Name */}
-                      <td className="py-1 px-2 border-r border-slate-100">
+                      <td className="py-1.5 px-2.5 border-r border-slate-100">
                         <input
                           type="text"
                           value={e.operatorName || ""}
                           onChange={(ev) => handleEntryChange(e.loomNumber, "operatorName", ev.target.value)}
                           onBlur={() => triggerAutoSave(true)}
-                          placeholder="Operator"
-                          className="w-full px-1.5 py-0.5 text-xs bg-transparent border-b border-transparent focus:border-slate-800 outline-none hover:bg-slate-50/80 rounded"
+                          placeholder="Operator Name"
+                          className="w-full px-2.5 py-1.5 text-xs bg-slate-50/40 group-hover:bg-white focus:bg-white border border-transparent hover:border-slate-200 focus:border-slate-800 rounded-lg outline-none font-medium text-slate-800 placeholder:text-slate-300 transition-all"
                         />
                       </td>
 
                       {/* Size */}
-                      <td className="py-1 px-1 border-r border-slate-100">
+                      <td className="py-1.5 px-2 border-r border-slate-100">
                         <input
                           type="text"
                           value={e.size || ""}
                           onChange={(ev) => handleEntryChange(e.loomNumber, "size", ev.target.value)}
                           onBlur={() => triggerAutoSave(true)}
-                          placeholder="Size"
-                          className="w-full px-1 py-0.5 text-xs text-center font-mono bg-transparent border-b border-transparent focus:border-slate-800 outline-none rounded"
+                          placeholder="Size (mm)"
+                          className="w-full px-2 py-1.5 text-xs text-center font-mono font-bold text-slate-800 bg-slate-50/40 group-hover:bg-white focus:bg-white border border-transparent hover:border-slate-200 focus:border-slate-800 rounded-lg outline-none placeholder:text-slate-300 transition-all"
                         />
                       </td>
 
                       {/* Denier */}
-                      <td className="py-1 px-1 border-r border-slate-100">
+                      <td className="py-1.5 px-2 border-r border-slate-100">
                         <input
                           type="text"
                           value={e.denier || ""}
                           onChange={(ev) => handleEntryChange(e.loomNumber, "denier", ev.target.value)}
                           onBlur={() => triggerAutoSave(true)}
-                          placeholder="DNR"
-                          className="w-full px-1 py-0.5 text-xs text-center font-mono bg-transparent border-b border-transparent focus:border-slate-800 outline-none rounded"
+                          placeholder="Denier"
+                          className="w-full px-2 py-1.5 text-xs text-center font-mono font-bold text-slate-800 bg-slate-50/40 group-hover:bg-white focus:bg-white border border-transparent hover:border-slate-200 focus:border-slate-800 rounded-lg outline-none placeholder:text-slate-300 transition-all"
                         />
                       </td>
 
                       {/* Quality Type */}
-                      <td className="py-1 px-2 border-r border-slate-100">
+                      <td className="py-1.5 px-2.5 border-r border-slate-100">
                         <input
                           type="text"
                           value={e.qualityType || ""}
                           onChange={(ev) => handleEntryChange(e.loomNumber, "qualityType", ev.target.value)}
                           onBlur={() => triggerAutoSave(true)}
-                          placeholder="Recipe / Quality"
-                          className="w-full px-1.5 py-0.5 text-xs font-semibold text-slate-800 bg-transparent border-b border-transparent focus:border-slate-800 outline-none rounded"
+                          placeholder="Recipe / Quality Code"
+                          className="w-full px-2.5 py-1.5 text-xs font-bold text-slate-900 bg-slate-50/40 group-hover:bg-white focus:bg-white border border-transparent hover:border-slate-200 focus:border-slate-800 rounded-lg outline-none placeholder:text-slate-300 transition-all"
                         />
                       </td>
 
                       {/* Initial Reading */}
-                      <td className="py-1 px-1.5 bg-slate-50/50 border-r border-slate-100">
+                      <td className="py-1.5 px-2.5 bg-slate-50/50 border-r border-slate-100">
                         <input
                           type="number"
                           value={e.initialReading !== null && e.initialReading !== undefined ? e.initialReading : ""}
@@ -1169,12 +1184,12 @@ export function LoomReadingSheetSection() {
                           }
                           onBlur={() => triggerAutoSave(true)}
                           placeholder="I/R"
-                          className="w-full px-1 py-0.5 text-xs text-right font-mono font-bold text-slate-700 bg-transparent border-b border-transparent focus:border-slate-800 outline-none"
+                          className="w-full px-2 py-1.5 text-xs text-right font-mono font-black text-slate-800 bg-slate-100/70 group-hover:bg-white focus:bg-white border border-transparent hover:border-slate-300 focus:border-slate-800 rounded-lg outline-none placeholder:text-slate-300 transition-all"
                         />
                       </td>
 
                       {/* 10:00 Reading & Prod */}
-                      <td className="py-1 px-1">
+                      <td className="py-1.5 px-2">
                         <input
                           type="number"
                           value={e.r1Reading !== null && e.r1Reading !== undefined ? e.r1Reading : ""}
@@ -1186,15 +1201,16 @@ export function LoomReadingSheetSection() {
                             )
                           }
                           onBlur={() => triggerAutoSave(true)}
-                          className="w-full px-1 py-0.5 text-xs text-right font-mono bg-transparent border-b border-transparent focus:border-slate-800 outline-none"
+                          placeholder="—"
+                          className="w-full px-2 py-1.5 text-xs text-right font-mono text-slate-800 bg-slate-50/40 group-hover:bg-white focus:bg-white border border-transparent hover:border-slate-200 focus:border-slate-800 rounded-lg outline-none transition-all"
                         />
                       </td>
-                      <td className="py-1 px-1.5 text-right font-mono font-bold text-emerald-700 bg-emerald-50/40 border-r border-slate-100">
-                        {e.r1Prod !== null && e.r1Prod > 0 ? e.r1Prod : e.r1Prod === 0 ? "0" : "—"}
+                      <td className="py-1.5 px-2.5 text-right font-mono font-black text-xs text-emerald-800 bg-emerald-50/50 border-r border-slate-100">
+                        {e.r1Prod !== null && e.r1Prod > 0 ? e.r1Prod.toLocaleString() : e.r1Prod === 0 ? "0" : "—"}
                       </td>
 
                       {/* 12:00 Reading & Prod */}
-                      <td className="py-1 px-1">
+                      <td className="py-1.5 px-2">
                         <input
                           type="number"
                           value={e.r2Reading !== null && e.r2Reading !== undefined ? e.r2Reading : ""}
@@ -1206,15 +1222,16 @@ export function LoomReadingSheetSection() {
                             )
                           }
                           onBlur={() => triggerAutoSave(true)}
-                          className="w-full px-1 py-0.5 text-xs text-right font-mono bg-transparent border-b border-transparent focus:border-slate-800 outline-none"
+                          placeholder="—"
+                          className="w-full px-2 py-1.5 text-xs text-right font-mono text-slate-800 bg-slate-50/40 group-hover:bg-white focus:bg-white border border-transparent hover:border-slate-200 focus:border-slate-800 rounded-lg outline-none transition-all"
                         />
                       </td>
-                      <td className="py-1 px-1.5 text-right font-mono font-bold text-emerald-700 bg-emerald-50/40 border-r border-slate-100">
-                        {e.r2Prod !== null && e.r2Prod > 0 ? e.r2Prod : e.r2Prod === 0 ? "0" : "—"}
+                      <td className="py-1.5 px-2.5 text-right font-mono font-black text-xs text-emerald-800 bg-emerald-50/50 border-r border-slate-100">
+                        {e.r2Prod !== null && e.r2Prod > 0 ? e.r2Prod.toLocaleString() : e.r2Prod === 0 ? "0" : "—"}
                       </td>
 
                       {/* 02:00 Reading & Prod */}
-                      <td className="py-1 px-1">
+                      <td className="py-1.5 px-2">
                         <input
                           type="number"
                           value={e.r3Reading !== null && e.r3Reading !== undefined ? e.r3Reading : ""}
@@ -1226,15 +1243,16 @@ export function LoomReadingSheetSection() {
                             )
                           }
                           onBlur={() => triggerAutoSave(true)}
-                          className="w-full px-1 py-0.5 text-xs text-right font-mono bg-transparent border-b border-transparent focus:border-slate-800 outline-none"
+                          placeholder="—"
+                          className="w-full px-2 py-1.5 text-xs text-right font-mono text-slate-800 bg-slate-50/40 group-hover:bg-white focus:bg-white border border-transparent hover:border-slate-200 focus:border-slate-800 rounded-lg outline-none transition-all"
                         />
                       </td>
-                      <td className="py-1 px-1.5 text-right font-mono font-bold text-emerald-700 bg-emerald-50/40 border-r border-slate-100">
-                        {e.r3Prod !== null && e.r3Prod > 0 ? e.r3Prod : e.r3Prod === 0 ? "0" : "—"}
+                      <td className="py-1.5 px-2.5 text-right font-mono font-black text-xs text-emerald-800 bg-emerald-50/50 border-r border-slate-100">
+                        {e.r3Prod !== null && e.r3Prod > 0 ? e.r3Prod.toLocaleString() : e.r3Prod === 0 ? "0" : "—"}
                       </td>
 
                       {/* 04:00 Reading & Prod */}
-                      <td className="py-1 px-1">
+                      <td className="py-1.5 px-2">
                         <input
                           type="number"
                           value={e.r4Reading !== null && e.r4Reading !== undefined ? e.r4Reading : ""}
@@ -1246,15 +1264,16 @@ export function LoomReadingSheetSection() {
                             )
                           }
                           onBlur={() => triggerAutoSave(true)}
-                          className="w-full px-1 py-0.5 text-xs text-right font-mono bg-transparent border-b border-transparent focus:border-slate-800 outline-none"
+                          placeholder="—"
+                          className="w-full px-2 py-1.5 text-xs text-right font-mono text-slate-800 bg-slate-50/40 group-hover:bg-white focus:bg-white border border-transparent hover:border-slate-200 focus:border-slate-800 rounded-lg outline-none transition-all"
                         />
                       </td>
-                      <td className="py-1 px-1.5 text-right font-mono font-bold text-emerald-700 bg-emerald-50/40 border-r border-slate-100">
-                        {e.r4Prod !== null && e.r4Prod > 0 ? e.r4Prod : e.r4Prod === 0 ? "0" : "—"}
+                      <td className="py-1.5 px-2.5 text-right font-mono font-black text-xs text-emerald-800 bg-emerald-50/50 border-r border-slate-100">
+                        {e.r4Prod !== null && e.r4Prod > 0 ? e.r4Prod.toLocaleString() : e.r4Prod === 0 ? "0" : "—"}
                       </td>
 
                       {/* 06:00 Reading & Prod */}
-                      <td className="py-1 px-1">
+                      <td className="py-1.5 px-2">
                         <input
                           type="number"
                           value={e.r5Reading !== null && e.r5Reading !== undefined ? e.r5Reading : ""}
@@ -1266,15 +1285,16 @@ export function LoomReadingSheetSection() {
                             )
                           }
                           onBlur={() => triggerAutoSave(true)}
-                          className="w-full px-1 py-0.5 text-xs text-right font-mono bg-transparent border-b border-transparent focus:border-slate-800 outline-none"
+                          placeholder="—"
+                          className="w-full px-2 py-1.5 text-xs text-right font-mono text-slate-800 bg-slate-50/40 group-hover:bg-white focus:bg-white border border-transparent hover:border-slate-200 focus:border-slate-800 rounded-lg outline-none transition-all"
                         />
                       </td>
-                      <td className="py-1 px-1.5 text-right font-mono font-bold text-emerald-700 bg-emerald-50/40 border-r border-slate-100">
-                        {e.r5Prod !== null && e.r5Prod > 0 ? e.r5Prod : e.r5Prod === 0 ? "0" : "—"}
+                      <td className="py-1.5 px-2.5 text-right font-mono font-black text-xs text-emerald-800 bg-emerald-50/50 border-r border-slate-100">
+                        {e.r5Prod !== null && e.r5Prod > 0 ? e.r5Prod.toLocaleString() : e.r5Prod === 0 ? "0" : "—"}
                       </td>
 
                       {/* 08:00 (Final Reading) */}
-                      <td className="py-1 px-1.5 bg-slate-50/50 border-r border-slate-100">
+                      <td className="py-1.5 px-2.5 bg-slate-50/50 border-r border-slate-100">
                         <input
                           type="number"
                           value={e.r6Reading !== null && e.r6Reading !== undefined ? e.r6Reading : ""}
@@ -1286,24 +1306,24 @@ export function LoomReadingSheetSection() {
                             )
                           }
                           onBlur={() => triggerAutoSave(true)}
-                          placeholder="End"
-                          className="w-full px-1 py-0.5 text-xs text-right font-mono font-bold text-slate-700 bg-transparent border-b border-transparent focus:border-slate-800 outline-none"
+                          placeholder="End Read"
+                          className="w-full px-2 py-1.5 text-xs text-right font-mono font-black text-slate-800 bg-slate-100/70 group-hover:bg-white focus:bg-white border border-transparent hover:border-slate-300 focus:border-slate-800 rounded-lg outline-none placeholder:text-slate-300 transition-all"
                         />
                       </td>
 
                       {/* Total Shift Production (Meters) */}
-                      <td className="py-1 px-2 text-right font-mono font-extrabold text-blue-900 bg-blue-50/50 border-r border-slate-100">
+                      <td className="py-1.5 px-3 text-right font-mono font-black text-sm text-blue-950 bg-blue-50/60 border-r border-slate-100">
                         {e.totalProduction > 0 ? e.totalProduction.toLocaleString() : "—"}
                       </td>
 
                       {/* Breakdown Column: Reason dropdown + Downtime in minutes */}
-                      <td className="py-1 px-1.5 border-r border-slate-100 bg-amber-50/20">
-                        <div className="flex items-center gap-1">
+                      <td className="py-1.5 px-2.5 border-r border-slate-100 bg-amber-50/20">
+                        <div className="flex items-center gap-1.5">
                           <select
                             value={e.breakdownReason || ""}
                             onChange={(ev) => handleEntryChange(e.loomNumber, "breakdownReason", ev.target.value || null)}
                             onBlur={() => triggerAutoSave(true)}
-                            className="flex-1 text-[10px] font-medium px-1 py-0.5 bg-white border border-amber-200/80 rounded outline-none text-slate-700 hover:border-amber-400"
+                            className="flex-1 text-xs font-semibold px-2 py-1 bg-white border border-amber-300 text-slate-800 rounded-lg outline-none hover:border-amber-500 focus:border-amber-600 shadow-2xs cursor-pointer"
                           >
                             <option value="">No Breakdown</option>
                             {LOOM_BREAKDOWN_REASONS.map((r) => (
@@ -1312,7 +1332,7 @@ export function LoomReadingSheetSection() {
                               </option>
                             ))}
                           </select>
-                          <div className="flex items-center gap-0.5 shrink-0">
+                          <div className="flex items-center gap-1 shrink-0 bg-white px-1.5 py-0.5 border border-amber-300 rounded-lg">
                             <input
                               type="number"
                               min="0"
@@ -1328,15 +1348,15 @@ export function LoomReadingSheetSection() {
                               onBlur={() => triggerAutoSave(true)}
                               placeholder="0"
                               title="Downtime in minutes"
-                              className="w-12 px-1 py-0.5 text-xs text-right font-mono font-bold text-amber-900 bg-white border border-amber-200/80 rounded outline-none focus:border-amber-500"
+                              className="w-12 text-xs text-right font-mono font-black text-amber-950 outline-none"
                             />
-                            <span className="text-[10px] text-slate-400">m</span>
+                            <span className="text-[10px] font-bold text-amber-700">m</span>
                           </div>
                         </div>
                       </td>
 
                       {/* C/O Target Quality Column */}
-                      <td className="py-1 px-1.5 border-r border-slate-100 bg-amber-50/10">
+                      <td className="py-1.5 px-2.5 border-r border-slate-100 bg-amber-50/20">
                         {e.breakdownReason === "Change Over" || e.changeoverTargetQuality ? (
                           <select
                             value={e.changeoverTargetQuality || ""}
@@ -1344,7 +1364,7 @@ export function LoomReadingSheetSection() {
                               handleEntryChange(e.loomNumber, "changeoverTargetQuality", ev.target.value || null)
                             }
                             onBlur={() => triggerAutoSave(true)}
-                            className="w-full text-[10.5px] font-semibold px-1 py-0.5 bg-white border border-amber-300 text-amber-950 rounded outline-none focus:border-amber-600 shadow-2xs"
+                            className="w-full text-xs font-extrabold px-2.5 py-1.5 bg-white border-2 border-amber-400 text-amber-950 rounded-lg outline-none focus:border-amber-600 shadow-2xs cursor-pointer"
                           >
                             <option value="">Select Target Quality...</option>
                             {(data?.availableQualities || []).map((q) => (
@@ -1363,43 +1383,45 @@ export function LoomReadingSheetSection() {
                       </td>
 
                       {/* Live Efficiency Column */}
-                      <td className="py-1 px-1.5 text-center font-mono border-r border-slate-100 bg-sky-50/20">
+                      <td className="py-1.5 px-2.5 text-center font-mono border-r border-slate-100 bg-sky-50/30">
                         {effVal > 0 ? (
                           <div className="inline-flex flex-col items-center">
                             <span
-                              className={`px-1.5 py-0.5 rounded text-[11px] font-extrabold ${
+                              className={`px-2.5 py-0.5 rounded-md text-xs font-black ${
                                 effVal >= 85
-                                  ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                                  ? "bg-emerald-100 text-emerald-900 border border-emerald-300"
                                   : effVal >= 70
-                                  ? "bg-amber-100 text-amber-800 border border-amber-200"
-                                  : "bg-rose-100 text-rose-800 border border-rose-200"
+                                  ? "bg-amber-100 text-amber-900 border border-amber-300"
+                                  : "bg-rose-100 text-rose-900 border border-rose-300"
                               }`}
                             >
                               {effVal}%
                             </span>
-                            <span className="text-[8.5px] text-slate-400 scale-90 -mt-0.5">
+                            <span className="text-[9px] font-bold text-slate-400 mt-0.5">
                               {stdSpeed}
                             </span>
                           </div>
                         ) : (
-                          <span className="text-slate-400 font-normal text-xs">—</span>
+                          <span className="text-slate-300 font-normal text-xs">—</span>
                         )}
                       </td>
 
                       {/* Remarks / Status */}
-                      <td className="py-1 px-2 flex items-center gap-1.5">
+                      <td className="py-1.5 px-3 flex items-center gap-2">
                         <select
                           value={e.status}
                           onChange={(ev) => handleEntryChange(e.loomNumber, "status", ev.target.value)}
                           onBlur={() => triggerAutoSave(true)}
-                          className={`text-[10px] font-bold px-1.5 py-0.5 rounded border outline-none ${
+                          className={`text-xs font-bold px-2 py-1 rounded-lg border outline-none cursor-pointer ${
                             e.status === "RUNNING"
-                              ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                              ? "bg-emerald-50 text-emerald-800 border-emerald-300"
                               : e.status === "STOP"
-                              ? "bg-rose-50 text-rose-800 border-rose-200"
+                              ? "bg-rose-50 text-rose-800 border-rose-300"
                               : e.status === "CLEANING"
-                              ? "bg-amber-50 text-amber-800 border-amber-200"
-                              : "bg-slate-100 text-slate-600 border-slate-200"
+                              ? "bg-amber-50 text-amber-800 border-amber-300"
+                              : e.status === "CHANGEOVER"
+                              ? "bg-amber-100 text-amber-900 border-amber-400"
+                              : "bg-slate-100 text-slate-600 border-slate-300"
                           }`}
                         >
                           <option value="RUNNING">RUN</option>
@@ -1414,7 +1436,7 @@ export function LoomReadingSheetSection() {
                           onChange={(ev) => handleEntryChange(e.loomNumber, "remarks", ev.target.value)}
                           onBlur={() => triggerAutoSave(true)}
                           placeholder="Notes..."
-                          className="flex-1 min-w-[70px] px-1 py-0.5 text-xs bg-transparent border-b border-transparent focus:border-slate-800 outline-none"
+                          className="flex-1 min-w-[110px] px-2 py-1 text-xs bg-slate-50/40 group-hover:bg-white focus:bg-white border border-transparent hover:border-slate-200 focus:border-slate-800 rounded-lg outline-none transition-all placeholder:text-slate-300"
                         />
                       </td>
                     </tr>
@@ -1424,39 +1446,42 @@ export function LoomReadingSheetSection() {
             </tbody>
             {/* Table Footer: Column Interval Totals */}
             <tfoot>
-              <tr className="bg-slate-100/90 border-t-2 border-slate-300 font-bold text-slate-900">
-                <td colSpan={6} className="py-2.5 px-3 text-right uppercase text-[10px] text-slate-700 border-r border-slate-200">
+              <tr className="bg-slate-100 border-t-2 border-slate-300 font-bold text-slate-900">
+                <td className="sticky left-0 bg-slate-200/90 z-20 py-3 px-3 text-center font-black font-mono text-sm text-slate-900 border-r-2 border-slate-300 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)]">
+                  TOTAL
+                </td>
+                <td colSpan={5} className="py-3 px-4 text-right uppercase text-[11px] font-bold text-slate-700 border-r border-slate-200">
                   Total Interval Production (Meters):
                 </td>
                 <td className="border-r border-slate-200"></td>
-                <td className="py-2 px-1.5 text-right font-mono font-extrabold text-emerald-800 bg-emerald-100/80 border-r border-slate-200">
+                <td className="py-2.5 px-2.5 text-right font-mono font-black text-sm text-emerald-900 bg-emerald-100/90 border-r border-slate-200">
                   {liveTotals.totalR1Prod.toLocaleString()}
                 </td>
                 <td className="border-r border-slate-200"></td>
-                <td className="py-2 px-1.5 text-right font-mono font-extrabold text-emerald-800 bg-emerald-100/80 border-r border-slate-200">
+                <td className="py-2.5 px-2.5 text-right font-mono font-black text-sm text-emerald-900 bg-emerald-100/90 border-r border-slate-200">
                   {liveTotals.totalR2Prod.toLocaleString()}
                 </td>
                 <td className="border-r border-slate-200"></td>
-                <td className="py-2 px-1.5 text-right font-mono font-extrabold text-emerald-800 bg-emerald-100/80 border-r border-slate-200">
+                <td className="py-2.5 px-2.5 text-right font-mono font-black text-sm text-emerald-900 bg-emerald-100/90 border-r border-slate-200">
                   {liveTotals.totalR3Prod.toLocaleString()}
                 </td>
                 <td className="border-r border-slate-200"></td>
-                <td className="py-2 px-1.5 text-right font-mono font-extrabold text-emerald-800 bg-emerald-100/80 border-r border-slate-200">
+                <td className="py-2.5 px-2.5 text-right font-mono font-black text-sm text-emerald-900 bg-emerald-100/90 border-r border-slate-200">
                   {liveTotals.totalR4Prod.toLocaleString()}
                 </td>
                 <td className="border-r border-slate-200"></td>
-                <td className="py-2 px-1.5 text-right font-mono font-extrabold text-emerald-800 bg-emerald-100/80 border-r border-slate-200">
+                <td className="py-2.5 px-2.5 text-right font-mono font-black text-sm text-emerald-900 bg-emerald-100/90 border-r border-slate-200">
                   {liveTotals.totalR5Prod.toLocaleString()}
                 </td>
                 <td className="border-r border-slate-200"></td>
-                <td className="py-2 px-2 text-right font-mono font-extrabold text-blue-900 bg-blue-100 border-r border-slate-200">
+                <td className="py-2.5 px-3 text-right font-mono font-black text-sm text-blue-950 bg-blue-100 border-r border-slate-200">
                   {liveTotals.totalShiftMeters.toLocaleString()}
                 </td>
-                <td className="py-2 px-2 text-center font-mono font-bold text-amber-900 bg-amber-100/80 border-r border-slate-200">
+                <td className="py-2.5 px-3 text-center font-mono font-black text-xs text-amber-950 bg-amber-100/90 border-r border-slate-200">
                   {liveTotals.totalBreakdownMins > 0 ? `${liveTotals.totalBreakdownMins} Mins` : "0 Mins"}
                 </td>
-                <td className="border-r border-slate-200 bg-amber-50/30"></td>
-                <td className="py-2 px-1 text-center font-mono font-extrabold text-sky-900 bg-sky-100/80 border-r border-slate-200">
+                <td className="border-r border-slate-200 bg-amber-50/40"></td>
+                <td className="py-2.5 px-2 text-center font-mono font-black text-xs text-sky-950 bg-sky-100/90 border-r border-slate-200">
                   {liveTotals.averageEfficiency}%
                 </td>
                 <td></td>
