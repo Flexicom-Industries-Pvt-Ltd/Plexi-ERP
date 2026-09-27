@@ -1,4 +1,4 @@
-import { LoomReadingEntryItem, IntervalKpiSummary } from "@/app/api/production/loom/reading-sheet/route";
+import { LoomReadingEntryItem, IntervalKpiSummary } from "./loom-reading-types";
 
 export interface PrintLoomReadingOptions {
   date: string;
