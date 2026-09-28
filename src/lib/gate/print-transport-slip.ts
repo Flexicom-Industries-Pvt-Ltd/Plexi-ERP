@@ -72,6 +72,7 @@ function formatStatus(status: string | null | undefined): string {
 }
 
 export function generateTransportSlipHtml(entry: GatePrintEntry): string {
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
   const statusLogs = entry.statusLogs && entry.statusLogs.length > 0
     ? entry.statusLogs
     : [
@@ -330,6 +331,9 @@ export function generateTransportSlipHtml(entry: GatePrintEntry): string {
     <!-- HEADER -->
     <table class="header-table">
       <tr>
+        <td style="width: 55px; vertical-align: middle; padding-right: 10px;">
+          <img src="${origin}/logo.png" alt="Flexicom Logo" style="height: 44px; width: auto; object-fit: contain; filter: contrast(1.15);" onerror="this.style.display='none'" />
+        </td>
         <td style="vertical-align: top;">
           <div class="company-title">Flexicom Industries Pvt. Ltd.</div>
           <div class="company-sub">Kathua Industrial Complex, Phase-II, Kathua, J&K (184102)</div>
@@ -492,7 +496,8 @@ export function printTransportSlip(entry: GatePrintEntry): void {
     doc.write(html);
     doc.close();
 
-    setTimeout(() => {
+    const logoImg = doc.querySelector("img");
+    const triggerPrint = () => {
       try {
         iframe?.contentWindow?.focus();
         iframe?.contentWindow?.print();
@@ -500,7 +505,15 @@ export function printTransportSlip(entry: GatePrintEntry): void {
         console.error("Iframe print failed, falling back to window.open", err);
         fallbackWindowPrint(html);
       }
-    }, 250);
+    };
+
+    if (logoImg && !logoImg.complete) {
+      logoImg.onload = () => setTimeout(triggerPrint, 100);
+      logoImg.onerror = () => setTimeout(triggerPrint, 100);
+      setTimeout(triggerPrint, 800);
+    } else {
+      setTimeout(triggerPrint, 250);
+    }
   } else {
     fallbackWindowPrint(html);
   }

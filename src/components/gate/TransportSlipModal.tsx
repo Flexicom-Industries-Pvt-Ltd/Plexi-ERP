@@ -143,16 +143,29 @@ export function TransportSlipModal({ open, onClose, entry }: TransportSlipModalP
             {/* 1. HEADER */}
             <div className="border-b-2 border-slate-900 pb-3 mb-4">
               <div className="flex items-start justify-between gap-4">
-                <div>
-                  <h1 className="text-base sm:text-lg font-bold tracking-tight text-slate-950 uppercase">
-                    FLEXICOM INDUSTRIES PVT. LTD.
-                  </h1>
-                  <p className="text-[11px] text-slate-600 font-medium">
-                    Kathua Industrial Complex, Phase-II, Kathua, J&K (184102)
-                  </p>
-                  <p className="text-[10px] text-slate-500">
-                    Security & Gate Logistics Division • ISO 9001:2015
-                  </p>
+                <div className="flex items-center gap-3.5">
+                  <div className="w-12 h-12 shrink-0 flex items-center justify-center">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src="/logo.png"
+                      alt="Flexicom Logo"
+                      className="h-11 w-auto object-contain"
+                      onError={(e) => {
+                        (e.target as HTMLElement).style.display = "none";
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <h1 className="text-base sm:text-lg font-bold tracking-tight text-slate-950 uppercase">
+                      FLEXICOM INDUSTRIES PVT. LTD.
+                    </h1>
+                    <p className="text-[11px] text-slate-600 font-medium">
+                      Kathua Industrial Complex, Phase-II, Kathua, J&K (184102)
+                    </p>
+                    <p className="text-[10px] text-slate-500">
+                      Security & Gate Logistics Division • ISO 9001:2015
+                    </p>
+                  </div>
                 </div>
 
                 <div className="text-right flex flex-col items-end">

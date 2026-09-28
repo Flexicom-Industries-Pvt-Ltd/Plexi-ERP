@@ -79,6 +79,7 @@ export interface PrintLoomProductionReportOptions {
 
 export function generateLoomProductionReportHtml(options: PrintLoomProductionReportOptions): string {
   const { criteria, period, kpis, loomWise, supervisorWise, operatorWise } = options;
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
   const genTimestamp = new Date().toLocaleString("en-IN", {
     day: "2-digit",
     month: "short",
@@ -304,7 +305,10 @@ export function generateLoomProductionReportHtml(options: PrintLoomProductionRep
     <!-- Header -->
     <table class="header-table">
       <tr>
-        <td style="width: 55%;">
+        <td style="width: 55px; vertical-align: middle; padding-right: 10px;">
+          <img src="${origin}/logo.png" alt="Flexicom Logo" style="height: 42px; width: auto; object-fit: contain; filter: contrast(1.15);" onerror="this.style.display='none'" />
+        </td>
+        <td style="width: 50%;">
           <div class="company-title">FLEXICOM INDUSTRIES PVT. LTD.</div>
           <div style="font-size: 7pt; color: #475569;">Plexi ERP • Loom Weaving & Circular Looms Division • Kathua Plant</div>
           <div class="report-title">${criteriaTitle}</div>

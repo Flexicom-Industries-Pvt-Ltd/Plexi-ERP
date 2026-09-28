@@ -19,6 +19,7 @@ export interface PrintRollCuttingOptions {
 
 export function generateLoomRollCuttingHtml(options: PrintRollCuttingOptions): string {
   const { report, entries, kpis } = options;
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
   const genTimestamp = new Date().toLocaleString("en-IN", {
     day: "2-digit",
     month: "short",
@@ -267,10 +268,18 @@ export function generateLoomRollCuttingHtml(options: PrintRollCuttingOptions): s
   <div class="sheet-container">
     <!-- Header -->
     <div class="header-container">
-      <div class="company-title">FLEXICOM INDUSTRIES PVT. LIMITED</div>
-      <div class="company-sub">SIDCO INDUSTRIAL ESTATE, PHASE-II, KATHUA (J&K) 184143 • CIRCULAR WEAVING DIVISION</div>
-      <div>
-        <span class="doc-main-heading">DAILY LOOM ROLL CUTTING REPORT</span>
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px;">
+        <div style="width: 55px; text-align: left; display: flex; align-items: center;">
+          <img src="${origin}/logo.png" alt="Flexicom" style="height: 40px; width: auto; object-fit: contain; filter: contrast(1.15);" onerror="this.style.display='none'" />
+        </div>
+        <div style="flex: 1; text-align: center;">
+          <div class="company-title">FLEXICOM INDUSTRIES PVT. LIMITED</div>
+          <div class="company-sub">SIDCO INDUSTRIAL ESTATE, PHASE-II, KATHUA (J&K) 184143 • CIRCULAR WEAVING DIVISION</div>
+          <div>
+            <span class="doc-main-heading">DAILY LOOM ROLL CUTTING REPORT</span>
+          </div>
+        </div>
+        <div style="width: 55px;" aria-hidden="true"></div>
       </div>
       <div class="doc-meta-strip">
         <div>DOC REF: <strong>${docRef}</strong></div>
@@ -497,7 +506,8 @@ export function printLoomRollCutting(options: PrintRollCuttingOptions): void {
     doc.write(html);
     doc.close();
 
-    setTimeout(() => {
+    const logoImg = doc.querySelector("img");
+    const triggerPrint = () => {
       try {
         iframe?.contentWindow?.focus();
         iframe?.contentWindow?.print();
@@ -505,7 +515,15 @@ export function printLoomRollCutting(options: PrintRollCuttingOptions): void {
         console.error("Iframe print failed, falling back to window print", err);
         fallbackWindowPrint(html);
       }
-    }, 250);
+    };
+
+    if (logoImg && !logoImg.complete) {
+      logoImg.onload = () => setTimeout(triggerPrint, 100);
+      logoImg.onerror = () => setTimeout(triggerPrint, 100);
+      setTimeout(triggerPrint, 800);
+    } else {
+      setTimeout(triggerPrint, 250);
+    }
   } else {
     fallbackWindowPrint(html);
   }
