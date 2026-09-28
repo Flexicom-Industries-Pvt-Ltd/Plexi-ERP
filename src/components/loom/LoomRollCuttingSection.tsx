@@ -14,14 +14,22 @@ import {
   Calendar,
   Clock,
   User,
+  Building,
+  Layers,
+  Sparkles,
+  X,
 } from "lucide-react";
 import {
   LoomRollCuttingEntryItem,
   LoomRollCuttingReportData,
   RollCuttingKpis,
+  RollCuttingContractorSummary,
+  RollCuttingQualitySummary,
   computeRollMeters,
   computeRollWeightsAndAvg,
   generateNextRollNumber,
+  computeContractorRollSummary,
+  computeQualityRollSummary,
 } from "@/lib/loom/loom-roll-cutting-types";
 import { exportLoomRollCuttingExcel } from "@/lib/loom/loom-roll-cutting-export";
 import { LoomRollCuttingPrintModal } from "./LoomRollCuttingPrintModal";
@@ -48,6 +56,13 @@ interface AvailableOperator {
   designation?: string | null;
 }
 
+interface AvailableContractor {
+  id: string;
+  name: string;
+  code?: string | null;
+  section?: string | null;
+}
+
 export function LoomRollCuttingSection() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -65,9 +80,18 @@ export function LoomRollCuttingSection() {
   const [availableQualities, setAvailableQualities] = useState<AvailableQuality[]>([]);
   const [availableShifts, setAvailableShifts] = useState<AvailableShift[]>([]);
   const [availableOperators, setAvailableOperators] = useState<AvailableOperator[]>([]);
+  const [availableContractors, setAvailableContractors] = useState<AvailableContractor[]>([]);
   const [loomAllocations, setLoomAllocations] = useState<Record<number, { qualityCode: string; size: string; denier: string }>>({});
   const [suggestedRollNumber, setSuggestedRollNumber] = useState("CT-14376");
   const [printModalOpen, setPrintModalOpen] = useState(false);
+
+  // Quick contractor modal state
+  const [quickContractorModalOpen, setQuickContractorModalOpen] = useState(false);
+  const [quickContractorName, setQuickContractorName] = useState("");
+  const [quickContractorCode, setQuickContractorCode] = useState("");
+  const [quickContractorPhone, setQuickContractorPhone] = useState("");
+  const [quickContractorSaving, setQuickContractorSaving] = useState(false);
+  const [targetEntryIndexForNewContractor, setTargetEntryIndexForNewContractor] = useState<number | null>(null);
 
   const latestPayloadRef = useRef<any>(null);
   const lastSavedPayloadRef = useRef<string>("");
@@ -106,6 +130,7 @@ export function LoomRollCuttingSection() {
       setAvailableQualities(json.availableQualities || []);
       setAvailableShifts(json.availableShifts || []);
       setAvailableOperators(json.availableOperators || []);
+      setAvailableContractors(json.availableContractors || []);
       setLoomAllocations(json.loomAllocations || {});
       if (json.suggestedNextRollNumber) {
         setSuggestedRollNumber(json.suggestedNextRollNumber);
@@ -262,6 +287,15 @@ export function LoomRollCuttingSection() {
     };
   }, [entries]);
 
+  // Real-time Summaries (Contractor-wise & Quality-wise)
+  const contractorSummary: RollCuttingContractorSummary[] = useMemo(() => {
+    return computeContractorRollSummary(entries);
+  }, [entries]);
+
+  const qualitySummary: RollCuttingQualitySummary[] = useMemo(() => {
+    return computeQualityRollSummary(entries);
+  }, [entries]);
+
   // Handle entry field update with live recalculation
   const handleUpdateEntry = (index: number, field: keyof LoomRollCuttingEntryItem, value: any) => {
     setEntries((prev) => {
@@ -316,6 +350,57 @@ export function LoomRollCuttingSection() {
     });
   };
 
+  // Quick Register Contractor Handler
+  const handleCreateQuickContractor = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!quickContractorName.trim()) {
+      toast.error("Contractor name is required");
+      return;
+    }
+
+    setQuickContractorSaving(true);
+    try {
+      const res = await fetch("/api/data-centre/contractors", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: quickContractorName.trim(),
+          code: quickContractorCode.trim() ? quickContractorCode.trim().toUpperCase() : undefined,
+          phone: quickContractorPhone.trim() || undefined,
+          section: "LOOM",
+          isActive: true,
+        }),
+      });
+
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Failed to register contractor");
+
+      const newC: AvailableContractor = {
+        id: json.id,
+        name: json.name,
+        code: json.code,
+        section: json.section,
+      };
+
+      setAvailableContractors((prev) => [...prev, newC]);
+      toast.success(`Contractor "${newC.name}" registered`);
+
+      if (targetEntryIndexForNewContractor !== null) {
+        handleUpdateEntry(targetEntryIndexForNewContractor, "contractor", newC.name);
+      }
+
+      setQuickContractorName("");
+      setQuickContractorCode("");
+      setQuickContractorPhone("");
+      setTargetEntryIndexForNewContractor(null);
+      setQuickContractorModalOpen(false);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to register contractor");
+    } finally {
+      setQuickContractorSaving(false);
+    }
+  };
+
   // Add new roll entry
   const handleAddEntry = () => {
     const lastEntry = entries[entries.length - 1];
@@ -329,6 +414,7 @@ export function LoomRollCuttingSection() {
       loomNumber: defaultLoom,
       size: alloc?.size || "490",
       qualityType: alloc?.qualityCode || (availableQualities[0]?.code || "Mahal/LPP/W"),
+      contractor: lastEntry?.contractor || (availableContractors[0]?.name || ""),
       initialReading: 0,
       finalReading: 0,
       meter: 0,
@@ -353,6 +439,7 @@ export function LoomRollCuttingSection() {
       id: undefined,
       sequence: entries.length + 1,
       rollNumber: nextRoll,
+      contractor: target.contractor || "",
       initialReading: target.finalReading,
       finalReading: target.finalReading,
       meter: 0,
@@ -446,7 +533,7 @@ export function LoomRollCuttingSection() {
                 </span>
               </h1>
               <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
-                Physical floor log entry matching Starlinger / Lohia standards with auto-weight and g/m computation.
+                Physical floor log entry with contractor tracking, live quality summaries, and auto-weight computation.
               </p>
             </div>
           </div>
@@ -549,7 +636,7 @@ export function LoomRollCuttingSection() {
           </label>
           <input
             type="text"
-            placeholder="Filter roll #, loom #, quality..."
+            placeholder="Filter roll #, loom #, quality, contractor..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full text-xs px-3 py-2 rounded-lg border bg-background text-foreground focus:ring-2 focus:ring-primary/20 outline-hidden"
@@ -598,6 +685,90 @@ export function LoomRollCuttingSection() {
         </div>
       </div>
 
+      {/* Real-Time Live Breakdowns: Contractor-Wise & Quality-Wise */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Contractor-Wise Live Roll Count */}
+        <div className="p-4 rounded-xl border bg-card shadow-xs">
+          <div className="flex items-center justify-between pb-3 border-b">
+            <div className="flex items-center gap-2">
+              <Building className="w-4 h-4 text-sky-600 dark:text-sky-400" />
+              <h3 className="text-xs font-bold uppercase tracking-wider text-foreground">
+                Contractor-Wise Roll Breakdown
+              </h3>
+            </div>
+            <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20">
+              {contractorSummary.length} Active {contractorSummary.length === 1 ? "Entity" : "Entities"}
+            </span>
+          </div>
+
+          <div className="mt-3 divide-y divide-border/50">
+            {contractorSummary.length > 0 ? (
+              contractorSummary.map((c) => (
+                <div key={c.contractor} className="py-2 flex items-center justify-between gap-3 text-xs">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="font-semibold text-foreground truncate">{c.contractor}</span>
+                  </div>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <span className="font-mono text-muted-foreground">
+                      {c.totalMeters.toLocaleString()} m
+                    </span>
+                    <span className="px-2 py-0.5 rounded-md font-mono font-bold bg-muted text-foreground">
+                      {c.rollsCount} {c.rollsCount === 1 ? "roll" : "rolls"}
+                    </span>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <p className="text-xs text-muted-foreground py-3 text-center italic">
+                Add entries to see live contractor-wise roll distribution.
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Quality-Wise Live Roll Count */}
+        <div className="p-4 rounded-xl border bg-card shadow-xs">
+          <div className="flex items-center justify-between pb-3 border-b">
+            <div className="flex items-center gap-2">
+              <Layers className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+              <h3 className="text-xs font-bold uppercase tracking-wider text-foreground">
+                Quality-Wise Roll Breakdown
+              </h3>
+            </div>
+            <span className="text-[11px] font-medium px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
+              {qualitySummary.length} {qualitySummary.length === 1 ? "Quality" : "Qualities"} Running
+            </span>
+          </div>
+
+          <div className="mt-3 divide-y divide-border/50">
+            {qualitySummary.length > 0 ? (
+              qualitySummary.map((q) => (
+                <div key={q.qualityType} className="py-2 flex items-center justify-between gap-3 text-xs">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="font-semibold text-foreground truncate">{q.qualityType}</span>
+                    <span className="text-[10px] text-purple-600 dark:text-purple-400 font-mono">
+                      ({q.avgWeightPerMeter.toFixed(1)} g/m)
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <span className="font-mono text-muted-foreground">
+                      {q.totalMeters.toLocaleString()} m
+                    </span>
+                    <span className="px-2 py-0.5 rounded-md font-mono font-bold bg-muted text-foreground">
+                      {q.rollsCount} {q.rollsCount === 1 ? "roll" : "rolls"}
+                    </span>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <p className="text-xs text-muted-foreground py-3 text-center italic">
+                Add entries to see live quality-wise roll distribution.
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+
       {/* Interactive Daily Floor Form Table */}
       <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
         <div className="px-5 py-3.5 border-b bg-muted/40 flex items-center justify-between">
@@ -624,7 +795,8 @@ export function LoomRollCuttingSection() {
                 <th className="p-2.5 border-r w-32">Roll No.</th>
                 <th className="p-2.5 border-r w-24 text-center">Loom #</th>
                 <th className="p-2.5 border-r w-20 text-center">Size (mm)</th>
-                <th className="p-2.5 border-r min-w-[160px]">Quality Code</th>
+                <th className="p-2.5 border-r min-w-[150px]">Quality Code</th>
+                <th className="p-2.5 border-r min-w-[150px]">Contractor</th>
                 <th className="p-2.5 border-r w-24 text-right">Init Reading</th>
                 <th className="p-2.5 border-r w-24 text-right">Final Reading</th>
                 <th className="p-2.5 border-r w-20 text-right bg-muted/90 text-foreground font-bold">Meter</th>
@@ -698,6 +870,36 @@ export function LoomRollCuttingSection() {
                         {!availableQualities.some((q) => q.code === entry.qualityType) && entry.qualityType && (
                           <option value={entry.qualityType}>{entry.qualityType}</option>
                         )}
+                      </select>
+                    </td>
+
+                    {/* Contractor */}
+                    <td className="p-1.5 border-r">
+                      <select
+                        value={entry.contractor || ""}
+                        onChange={(e) => {
+                          if (e.target.value === "__NEW__") {
+                            setTargetEntryIndexForNewContractor(idx);
+                            setQuickContractorModalOpen(true);
+                          } else {
+                            handleUpdateEntry(idx, "contractor", e.target.value);
+                          }
+                        }}
+                        className="w-full text-xs font-medium px-2 py-1.5 rounded border bg-background text-foreground focus:ring-1 focus:ring-primary outline-hidden cursor-pointer"
+                      >
+                        <option value="">In-House / Direct</option>
+                        {availableContractors.map((c) => (
+                          <option key={c.id} value={c.name}>
+                            {c.name} {c.code ? `(${c.code})` : ""}
+                          </option>
+                        ))}
+                        {entry.contractor &&
+                          !availableContractors.some((c) => c.name === entry.contractor) && (
+                            <option value={entry.contractor}>{entry.contractor}</option>
+                          )}
+                        <option value="__NEW__" className="text-primary font-bold">
+                          + Register New Contractor...
+                        </option>
                       </select>
                     </td>
 
@@ -807,7 +1009,7 @@ export function LoomRollCuttingSection() {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={15} className="py-12 text-center text-muted-foreground">
+                  <td colSpan={16} className="py-12 text-center text-muted-foreground">
                     <div className="max-w-xs mx-auto space-y-3">
                       <div className="p-3 bg-muted rounded-full w-fit mx-auto text-muted-foreground">
                         <Scissors className="w-6 h-6" />
@@ -840,6 +1042,7 @@ export function LoomRollCuttingSection() {
                   <td className="p-2.5 border-r"></td>
                   <td className="p-2.5 border-r"></td>
                   <td className="p-2.5 border-r"></td>
+                  <td className="p-2.5 border-r"></td>
                   <td className="p-2.5 border-r text-right font-mono font-bold">{kpis.totalMeters.toLocaleString()}</td>
                   <td className="p-2.5 border-r text-right font-mono">{kpis.totalGrossWtKg.toFixed(2)}</td>
                   <td className="p-2.5 border-r text-right font-mono text-muted-foreground">{kpis.totalTareWtKg.toFixed(2)}</td>
@@ -862,6 +1065,85 @@ export function LoomRollCuttingSection() {
           </table>
         </div>
       </div>
+
+      {/* Quick Register Contractor Modal */}
+      {quickContractorModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-xs">
+          <div className="bg-card text-card-foreground rounded-xl border shadow-xl w-full max-w-sm overflow-hidden animate-in fade-in duration-150">
+            <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/40">
+              <div className="flex items-center gap-2">
+                <Building className="w-4 h-4 text-primary" />
+                <h3 className="font-bold text-xs text-foreground">Register Contractor</h3>
+              </div>
+              <button
+                onClick={() => setQuickContractorModalOpen(false)}
+                className="p-1 rounded hover:bg-muted text-muted-foreground cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateQuickContractor} className="p-4 space-y-3">
+              <div>
+                <label className="text-xs font-semibold text-foreground block mb-1">
+                  Contractor Name <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Sharma Enterprise"
+                  value={quickContractorName}
+                  onChange={(e) => setQuickContractorName(e.target.value)}
+                  className="w-full text-xs px-2.5 py-1.5 rounded-lg border bg-background text-foreground focus:ring-2 focus:ring-primary/20 outline-hidden"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-foreground block mb-1">
+                  Code (Optional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. CON-005"
+                  value={quickContractorCode}
+                  onChange={(e) => setQuickContractorCode(e.target.value)}
+                  className="w-full text-xs font-mono uppercase px-2.5 py-1.5 rounded-lg border bg-background text-foreground focus:ring-2 focus:ring-primary/20 outline-hidden"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-foreground block mb-1">
+                  Phone (Optional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. 9876543210"
+                  value={quickContractorPhone}
+                  onChange={(e) => setQuickContractorPhone(e.target.value)}
+                  className="w-full text-xs font-mono px-2.5 py-1.5 rounded-lg border bg-background text-foreground focus:ring-2 focus:ring-primary/20 outline-hidden"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t">
+                <button
+                  type="button"
+                  onClick={() => setQuickContractorModalOpen(false)}
+                  className="px-2.5 py-1.5 text-xs font-semibold rounded-lg border bg-card hover:bg-muted text-foreground transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={quickContractorSaving}
+                  className="px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  {quickContractorSaving ? "Saving..." : "Save & Assign"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Print Preview Modal */}
       <LoomRollCuttingPrintModal

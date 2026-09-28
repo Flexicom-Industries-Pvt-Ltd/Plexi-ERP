@@ -11,6 +11,8 @@ import {
   LoomRollCuttingEntryItem,
   LoomRollCuttingReportData,
   RollCuttingKpis,
+  computeContractorRollSummary,
+  computeQualityRollSummary,
 } from "@/lib/loom/loom-roll-cutting-types";
 import { exportLoomRollCuttingExcel } from "@/lib/loom/loom-roll-cutting-export";
 import { printLoomRollCutting } from "@/lib/loom/print-loom-roll-cutting";
@@ -54,6 +56,9 @@ export function LoomRollCuttingPrintModal({
   const totalNett = entries.reduce((s, e) => s + (Number(e.nettWeightKg) || 0), 0);
   const overallAvg = totalMeters > 0 && totalNett > 0 ? Math.round(((totalNett * 1000) / totalMeters) * 10) / 10 : 0;
   const uniqueLooms = new Set(entries.map((e) => e.loomNumber));
+
+  const contractorSummaries = computeContractorRollSummary(entries);
+  const qualitySummaries = computeQualityRollSummary(entries);
 
   const handlePrint = () => {
     printLoomRollCutting({ report, entries, kpis });
@@ -253,7 +258,8 @@ export function LoomRollCuttingPrintModal({
                     <th className="border border-slate-700 px-2 py-1.5 text-center font-mono w-24">Roll No.</th>
                     <th className="border border-slate-700 px-2 py-1.5 text-center w-14">Loom #</th>
                     <th className="border border-slate-700 px-2 py-1.5 text-center w-16">Size (mm)</th>
-                    <th className="border border-slate-700 px-2 py-1.5 text-left min-w-[140px]">Quality Code</th>
+                    <th className="border border-slate-700 px-2 py-1.5 text-left min-w-[130px]">Quality Code</th>
+                    <th className="border border-slate-700 px-2 py-1.5 text-left min-w-[100px]">Contractor</th>
                     <th className="border border-slate-700 px-2 py-1.5 text-right w-20">Init Rdg</th>
                     <th className="border border-slate-700 px-2 py-1.5 text-right w-20">Final Rdg</th>
                     <th className="border border-slate-700 px-2 py-1.5 text-right w-20 bg-slate-800">Meter</th>
@@ -286,8 +292,11 @@ export function LoomRollCuttingPrintModal({
                         <td className="border border-slate-200 px-2 py-1 text-center font-mono text-slate-600">
                           {entry.size || "—"}
                         </td>
-                        <td className="border border-slate-200 px-2 py-1 font-bold text-slate-900 truncate max-w-[140px]">
+                        <td className="border border-slate-200 px-2 py-1 font-bold text-slate-900 truncate max-w-[130px]">
                           {entry.qualityType}
+                        </td>
+                        <td className="border border-slate-200 px-2 py-1 font-semibold text-slate-700 truncate max-w-[100px]">
+                          {entry.contractor || "In-House"}
                         </td>
                         <td className="border border-slate-200 px-2 py-1 text-right font-mono text-slate-600">
                           {entry.initialReading !== undefined && entry.initialReading !== null ? Number(entry.initialReading).toLocaleString() : "—"}
@@ -324,7 +333,7 @@ export function LoomRollCuttingPrintModal({
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={14} className="px-4 py-8 text-center text-slate-500 font-medium bg-slate-50">
+                      <td colSpan={15} className="px-4 py-8 text-center text-slate-500 font-medium bg-slate-50">
                         No roll cutting records logged yet.
                       </td>
                     </tr>
@@ -339,6 +348,7 @@ export function LoomRollCuttingPrintModal({
                     <td className="border border-slate-300"></td>
                     <td className="border border-slate-300"></td>
                     <td className="border border-slate-300"></td>
+                    <td className="border border-slate-300"></td>
                     <td className="border border-slate-300 px-2 py-1.5 text-right font-mono font-black text-slate-950 bg-slate-200/60">{totalMeters.toLocaleString()}</td>
                     <td className="border border-slate-300 px-2 py-1.5 text-right font-mono font-bold text-slate-900">{totalGross.toFixed(2)}</td>
                     <td className="border border-slate-300 px-2 py-1.5 text-right font-mono text-slate-500">{totalTare.toFixed(2)}</td>
@@ -349,6 +359,116 @@ export function LoomRollCuttingPrintModal({
                   </tr>
                 </tfoot>
               </table>
+            </div>
+
+            {/* Real-time Summary Breakdown Cards (Below Report Table) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+              {/* Quality Breakdown Card */}
+              <div className="border border-slate-300 rounded-lg overflow-hidden bg-white shadow-xs">
+                <div className="bg-slate-900 text-white px-3 py-2 flex items-center justify-between">
+                  <span className="text-[11px] font-bold uppercase tracking-wider">Quality-Wise Roll Breakdown</span>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-white/10 text-slate-300">
+                    {qualitySummaries.length} Qualities
+                  </span>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-[11px] border-collapse">
+                    <thead>
+                      <tr className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200 text-[10px]">
+                        <th className="px-2.5 py-1.5 text-left">Quality Code</th>
+                        <th className="px-2.5 py-1.5 text-center w-14">Rolls</th>
+                        <th className="px-2.5 py-1.5 text-right w-20">Meters</th>
+                        <th className="px-2.5 py-1.5 text-right w-20">Nett (kg)</th>
+                        <th className="px-2.5 py-1.5 text-right w-18">Avg (g/m)</th>
+                        <th className="px-2.5 py-1.5 text-right w-16">Share</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200">
+                      {qualitySummaries.length > 0 ? (
+                        qualitySummaries.map((q) => {
+                          const share = entries.length > 0 ? ((q.rollsCount / entries.length) * 100).toFixed(1) : "0.0";
+                          return (
+                            <tr key={q.qualityType} className="hover:bg-slate-50 transition-colors">
+                              <td className="px-2.5 py-1 font-bold text-slate-900">{q.qualityType}</td>
+                              <td className="px-2.5 py-1 text-center font-mono font-black text-slate-800">{q.rollsCount}</td>
+                              <td className="px-2.5 py-1 text-right font-mono text-slate-700">{q.totalMeters.toLocaleString()}</td>
+                              <td className="px-2.5 py-1 text-right font-mono font-bold text-emerald-700">{q.totalNettWtKg.toFixed(2)}</td>
+                              <td className="px-2.5 py-1 text-right font-mono font-bold text-purple-700">{q.avgWeightPerMeter.toFixed(1)}</td>
+                              <td className="px-2.5 py-1 text-right font-mono text-slate-500">{share}%</td>
+                            </tr>
+                          );
+                        })
+                      ) : (
+                        <tr>
+                          <td colSpan={6} className="px-3 py-4 text-center text-slate-400">No qualities recorded</td>
+                        </tr>
+                      )}
+                    </tbody>
+                    <tfoot>
+                      <tr className="bg-slate-100 font-bold border-t border-slate-300 text-slate-900 text-[10px]">
+                        <td className="px-2.5 py-1.5">TOTAL</td>
+                        <td className="px-2.5 py-1.5 text-center font-mono">{entries.length}</td>
+                        <td className="px-2.5 py-1.5 text-right font-mono">{totalMeters.toLocaleString()}</td>
+                        <td className="px-2.5 py-1.5 text-right font-mono text-emerald-800">{totalNett.toFixed(2)}</td>
+                        <td className="px-2.5 py-1.5 text-right font-mono text-purple-800">{overallAvg.toFixed(1)}</td>
+                        <td className="px-2.5 py-1.5 text-right font-mono">100%</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+
+              {/* Contractor Breakdown Card */}
+              <div className="border border-slate-300 rounded-lg overflow-hidden bg-white shadow-xs">
+                <div className="bg-slate-900 text-white px-3 py-2 flex items-center justify-between">
+                  <span className="text-[11px] font-bold uppercase tracking-wider">Contractor-Wise Roll Breakdown</span>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-white/10 text-slate-300">
+                    {contractorSummaries.length} Contractors
+                  </span>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-[11px] border-collapse">
+                    <thead>
+                      <tr className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200 text-[10px]">
+                        <th className="px-2.5 py-1.5 text-left">Contractor</th>
+                        <th className="px-2.5 py-1.5 text-center w-14">Rolls</th>
+                        <th className="px-2.5 py-1.5 text-right w-24">Meters</th>
+                        <th className="px-2.5 py-1.5 text-right w-24">Nett (kg)</th>
+                        <th className="px-2.5 py-1.5 text-right w-16">Share</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200">
+                      {contractorSummaries.length > 0 ? (
+                        contractorSummaries.map((c) => {
+                          const share = entries.length > 0 ? ((c.rollsCount / entries.length) * 100).toFixed(1) : "0.0";
+                          return (
+                            <tr key={c.contractor} className="hover:bg-slate-50 transition-colors">
+                              <td className="px-2.5 py-1 font-bold text-slate-900">{c.contractor}</td>
+                              <td className="px-2.5 py-1 text-center font-mono font-black text-slate-800">{c.rollsCount}</td>
+                              <td className="px-2.5 py-1 text-right font-mono text-slate-700">{c.totalMeters.toLocaleString()}</td>
+                              <td className="px-2.5 py-1 text-right font-mono font-bold text-emerald-700">{c.totalNettWtKg.toFixed(2)}</td>
+                              <td className="px-2.5 py-1 text-right font-mono text-slate-500">{share}%</td>
+                            </tr>
+                          );
+                        })
+                      ) : (
+                        <tr>
+                          <td colSpan={5} className="px-3 py-4 text-center text-slate-400">No contractors recorded</td>
+                        </tr>
+                      )}
+                    </tbody>
+                    <tfoot>
+                      <tr className="bg-slate-100 font-bold border-t border-slate-300 text-slate-900 text-[10px]">
+                        <td className="px-2.5 py-1.5">TOTAL</td>
+                        <td className="px-2.5 py-1.5 text-center font-mono">{entries.length}</td>
+                        <td className="px-2.5 py-1.5 text-right font-mono">{totalMeters.toLocaleString()}</td>
+                        <td className="px-2.5 py-1.5 text-right font-mono text-emerald-800">{totalNett.toFixed(2)}</td>
+                        <td className="px-2.5 py-1.5 text-right font-mono">100%</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
             </div>
 
             {/* Floor Sign-Off Blocks */}
