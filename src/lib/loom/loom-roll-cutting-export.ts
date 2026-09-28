@@ -49,10 +49,15 @@ export function exportLoomRollCuttingExcel(options: RollCuttingExportOptions): v
     entry.remarks || "—",
   ]);
 
-  const totalMeters = entries.reduce((s, e) => s + (e.meter || 0), 0);
-  const totalGross = entries.reduce((s, e) => s + (e.grossWeightKg || 0), 0);
-  const totalTare = entries.reduce((s, e) => s + (e.tareWeightKg || 1.2), 0);
-  const totalNett = entries.reduce((s, e) => s + (e.nettWeightKg || 0), 0);
+  const totalMeters = entries.reduce((s, e) => s + (Number(e.meter) || 0), 0);
+  const totalGross = entries.reduce((s, e) => s + (Number(e.grossWeightKg) || 0), 0);
+  const totalTare = entries.reduce((s, e) => {
+    const t = e.tareWeightKg !== "" && e.tareWeightKg !== null && e.tareWeightKg !== undefined
+      ? (!isNaN(Number(e.tareWeightKg)) ? Number(e.tareWeightKg) : 1.2)
+      : 1.2;
+    return s + t;
+  }, 0);
+  const totalNett = entries.reduce((s, e) => s + (Number(e.nettWeightKg) || 0), 0);
   const overallAvg = totalMeters > 0 && totalNett > 0 ? Math.round(((totalNett * 1000) / totalMeters) * 10) / 10 : 0;
 
   const totalsRow = [

@@ -25,10 +25,15 @@ export function generateLoomRollCuttingHtml(options: PrintRollCuttingOptions): s
   const docDate = (report.date || new Date().toISOString().slice(0, 10)).replace(/[^a-zA-Z0-9]/g, "");
   const docRef = `LM-RC-${docDate}-${(report.shiftName || "SHIFT").toUpperCase().replace(/\s+/g, "")}`;
 
-  const totalMeters = entries.reduce((s, e) => s + (e.meter || 0), 0);
-  const totalGross = entries.reduce((s, e) => s + (e.grossWeightKg || 0), 0);
-  const totalTare = entries.reduce((s, e) => s + (e.tareWeightKg || 1.2), 0);
-  const totalNett = entries.reduce((s, e) => s + (e.nettWeightKg || 0), 0);
+  const totalMeters = entries.reduce((s, e) => s + (Number(e.meter) || 0), 0);
+  const totalGross = entries.reduce((s, e) => s + (Number(e.grossWeightKg) || 0), 0);
+  const totalTare = entries.reduce((s, e) => {
+    const t = e.tareWeightKg !== "" && e.tareWeightKg !== null && e.tareWeightKg !== undefined
+      ? (!isNaN(Number(e.tareWeightKg)) ? Number(e.tareWeightKg) : 1.2)
+      : 1.2;
+    return s + t;
+  }, 0);
+  const totalNett = entries.reduce((s, e) => s + (Number(e.nettWeightKg) || 0), 0);
   const overallAvg = totalMeters > 0 && totalNett > 0 ? Math.round(((totalNett * 1000) / totalMeters) * 10) / 10 : 0;
   const uniqueLooms = new Set(entries.map((e) => e.loomNumber));
 
@@ -58,10 +63,10 @@ export function generateLoomRollCuttingHtml(options: PrintRollCuttingOptions): s
             ${entry.meter !== undefined && entry.meter !== null ? Number(entry.meter).toLocaleString() : "0"}
           </td>
           <td style="text-align: right; font-family: monospace; font-size: 7.5pt; color: #475569;">
-            ${entry.grossWeightKg !== undefined && entry.grossWeightKg !== null ? entry.grossWeightKg.toFixed(2) : "0.00"}
+            ${entry.grossWeightKg !== "" && entry.grossWeightKg !== null && entry.grossWeightKg !== undefined ? Number(entry.grossWeightKg).toFixed(2) : "0.00"}
           </td>
           <td style="text-align: right; font-family: monospace; font-size: 7.5pt; color: #64748b;">
-            ${entry.tareWeightKg !== undefined && entry.tareWeightKg !== null ? entry.tareWeightKg.toFixed(2) : "1.20"}
+            ${entry.tareWeightKg !== "" && entry.tareWeightKg !== null && entry.tareWeightKg !== undefined ? Number(entry.tareWeightKg).toFixed(2) : "1.20"}
           </td>
           <td style="text-align: right; font-family: monospace; font-size: 8pt; font-weight: 800; color: #15803d; background: #ecfdf5;">
             ${entry.nettWeightKg !== undefined && entry.nettWeightKg !== null ? entry.nettWeightKg.toFixed(2) : "0.00"}
