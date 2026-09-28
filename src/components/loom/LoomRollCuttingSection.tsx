@@ -63,6 +63,13 @@ interface AvailableContractor {
   section?: string | null;
 }
 
+interface AvailableSupervisor {
+  id: string;
+  name: string;
+  code?: string | null;
+  department?: string | null;
+}
+
 export function LoomRollCuttingSection() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -81,6 +88,7 @@ export function LoomRollCuttingSection() {
   const [availableShifts, setAvailableShifts] = useState<AvailableShift[]>([]);
   const [availableOperators, setAvailableOperators] = useState<AvailableOperator[]>([]);
   const [availableContractors, setAvailableContractors] = useState<AvailableContractor[]>([]);
+  const [availableSupervisors, setAvailableSupervisors] = useState<AvailableSupervisor[]>([]);
   const [loomAllocations, setLoomAllocations] = useState<Record<number, { qualityCode: string; size: string; denier: string }>>({});
   const [suggestedRollNumber, setSuggestedRollNumber] = useState("CT-14376");
   const [printModalOpen, setPrintModalOpen] = useState(false);
@@ -131,6 +139,7 @@ export function LoomRollCuttingSection() {
       setAvailableShifts(json.availableShifts || []);
       setAvailableOperators(json.availableOperators || []);
       setAvailableContractors(json.availableContractors || []);
+      setAvailableSupervisors(json.availableSupervisors || []);
       setLoomAllocations(json.loomAllocations || {});
       if (json.suggestedNextRollNumber) {
         setSuggestedRollNumber(json.suggestedNextRollNumber);
@@ -619,15 +628,23 @@ export function LoomRollCuttingSection() {
 
         <div>
           <label className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5 mb-1.5">
-            <User className="w-3.5 h-3.5" /> Supervisor Sign / In-Charge
+            <User className="w-3.5 h-3.5" /> Entering Supervisor
           </label>
-          <input
-            type="text"
-            placeholder="e.g. Ravinder Kumar"
+          <select
             value={supervisorName}
             onChange={(e) => setSupervisorName(e.target.value)}
-            className="w-full text-xs px-3 py-2 rounded-lg border bg-background text-foreground focus:ring-2 focus:ring-primary/20 outline-hidden"
-          />
+            className="w-full text-xs font-medium px-3 py-2 rounded-lg border bg-background text-foreground focus:ring-2 focus:ring-primary/20 outline-hidden cursor-pointer"
+          >
+            <option value="">— Select Supervisor —</option>
+            {availableSupervisors.map((s) => (
+              <option key={s.id} value={s.name}>
+                {s.name} {s.code ? `(${s.code})` : ""} {s.department ? `• ${s.department}` : ""}
+              </option>
+            ))}
+            {supervisorName && !availableSupervisors.some((s) => s.name === supervisorName) && (
+              <option value={supervisorName}>{supervisorName} (Custom)</option>
+            )}
+          </select>
         </div>
 
         <div>
@@ -968,11 +985,17 @@ export function LoomRollCuttingSection() {
                     <td className="p-1.5 border-r">
                       <input
                         type="text"
+                        list="supervisors-datalist"
                         value={entry.supervisorSign || ""}
                         onChange={(e) => handleUpdateEntry(idx, "supervisorSign", e.target.value)}
                         className="w-full text-xs text-center px-1.5 py-1.5 rounded border bg-background text-foreground focus:ring-1 focus:ring-primary outline-hidden"
                         placeholder={supervisorName || "Sign"}
                       />
+                      <datalist id="supervisors-datalist">
+                        {availableSupervisors.map((s) => (
+                          <option key={s.id} value={s.name} />
+                        ))}
+                      </datalist>
                     </td>
 
                     {/* Remarks */}

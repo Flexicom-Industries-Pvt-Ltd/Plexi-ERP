@@ -55,6 +55,7 @@ const loomItems = [
   { title: "Change Over Sheet", url: "/dashboard/production/loom?tab=changeover" },
   { title: "2 Hours Reading Sheet", url: "/dashboard/production/loom?tab=reading-sheet" },
   { title: "Roll Cutting Report", url: "/dashboard/production/loom?tab=roll-cutting" },
+  { title: "Production Report", url: "/dashboard/production/loom?tab=production-report" },
 ];
 
 const settingsItems = [
@@ -67,6 +68,7 @@ const settingsItems = [
 
 const dataCentreItems = [
   { title: "Drivers", url: "/dashboard/data-centre/driver" },
+  { title: "Supervisors", url: "/dashboard/data-centre/supervisors" },
   { title: "Operators", url: "/dashboard/data-centre/operators" },
   { title: "Contractors", url: "/dashboard/data-centre/contractors" },
   { title: "Stocks", url: "/dashboard/data-centre/stock" },

@@ -2031,6 +2031,7 @@ model LoomRollCuttingReport {
   date                  String                 // YYYY-MM-DD
   shiftName             String                 // "Day Shift", "Night Shift", "Shift A", "Shift B"
   supervisorName        String?                // Floor supervisor
+  supervisorId          String?                // Optional reference to Supervisor master
   preparedBy            String?                // User email / name
   checkedBy             String?
   approvedBy            String?
@@ -2049,6 +2050,7 @@ model LoomRollCuttingReport {
   @@unique([date, shiftName])
   @@index([date])
   @@index([shiftName])
+  @@index([supervisorName])
   @@index([status])
 }
 
@@ -2079,6 +2081,7 @@ model LoomRollCuttingEntry {
   @@index([loomNumber])
   @@index([qualityType])
   @@index([contractor])
+  @@index([supervisorSign])
 }
 
 model Contractor {
@@ -2099,6 +2102,25 @@ model Contractor {
   @@index([section, isActive])
   @@index([isActive])
 }
+
+model Supervisor {
+  id              String   @id @default(cuid())
+  name            String
+  code            String?  @unique // e.g. "SUP-001"
+  department      String   @default("LOOM") // e.g. "LOOM", "TAPE_PLANT", "FINISHING", "ALL"
+  phone           String?
+  email           String?
+  shiftPreference String?  // e.g. "Day Shift", "Night Shift", "ALL"
+  notes           String?
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([name])
+  @@index([department, isActive])
+  @@index([isActive])
+}
+
 
 
 
