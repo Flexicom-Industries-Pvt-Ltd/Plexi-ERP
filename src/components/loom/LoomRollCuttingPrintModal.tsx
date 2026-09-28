@@ -251,15 +251,15 @@ export function LoomRollCuttingPrintModal({
 
             {/* Main High-Fidelity Table */}
             <div className="border border-slate-300 rounded-lg overflow-x-auto">
-              <table className="w-full text-[11px] border-collapse">
+              <table className="w-full text-[11px] border-collapse min-w-[1400px]">
                 <thead>
                   <tr className="bg-slate-900 text-white font-bold text-[10px] tracking-wider uppercase">
                     <th className="border border-slate-700 px-2 py-1.5 text-center w-10">S.No.</th>
                     <th className="border border-slate-700 px-2 py-1.5 text-center font-mono w-24">Roll No.</th>
                     <th className="border border-slate-700 px-2 py-1.5 text-center w-14">Loom #</th>
                     <th className="border border-slate-700 px-2 py-1.5 text-center w-16">Size (mm)</th>
-                    <th className="border border-slate-700 px-2 py-1.5 text-left min-w-[130px]">Quality Code</th>
-                    <th className="border border-slate-700 px-2 py-1.5 text-left min-w-[100px]">Contractor</th>
+                    <th className="border border-slate-700 px-2 py-1.5 text-left min-w-[200px]">Quality Code</th>
+                    <th className="border border-slate-700 px-2 py-1.5 text-left min-w-[160px]">Contractor</th>
                     <th className="border border-slate-700 px-2 py-1.5 text-right w-20">Init Rdg</th>
                     <th className="border border-slate-700 px-2 py-1.5 text-right w-20">Final Rdg</th>
                     <th className="border border-slate-700 px-2 py-1.5 text-right w-20 bg-slate-800">Meter</th>
@@ -292,10 +292,10 @@ export function LoomRollCuttingPrintModal({
                         <td className="border border-slate-200 px-2 py-1 text-center font-mono text-slate-600">
                           {entry.size || "—"}
                         </td>
-                        <td className="border border-slate-200 px-2 py-1 font-bold text-slate-900 truncate max-w-[130px]">
+                        <td className="border border-slate-200 px-2 py-1 font-bold text-slate-900 whitespace-nowrap">
                           {entry.qualityType}
                         </td>
-                        <td className="border border-slate-200 px-2 py-1 font-semibold text-slate-700 truncate max-w-[100px]">
+                        <td className="border border-slate-200 px-2 py-1 font-semibold text-slate-700 whitespace-nowrap">
                           {entry.contractor || "In-House"}
                         </td>
                         <td className="border border-slate-200 px-2 py-1 text-right font-mono text-slate-600">
