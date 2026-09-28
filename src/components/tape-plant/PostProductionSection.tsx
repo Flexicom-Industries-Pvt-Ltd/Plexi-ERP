@@ -14,9 +14,11 @@ import {
   Percent,
   ClipboardList,
   RefreshCw,
+  Printer,
 } from "lucide-react";
 import { RecipeQualityBadge } from "./RecipeQualityBadge";
 import { OperatorSelect } from "./OperatorSelect";
+import { PostProductionPrintPreviewModal } from "./PostProductionPrintPreviewModal";
 
 export interface RecipePostProductionEntry {
   id: string;
@@ -49,6 +51,7 @@ export function PostProductionSection({ date, shiftId, shiftName }: PostProducti
   const [operatorName, setOperatorName] = useState("");
   const [operatorId, setOperatorId] = useState("");
   const [entries, setEntries] = useState<RecipePostProductionEntry[]>([]);
+  const [showPrintModal, setShowPrintModal] = useState(false);
 
   const fetchPostProductionData = useCallback(
     async (showSyncToast = false) => {
@@ -298,6 +301,16 @@ export function PostProductionSection({ date, shiftId, shiftName }: PostProducti
           </button>
           <button
             type="button"
+            disabled={entries.length === 0}
+            onClick={() => setShowPrintModal(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold rounded-lg transition-all active:scale-95 disabled:opacity-50 h-8 cursor-pointer shadow-xs"
+            title="Print Post-Production Entry Sheet"
+          >
+            <Printer className="h-3.5 w-3.5 text-slate-600" />
+            <span>Print Sheet</span>
+          </button>
+          <button
+            type="button"
             disabled={saving || entries.length === 0}
             onClick={() => handleSave("SUBMITTED")}
             className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary hover:bg-primary/90 text-white text-xs font-semibold rounded-lg shadow-sm transition-all active:scale-95 disabled:opacity-50 h-8 cursor-pointer"
@@ -515,6 +528,17 @@ export function PostProductionSection({ date, shiftId, shiftName }: PostProducti
           </div>
         </>
       )}
+
+      {/* Post Production Print Preview Modal */}
+      <PostProductionPrintPreviewModal
+        open={showPrintModal}
+        onClose={() => setShowPrintModal(false)}
+        date={date}
+        shiftName={shiftName}
+        operatorName={operatorName}
+        status={status}
+        entries={entries}
+      />
     </div>
   );
 }
