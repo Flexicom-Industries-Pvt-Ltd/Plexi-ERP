@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
       db.loomRollCuttingReport.findFirst({
         where: {
           date: dateParam,
-          shiftName: { in: candidateShiftNames, mode: "insensitive" },
+          shiftName: { in: candidateShiftNames },
         },
         include: {
           entries: {
@@ -313,7 +313,7 @@ export async function POST(request: NextRequest) {
       const existingReport = await db.loomRollCuttingReport.findFirst({
         where: {
           date,
-          shiftName: { in: candidateShiftNames, mode: "insensitive" },
+          shiftName: { in: candidateShiftNames },
         },
       });
 
@@ -479,7 +479,7 @@ export async function POST(request: NextRequest) {
       const sheet = await db.loomReadingSheet.findFirst({
         where: {
           date,
-          shiftName: { in: candidateShiftNames, mode: "insensitive" },
+          shiftName: { in: candidateShiftNames },
         },
         include: {
           entries: {

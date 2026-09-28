@@ -10,18 +10,11 @@ import {
   Save,
   Printer,
   FileSpreadsheet,
-  RotateCcw,
-  Sparkles,
   Scissors,
   CheckCircle2,
   Calendar,
   Clock,
   User,
-  Scale,
-  Ruler,
-  Layers,
-  ArrowRight,
-  TrendingUp,
 } from "lucide-react";
 import {
   LoomRollCuttingEntryItem,
@@ -59,7 +52,6 @@ interface AvailableOperator {
 export function LoomRollCuttingSection() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [autoFilling, setAutoFilling] = useState(false);
   const [search, setSearch] = useState("");
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [selectedShift, setSelectedShift] = useState("Day Shift");
@@ -246,38 +238,6 @@ export function LoomRollCuttingSection() {
     toast.info("Roll cutting entry removed");
   };
 
-  // Auto-fill from 2-Hour Reading Sheet
-  const handleAutoFillFromSheet = async () => {
-    setAutoFilling(true);
-    try {
-      const res = await fetch("/api/production/loom/roll-cutting", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "AUTO_PREFILL_FROM_SHEET",
-          date: selectedDate,
-          shiftName: selectedShift,
-        }),
-      });
-
-      const json = await res.json();
-      if (!res.ok || !json.success) {
-        throw new Error(json.message || "No production recorded on 2-Hour Sheet for this shift");
-      }
-
-      if (json.entries && json.entries.length > 0) {
-        setEntries(json.entries);
-        toast.success(json.message);
-      } else {
-        toast.info("No active loom production found on the 2-Hour sheet for this shift");
-      }
-    } catch (err: any) {
-      toast.error(err.message || "Failed to auto-fill from 2-Hour Sheet");
-    } finally {
-      setAutoFilling(false);
-    }
-  };
-
   // Save / Submit Report
   const handleSaveReport = async (targetStatus: "DRAFT" | "SUBMITTED" = "DRAFT") => {
     if (entries.length === 0) {
@@ -360,16 +320,6 @@ export function LoomRollCuttingSection() {
 
         {/* Global Action Buttons */}
         <div className="flex flex-wrap items-center gap-2">
-          <button
-            onClick={handleAutoFillFromSheet}
-            disabled={autoFilling || loading}
-            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 transition-colors cursor-pointer shadow-xs disabled:opacity-50"
-            title="Pull active looms and meter readings recorded on the 2-Hour Reading Sheet"
-          >
-            <Sparkles className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-            {autoFilling ? "Syncing..." : "Auto-fill from 2-Hr Sheet"}
-          </button>
-
           <button
             onClick={() => exportLoomRollCuttingExcel({ report: reportDataForPrint, entries, kpis })}
             disabled={entries.length === 0}
@@ -727,20 +677,12 @@ export function LoomRollCuttingSection() {
                       </div>
                       <p className="text-sm font-medium">No roll cutting entries for this shift</p>
                       <p className="text-xs">
-                        Click <strong>&quot;Auto-fill from 2-Hr Sheet&quot;</strong> to automatically pull running looms with production, or click <strong>&quot;Add Roll Row&quot;</strong> to enter roll details manually.
+                        Click <strong>&quot;Add Roll Row&quot;</strong> to start logging floor roll cuts.
                       </p>
                       <div className="flex items-center justify-center gap-2 pt-2">
                         <button
-                          onClick={handleAutoFillFromSheet}
-                          disabled={autoFilling}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition-colors cursor-pointer shadow-xs"
-                        >
-                          <Sparkles className="w-3.5 h-3.5" />
-                          Auto-fill from 2-Hr Sheet
-                        </button>
-                        <button
                           onClick={handleAddEntry}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border bg-card hover:bg-muted text-foreground transition-colors cursor-pointer"
+                          className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground transition-colors cursor-pointer shadow-xs"
                         >
                           <Plus className="w-3.5 h-3.5" />
                           Add First Row
