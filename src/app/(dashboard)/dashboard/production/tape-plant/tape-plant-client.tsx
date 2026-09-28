@@ -238,22 +238,24 @@ export function TapePlantClient() {
                 </button>
               </div>
 
-              {/* Shift Picker */}
-              <div className="flex items-center gap-2 bg-white rounded-lg border border-slate-200 px-3 py-1 shadow-sm">
-                <Clock className="h-4 w-4 text-slate-400" />
-                <select
-                  value={selectedShiftId}
-                  onChange={(e) => setSelectedShiftId(e.target.value)}
-                  className="text-xs font-bold text-slate-800 bg-transparent outline-none cursor-pointer pr-1"
-                >
-                  <option value="ALL">ALL (All Shifts)</option>
-                  {shifts.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {/* Shift Picker (Hidden on planning tab where shifts are assigned per row in the planning grid) */}
+              {activeTab !== "planning" && (
+                <div className="flex items-center gap-2 bg-white rounded-lg border border-slate-200 px-3 py-1 shadow-sm">
+                  <Clock className="h-4 w-4 text-slate-400" />
+                  <select
+                    value={selectedShiftId}
+                    onChange={(e) => setSelectedShiftId(e.target.value)}
+                    className="text-xs font-bold text-slate-800 bg-transparent outline-none cursor-pointer pr-1"
+                  >
+                    <option value="ALL">ALL (All Shifts)</option>
+                    {shifts.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -262,7 +264,12 @@ export function TapePlantClient() {
       {/* Active Section Workspace */}
       <div className="transition-all duration-200 w-full min-w-0 max-w-full">
         {activeTab === "planning" && (
-          <TapePlantPlanningSection date={selectedDate} shiftId={selectedShiftId} shiftName={shiftName} />
+          <TapePlantPlanningSection
+            date={selectedDate}
+            shiftId="ALL"
+            shiftName="All Shifts"
+            shifts={shifts}
+          />
         )}
         {activeTab === "temperature" && (
           <ProcessTemperatureSection date={selectedDate} shiftId={selectedShiftId} shiftName={shiftName} />
