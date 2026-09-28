@@ -1,13 +1,12 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { toast } from "sonner";
 import {
   Search,
   Plus,
   Trash2,
   Copy,
-  Save,
   Printer,
   FileSpreadsheet,
   Scissors,
@@ -51,7 +50,10 @@ interface AvailableOperator {
 
 export function LoomRollCuttingSection() {
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [autoSaving, setAutoSaving] = useState(false);
+  const [lastAutoSavedAt, setLastAutoSavedAt] = useState<Date | null>(null);
+
   const [search, setSearch] = useState("");
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [selectedShift, setSelectedShift] = useState("Day Shift");
@@ -67,9 +69,14 @@ export function LoomRollCuttingSection() {
   const [suggestedRollNumber, setSuggestedRollNumber] = useState("CT-14376");
   const [printModalOpen, setPrintModalOpen] = useState(false);
 
+  const latestPayloadRef = useRef<any>(null);
+  const lastSavedPayloadRef = useRef<string>("");
+  const isInitialMountRef = useRef<boolean>(true);
+
   // Fetch report data
   const fetchData = useCallback(async () => {
     setLoading(true);
+    isInitialMountRef.current = true;
     try {
       const params = new URLSearchParams({
         date: selectedDate,
@@ -87,10 +94,15 @@ export function LoomRollCuttingSection() {
       const json = await res.json();
 
       const report = json.report || {};
-      setSupervisorName(report.supervisorName || "");
-      setReportStatus(report.status || "DRAFT");
-      setReportRemarks(report.remarks || "");
-      setEntries(json.entries || []);
+      const fetchedEntries: LoomRollCuttingEntryItem[] = json.entries || [];
+      const supName = report.supervisorName || "";
+      const status = report.status || "DRAFT";
+      const remarks = report.remarks || "";
+
+      setSupervisorName(supName);
+      setReportStatus(status);
+      setReportRemarks(remarks);
+      setEntries(fetchedEntries);
       setAvailableQualities(json.availableQualities || []);
       setAvailableShifts(json.availableShifts || []);
       setAvailableOperators(json.availableOperators || []);
@@ -98,6 +110,19 @@ export function LoomRollCuttingSection() {
       if (json.suggestedNextRollNumber) {
         setSuggestedRollNumber(json.suggestedNextRollNumber);
       }
+
+      const initialPayload = {
+        action: "SAVE_REPORT",
+        date: selectedDate,
+        shiftName: selectedShift,
+        supervisorName: supName,
+        status,
+        remarks,
+        entries: fetchedEntries,
+      };
+      latestPayloadRef.current = initialPayload;
+      lastSavedPayloadRef.current = JSON.stringify(initialPayload);
+      isInitialMountRef.current = false;
     } catch {
       toast.error("Failed to load Roll Cutting Report");
     } finally {
@@ -109,17 +134,122 @@ export function LoomRollCuttingSection() {
     fetchData();
   }, [fetchData]);
 
+  // Immediate or debounced auto-save function
+  const triggerAutoSave = useCallback(async (isImmediate: boolean = false, keepalive: boolean = false) => {
+    if (!latestPayloadRef.current || isInitialMountRef.current) return;
+    const serialized = JSON.stringify(latestPayloadRef.current);
+    if (serialized === lastSavedPayloadRef.current) return;
+
+    if (!isImmediate) {
+      setAutoSaving(true);
+    }
+
+    try {
+      const res = await fetch("/api/production/loom/roll-cutting", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: serialized,
+        keepalive,
+      });
+
+      if (res.ok) {
+        lastSavedPayloadRef.current = serialized;
+        setLastAutoSavedAt(new Date());
+      }
+    } catch (err) {
+      console.error("Roll cutting auto-save error:", err);
+    } finally {
+      if (!isImmediate) {
+        setAutoSaving(false);
+      }
+    }
+  }, []);
+
+  // Sync latestPayloadRef and debounce auto-save (500ms)
+  useEffect(() => {
+    if (loading || isInitialMountRef.current) return;
+
+    const payload = {
+      action: "SAVE_REPORT",
+      date: selectedDate,
+      shiftName: selectedShift,
+      supervisorName,
+      status: reportStatus,
+      remarks: reportRemarks,
+      entries,
+    };
+
+    latestPayloadRef.current = payload;
+    const serialized = JSON.stringify(payload);
+    if (serialized === lastSavedPayloadRef.current) return;
+
+    const timer = setTimeout(() => {
+      triggerAutoSave(false);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [
+    entries,
+    selectedDate,
+    selectedShift,
+    supervisorName,
+    reportStatus,
+    reportRemarks,
+    loading,
+    triggerAutoSave,
+  ]);
+
+  // Immediate flush on page reload, tab close, or navigation hide
+  useEffect(() => {
+    const handleUnloadOrHide = () => {
+      if (latestPayloadRef.current && !isInitialMountRef.current) {
+        const serialized = JSON.stringify(latestPayloadRef.current);
+        if (serialized !== lastSavedPayloadRef.current) {
+          fetch("/api/production/loom/roll-cutting", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: serialized,
+            keepalive: true,
+          }).catch(() => {});
+          lastSavedPayloadRef.current = serialized;
+        }
+      }
+    };
+
+    window.addEventListener("beforeunload", handleUnloadOrHide);
+    window.addEventListener("pagehide", handleUnloadOrHide);
+    const handleVisibility = () => {
+      if (document.visibilityState === "hidden") {
+        handleUnloadOrHide();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      window.removeEventListener("beforeunload", handleUnloadOrHide);
+      window.removeEventListener("pagehide", handleUnloadOrHide);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, []);
+
   // Live KPI Calculations
   const kpis: RollCuttingKpis = useMemo(() => {
     const totalRollsCount = entries.length;
-    const totalMeters = Math.round(entries.reduce((s, e) => s + (e.meter || 0), 0) * 100) / 100;
-    const totalGrossWtKg = Math.round(entries.reduce((s, e) => s + (e.grossWeightKg || 0), 0) * 100) / 100;
-    const totalTareWtKg = Math.round(entries.reduce((s, e) => s + (e.tareWeightKg || 1.2), 0) * 100) / 100;
-    const totalNettWtKg = Math.round(entries.reduce((s, e) => s + (e.nettWeightKg || 0), 0) * 100) / 100;
+    const totalMeters = Math.round(entries.reduce((s, e) => s + (Number(e.meter) || 0), 0) * 100) / 100;
+    const totalGrossWtKg = Math.round(entries.reduce((s, e) => s + (Number(e.grossWeightKg) || 0), 0) * 100) / 100;
+    const totalTareWtKg = Math.round(
+      entries.reduce((s, e) => {
+        const tareVal = e.tareWeightKg !== "" && e.tareWeightKg !== null && e.tareWeightKg !== undefined
+          ? (!isNaN(Number(e.tareWeightKg)) ? Number(e.tareWeightKg) : 1.2)
+          : 1.2;
+        return s + tareVal;
+      }, 0) * 100
+    ) / 100;
+    const totalNettWtKg = Math.round(entries.reduce((s, e) => s + (Number(e.nettWeightKg) || 0), 0) * 100) / 100;
     const averageWeightPerMeter = totalMeters > 0 && totalNettWtKg > 0
       ? Math.round(((totalNettWtKg * 1000) / totalMeters) * 10) / 10
       : 0;
-    const uniqueLooms = new Set(entries.map((e) => e.loomNumber));
+    const uniqueLooms = new Set(entries.map((e) => Number(e.loomNumber)).filter(Boolean));
 
     return {
       totalRollsCount,
@@ -158,26 +288,28 @@ export function LoomRollCuttingSection() {
         }
       }
 
-      if (field === "initialReading" || field === "finalReading") {
-        const init = field === "initialReading" ? Number(value) || 0 : current.initialReading;
-        const final = field === "finalReading" ? Number(value) || 0 : current.finalReading;
-        current.meter = computeRollMeters(init, final);
-        const { nettWeightKg, avgWeightPerMeter } = computeRollWeightsAndAvg(
-          current.meter,
-          current.grossWeightKg,
-          current.tareWeightKg
-        );
-        current.nettWeightKg = nettWeightKg;
-        current.avgWeightPerMeter = avgWeightPerMeter;
-      }
+      const init = current.initialReading !== "" && current.initialReading !== undefined && current.initialReading !== null
+        ? current.initialReading
+        : 0;
+      const final = current.finalReading !== "" && current.finalReading !== undefined && current.finalReading !== null
+        ? current.finalReading
+        : 0;
+      current.meter = computeRollMeters(init, final);
 
-      if (field === "grossWeightKg" || field === "tareWeightKg") {
-        const gross = field === "grossWeightKg" ? Number(value) || 0 : current.grossWeightKg;
-        const tare = field === "tareWeightKg" ? Number(value) || 0 : current.tareWeightKg;
-        const { nettWeightKg, avgWeightPerMeter } = computeRollWeightsAndAvg(current.meter, gross, tare);
-        current.nettWeightKg = nettWeightKg;
-        current.avgWeightPerMeter = avgWeightPerMeter;
-      }
+      const gross = current.grossWeightKg !== "" && current.grossWeightKg !== undefined && current.grossWeightKg !== null
+        ? current.grossWeightKg
+        : 0;
+      const tare = current.tareWeightKg !== "" && current.tareWeightKg !== undefined && current.tareWeightKg !== null
+        ? current.tareWeightKg
+        : 1.2;
+
+      const { nettWeightKg, avgWeightPerMeter } = computeRollWeightsAndAvg(
+        current.meter,
+        gross,
+        tare
+      );
+      current.nettWeightKg = nettWeightKg;
+      current.avgWeightPerMeter = avgWeightPerMeter;
 
       copy[index] = current;
       return copy;
@@ -188,7 +320,7 @@ export function LoomRollCuttingSection() {
   const handleAddEntry = () => {
     const lastEntry = entries[entries.length - 1];
     const nextRoll = generateNextRollNumber(lastEntry?.rollNumber || suggestedRollNumber);
-    const defaultLoom = lastEntry ? (lastEntry.loomNumber % 91) + 1 : 1;
+    const defaultLoom = lastEntry ? (Number(lastEntry.loomNumber) % 91) + 1 : 1;
     const alloc = loomAllocations[defaultLoom];
 
     const newEntry: LoomRollCuttingEntryItem = {
@@ -200,7 +332,7 @@ export function LoomRollCuttingSection() {
       initialReading: 0,
       finalReading: 0,
       meter: 0,
-      grossWeightKg: 0,
+      grossWeightKg: "",
       tareWeightKg: 1.2,
       nettWeightKg: 0,
       avgWeightPerMeter: 0,
@@ -224,7 +356,8 @@ export function LoomRollCuttingSection() {
       initialReading: target.finalReading,
       finalReading: target.finalReading,
       meter: 0,
-      grossWeightKg: 0,
+      grossWeightKg: "",
+      tareWeightKg: target.tareWeightKg !== undefined ? target.tareWeightKg : 1.2,
       nettWeightKg: 0,
       avgWeightPerMeter: 0,
     };
@@ -238,21 +371,21 @@ export function LoomRollCuttingSection() {
     toast.info("Roll cutting entry removed");
   };
 
-  // Save / Submit Report
-  const handleSaveReport = async (targetStatus: "DRAFT" | "SUBMITTED" = "DRAFT") => {
+  // Submit Report & Sync to Roll Stock
+  const handleSubmitReport = async () => {
     if (entries.length === 0) {
-      toast.error("Please add at least one roll cutting entry before saving");
+      toast.error("Please add at least one roll cutting entry before submitting");
       return;
     }
 
-    setSaving(true);
+    setSubmitting(true);
     try {
       const payload = {
         action: "SAVE_REPORT",
         date: selectedDate,
         shiftName: selectedShift,
         supervisorName,
-        status: targetStatus,
+        status: "SUBMITTED",
         remarks: reportRemarks,
         entries,
       };
@@ -264,15 +397,16 @@ export function LoomRollCuttingSection() {
       });
 
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "Failed to save report");
+      if (!res.ok) throw new Error(json.error || "Failed to submit report");
 
-      setReportStatus(targetStatus);
-      toast.success(targetStatus === "SUBMITTED" ? "Daily Roll Cutting Report submitted and synced to Roll Stock!" : "Roll Cutting Report draft saved successfully!");
-      fetchData();
+      setReportStatus("SUBMITTED");
+      lastSavedPayloadRef.current = JSON.stringify(payload);
+      setLastAutoSavedAt(new Date());
+      toast.success("Daily Roll Cutting Report submitted and synced to Roll Stock!");
     } catch (err: any) {
-      toast.error(err.message || "Failed to save report");
+      toast.error(err.message || "Failed to submit report");
     } finally {
-      setSaving(false);
+      setSubmitting(false);
     }
   };
 
@@ -318,8 +452,20 @@ export function LoomRollCuttingSection() {
           </div>
         </div>
 
-        {/* Global Action Buttons */}
+        {/* Global Action Buttons & Auto-Save Status */}
         <div className="flex flex-wrap items-center gap-2">
+          {autoSaving ? (
+            <div className="flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400 font-medium px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/20">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+              Auto-saving...
+            </div>
+          ) : lastAutoSavedAt ? (
+            <div className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 font-medium px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              Saved {lastAutoSavedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+            </div>
+          ) : null}
+
           <button
             onClick={() => exportLoomRollCuttingExcel({ report: reportDataForPrint, entries, kpis })}
             disabled={entries.length === 0}
@@ -339,21 +485,12 @@ export function LoomRollCuttingSection() {
           </button>
 
           <button
-            onClick={() => handleSaveReport("DRAFT")}
-            disabled={saving || loading}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-lg border bg-card hover:bg-muted text-foreground transition-colors cursor-pointer shadow-xs disabled:opacity-50"
-          >
-            <Save className="w-3.5 h-3.5" />
-            {saving ? "Saving..." : "Save Draft"}
-          </button>
-
-          <button
-            onClick={() => handleSaveReport("SUBMITTED")}
-            disabled={saving || loading}
+            onClick={handleSubmitReport}
+            disabled={submitting || loading || entries.length === 0}
             className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground transition-colors cursor-pointer shadow-xs disabled:opacity-50"
           >
             <CheckCircle2 className="w-3.5 h-3.5" />
-            Submit & Sync Roll Stock
+            {submitting ? "Submitting..." : "Submit & Sync Roll Stock"}
           </button>
         </div>
       </div>
@@ -492,7 +629,7 @@ export function LoomRollCuttingSection() {
                 <th className="p-2.5 border-r w-24 text-right">Final Reading</th>
                 <th className="p-2.5 border-r w-20 text-right bg-muted/90 text-foreground font-bold">Meter</th>
                 <th className="p-2.5 border-r w-24 text-right">Gross Wt (kg)</th>
-                <th className="p-2.5 border-r w-20 text-right text-muted-foreground">Tare (kg)</th>
+                <th className="p-2.5 border-r w-24 text-right text-muted-foreground">Tare (kg)</th>
                 <th className="p-2.5 border-r w-24 text-right font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/5">Nett (kg)</th>
                 <th className="p-2.5 border-r w-20 text-right text-purple-600 dark:text-purple-400">Avg (g/m)</th>
                 <th className="p-2.5 border-r w-28 text-center">Sup. Sign</th>
@@ -568,8 +705,8 @@ export function LoomRollCuttingSection() {
                     <td className="p-1.5 border-r">
                       <input
                         type="number"
-                        value={entry.initialReading ?? ""}
-                        onChange={(e) => handleUpdateEntry(idx, "initialReading", e.target.value === "" ? 0 : Number(e.target.value))}
+                        value={entry.initialReading !== undefined && entry.initialReading !== null ? entry.initialReading : ""}
+                        onChange={(e) => handleUpdateEntry(idx, "initialReading", e.target.value)}
                         className="w-full text-xs font-mono text-right px-2 py-1.5 rounded border bg-background text-foreground focus:ring-1 focus:ring-primary outline-hidden"
                         placeholder="0"
                       />
@@ -579,8 +716,8 @@ export function LoomRollCuttingSection() {
                     <td className="p-1.5 border-r">
                       <input
                         type="number"
-                        value={entry.finalReading ?? ""}
-                        onChange={(e) => handleUpdateEntry(idx, "finalReading", e.target.value === "" ? 0 : Number(e.target.value))}
+                        value={entry.finalReading !== undefined && entry.finalReading !== null ? entry.finalReading : ""}
+                        onChange={(e) => handleUpdateEntry(idx, "finalReading", e.target.value)}
                         className="w-full text-xs font-mono text-right px-2 py-1.5 rounded border bg-background text-foreground focus:ring-1 focus:ring-primary outline-hidden"
                         placeholder="0"
                       />
@@ -596,8 +733,8 @@ export function LoomRollCuttingSection() {
                       <input
                         type="number"
                         step="0.01"
-                        value={entry.grossWeightKg ?? ""}
-                        onChange={(e) => handleUpdateEntry(idx, "grossWeightKg", e.target.value === "" ? 0 : Number(e.target.value))}
+                        value={entry.grossWeightKg !== undefined && entry.grossWeightKg !== null ? entry.grossWeightKg : ""}
+                        onChange={(e) => handleUpdateEntry(idx, "grossWeightKg", e.target.value)}
                         className="w-full text-xs font-mono text-right px-2 py-1.5 rounded border bg-background text-foreground focus:ring-1 focus:ring-primary outline-hidden font-semibold"
                         placeholder="0.00"
                       />
@@ -608,21 +745,21 @@ export function LoomRollCuttingSection() {
                       <input
                         type="number"
                         step="0.01"
-                        value={entry.tareWeightKg ?? 1.2}
-                        onChange={(e) => handleUpdateEntry(idx, "tareWeightKg", e.target.value === "" ? 1.2 : Number(e.target.value))}
-                        className="w-full text-xs font-mono text-right px-2 py-1.5 rounded border bg-background text-muted-foreground focus:ring-1 focus:ring-primary outline-hidden"
+                        value={entry.tareWeightKg !== undefined && entry.tareWeightKg !== null ? entry.tareWeightKg : ""}
+                        onChange={(e) => handleUpdateEntry(idx, "tareWeightKg", e.target.value)}
+                        className="w-full text-xs font-mono text-right px-2 py-1.5 rounded border bg-background text-muted-foreground focus:ring-1 focus:ring-primary outline-hidden font-semibold"
                         placeholder="1.20"
                       />
                     </td>
 
                     {/* Nett Wt (Auto-Calculated) */}
                     <td className="p-2 border-r text-right font-mono font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/5">
-                      {entry.nettWeightKg !== undefined && entry.nettWeightKg !== null ? entry.nettWeightKg.toFixed(2) : "0.00"}
+                      {entry.nettWeightKg !== undefined && entry.nettWeightKg !== null ? Number(entry.nettWeightKg).toFixed(2) : "0.00"}
                     </td>
 
                     {/* Avg g/m (Auto-Calculated) */}
                     <td className="p-2 border-r text-right font-mono font-bold text-purple-600 dark:text-purple-400">
-                      {entry.avgWeightPerMeter !== undefined && entry.avgWeightPerMeter !== null ? entry.avgWeightPerMeter.toFixed(1) : "0.0"}
+                      {entry.avgWeightPerMeter !== undefined && entry.avgWeightPerMeter !== null ? Number(entry.avgWeightPerMeter).toFixed(1) : "0.0"}
                     </td>
 
                     {/* Sup. Sign */}

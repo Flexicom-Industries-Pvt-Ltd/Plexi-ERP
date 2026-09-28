@@ -5,11 +5,11 @@ export interface LoomRollCuttingEntryItem {
   loomNumber: number;        // e.g. 4, 2, 3, 68...
   size: string;              // Fabric width mm e.g. "490", "500"
   qualityType: string;       // e.g. "Mahal/LPP/W", "UTCL/LPP/Y/67"
-  initialReading: number;    // Counter start
-  finalReading: number;      // Counter cut point
+  initialReading: number | string;    // Counter start
+  finalReading: number | string;      // Counter cut point
   meter: number;             // Calculated: finalReading - initialReading
-  grossWeightKg: number;     // Scale weight with core
-  tareWeightKg: number;      // Core weight (default 1.2 kg)
+  grossWeightKg: number | string;     // Scale weight with core
+  tareWeightKg: number | string;      // Core weight (default 1.2 kg)
   nettWeightKg: number;      // Gross - Tare
   avgWeightPerMeter: number; // (Nett * 1000) / Meter in g/m
   supervisorSign: string;    // Supervisor name/initials
@@ -51,17 +51,23 @@ export interface RollCuttingKpis {
  * Calculates meter length from initial and final loom readings,
  * handling counter rollovers (e.g. 9950 -> 0120).
  */
-export function computeRollMeters(initialReading: number, finalReading: number): number {
-  if (typeof initialReading !== "number" || typeof finalReading !== "number") return 0;
-  if (isNaN(initialReading) || isNaN(finalReading)) return 0;
+export function computeRollMeters(
+  initialReading: number | string | null | undefined,
+  finalReading: number | string | null | undefined
+): number {
+  if (initialReading === "" || initialReading === null || initialReading === undefined) return 0;
+  if (finalReading === "" || finalReading === null || finalReading === undefined) return 0;
+  const init = typeof initialReading === "number" ? initialReading : parseFloat(String(initialReading));
+  const final = typeof finalReading === "number" ? finalReading : parseFloat(String(finalReading));
+  if (isNaN(init) || isNaN(final)) return 0;
 
-  let diff = finalReading - initialReading;
+  let diff = final - init;
   if (diff < 0) {
     // 4-digit or 5-digit mechanical counter rollover
-    if (initialReading > 8000 && finalReading < 3000) {
-      diff = (10000 - initialReading) + finalReading;
-    } else if (initialReading > 80000 && finalReading < 30000) {
-      diff = (100000 - initialReading) + finalReading;
+    if (init > 8000 && final < 3000) {
+      diff = (10000 - init) + final;
+    } else if (init > 80000 && final < 30000) {
+      diff = (100000 - init) + final;
     } else {
       diff = 0;
     }
@@ -73,21 +79,27 @@ export function computeRollMeters(initialReading: number, finalReading: number):
  * Calculates nett weight and avg g/m (grams per meter).
  */
 export function computeRollWeightsAndAvg(
-  meter: number,
-  grossWeightKg: number,
-  tareWeightKg: number = 1.2
+  meter: number | string | null | undefined,
+  grossWeightKg: number | string | null | undefined,
+  tareWeightKg: number | string | null | undefined = 1.2
 ): {
   nettWeightKg: number;
   avgWeightPerMeter: number;
 } {
-  const gross = Number(grossWeightKg) || 0;
-  const tare = Number(tareWeightKg) || 0;
+  const m = typeof meter === "number" ? meter : (meter ? parseFloat(String(meter)) : 0) || 0;
+  const gross = grossWeightKg !== "" && grossWeightKg !== null && grossWeightKg !== undefined
+    ? (typeof grossWeightKg === "number" ? grossWeightKg : parseFloat(String(grossWeightKg)) || 0)
+    : 0;
+  const tare = tareWeightKg !== "" && tareWeightKg !== null && tareWeightKg !== undefined
+    ? (typeof tareWeightKg === "number" ? tareWeightKg : parseFloat(String(tareWeightKg)) || 0)
+    : 1.2;
+
   const nett = Math.max(0, Math.round((gross - tare) * 100) / 100);
 
   let avg = 0;
-  if (meter > 0 && nett > 0) {
+  if (m > 0 && nett > 0) {
     // (Nett kg * 1000 g/kg) / meters = grams per meter (g/m)
-    avg = Math.round(((nett * 1000) / meter) * 10) / 10;
+    avg = Math.round(((nett * 1000) / m) * 10) / 10;
   }
 
   return {

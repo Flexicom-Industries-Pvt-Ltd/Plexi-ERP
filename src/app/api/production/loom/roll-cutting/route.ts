@@ -163,10 +163,17 @@ export async function GET(request: NextRequest) {
 
     // Calculate report totals & KPIs
     const totalRollsCount = entries.length;
-    const totalMeters = Math.round(entries.reduce((s, e) => s + (e.meter || 0), 0) * 100) / 100;
-    const totalGrossWtKg = Math.round(entries.reduce((s, e) => s + (e.grossWeightKg || 0), 0) * 100) / 100;
-    const totalTareWtKg = Math.round(entries.reduce((s, e) => s + (e.tareWeightKg || 1.2), 0) * 100) / 100;
-    const totalNettWtKg = Math.round(entries.reduce((s, e) => s + (e.nettWeightKg || 0), 0) * 100) / 100;
+    const totalMeters = Math.round(entries.reduce((s, e) => s + (Number(e.meter) || 0), 0) * 100) / 100;
+    const totalGrossWtKg = Math.round(entries.reduce((s, e) => s + (Number(e.grossWeightKg) || 0), 0) * 100) / 100;
+    const totalTareWtKg = Math.round(
+      entries.reduce((s, e) => {
+        const tareVal = e.tareWeightKg !== "" && e.tareWeightKg !== null && e.tareWeightKg !== undefined
+          ? (!isNaN(Number(e.tareWeightKg)) ? Number(e.tareWeightKg) : 1.2)
+          : 1.2;
+        return s + tareVal;
+      }, 0) * 100
+    ) / 100;
+    const totalNettWtKg = Math.round(entries.reduce((s, e) => s + (Number(e.nettWeightKg) || 0), 0) * 100) / 100;
     const averageWeightPerMeter = totalMeters > 0 && totalNettWtKg > 0
       ? Math.round(((totalNettWtKg * 1000) / totalMeters) * 10) / 10
       : 0;
@@ -274,11 +281,19 @@ export async function POST(request: NextRequest) {
       let reportTotalNett = 0;
 
       const processedEntries = (entries as LoomRollCuttingEntryItem[]).map((e, idx) => {
-        const initRdg = Number(e.initialReading) || 0;
-        const finalRdg = Number(e.finalReading) || 0;
+        const initRdg = e.initialReading !== "" && e.initialReading !== null && e.initialReading !== undefined
+          ? (Number(e.initialReading) || 0)
+          : 0;
+        const finalRdg = e.finalReading !== "" && e.finalReading !== null && e.finalReading !== undefined
+          ? (Number(e.finalReading) || 0)
+          : 0;
         const meter = computeRollMeters(initRdg, finalRdg);
-        const gross = Number(e.grossWeightKg) || 0;
-        const tare = Number(e.tareWeightKg) || 1.2;
+        const gross = e.grossWeightKg !== "" && e.grossWeightKg !== null && e.grossWeightKg !== undefined
+          ? (Number(e.grossWeightKg) || 0)
+          : 0;
+        const tare = e.tareWeightKg !== "" && e.tareWeightKg !== null && e.tareWeightKg !== undefined
+          ? (!isNaN(Number(e.tareWeightKg)) && Number(e.tareWeightKg) >= 0 ? Number(e.tareWeightKg) : 1.2)
+          : 1.2;
         const { nettWeightKg, avgWeightPerMeter } = computeRollWeightsAndAvg(meter, gross, tare);
 
         reportTotalMeters += meter;
