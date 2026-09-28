@@ -204,15 +204,17 @@ export function generatePostProductionSheetHtml(data: PostProductionPrintData): 
       margin-bottom: 6px;
     }
     .data-table th {
-      background-color: #0f172a;
-      color: #ffffff;
-      border: 1px solid #0f172a;
+      background-color: #e2e8f0 !important;
+      color: #000000 !important;
+      border: 1.5px solid #0f172a !important;
       padding: 4px 4px;
-      font-size: 6.5pt;
-      font-weight: 800;
+      font-size: 6.8pt;
+      font-weight: 900;
       text-transform: uppercase;
       letter-spacing: 0.3px;
       text-align: center;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
     }
     .data-table td {
       border: 1px solid #cbd5e1;

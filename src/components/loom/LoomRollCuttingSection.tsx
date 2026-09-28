@@ -818,23 +818,23 @@ export function LoomRollCuttingSection() {
         <div className="overflow-x-auto min-h-[300px]">
           <table className="w-full text-xs text-left border-collapse min-w-[2140px]">
             <thead>
-              <tr className="bg-muted/80 border-b text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200">
-                <th className="p-3 text-center border-r w-14 min-w-[56px]">S.No.</th>
-                <th className="p-3 border-r w-36 min-w-[144px]">Roll No.</th>
-                <th className="p-3 border-r w-36 min-w-[130px] text-center">Loom #</th>
-                <th className="p-3 border-r w-28 min-w-[100px] text-center">Size (mm)</th>
-                <th className="p-3 border-r w-80 min-w-[300px]">Quality Code</th>
-                <th className="p-3 border-r w-64 min-w-[240px]">Contractor</th>
-                <th className="p-3 border-r w-32 min-w-[120px] text-right">Init Reading</th>
-                <th className="p-3 border-r w-32 min-w-[120px] text-right">Final Reading</th>
-                <th className="p-3 border-r w-28 min-w-[110px] text-right bg-muted text-foreground font-extrabold">Meter</th>
-                <th className="p-3 border-r w-32 min-w-[120px] text-right">Gross Wt (kg)</th>
-                <th className="p-3 border-r w-28 min-w-[100px] text-right text-muted-foreground">Tare (kg)</th>
-                <th className="p-3 border-r w-32 min-w-[120px] text-right font-extrabold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10">Nett (kg)</th>
-                <th className="p-3 border-r w-28 min-w-[110px] text-right text-purple-600 dark:text-purple-400 font-extrabold bg-purple-500/10">Avg (g/m)</th>
-                <th className="p-3 border-r w-44 min-w-[160px] text-center">Sup. Sign</th>
-                <th className="p-3 border-r w-64 min-w-[220px]">Remarks</th>
-                <th className="p-3 text-center w-28 min-w-[100px]">Actions</th>
+              <tr className="bg-slate-900 border-b border-slate-800 text-xs font-bold uppercase tracking-wider text-white">
+                <th className="p-3 text-center border-r border-slate-800 w-14 min-w-[56px] text-white font-bold">S.No.</th>
+                <th className="p-3 border-r border-slate-800 w-36 min-w-[144px] text-white font-bold">Roll No.</th>
+                <th className="p-3 border-r border-slate-800 w-36 min-w-[130px] text-center text-white font-bold">Loom #</th>
+                <th className="p-3 border-r border-slate-800 w-28 min-w-[100px] text-center text-white font-bold">Size (mm)</th>
+                <th className="p-3 border-r border-slate-800 w-80 min-w-[300px] text-white font-bold">Quality Code</th>
+                <th className="p-3 border-r border-slate-800 w-64 min-w-[240px] text-white font-bold">Contractor</th>
+                <th className="p-3 border-r border-slate-800 w-32 min-w-[120px] text-right text-white font-bold">Init Reading</th>
+                <th className="p-3 border-r border-slate-800 w-32 min-w-[120px] text-right text-white font-bold">Final Reading</th>
+                <th className="p-3 border-r border-slate-800 w-28 min-w-[110px] text-right bg-slate-950 text-white font-extrabold">Meter</th>
+                <th className="p-3 border-r border-slate-800 w-32 min-w-[120px] text-right text-white font-bold">Gross Wt (kg)</th>
+                <th className="p-3 border-r border-slate-800 w-28 min-w-[100px] text-right text-slate-300 font-bold">Tare (kg)</th>
+                <th className="p-3 border-r border-slate-800 w-32 min-w-[120px] text-right font-extrabold text-emerald-300 bg-emerald-950/70">Nett (kg)</th>
+                <th className="p-3 border-r border-slate-800 w-28 min-w-[110px] text-right text-purple-300 font-extrabold bg-purple-950/70">Avg (g/m)</th>
+                <th className="p-3 border-r border-slate-800 w-44 min-w-[160px] text-center text-white font-bold">Sup. Sign</th>
+                <th className="p-3 border-r border-slate-800 w-64 min-w-[220px] text-white font-bold">Remarks</th>
+                <th className="p-3 text-center border-slate-800 w-28 min-w-[100px] text-white font-bold">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/60 font-sans">
