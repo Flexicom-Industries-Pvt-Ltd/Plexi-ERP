@@ -254,21 +254,21 @@ export function LoomRollCuttingPrintModal({
               <table className="w-full text-[11px] border-collapse min-w-[1400px]">
                 <thead>
                   <tr className="bg-slate-900 text-white font-bold text-[10px] tracking-wider uppercase">
-                    <th className="border border-slate-700 px-2 py-1.5 text-center w-10">S.No.</th>
-                    <th className="border border-slate-700 px-2 py-1.5 text-center font-mono w-24">Roll No.</th>
-                    <th className="border border-slate-700 px-2 py-1.5 text-center w-14">Loom #</th>
-                    <th className="border border-slate-700 px-2 py-1.5 text-center w-16">Size (mm)</th>
-                    <th className="border border-slate-700 px-2 py-1.5 text-left min-w-[200px]">Quality Code</th>
-                    <th className="border border-slate-700 px-2 py-1.5 text-left min-w-[160px]">Contractor</th>
-                    <th className="border border-slate-700 px-2 py-1.5 text-right w-20">Init Rdg</th>
-                    <th className="border border-slate-700 px-2 py-1.5 text-right w-20">Final Rdg</th>
-                    <th className="border border-slate-700 px-2 py-1.5 text-right w-20 bg-slate-800">Meter</th>
-                    <th className="border border-slate-700 px-2 py-1.5 text-right w-20">Gross (kg)</th>
-                    <th className="border border-slate-700 px-2 py-1.5 text-right w-16 text-slate-300">Tare (kg)</th>
-                    <th className="border border-slate-700 px-2 py-1.5 text-right w-20 bg-emerald-950 text-emerald-200">Nett (kg)</th>
-                    <th className="border border-slate-700 px-2 py-1.5 text-right w-18 text-purple-300 bg-purple-950/40">Avg (g/m)</th>
-                    <th className="border border-slate-700 px-2 py-1.5 text-center w-24">Sup. Sign</th>
-                    <th className="border border-slate-700 px-2 py-1.5 text-left min-w-[120px]">Remarks</th>
+                    <th className="border border-slate-700 px-2 py-1.5 text-center w-10 text-white font-bold">S.No.</th>
+                    <th className="border border-slate-700 px-2 py-1.5 text-center font-mono w-24 text-white font-bold">Roll No.</th>
+                    <th className="border border-slate-700 px-2 py-1.5 text-center w-14 text-white font-bold">Loom #</th>
+                    <th className="border border-slate-700 px-2 py-1.5 text-center w-16 text-white font-bold">Size (mm)</th>
+                    <th className="border border-slate-700 px-2 py-1.5 text-left min-w-[200px] text-white font-bold">Quality Code</th>
+                    <th className="border border-slate-700 px-2 py-1.5 text-left min-w-[160px] text-white font-bold">Contractor</th>
+                    <th className="border border-slate-700 px-2 py-1.5 text-right w-20 text-white font-bold">Init Rdg</th>
+                    <th className="border border-slate-700 px-2 py-1.5 text-right w-20 text-white font-bold">Final Rdg</th>
+                    <th className="border border-slate-700 px-2 py-1.5 text-right w-20 bg-slate-950 text-white font-extrabold">Meter</th>
+                    <th className="border border-slate-700 px-2 py-1.5 text-right w-20 text-white font-bold">Gross (kg)</th>
+                    <th className="border border-slate-700 px-2 py-1.5 text-right w-16 text-slate-300 font-bold">Tare (kg)</th>
+                    <th className="border border-slate-700 px-2 py-1.5 text-right w-20 bg-emerald-950 text-emerald-200 font-extrabold">Nett (kg)</th>
+                    <th className="border border-slate-700 px-2 py-1.5 text-right w-18 text-purple-300 bg-purple-950/40 font-extrabold">Avg (g/m)</th>
+                    <th className="border border-slate-700 px-2 py-1.5 text-center w-24 text-white font-bold">Sup. Sign</th>
+                    <th className="border border-slate-700 px-2 py-1.5 text-left min-w-[120px] text-white font-bold">Remarks</th>
                   </tr>
                 </thead>
                 <tbody>
