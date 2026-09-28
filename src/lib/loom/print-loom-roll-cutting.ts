@@ -211,14 +211,16 @@ export function generateLoomRollCuttingHtml(options: PrintRollCuttingOptions): s
       table-layout: fixed;
     }
     .data-table th {
-      background-color: #0f172a;
-      border: 1px solid #334155;
-      padding: 3px 2px;
-      font-weight: 700;
-      font-size: 6.5pt;
+      background-color: #e2e8f0 !important;
+      border: 1.5px solid #0f172a !important;
+      padding: 3.5px 2px;
+      font-weight: 900;
+      font-size: 6.8pt;
       text-transform: uppercase;
       text-align: center;
-      color: #ffffff;
+      color: #000000 !important;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
     }
     .data-table td {
       border: 1px solid #cbd5e1;
@@ -376,13 +378,13 @@ export function generateLoomRollCuttingHtml(options: PrintRollCuttingOptions): s
         </div>
         <table style="width: 100%; border-collapse: collapse; font-size: 6.5pt;">
           <thead>
-            <tr style="background: #f1f5f9; color: #334155; font-weight: 700;">
-              <th style="border: 1px solid #cbd5e1; padding: 2px 4px; text-align: left;">Quality Code</th>
-              <th style="border: 1px solid #cbd5e1; padding: 2px 4px; text-align: center; width: 45px;">Rolls</th>
-              <th style="border: 1px solid #cbd5e1; padding: 2px 4px; text-align: right; width: 60px;">Meters</th>
-              <th style="border: 1px solid #cbd5e1; padding: 2px 4px; text-align: right; width: 60px;">Nett (kg)</th>
-              <th style="border: 1px solid #cbd5e1; padding: 2px 4px; text-align: right; width: 50px;">Avg (g/m)</th>
-              <th style="border: 1px solid #cbd5e1; padding: 2px 4px; text-align: right; width: 45px;">Share</th>
+            <tr style="background: #e2e8f0; color: #000000; font-weight: 800; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important;">
+              <th style="border: 1px solid #0f172a; padding: 2px 4px; text-align: left; color: #000000 !important; font-weight: 800;">Quality Code</th>
+              <th style="border: 1px solid #0f172a; padding: 2px 4px; text-align: center; width: 45px; color: #000000 !important; font-weight: 800;">Rolls</th>
+              <th style="border: 1px solid #0f172a; padding: 2px 4px; text-align: right; width: 60px; color: #000000 !important; font-weight: 800;">Meters</th>
+              <th style="border: 1px solid #0f172a; padding: 2px 4px; text-align: right; width: 60px; color: #000000 !important; font-weight: 800;">Nett (kg)</th>
+              <th style="border: 1px solid #0f172a; padding: 2px 4px; text-align: right; width: 50px; color: #000000 !important; font-weight: 800;">Avg (g/m)</th>
+              <th style="border: 1px solid #0f172a; padding: 2px 4px; text-align: right; width: 45px; color: #000000 !important; font-weight: 800;">Share</th>
             </tr>
           </thead>
           <tbody>
@@ -421,12 +423,12 @@ export function generateLoomRollCuttingHtml(options: PrintRollCuttingOptions): s
         </div>
         <table style="width: 100%; border-collapse: collapse; font-size: 6.5pt;">
           <thead>
-            <tr style="background: #f1f5f9; color: #334155; font-weight: 700;">
-              <th style="border: 1px solid #cbd5e1; padding: 2px 4px; text-align: left;">Contractor</th>
-              <th style="border: 1px solid #cbd5e1; padding: 2px 4px; text-align: center; width: 45px;">Rolls</th>
-              <th style="border: 1px solid #cbd5e1; padding: 2px 4px; text-align: right; width: 65px;">Meters</th>
-              <th style="border: 1px solid #cbd5e1; padding: 2px 4px; text-align: right; width: 65px;">Nett (kg)</th>
-              <th style="border: 1px solid #cbd5e1; padding: 2px 4px; text-align: right; width: 45px;">Share</th>
+            <tr style="background: #e2e8f0; color: #000000; font-weight: 800; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important;">
+              <th style="border: 1px solid #0f172a; padding: 2px 4px; text-align: left; color: #000000 !important; font-weight: 800;">Contractor</th>
+              <th style="border: 1px solid #0f172a; padding: 2px 4px; text-align: center; width: 45px; color: #000000 !important; font-weight: 800;">Rolls</th>
+              <th style="border: 1px solid #0f172a; padding: 2px 4px; text-align: right; width: 65px; color: #000000 !important; font-weight: 800;">Meters</th>
+              <th style="border: 1px solid #0f172a; padding: 2px 4px; text-align: right; width: 65px; color: #000000 !important; font-weight: 800;">Nett (kg)</th>
+              <th style="border: 1px solid #0f172a; padding: 2px 4px; text-align: right; width: 45px; color: #000000 !important; font-weight: 800;">Share</th>
             </tr>
           </thead>
           <tbody>

@@ -251,17 +251,17 @@ export function PostProductionPrintPreviewModal({
             <div className="border border-slate-300 rounded-lg overflow-hidden mb-6">
               <table className="w-full text-xs border-collapse">
                 <thead>
-                  <tr className="bg-slate-900 text-white">
-                    <th className="py-2 px-2 text-center font-bold w-10 border-r border-slate-700">#</th>
-                    <th className="py-2 px-3 text-left font-bold border-r border-slate-700">Recipe / Quality</th>
-                    <th className="py-2 px-3 text-right font-bold w-24 border-r border-slate-700">Planned (KG)</th>
-                    <th className="py-2 px-3 text-right font-bold w-24 border-r border-slate-700 bg-sky-950/60">Done (KG)</th>
-                    <th className="py-2 px-3 text-right font-bold w-20 border-r border-slate-700">Gap (KG)</th>
-                    <th className="py-2 px-3 text-right font-bold w-20 border-r border-slate-700 text-red-300">Waste (KG)</th>
-                    <th className="py-2 px-2 text-right font-bold w-16 border-r border-slate-700 text-red-300">Waste %</th>
-                    <th className="py-2 px-3 text-right font-bold w-24 border-r border-slate-700 bg-emerald-950/60 text-emerald-300">Net Output</th>
-                    <th className="py-2 px-2 text-center font-bold w-16 border-r border-slate-700">Eff %</th>
-                    <th className="py-2 px-3 text-left font-bold">Remarks</th>
+                  <tr className="bg-slate-900 text-white font-bold">
+                    <th className="py-2.5 px-2 text-center font-bold w-10 border-r border-slate-700 text-white">#</th>
+                    <th className="py-2.5 px-3 text-left font-bold border-r border-slate-700 text-white">Recipe / Quality</th>
+                    <th className="py-2.5 px-3 text-right font-bold w-24 border-r border-slate-700 text-white">Planned (KG)</th>
+                    <th className="py-2.5 px-3 text-right font-bold w-24 border-r border-slate-700 bg-sky-950/60 text-white">Done (KG)</th>
+                    <th className="py-2.5 px-3 text-right font-bold w-20 border-r border-slate-700 text-white">Gap (KG)</th>
+                    <th className="py-2.5 px-3 text-right font-bold w-20 border-r border-slate-700 text-red-300">Waste (KG)</th>
+                    <th className="py-2.5 px-2 text-right font-bold w-16 border-r border-slate-700 text-red-300">Waste %</th>
+                    <th className="py-2.5 px-3 text-right font-bold w-24 border-r border-slate-700 bg-emerald-950/60 text-emerald-300">Net Output</th>
+                    <th className="py-2.5 px-2 text-center font-bold w-16 border-r border-slate-700 text-white">Eff %</th>
+                    <th className="py-2.5 px-3 text-left font-bold text-white">Remarks</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">

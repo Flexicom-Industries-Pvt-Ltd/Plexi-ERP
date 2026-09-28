@@ -447,7 +447,7 @@ export function PostProductionSection({ date, shiftId, shiftName }: PostProducti
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 divide-x divide-y md:divide-y-0 divide-slate-200 text-xs">
                     {/* Planned KG (Read-only reference from planning) */}
                     <div className="p-3 bg-slate-50/50">
-                      <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">
+                      <label className="block text-[11px] font-extrabold text-slate-700 uppercase mb-1">
                         Planned (KG)
                       </label>
                       <div className="h-8 px-2.5 flex items-center justify-end font-mono font-bold text-xs text-slate-700 bg-slate-100 border border-slate-200 rounded">
@@ -471,7 +471,7 @@ export function PostProductionSection({ date, shiftId, shiftName }: PostProducti
 
                     {/* Gap KG (Auto-calculated: Planned - Done) */}
                     <div className="p-3 bg-slate-100/70">
-                      <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">
+                      <label className="block text-[11px] font-extrabold text-slate-700 uppercase mb-1">
                         Gap (KG)
                       </label>
                       <div
@@ -499,7 +499,7 @@ export function PostProductionSection({ date, shiftId, shiftName }: PostProducti
 
                     {/* Waste % (Auto-calculated / Editable) */}
                     <div className="p-3 bg-white">
-                      <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">
+                      <label className="block text-[11px] font-extrabold text-slate-700 uppercase mb-1">
                         Waste %
                       </label>
                       <input
