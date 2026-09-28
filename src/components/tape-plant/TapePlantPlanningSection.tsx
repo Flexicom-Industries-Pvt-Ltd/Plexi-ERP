@@ -17,7 +17,8 @@ import {
 } from "lucide-react";
 import { PlanningPrintPreviewModal } from "./PlanningPrintPreviewModal";
 import { generateTapePlantPlanningExcel } from "@/lib/tape-plant/planning-export";
-import { DEFAULT_RECIPE_STRING, parseRecipeQuality } from "@/lib/tape-plant/recipe-format";
+import { parseRecipeQuality } from "@/lib/tape-plant/recipe-format";
+import { QualityCombobox } from "./QualityCombobox";
 
 export interface MaterialRow {
   material: string;
@@ -188,7 +189,7 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName, shifts }: T
             spacerSize: p.spacerSize || "",
             requiredAsh: p.requiredAsh ?? "",
             ashPercent: p.ashPercent ?? "",
-            plannedQtyKg: p.plannedQtyKg ?? "",
+            plannedQtyKg: p.plannedQtyKg ? p.plannedQtyKg : "",
             omega: p.omega || "",
             vistPercent: p.vistPercent ?? "",
             remarks: p.remarks || "",
@@ -244,7 +245,7 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName, shifts }: T
             spacerSize: data.spacerSize || "",
             requiredAsh: data.requiredAsh ?? "",
             ashPercent: data.ashPercent ?? "",
-            plannedQtyKg: data.plannedQtyKg ?? "",
+            plannedQtyKg: data.plannedQtyKg ? data.plannedQtyKg : "",
             omega: data.omega || "",
             vistPercent: data.vistPercent ?? "",
             remarks: data.remarks || "",
@@ -310,13 +311,11 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName, shifts }: T
 
   // Auto-fetch and apply master recipe
   const applyRecipeMaster = (recipe: any) => {
-    const plannedQty = currentPlan.plannedQtyKg
-      ? Number(currentPlan.plannedQtyKg)
-      : recipe.defaultQtyKg || 2500;
+    const plannedQty = currentPlan.plannedQtyKg ? currentPlan.plannedQtyKg : "";
 
     const computeQty = (percent: number | null | undefined) => {
-      if (!percent || !plannedQty) return "";
-      return Number(((plannedQty * Number(percent)) / 100).toFixed(2));
+      if (!percent || !plannedQty || Number(plannedQty) <= 0) return "";
+      return Number(((Number(plannedQty) * Number(percent)) / 100).toFixed(2));
     };
 
     const updatedMaterials: MaterialRow[] = [
@@ -333,7 +332,7 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName, shifts }: T
       recipeQuality: recipe.code,
       tapeType: recipe.tapeType || "PP",
       denier: recipe.denier ?? "",
-      tapeWidth: recipe.tapeWidth ?? "500",
+      tapeWidth: recipe.tapeWidth ?? "",
       strength: recipe.strength ?? "",
       eloPercent:
         recipe.eloPercent !== null && recipe.eloPercent !== undefined
@@ -558,22 +557,22 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName, shifts }: T
         setRecipePlans(
           resData.plans.map((p: any) => ({
             id: p.id,
-            recipeQuality: p.recipeQuality || DEFAULT_RECIPE_STRING,
-            tapeType: p.tapeType || "LPP",
+            recipeQuality: p.recipeQuality || "",
+            tapeType: p.tapeType || "PP",
             denier: p.denier ?? "",
-            tapeWidth: p.tapeWidth ?? "500",
+            tapeWidth: p.tapeWidth ?? "",
             strength: p.strength ?? "",
             eloPercent: p.eloPercent ?? "",
             bobbinMarking: p.bobbinMarking || "",
-            colour: p.colour || "YL (Yellow)",
+            colour: p.colour || "",
             spacerSize: p.spacerSize || "",
             requiredAsh: p.requiredAsh ?? "",
             ashPercent: p.ashPercent ?? "",
-            plannedQtyKg: p.plannedQtyKg ?? "",
+            plannedQtyKg: p.plannedQtyKg ? p.plannedQtyKg : "",
             omega: p.omega || "",
             vistPercent: p.vistPercent ?? "",
             remarks: p.remarks || "",
-            materials: Array.isArray(p.materials) && p.materials.length > 0 ? p.materials : DEFAULT_MATERIALS,
+            materials: Array.isArray(p.materials) && p.materials.length > 0 ? p.materials : DEFAULT_MATERIALS.map((m) => ({ material: m.material, quantity: "", percentage: "" })),
             isDayNight: Boolean(p.isDayNight),
             shiftId: p.shiftId,
             shiftName: p.shiftName || p.shift?.name,
@@ -738,7 +737,7 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName, shifts }: T
       const pct = Number(m.percentage);
       return {
         ...m,
-        quantity: pct && qty > 0 ? Number(((qty * pct) / 100).toFixed(2)) : m.quantity,
+        quantity: pct && qty > 0 ? Number(((qty * pct) / 100).toFixed(2)) : "",
       };
     });
     updatePlanAt(index, { plannedQtyKg: newQtyStr, materials: updatedMaterials });
@@ -780,11 +779,11 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName, shifts }: T
   // Apply master recipe to a specific row
   const applyRecipeMasterForRow = (index: number, recipe: any) => {
     const plan = recipePlans[index];
-    const plannedQty = plan.plannedQtyKg ? Number(plan.plannedQtyKg) : recipe.defaultQtyKg || 2500;
+    const plannedQty = plan.plannedQtyKg ? plan.plannedQtyKg : "";
 
     const computeQty = (percent: number | null | undefined) => {
-      if (!percent || !plannedQty) return "";
-      return Number(((plannedQty * Number(percent)) / 100).toFixed(2));
+      if (!percent || !plannedQty || Number(plannedQty) <= 0) return "";
+      return Number(((Number(plannedQty) * Number(percent)) / 100).toFixed(2));
     };
 
     const updatedMaterials: MaterialRow[] = [
@@ -931,7 +930,7 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName, shifts }: T
 
       {/* ── Excel-Like Data Grid ── */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto min-h-[380px]">
           <table className="w-full text-xs border-collapse min-w-[1450px]">
             {/* Column Headers */}
             <thead>
@@ -989,27 +988,17 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName, shifts }: T
                       </td>
 
                       {/* Col 0: Quality / Recipe */}
-                      <td className={`sticky left-10 z-20 ${isActive ? "bg-sky-50" : index % 2 === 0 ? "bg-white" : "bg-slate-50"} border-r border-slate-200 px-1 py-1`}>
-                        <select
-                          value={plan.recipeQuality}
-                          onChange={(e) => handleRecipeCodeChangeForRow(index, e.target.value)}
+                      <td className={`sticky left-10 z-20 ${isActive ? "bg-sky-50" : index % 2 === 0 ? "bg-white" : "bg-slate-50"} border-r border-slate-200 px-1 py-1 min-w-[240px]`}>
+                        <QualityCombobox
+                          value={plan.recipeQuality || ""}
+                          onChange={(newCode) => handleRecipeCodeChangeForRow(index, newCode)}
+                          recipes={masterRecipes}
+                          gridCellId={`${index}-0`}
+                          rowIndex={index}
                           onFocus={() => setActiveRecipeIndex(index)}
-                          className={`${cellSelectClass} font-bold ${
-                            !plan.recipeQuality ? "text-slate-400 italic font-normal" : "text-slate-900"
-                          }`}
-                          data-grid-cell={`${index}-0`}
-                          onKeyDown={(e) => handleGridKeyDown(e, index, 0)}
-                        >
-                          <option value="">— Select Quality / Recipe —</option>
-                          {masterRecipes.map((r) => (
-                            <option key={r.code} value={r.code}>
-                              {r.code} {r.tapeType ? `(${r.tapeType}${r.colour ? ` • ${r.colour}` : ""})` : ""}
-                            </option>
-                          ))}
-                          {plan.recipeQuality && !masterRecipes.some((r) => r.code?.toUpperCase() === plan.recipeQuality?.toUpperCase()) && (
-                            <option value={plan.recipeQuality}>{plan.recipeQuality}</option>
-                          )}
-                        </select>
+                          onGridKeyDown={handleGridKeyDown}
+                          placeholder="— Search / Select Quality —"
+                        />
                       </td>
 
                       {/* Col 1: Shift */}
@@ -1147,7 +1136,7 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName, shifts }: T
 
                       {/* Col 12: Planned KG — highlighted */}
                       <td className="border-r border-slate-200 px-1 py-1 bg-slate-50">
-                        <input type="number" value={plan.plannedQtyKg} placeholder="0"
+                        <input type="number" value={plan.plannedQtyKg} placeholder="—"
                           onChange={(e) => handlePlannedQtyChangeForRow(index, e.target.value)}
                           onFocus={() => setActiveRecipeIndex(index)}
                           className={`${cellInputNumClass} font-bold text-slate-900 bg-white border border-slate-200 rounded`}
