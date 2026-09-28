@@ -55,6 +55,7 @@ const loomItems = [
   { title: "Change Over Sheet", url: "/dashboard/production/loom?tab=changeover" },
   { title: "2 Hours Reading Sheet", url: "/dashboard/production/loom?tab=reading-sheet" },
   { title: "Roll Cutting Report", url: "/dashboard/production/loom?tab=roll-cutting" },
+  { title: "Roll Stock", url: "/dashboard/production/loom?tab=roll-stock" },
   { title: "Production Report", url: "/dashboard/production/loom?tab=production-report" },
 ];
 
