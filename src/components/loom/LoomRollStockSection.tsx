@@ -161,8 +161,8 @@ export function LoomRollStockSection() {
       {/* 1. Header Banner & Main Actions */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-slate-900 text-white rounded-xl shadow-xs">
-            <Layers className="h-6 w-6 text-sky-400" />
+          <div className="p-2.5 bg-sky-50 text-sky-700 border border-sky-200/90 rounded-xl shadow-xs">
+            <Layers className="h-6 w-6 text-sky-600" />
           </div>
           <div>
             <div className="flex items-center gap-2">
@@ -196,9 +196,9 @@ export function LoomRollStockSection() {
           <button
             onClick={() => setPrintModalOpen(true)}
             disabled={rolls.length === 0}
-            className="px-3.5 py-2 text-xs font-bold rounded-lg bg-slate-900 hover:bg-slate-800 text-white transition-all shadow-xs inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-3.5 py-2 text-xs font-bold rounded-lg bg-sky-600 hover:bg-sky-700 text-white transition-all shadow-xs inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <Printer className="h-4 w-4 text-sky-400" />
+            <Printer className="h-4 w-4" />
             <span>Print Stock Sheet</span>
           </button>
 
@@ -321,10 +321,10 @@ export function LoomRollStockSection() {
           <div className="flex flex-wrap items-center gap-2 pt-1">
             <button
               onClick={() => setSelectedQuality("ALL")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer border ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer border ${
                 selectedQuality === "ALL"
-                  ? "bg-slate-900 text-white border-slate-900 shadow-xs"
-                  : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
+                  ? "bg-sky-600 text-white border-sky-600 shadow-xs"
+                  : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-sky-50 hover:text-sky-800 hover:border-sky-200"
               }`}
             >
               All Qualities ({summary.totalRolls} rolls • {summary.totalNettWeightKg.toFixed(0)} kg)
@@ -336,16 +336,16 @@ export function LoomRollStockSection() {
                 <button
                   key={q.qualityType}
                   onClick={() => setSelectedQuality(isSelected ? "ALL" : q.qualityType)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer border flex items-center gap-1.5 ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer border flex items-center gap-1.5 ${
                     isSelected
                       ? "bg-sky-600 text-white border-sky-600 shadow-xs"
-                      : "bg-slate-50 text-slate-800 border-slate-200 hover:bg-sky-50 hover:border-sky-300"
+                      : "bg-sky-50/70 text-sky-800 border-sky-200 hover:bg-sky-100 hover:border-sky-300"
                   }`}
                 >
                   <span>{q.qualityType}</span>
                   <span
                     className={`px-1.5 py-0.2 rounded-sm text-[10px] font-mono ${
-                      isSelected ? "bg-white/20 text-white" : "bg-slate-200 text-slate-700"
+                      isSelected ? "bg-white/20 text-white" : "bg-sky-100 text-sky-700 font-bold"
                     }`}
                   >
                     {q.rollsCount} rolls • {q.totalNettWeightKg.toFixed(0)} kg
@@ -445,7 +445,7 @@ export function LoomRollStockSection() {
                 }}
                 className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all cursor-pointer ${
                   datePreset === preset && !dateFrom && !dateTo
-                    ? "bg-slate-900 text-white font-bold"
+                    ? "bg-sky-600 text-white font-bold shadow-xs"
                     : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                 }`}
               >
@@ -516,21 +516,21 @@ export function LoomRollStockSection() {
         <div className="overflow-x-auto min-w-full">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
-              <tr className="bg-slate-900 text-white font-bold text-xs uppercase tracking-wider border-b border-slate-800">
-                <th className="py-3 px-3 w-10 text-center text-slate-400">#</th>
-                <th className="py-3 px-3 w-32 font-bold text-white">Roll Number</th>
-                <th className="py-3 px-3 min-w-[200px] font-bold text-white">Quality / Recipe</th>
-                <th className="py-3 px-3 w-32 text-right font-bold text-white">Quantity (Meters)</th>
-                <th className="py-3 px-3 w-36 text-right font-bold text-emerald-400">Quantity (Nett Kg)</th>
-                <th className="py-3 px-3 w-24 text-center font-bold text-sky-400">Loom #</th>
-                <th className="py-3 px-3 w-20 text-center font-bold text-white">Size</th>
-                <th className="py-3 px-3 w-28 text-right font-bold text-slate-300">Gross Wt</th>
-                <th className="py-3 px-3 w-24 text-right font-bold text-slate-400">Tare Wt</th>
-                <th className="py-3 px-3 w-24 text-right font-bold text-purple-300">Linear Mass</th>
-                <th className="py-3 px-3 w-28 text-center font-bold text-slate-300">Cut Date</th>
-                <th className="py-3 px-3 w-24 text-center font-bold text-slate-300">Shift</th>
-                <th className="py-3 px-3 min-w-[140px] font-bold text-slate-300">Contractor</th>
-                <th className="py-3 px-3 min-w-[140px] font-bold text-slate-400">Remarks</th>
+              <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-semibold text-slate-600 uppercase tracking-wider">
+                <th className="py-2.5 px-3 w-10 text-center font-semibold text-slate-500">#</th>
+                <th className="py-2.5 px-3 w-32 font-bold text-slate-700">Roll Number</th>
+                <th className="py-2.5 px-3 min-w-[200px] font-bold text-slate-700">Quality / Recipe</th>
+                <th className="py-2.5 px-3 w-32 text-right font-bold text-slate-700">Quantity (Meters)</th>
+                <th className="py-2.5 px-3 w-36 text-right font-bold text-emerald-700">Quantity (Nett Kg)</th>
+                <th className="py-2.5 px-3 w-24 text-center font-bold text-sky-700">Loom #</th>
+                <th className="py-2.5 px-3 w-20 text-center font-semibold text-slate-600">Size</th>
+                <th className="py-2.5 px-3 w-28 text-right font-semibold text-slate-600">Gross Wt</th>
+                <th className="py-2.5 px-3 w-24 text-right font-semibold text-slate-500">Tare Wt</th>
+                <th className="py-2.5 px-3 w-24 text-right font-semibold text-purple-700">Linear Mass</th>
+                <th className="py-2.5 px-3 w-28 text-center font-semibold text-slate-600">Cut Date</th>
+                <th className="py-2.5 px-3 w-24 text-center font-semibold text-slate-600">Shift</th>
+                <th className="py-2.5 px-3 min-w-[140px] font-semibold text-slate-600">Contractor</th>
+                <th className="py-2.5 px-3 min-w-[140px] font-semibold text-slate-500">Remarks</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
@@ -555,7 +555,7 @@ export function LoomRollStockSection() {
                       {hasActiveFilters && (
                         <button
                           onClick={handleResetFilters}
-                          className="mt-2 px-3 py-1.5 text-xs font-bold rounded-lg bg-slate-900 text-white cursor-pointer"
+                          className="mt-2 px-3 py-1.5 text-xs font-bold rounded-lg bg-sky-600 hover:bg-sky-700 text-white cursor-pointer transition-all"
                         >
                           Clear All Filters
                         </button>
@@ -678,26 +678,26 @@ export function LoomRollStockSection() {
             {/* Table Footer with Totals */}
             {rolls.length > 0 && (
               <tfoot>
-                <tr className="bg-slate-900 text-white font-mono font-bold text-xs border-t-2 border-slate-950">
-                  <td colSpan={3} className="py-3 px-3 text-right font-sans font-bold uppercase tracking-wider text-slate-300">
+                <tr className="bg-slate-50/80 border-t-2 border-slate-200 text-slate-800 font-mono font-bold text-xs">
+                  <td colSpan={3} className="py-3 px-3 text-right font-sans font-bold uppercase tracking-wider text-slate-700">
                     TOTAL ({rolls.length} ROLLS):
                   </td>
-                  <td className="py-3 px-3 text-right text-white">
+                  <td className="py-3 px-3 text-right text-slate-900">
                     {summary.totalMeters.toLocaleString()} m
                   </td>
-                  <td className="py-3 px-3 text-right text-emerald-400 font-black">
+                  <td className="py-3 px-3 text-right text-emerald-700 font-black">
                     {summary.totalNettWeightKg.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kg
                   </td>
                   <td colSpan={2} className="py-3 px-3 text-center text-slate-400 font-sans">
                     —
                   </td>
-                  <td className="py-3 px-3 text-right text-slate-300">
+                  <td className="py-3 px-3 text-right text-slate-700">
                     {summary.totalGrossWeightKg.toFixed(2)}
                   </td>
-                  <td className="py-3 px-3 text-right text-slate-400">
+                  <td className="py-3 px-3 text-right text-slate-500">
                     {summary.totalTareWeightKg.toFixed(2)}
                   </td>
-                  <td className="py-3 px-3 text-right text-purple-300">
+                  <td className="py-3 px-3 text-right text-purple-800">
                     {summary.averageWeightPerMeter.toFixed(1)} g/m
                   </td>
                   <td colSpan={4} className="py-3 px-3 text-center text-slate-400 font-sans">
