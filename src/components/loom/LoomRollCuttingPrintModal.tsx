@@ -6,7 +6,6 @@ import {
   Printer,
   FileSpreadsheet,
   FileText,
-  CheckCircle2,
 } from "lucide-react";
 import {
   LoomRollCuttingEntryItem,
@@ -33,11 +32,23 @@ export function LoomRollCuttingPrintModal({
 }: LoomRollCuttingPrintModalProps) {
   if (!open) return null;
 
+  const docDate = (report.date || new Date().toISOString().slice(0, 10)).replace(/[^a-zA-Z0-9]/g, "");
+  const docRef = `LM-RC-${docDate}-${(report.shiftName || "SHIFT").toUpperCase().replace(/\s+/g, "")}`;
+  const genTimestamp = new Date().toLocaleString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
+
   const totalMeters = entries.reduce((s, e) => s + (e.meter || 0), 0);
   const totalGross = entries.reduce((s, e) => s + (e.grossWeightKg || 0), 0);
   const totalTare = entries.reduce((s, e) => s + (e.tareWeightKg || 1.2), 0);
   const totalNett = entries.reduce((s, e) => s + (e.nettWeightKg || 0), 0);
   const overallAvg = totalMeters > 0 && totalNett > 0 ? Math.round(((totalNett * 1000) / totalMeters) * 10) / 10 : 0;
+  const uniqueLooms = new Set(entries.map((e) => e.loomNumber));
 
   const handlePrint = () => {
     printLoomRollCutting({ report, entries, kpis });
@@ -48,23 +59,31 @@ export function LoomRollCuttingPrintModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
-      <div className="bg-card w-full max-w-6xl max-h-[92vh] flex flex-col rounded-xl border shadow-2xl overflow-hidden">
-        {/* Top Action Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b bg-muted/40">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/75 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-150">
+      <div className="bg-white rounded-xl shadow-2xl border border-slate-300 w-full max-w-6xl max-h-[92vh] flex flex-col overflow-hidden">
+        {/* Modal Top Control Bar (Standard Dark Theme) */}
+        <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 bg-slate-900 text-white border-b border-slate-800 shrink-0">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-sky-500/10 text-sky-600 dark:text-sky-400">
-              <FileText className="w-5 h-5" />
+            <div className="p-2 bg-white/10 text-white rounded-lg">
+              <FileText className="h-5 w-5" />
             </div>
             <div>
-              <h3 className="font-semibold text-base text-foreground flex items-center gap-2">
-                Daily Loom Roll Cutting Report — Print Preview
-                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20">
-                  {entries.length} Rolls
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm sm:text-base font-bold text-white tracking-tight">
+                  Daily Loom Roll Cutting Report Preview
+                </h2>
+                <span
+                  className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-sm border ${
+                    report.status === "SUBMITTED" || report.status === "APPROVED"
+                      ? "bg-emerald-900/40 text-emerald-300 border-emerald-500/40"
+                      : "bg-amber-900/40 text-amber-300 border-amber-500/40"
+                  }`}
+                >
+                  {report.status || "DRAFT"}
                 </span>
-              </h3>
-              <p className="text-xs text-muted-foreground">
-                Document Ref: RC-{(report.date || "").replace(/-/g, "")}-{report.shiftName?.slice(0, 3).toUpperCase() || "SHT"} • Shift: {report.shiftName}
+              </div>
+              <p className="text-xs text-slate-400">
+                {report.shiftName} • {report.date} • {entries.length} Roll(s) logged • Ref: {docRef}
               </p>
             </div>
           </div>
@@ -72,154 +91,275 @@ export function LoomRollCuttingPrintModal({
           <div className="flex items-center gap-2">
             <button
               onClick={handleExportExcel}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition-colors cursor-pointer shadow-xs"
+              className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition-all inline-flex items-center gap-1.5 shadow-sm cursor-pointer"
             >
-              <FileSpreadsheet className="w-3.5 h-3.5" />
-              Export Excel (.xlsx)
+              <FileSpreadsheet className="h-3.5 w-3.5" />
+              <span>Export Excel</span>
             </button>
+
             <button
               onClick={handlePrint}
-              className="inline-flex items-center gap-1.5 px-4 py-1.5 text-xs font-semibold rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground transition-colors cursor-pointer shadow-xs"
+              className="px-4 py-1.5 text-xs font-bold rounded-lg bg-white hover:bg-slate-100 text-slate-900 transition-all inline-flex items-center gap-1.5 shadow-sm cursor-pointer"
             >
-              <Printer className="w-3.5 h-3.5" />
-              Print Report (A4)
+              <Printer className="h-3.5 w-3.5 text-slate-900" />
+              <span>Print Document</span>
             </button>
+
             <button
               onClick={onClose}
-              className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors cursor-pointer"
+              className="p-1.5 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition-all cursor-pointer ml-1"
+              title="Close Preview"
             >
-              <X className="w-5 h-5" />
+              <X className="h-5 w-5" />
             </button>
           </div>
         </div>
 
-        {/* Scrollable A4 Document Sheet View */}
-        <div className="flex-1 overflow-auto p-4 sm:p-6 bg-muted/20">
-          <div className="bg-card text-card-foreground border shadow-sm rounded-lg p-6 max-w-5xl mx-auto text-xs font-sans">
-            {/* Header Title */}
-            <div className="border-b-2 border-primary/40 pb-4 mb-4 flex justify-between items-end">
-              <div>
-                <h1 className="text-xl font-extrabold uppercase tracking-wide text-foreground">
-                  FLEXICOM INDUSTRIES PVT. LTD.
-                </h1>
-                <h2 className="text-sm font-bold tracking-wider text-sky-600 dark:text-sky-400 uppercase mt-0.5">
-                  DAILY LOOM ROLL CUTTING REPORT
-                </h2>
+        {/* Scrollable Preview Canvas */}
+        <div className="flex-1 overflow-auto p-4 sm:p-6 bg-slate-100/80">
+          <div className="max-w-[1240px] mx-auto bg-white rounded-xl shadow-lg border border-slate-200 p-6 font-sans text-slate-900">
+            {/* Standard Sheet Header */}
+            <div className="border-b-2 border-slate-900 pb-3 mb-4">
+              <div className="flex items-center justify-between gap-4">
+                <div className="w-16">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src="/logo.png"
+                    alt="Flexicom Logo"
+                    className="h-10 w-auto object-contain"
+                    onError={(e) => {
+                      (e.target as HTMLElement).style.display = "none";
+                    }}
+                  />
+                </div>
+                <div className="flex-1 text-center">
+                  <div className="text-base font-extrabold tracking-wide uppercase text-slate-950">
+                    Flexicom Industries Pvt. Limited
+                  </div>
+                  <div className="text-[11px] font-semibold text-slate-600 tracking-tight">
+                    SIDCO INDUSTRIAL ESTATE, PHASE-II, KATHUA (J&K) 184143 • CIRCULAR WEAVING DIVISION
+                  </div>
+                  <div className="text-sm font-black tracking-wider text-slate-900 mt-1 uppercase">
+                    DAILY LOOM ROLL CUTTING REPORT
+                  </div>
+                </div>
+                <div className="w-16 text-right">
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
+                    A4 LANDSCAPE
+                  </span>
+                </div>
               </div>
-              <div className="text-right text-[11px] text-muted-foreground">
-                <div>Date: <strong className="text-foreground">{report.date || "—"}</strong></div>
-                <div>Shift: <strong className="text-foreground">{report.shiftName || "—"}</strong></div>
+
+              {/* Metadata strip */}
+              <div className="mt-3 pt-2 border-t border-slate-200 flex flex-wrap items-center justify-between text-xs text-slate-600 font-medium">
+                <div>
+                  Doc Ref: <strong className="text-slate-900">{docRef}</strong>
+                </div>
+                <div>
+                  Date: <strong className="text-slate-900">{report.date || "—"}</strong>
+                </div>
+                <div>
+                  Shift: <strong className="text-slate-900">{report.shiftName || "—"}</strong>
+                </div>
+                <div>
+                  Supervisor: <strong className="text-slate-900">{report.supervisorName || report.preparedBy || "—"}</strong>
+                </div>
+                <div>
+                  Total Rolls:{" "}
+                  <strong className="text-slate-900">
+                    {entries.length} Rolls ({uniqueLooms.size} Looms)
+                  </strong>
+                </div>
+                <div>
+                  Generated: <strong className="text-slate-900">{genTimestamp}</strong>
+                </div>
               </div>
             </div>
 
-            {/* Meta details bar */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-muted/50 p-3 rounded-lg border mb-4 text-xs">
-              <div>
-                <span className="text-muted-foreground text-[10px] uppercase font-bold block">Supervisor</span>
-                <span className="font-semibold text-foreground">{report.supervisorName || report.preparedBy || "—"}</span>
+            {/* Summary KPI Strip (6 Bento Cards) */}
+            <div className="grid grid-cols-2 sm:grid-cols-6 gap-3 mb-4">
+              <div className="p-2.5 rounded-lg border border-slate-200 bg-slate-50">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                  Total Rolls Cut
+                </div>
+                <div className="text-base font-black text-slate-900 mt-0.5">
+                  {entries.length}{" "}
+                  <span className="text-xs font-normal text-slate-500">({uniqueLooms.size} Looms)</span>
+                </div>
               </div>
-              <div>
-                <span className="text-muted-foreground text-[10px] uppercase font-bold block">Total Rolls Cut</span>
-                <span className="font-semibold text-foreground">{entries.length}</span>
+
+              <div className="p-2.5 rounded-lg border border-slate-200 bg-slate-50">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                  Total Cut Length
+                </div>
+                <div className="text-base font-black text-blue-700 mt-0.5">
+                  {totalMeters.toLocaleString()}{" "}
+                  <span className="text-xs font-normal text-slate-500">M</span>
+                </div>
               </div>
-              <div>
-                <span className="text-muted-foreground text-[10px] uppercase font-bold block">Total Cut Length</span>
-                <span className="font-semibold text-foreground font-mono">{totalMeters.toLocaleString()} m</span>
+
+              <div className="p-2.5 rounded-lg border border-slate-200 bg-slate-50">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                  Gross Weight
+                </div>
+                <div className="text-base font-black text-slate-900 mt-0.5">
+                  {totalGross.toFixed(2)}{" "}
+                  <span className="text-xs font-normal text-slate-500">Kg</span>
+                </div>
               </div>
-              <div>
-                <span className="text-muted-foreground text-[10px] uppercase font-bold block">Total Nett Weight</span>
-                <span className="font-semibold text-emerald-600 dark:text-emerald-400 font-mono">{totalNett.toFixed(2)} kg</span>
+
+              <div className="p-2.5 rounded-lg border border-slate-200 bg-slate-50">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                  Tare Weight
+                </div>
+                <div className="text-base font-black text-slate-500 mt-0.5">
+                  {totalTare.toFixed(2)}{" "}
+                  <span className="text-xs font-normal text-slate-500">Kg</span>
+                </div>
+              </div>
+
+              <div className="p-2.5 rounded-lg border border-slate-200 bg-slate-50">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                  Total Nett Weight
+                </div>
+                <div className="text-base font-black text-emerald-700 mt-0.5">
+                  {totalNett.toFixed(2)}{" "}
+                  <span className="text-xs font-normal text-slate-500">Kg</span>
+                </div>
+              </div>
+
+              <div className="p-2.5 rounded-lg border border-slate-200 bg-slate-50">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                  Avg Linear Mass
+                </div>
+                <div className="text-base font-black text-purple-700 mt-0.5">
+                  {overallAvg.toFixed(1)}{" "}
+                  <span className="text-xs font-normal text-slate-500">g/m</span>
+                </div>
               </div>
             </div>
 
-            {/* Main Table */}
-            <div className="border rounded-md overflow-hidden">
-              <table className="w-full text-[11px] text-left border-collapse">
+            {/* Main High-Fidelity Table */}
+            <div className="border border-slate-300 rounded-lg overflow-x-auto">
+              <table className="w-full text-[11px] border-collapse">
                 <thead>
-                  <tr className="bg-muted/80 border-b text-[10px] font-bold uppercase tracking-wider text-foreground">
-                    <th className="p-2 text-center border-r w-10">S.No.</th>
-                    <th className="p-2 border-r font-mono">Roll No.</th>
-                    <th className="p-2 border-r text-center">Loom #</th>
-                    <th className="p-2 border-r text-center">Size</th>
-                    <th className="p-2 border-r">Quality</th>
-                    <th className="p-2 border-r text-right font-mono">Init Rdg</th>
-                    <th className="p-2 border-r text-right font-mono">Final Rdg</th>
-                    <th className="p-2 border-r text-right font-mono font-bold bg-muted/90">Meter</th>
-                    <th className="p-2 border-r text-right font-mono">Gross (kg)</th>
-                    <th className="p-2 border-r text-right font-mono text-muted-foreground">Tare (kg)</th>
-                    <th className="p-2 border-r text-right font-mono font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/5">Nett (kg)</th>
-                    <th className="p-2 border-r text-right font-mono text-purple-600 dark:text-purple-400">Avg (g/m)</th>
-                    <th className="p-2 border-r text-center">Sup. Sign</th>
-                    <th className="p-2">Remarks</th>
+                  <tr className="bg-slate-900 text-white font-bold text-[10px] tracking-wider uppercase">
+                    <th className="border border-slate-700 px-2 py-1.5 text-center w-10">S.No.</th>
+                    <th className="border border-slate-700 px-2 py-1.5 text-center font-mono w-24">Roll No.</th>
+                    <th className="border border-slate-700 px-2 py-1.5 text-center w-14">Loom #</th>
+                    <th className="border border-slate-700 px-2 py-1.5 text-center w-16">Size (mm)</th>
+                    <th className="border border-slate-700 px-2 py-1.5 text-left min-w-[140px]">Quality Code</th>
+                    <th className="border border-slate-700 px-2 py-1.5 text-right w-20">Init Rdg</th>
+                    <th className="border border-slate-700 px-2 py-1.5 text-right w-20">Final Rdg</th>
+                    <th className="border border-slate-700 px-2 py-1.5 text-right w-20 bg-slate-800">Meter</th>
+                    <th className="border border-slate-700 px-2 py-1.5 text-right w-20">Gross (kg)</th>
+                    <th className="border border-slate-700 px-2 py-1.5 text-right w-16 text-slate-300">Tare (kg)</th>
+                    <th className="border border-slate-700 px-2 py-1.5 text-right w-20 bg-emerald-950 text-emerald-200">Nett (kg)</th>
+                    <th className="border border-slate-700 px-2 py-1.5 text-right w-18 text-purple-300 bg-purple-950/40">Avg (g/m)</th>
+                    <th className="border border-slate-700 px-2 py-1.5 text-center w-24">Sup. Sign</th>
+                    <th className="border border-slate-700 px-2 py-1.5 text-left min-w-[120px]">Remarks</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-border/60">
+                <tbody>
                   {entries.length > 0 ? (
                     entries.map((entry, idx) => (
-                      <tr key={entry.id || idx} className="hover:bg-muted/30">
-                        <td className="p-2 text-center border-r font-bold text-muted-foreground">{idx + 1}</td>
-                        <td className="p-2 border-r font-mono font-bold text-foreground bg-muted/10">{entry.rollNumber}</td>
-                        <td className="p-2 border-r text-center font-bold text-sky-600 dark:text-sky-400">#{entry.loomNumber}</td>
-                        <td className="p-2 border-r text-center text-muted-foreground">{entry.size || "—"}</td>
-                        <td className="p-2 border-r font-medium text-foreground">{entry.qualityType}</td>
-                        <td className="p-2 border-r text-right font-mono text-muted-foreground">
+                      <tr
+                        key={entry.id || idx}
+                        className={`border-b border-slate-200 transition-colors ${
+                          idx % 2 === 1 ? "bg-slate-50/60" : "bg-white"
+                        } hover:bg-slate-100/60`}
+                      >
+                        <td className="border border-slate-200 px-2 py-1 text-center font-bold text-slate-500">
+                          {idx + 1}
+                        </td>
+                        <td className="border border-slate-200 px-2 py-1 text-center font-mono font-black text-slate-900 bg-slate-50/50">
+                          {entry.rollNumber || "—"}
+                        </td>
+                        <td className="border border-slate-200 px-2 py-1 text-center font-bold text-sky-700 font-mono">
+                          #{entry.loomNumber}
+                        </td>
+                        <td className="border border-slate-200 px-2 py-1 text-center font-mono text-slate-600">
+                          {entry.size || "—"}
+                        </td>
+                        <td className="border border-slate-200 px-2 py-1 font-bold text-slate-900 truncate max-w-[140px]">
+                          {entry.qualityType}
+                        </td>
+                        <td className="border border-slate-200 px-2 py-1 text-right font-mono text-slate-600">
                           {entry.initialReading !== undefined && entry.initialReading !== null ? Number(entry.initialReading).toLocaleString() : "—"}
                         </td>
-                        <td className="p-2 border-r text-right font-mono text-muted-foreground">
+                        <td className="border border-slate-200 px-2 py-1 text-right font-mono text-slate-600">
                           {entry.finalReading !== undefined && entry.finalReading !== null ? Number(entry.finalReading).toLocaleString() : "—"}
                         </td>
-                        <td className="p-2 border-r text-right font-mono font-bold text-foreground bg-muted/20">
+                        <td className="border border-slate-200 px-2 py-1 text-right font-mono font-black text-slate-900 bg-slate-100/70">
                           {entry.meter !== undefined && entry.meter !== null ? Number(entry.meter).toLocaleString() : "0"}
                         </td>
-                        <td className="p-2 border-r text-right font-mono">{entry.grossWeightKg?.toFixed(2) || "0.00"}</td>
-                        <td className="p-2 border-r text-right font-mono text-muted-foreground">{entry.tareWeightKg?.toFixed(2) || "1.20"}</td>
-                        <td className="p-2 border-r text-right font-mono font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/5">
+                        <td className="border border-slate-200 px-2 py-1 text-right font-mono text-slate-700">
+                          {entry.grossWeightKg?.toFixed(2) || "0.00"}
+                        </td>
+                        <td className="border border-slate-200 px-2 py-1 text-right font-mono text-slate-400">
+                          {entry.tareWeightKg?.toFixed(2) || "1.20"}
+                        </td>
+                        <td className="border border-slate-200 px-2 py-1 text-right font-mono font-black text-emerald-700 bg-emerald-50/60">
                           {entry.nettWeightKg?.toFixed(2) || "0.00"}
                         </td>
-                        <td className="p-2 border-r text-right font-mono font-semibold text-purple-600 dark:text-purple-400">
+                        <td className="border border-slate-200 px-2 py-1 text-right font-mono font-bold text-purple-700">
                           {entry.avgWeightPerMeter?.toFixed(1) || "0.0"}
                         </td>
-                        <td className="p-2 border-r text-center text-muted-foreground text-[10px]">
+                        <td className="border border-slate-200 px-2 py-1 text-center text-slate-600 text-[10px]">
                           {entry.supervisorSign || report.supervisorName || "—"}
                         </td>
-                        <td className="p-2 text-muted-foreground text-[10px]">{entry.remarks || "—"}</td>
+                        <td className="border border-slate-200 px-2 py-1 text-slate-600 text-[10px] truncate max-w-[120px]">
+                          {entry.remarks || "—"}
+                        </td>
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={14} className="p-6 text-center text-muted-foreground italic">
+                      <td colSpan={14} className="px-4 py-8 text-center text-slate-500 font-medium bg-slate-50">
                         No roll cutting records logged yet.
                       </td>
                     </tr>
                   )}
                 </tbody>
                 <tfoot>
-                  <tr className="bg-muted font-bold border-t-2 border-foreground/20">
-                    <td className="p-2 text-center border-r font-bold">TOTAL</td>
-                    <td className="p-2 border-r font-mono">{entries.length} Rolls</td>
-                    <td className="p-2 border-r"></td>
-                    <td className="p-2 border-r"></td>
-                    <td className="p-2 border-r"></td>
-                    <td className="p-2 border-r"></td>
-                    <td className="p-2 border-r"></td>
-                    <td className="p-2 border-r text-right font-mono font-bold">{totalMeters.toLocaleString()}</td>
-                    <td className="p-2 border-r text-right font-mono">{totalGross.toFixed(2)}</td>
-                    <td className="p-2 border-r text-right font-mono">{totalTare.toFixed(2)}</td>
-                    <td className="p-2 border-r text-right font-mono font-bold text-emerald-600 dark:text-emerald-400">{totalNett.toFixed(2)}</td>
-                    <td className="p-2 border-r text-right font-mono text-purple-600 dark:text-purple-400">{overallAvg.toFixed(1)}</td>
-                    <td className="p-2 border-r"></td>
-                    <td className="p-2"></td>
+                  <tr className="bg-slate-100 font-bold border-t-2 border-slate-900 text-slate-950">
+                    <td className="border border-slate-300 px-2 py-1.5 text-center font-black">TOTAL</td>
+                    <td className="border border-slate-300 px-2 py-1.5 text-center font-mono font-black">{entries.length} Rolls</td>
+                    <td className="border border-slate-300 px-2 py-1.5 text-center font-mono font-bold text-sky-700">{uniqueLooms.size} Looms</td>
+                    <td className="border border-slate-300"></td>
+                    <td className="border border-slate-300"></td>
+                    <td className="border border-slate-300"></td>
+                    <td className="border border-slate-300"></td>
+                    <td className="border border-slate-300 px-2 py-1.5 text-right font-mono font-black text-slate-950 bg-slate-200/60">{totalMeters.toLocaleString()}</td>
+                    <td className="border border-slate-300 px-2 py-1.5 text-right font-mono font-bold text-slate-900">{totalGross.toFixed(2)}</td>
+                    <td className="border border-slate-300 px-2 py-1.5 text-right font-mono text-slate-500">{totalTare.toFixed(2)}</td>
+                    <td className="border border-slate-300 px-2 py-1.5 text-right font-mono font-black text-emerald-800 bg-emerald-100/50">{totalNett.toFixed(2)}</td>
+                    <td className="border border-slate-300 px-2 py-1.5 text-right font-mono font-bold text-purple-700">{overallAvg.toFixed(1)}</td>
+                    <td className="border border-slate-300"></td>
+                    <td className="border border-slate-300"></td>
                   </tr>
                 </tfoot>
               </table>
             </div>
 
-            {/* Floor sign-off blocks */}
-            <div className="grid grid-cols-4 gap-4 mt-8 pt-4 border-t text-center text-[10px] text-muted-foreground font-semibold uppercase">
-              <div className="border-t pt-2">Loom Operator</div>
-              <div className="border-t pt-2">Shift Supervisor</div>
-              <div className="border-t pt-2">Quality Control</div>
-              <div className="border-t pt-2">Factory Manager</div>
+            {/* Floor Sign-Off Blocks */}
+            <div className="grid grid-cols-4 gap-4 mt-8 pt-4 border-t border-slate-300 text-center text-[10px] text-slate-600 font-bold uppercase">
+              <div className="border-t border-slate-300 pt-2">
+                <div>Prepared By / Operator</div>
+                <div className="text-[9px] text-slate-400 font-normal mt-0.5">Sign & Date</div>
+              </div>
+              <div className="border-t border-slate-300 pt-2">
+                <div>Shift Supervisor / In-Charge</div>
+                <div className="text-[9px] text-slate-400 font-normal mt-0.5">Sign & Date</div>
+              </div>
+              <div className="border-t border-slate-300 pt-2">
+                <div>Quality Control In-Charge</div>
+                <div className="text-[9px] text-slate-400 font-normal mt-0.5">Sign & Date</div>
+              </div>
+              <div className="border-t border-slate-300 pt-2">
+                <div>Plant Manager / HOD</div>
+                <div className="text-[9px] text-slate-400 font-normal mt-0.5">Sign & Date</div>
+              </div>
             </div>
           </div>
         </div>
