@@ -767,15 +767,17 @@ export async function POST(request: NextRequest) {
         updates.push(
           db.loomReadingEntry.upsert({
             where: {
-              sheetId_loomNumber: {
+              sheetId_loomNumber_rowSequence: {
                 sheetId: sheet.id,
                 loomNumber: l,
+                rowSequence: 1,
               },
             },
             update: updateData,
             create: {
               sheetId: sheet.id,
               loomNumber: l,
+              rowSequence: 1,
               ...updateData,
             },
           })
