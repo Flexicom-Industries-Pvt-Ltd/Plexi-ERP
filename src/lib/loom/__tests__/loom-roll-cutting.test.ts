@@ -3,6 +3,9 @@ import {
   computeRollMeters,
   computeRollWeightsAndAvg,
   generateNextRollNumber,
+  computeContractorRollSummary,
+  computeQualityRollSummary,
+  LoomRollCuttingEntryItem,
 } from "../loom-roll-cutting-types";
 
 describe("Daily Loom Roll Cutting Utilities", () => {
@@ -64,4 +67,113 @@ describe("Daily Loom Roll Cutting Utilities", () => {
       expect(roll).toMatch(/^[A-Z]{2}-\d+$/);
     });
   });
+
+  describe("computeContractorRollSummary & computeQualityRollSummary", () => {
+    const mockEntries: LoomRollCuttingEntryItem[] = [
+      {
+        sequence: 1,
+        loomNumber: 1,
+        rollNumber: "CT-101",
+        size: "490",
+        qualityType: "HDPE-120",
+        contractor: "Sharma Weaving",
+        initialReading: 0,
+        finalReading: 1000,
+        meter: 1000,
+        grossWeightKg: 121.2,
+        tareWeightKg: 1.2,
+        nettWeightKg: 120,
+        avgWeightPerMeter: 120,
+        supervisorSign: "RK",
+        remarks: "OK",
+      },
+      {
+        sequence: 2,
+        loomNumber: 2,
+        rollNumber: "CT-102",
+        size: "490",
+        qualityType: "HDPE-120",
+        contractor: "Sharma Weaving",
+        initialReading: 1000,
+        finalReading: 2500,
+        meter: 1500,
+        grossWeightKg: 181.2,
+        tareWeightKg: 1.2,
+        nettWeightKg: 180,
+        avgWeightPerMeter: 120,
+        supervisorSign: "RK",
+        remarks: "OK",
+      },
+      {
+        sequence: 3,
+        loomNumber: 3,
+        rollNumber: "CT-103",
+        size: "500",
+        qualityType: "PP-140",
+        contractor: "Verma Enterprises",
+        initialReading: 200,
+        finalReading: 1000,
+        meter: 800,
+        grossWeightKg: 113.2,
+        tareWeightKg: 1.2,
+        nettWeightKg: 112,
+        avgWeightPerMeter: 140,
+        supervisorSign: "RK",
+        remarks: "OK",
+      },
+      {
+        sequence: 4,
+        loomNumber: 4,
+        rollNumber: "CT-104",
+        size: "500",
+        qualityType: "PP-140",
+        contractor: "",
+        initialReading: 0,
+        finalReading: 500,
+        meter: 500,
+        grossWeightKg: 71.2,
+        tareWeightKg: 1.2,
+        nettWeightKg: 70,
+        avgWeightPerMeter: 140,
+        supervisorSign: "RK",
+        remarks: "OK",
+      },
+    ];
+
+    it("computes contractor-wise breakdown accurately", () => {
+      const summary = computeContractorRollSummary(mockEntries);
+      expect(summary).toHaveLength(3);
+
+      const sharma = summary.find((s) => s.contractor === "Sharma Weaving");
+      expect(sharma).toBeDefined();
+      expect(sharma?.rollsCount).toBe(2);
+      expect(sharma?.totalMeters).toBe(2500);
+      expect(sharma?.totalNettWtKg).toBe(300);
+
+      const inHouse = summary.find((s) => s.contractor === "In-House / Direct");
+      expect(inHouse).toBeDefined();
+      expect(inHouse?.rollsCount).toBe(1);
+      expect(inHouse?.totalMeters).toBe(500);
+    });
+
+    it("computes quality-wise breakdown and linear mass averages accurately", () => {
+      const summary = computeQualityRollSummary(mockEntries);
+      expect(summary).toHaveLength(2);
+
+      const hdpe = summary.find((q) => q.qualityType === "HDPE-120");
+      expect(hdpe).toBeDefined();
+      expect(hdpe?.rollsCount).toBe(2);
+      expect(hdpe?.totalMeters).toBe(2500);
+      expect(hdpe?.totalNettWtKg).toBe(300);
+      // (300 * 1000) / 2500 = 120 g/m
+      expect(hdpe?.avgWeightPerMeter).toBe(120);
+
+      const pp = summary.find((q) => q.qualityType === "PP-140");
+      expect(pp).toBeDefined();
+      expect(pp?.rollsCount).toBe(2);
+      expect(pp?.totalMeters).toBe(1300);
+      expect(pp?.totalNettWtKg).toBe(182);
+    });
+  });
 });
+

@@ -2070,6 +2070,7 @@ model LoomRollCuttingEntry {
   avgWeightPerMeter Float?                @default(0) // (nettWeightKg * 1000) / meter in g/m
   supervisorSign    String?               // Name / Initials
   remarks           String?
+  contractor        String?               // Contractor / Labour Agency name
   productionRollId  String?               // Reference to ProductionRoll if synced to central roll stock
   createdAt         DateTime              @default(now())
   updatedAt         DateTime              @updatedAt
@@ -2077,6 +2078,26 @@ model LoomRollCuttingEntry {
   @@index([rollNumber])
   @@index([loomNumber])
   @@index([qualityType])
+  @@index([contractor])
+}
+
+model Contractor {
+  id            String   @id @default(cuid())
+  name          String
+  code          String?  @unique // e.g. "CON-001"
+  contactPerson String?
+  phone         String?
+  email         String?
+  address       String?
+  section       String   @default("LOOM") // e.g. "LOOM", "TAPE_PLANT", "FINISHING", "ALL"
+  notes         String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([name])
+  @@index([section, isActive])
+  @@index([isActive])
 }
 
 

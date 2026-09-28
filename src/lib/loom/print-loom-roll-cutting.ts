@@ -3,7 +3,13 @@
  * High-fidelity, enterprise standard output formatted for A4 landscape print.
  */
 
-import { LoomRollCuttingEntryItem, LoomRollCuttingReportData, RollCuttingKpis } from "./loom-roll-cutting-types";
+import {
+  LoomRollCuttingEntryItem,
+  LoomRollCuttingReportData,
+  RollCuttingKpis,
+  computeContractorRollSummary,
+  computeQualityRollSummary,
+} from "./loom-roll-cutting-types";
 
 export interface PrintRollCuttingOptions {
   report: LoomRollCuttingReportData;
@@ -37,6 +43,9 @@ export function generateLoomRollCuttingHtml(options: PrintRollCuttingOptions): s
   const overallAvg = totalMeters > 0 && totalNett > 0 ? Math.round(((totalNett * 1000) / totalMeters) * 10) / 10 : 0;
   const uniqueLooms = new Set(entries.map((e) => e.loomNumber));
 
+  const contractorSummaries = computeContractorRollSummary(entries);
+  const qualitySummaries = computeQualityRollSummary(entries);
+
   const rowsHtml = entries.length > 0
     ? entries.map((entry, idx) => `
         <tr style="${idx % 2 === 1 ? "background-color: #f8fafc;" : "background-color: #ffffff;"}">
@@ -50,8 +59,11 @@ export function generateLoomRollCuttingHtml(options: PrintRollCuttingOptions): s
           <td style="text-align: center; font-family: monospace; font-size: 7.5pt; font-weight: 600; color: #334155;">
             ${entry.size || "—"}
           </td>
-          <td style="font-size: 7.5pt; font-weight: 700; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 130px;">
+          <td style="font-size: 7.5pt; font-weight: 700; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 120px;">
             ${entry.qualityType || "—"}
+          </td>
+          <td style="font-size: 7pt; font-weight: 600; color: #334155; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 85px;">
+            ${entry.contractor || "In-House"}
           </td>
           <td style="text-align: right; font-family: monospace; font-size: 7.5pt; color: #475569;">
             ${entry.initialReading !== undefined && entry.initialReading !== null ? Number(entry.initialReading).toLocaleString() : "—"}
@@ -82,7 +94,7 @@ export function generateLoomRollCuttingHtml(options: PrintRollCuttingOptions): s
           </td>
         </tr>
       `).join("")
-    : `<tr><td colspan="14" style="text-align: center; padding: 24px; color: #64748b; font-style: italic;">No roll entries logged for this shift.</td></tr>`;
+    : `<tr><td colspan="15" style="text-align: center; padding: 24px; color: #64748b; font-style: italic;">No roll entries logged for this shift.</td></tr>`;
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -308,7 +320,8 @@ export function generateLoomRollCuttingHtml(options: PrintRollCuttingOptions): s
           <th style="width: 70px;">Roll No</th>
           <th style="width: 45px;">Loom #</th>
           <th style="width: 45px;">Size (mm)</th>
-          <th style="width: 130px; text-align: left; padding-left: 4px;">Quality Code</th>
+          <th style="width: 120px; text-align: left; padding-left: 4px;">Quality Code</th>
+          <th style="width: 85px; text-align: left; padding-left: 4px;">Contractor</th>
           <th style="width: 55px; text-align: right; padding-right: 4px;">Init Rdg</th>
           <th style="width: 55px; text-align: right; padding-right: 4px;">Final Rdg</th>
           <th style="width: 60px; text-align: right; padding-right: 4px; background: #1e293b;">Meter</th>
@@ -332,6 +345,7 @@ export function generateLoomRollCuttingHtml(options: PrintRollCuttingOptions): s
           <td></td>
           <td></td>
           <td></td>
+          <td></td>
           <td style="text-align: right; font-family: monospace; font-weight: 800; color: #0f172a; background: #f1f5f9;">${totalMeters.toLocaleString()}</td>
           <td style="text-align: right; font-family: monospace; font-weight: 700;">${totalGross.toFixed(2)}</td>
           <td style="text-align: right; font-family: monospace; color: #64748b;">${totalTare.toFixed(2)}</td>
@@ -342,6 +356,96 @@ export function generateLoomRollCuttingHtml(options: PrintRollCuttingOptions): s
         </tr>
       </tfoot>
     </table>
+
+    <!-- Real-time Breakdowns (Quality & Contractor Summaries) -->
+    <div style="display: flex; gap: 8px; margin-top: 5px; margin-bottom: 5px; page-break-inside: avoid;">
+      <!-- Quality Breakdown Table -->
+      <div style="flex: 1; border: 1px solid #94a3b8; background: #ffffff;">
+        <div style="background: #0f172a; color: #ffffff; font-size: 6.5pt; font-weight: 800; padding: 2.5px 6px; letter-spacing: 0.5px; display: flex; justify-content: space-between;">
+          <span>QUALITY-WISE ROLL BREAKDOWN</span>
+          <span>${qualitySummaries.length} QUALITIES</span>
+        </div>
+        <table style="width: 100%; border-collapse: collapse; font-size: 6.5pt;">
+          <thead>
+            <tr style="background: #f1f5f9; color: #334155; font-weight: 700;">
+              <th style="border: 1px solid #cbd5e1; padding: 2px 4px; text-align: left;">Quality Code</th>
+              <th style="border: 1px solid #cbd5e1; padding: 2px 4px; text-align: center; width: 45px;">Rolls</th>
+              <th style="border: 1px solid #cbd5e1; padding: 2px 4px; text-align: right; width: 60px;">Meters</th>
+              <th style="border: 1px solid #cbd5e1; padding: 2px 4px; text-align: right; width: 60px;">Nett (kg)</th>
+              <th style="border: 1px solid #cbd5e1; padding: 2px 4px; text-align: right; width: 50px;">Avg (g/m)</th>
+              <th style="border: 1px solid #cbd5e1; padding: 2px 4px; text-align: right; width: 45px;">Share</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${qualitySummaries.map((q) => {
+              const share = entries.length > 0 ? ((q.rollsCount / entries.length) * 100).toFixed(1) : "0.0";
+              return `
+                <tr>
+                  <td style="border: 1px solid #cbd5e1; padding: 2px 4px; font-weight: 700; color: #0f172a;">${q.qualityType}</td>
+                  <td style="border: 1px solid #cbd5e1; padding: 2px 4px; text-align: center; font-family: monospace; font-weight: 800;">${q.rollsCount}</td>
+                  <td style="border: 1px solid #cbd5e1; padding: 2px 4px; text-align: right; font-family: monospace;">${q.totalMeters.toLocaleString()}</td>
+                  <td style="border: 1px solid #cbd5e1; padding: 2px 4px; text-align: right; font-family: monospace; color: #15803d; font-weight: 700;">${q.totalNettWtKg.toFixed(2)}</td>
+                  <td style="border: 1px solid #cbd5e1; padding: 2px 4px; text-align: right; font-family: monospace; color: #7c3aed;">${q.avgWeightPerMeter.toFixed(1)}</td>
+                  <td style="border: 1px solid #cbd5e1; padding: 2px 4px; text-align: right; font-family: monospace; color: #64748b;">${share}%</td>
+                </tr>
+              `;
+            }).join("")}
+          </tbody>
+          <tfoot>
+            <tr style="background: #f8fafc; font-weight: 800; border-top: 1.5px solid #0f172a;">
+              <td style="border: 1px solid #94a3b8; padding: 2px 4px;">TOTAL</td>
+              <td style="border: 1px solid #94a3b8; padding: 2px 4px; text-align: center; font-family: monospace;">${entries.length}</td>
+              <td style="border: 1px solid #94a3b8; padding: 2px 4px; text-align: right; font-family: monospace;">${totalMeters.toLocaleString()}</td>
+              <td style="border: 1px solid #94a3b8; padding: 2px 4px; text-align: right; font-family: monospace; color: #15803d;">${totalNett.toFixed(2)}</td>
+              <td style="border: 1px solid #94a3b8; padding: 2px 4px; text-align: right; font-family: monospace; color: #7c3aed;">${overallAvg.toFixed(1)}</td>
+              <td style="border: 1px solid #94a3b8; padding: 2px 4px; text-align: right; font-family: monospace;">100%</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <!-- Contractor Breakdown Table -->
+      <div style="flex: 1; border: 1px solid #94a3b8; background: #ffffff;">
+        <div style="background: #0f172a; color: #ffffff; font-size: 6.5pt; font-weight: 800; padding: 2.5px 6px; letter-spacing: 0.5px; display: flex; justify-content: space-between;">
+          <span>CONTRACTOR-WISE ROLL BREAKDOWN</span>
+          <span>${contractorSummaries.length} CONTRACTORS</span>
+        </div>
+        <table style="width: 100%; border-collapse: collapse; font-size: 6.5pt;">
+          <thead>
+            <tr style="background: #f1f5f9; color: #334155; font-weight: 700;">
+              <th style="border: 1px solid #cbd5e1; padding: 2px 4px; text-align: left;">Contractor</th>
+              <th style="border: 1px solid #cbd5e1; padding: 2px 4px; text-align: center; width: 45px;">Rolls</th>
+              <th style="border: 1px solid #cbd5e1; padding: 2px 4px; text-align: right; width: 65px;">Meters</th>
+              <th style="border: 1px solid #cbd5e1; padding: 2px 4px; text-align: right; width: 65px;">Nett (kg)</th>
+              <th style="border: 1px solid #cbd5e1; padding: 2px 4px; text-align: right; width: 45px;">Share</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${contractorSummaries.map((c) => {
+              const share = entries.length > 0 ? ((c.rollsCount / entries.length) * 100).toFixed(1) : "0.0";
+              return `
+                <tr>
+                  <td style="border: 1px solid #cbd5e1; padding: 2px 4px; font-weight: 700; color: #0f172a;">${c.contractor}</td>
+                  <td style="border: 1px solid #cbd5e1; padding: 2px 4px; text-align: center; font-family: monospace; font-weight: 800;">${c.rollsCount}</td>
+                  <td style="border: 1px solid #cbd5e1; padding: 2px 4px; text-align: right; font-family: monospace;">${c.totalMeters.toLocaleString()}</td>
+                  <td style="border: 1px solid #cbd5e1; padding: 2px 4px; text-align: right; font-family: monospace; color: #15803d; font-weight: 700;">${c.totalNettWtKg.toFixed(2)}</td>
+                  <td style="border: 1px solid #cbd5e1; padding: 2px 4px; text-align: right; font-family: monospace; color: #64748b;">${share}%</td>
+                </tr>
+              `;
+            }).join("")}
+          </tbody>
+          <tfoot>
+            <tr style="background: #f8fafc; font-weight: 800; border-top: 1.5px solid #0f172a;">
+              <td style="border: 1px solid #94a3b8; padding: 2px 4px;">TOTAL</td>
+              <td style="border: 1px solid #94a3b8; padding: 2px 4px; text-align: center; font-family: monospace;">${entries.length}</td>
+              <td style="border: 1px solid #94a3b8; padding: 2px 4px; text-align: right; font-family: monospace;">${totalMeters.toLocaleString()}</td>
+              <td style="border: 1px solid #94a3b8; padding: 2px 4px; text-align: right; font-family: monospace; color: #15803d;">${totalNett.toFixed(2)}</td>
+              <td style="border: 1px solid #94a3b8; padding: 2px 4px; text-align: right; font-family: monospace;">100%</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
 
     <!-- Floor Sign-Off Section -->
     <table class="sign-table">

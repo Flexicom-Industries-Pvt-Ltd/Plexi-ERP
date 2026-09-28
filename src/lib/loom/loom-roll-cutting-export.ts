@@ -1,5 +1,11 @@
 import * as XLSX from "xlsx";
-import { LoomRollCuttingEntryItem, LoomRollCuttingReportData, RollCuttingKpis } from "./loom-roll-cutting-types";
+import {
+  LoomRollCuttingEntryItem,
+  LoomRollCuttingReportData,
+  RollCuttingKpis,
+  computeContractorRollSummary,
+  computeQualityRollSummary,
+} from "./loom-roll-cutting-types";
 
 export interface RollCuttingExportOptions {
   report: LoomRollCuttingReportData;
@@ -21,6 +27,7 @@ export function exportLoomRollCuttingExcel(options: RollCuttingExportOptions): v
     "LOOM NO.",
     "SIZE",
     "QUALITY",
+    "CONTRACTOR",
     "INITIAL READING",
     "FINAL READING",
     "METER",
@@ -38,6 +45,7 @@ export function exportLoomRollCuttingExcel(options: RollCuttingExportOptions): v
     `Loom #${entry.loomNumber}`,
     entry.size || "—",
     entry.qualityType || "—",
+    entry.contractor || "In-House",
     entry.initialReading ?? 0,
     entry.finalReading ?? 0,
     entry.meter ?? 0,
@@ -68,6 +76,7 @@ export function exportLoomRollCuttingExcel(options: RollCuttingExportOptions): v
     "—",
     "—",
     "—",
+    "—",
     totalMeters,
     Math.round(totalGross * 100) / 100,
     Math.round(totalTare * 100) / 100,
@@ -76,6 +85,19 @@ export function exportLoomRollCuttingExcel(options: RollCuttingExportOptions): v
     "—",
     "—",
   ];
+
+  const qualitySummaries = computeQualityRollSummary(entries);
+  const contractorSummaries = computeContractorRollSummary(entries);
+
+  const qualityRows = qualitySummaries.map((q) => {
+    const share = entries.length > 0 ? ((q.rollsCount / entries.length) * 100).toFixed(1) + "%" : "0%";
+    return [q.qualityType, q.rollsCount, q.totalMeters, q.totalGrossWtKg, q.totalNettWtKg, q.avgWeightPerMeter, share];
+  });
+
+  const contractorRows = contractorSummaries.map((c) => {
+    const share = entries.length > 0 ? ((c.rollsCount / entries.length) * 100).toFixed(1) + "%" : "0%";
+    return [c.contractor, c.rollsCount, c.totalMeters, c.totalGrossWtKg, c.totalNettWtKg, share];
+  });
 
   const wsData = [
     ["FLEXICOM INDUSTRIES PVT. LTD."],
@@ -89,6 +111,17 @@ export function exportLoomRollCuttingExcel(options: RollCuttingExportOptions): v
     emptyRow,
     totalsRow,
     emptyRow,
+    emptyRow,
+    ["QUALITY-WISE ROLL BREAKDOWN"],
+    ["Quality Code", "Rolls", "Total Meters", "Gross Wt (kg)", "Nett Wt (kg)", "Avg (g/m)", "Share"],
+    ...qualityRows,
+    ["Total Qualities", entries.length, totalMeters, Math.round(totalGross * 100) / 100, Math.round(totalNett * 100) / 100, overallAvg, "100%"],
+    emptyRow,
+    ["CONTRACTOR-WISE ROLL BREAKDOWN"],
+    ["Contractor", "Rolls", "Total Meters", "Gross Wt (kg)", "Nett Wt (kg)", "Share"],
+    ...contractorRows,
+    ["Total Contractors", entries.length, totalMeters, Math.round(totalGross * 100) / 100, Math.round(totalNett * 100) / 100, "100%"],
+    emptyRow,
     ["Exported from Flexicom Central ERP on:", new Date().toLocaleString()],
   ];
 
@@ -100,7 +133,8 @@ export function exportLoomRollCuttingExcel(options: RollCuttingExportOptions): v
     { wch: 16 }, // Roll No
     { wch: 12 }, // Loom No
     { wch: 10 }, // Size
-    { wch: 24 }, // Quality
+    { wch: 22 }, // Quality
+    { wch: 18 }, // Contractor
     { wch: 16 }, // Initial Reading
     { wch: 16 }, // Final Reading
     { wch: 12 }, // Meter
@@ -120,3 +154,4 @@ export function exportLoomRollCuttingExcel(options: RollCuttingExportOptions): v
 
   XLSX.writeFile(wb, fileName);
 }
+
