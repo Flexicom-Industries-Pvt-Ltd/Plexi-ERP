@@ -111,59 +111,69 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // 2. Build 1..91 entries list
+    // 2. Build 1..91 entries list (supporting multi-row changeovers per loom)
     let entries: LoomReadingEntryItem[] = [];
 
     if (existingSheet && existingSheet.entries.length > 0) {
-      const entryMap = new Map<number, typeof existingSheet.entries[0]>();
-      existingSheet.entries.forEach((e) => entryMap.set(e.loomNumber, e));
+      const entryGroupMap = new Map<number, typeof existingSheet.entries>();
+      existingSheet.entries.forEach((e) => {
+        const list = entryGroupMap.get(e.loomNumber) || [];
+        list.push(e);
+        entryGroupMap.set(e.loomNumber, list);
+      });
 
       for (let i = 1; i <= TOTAL_FACTORY_LOOMS; i++) {
-        const existing = entryMap.get(i);
+        const loomExistingList = entryGroupMap.get(i);
         const alloc = loomAllocationMap.get(i);
 
-        if (existing) {
-          const quality = existing.qualityType || alloc?.qualityCode || "";
-          const bdMinutes = existing.breakdownMinutes || 0;
-          const { r1Prod, r2Prod, r3Prod, r4Prod, r5Prod, r6Prod, totalProduction } = computeIntervalDeltas(existing);
-          const eff = computeLoomEfficiency(
-            totalProduction,
-            quality,
-            bdMinutes,
-            existingSheet.shiftHours || 12
-          );
+        if (loomExistingList && loomExistingList.length > 0) {
+          loomExistingList.sort((a, b) => (a.rowSequence || 1) - (b.rowSequence || 1));
 
-          entries.push({
-            id: existing.id,
-            loomNumber: i,
-            operatorName: existing.operatorName || "",
-            size: existing.size || alloc?.size || "",
-            denier: existing.denier || alloc?.denier || "",
-            qualityType: quality,
-            initialReading: existing.initialReading,
-            r1Reading: existing.r1Reading,
-            r1Prod,
-            r2Reading: existing.r2Reading,
-            r2Prod,
-            r3Reading: existing.r3Reading,
-            r3Prod,
-            r4Reading: existing.r4Reading,
-            r4Prod,
-            r5Reading: existing.r5Reading,
-            r5Prod,
-            r6Reading: existing.r6Reading,
-            r6Prod,
-            totalProduction,
-            breakdownReason: existing.breakdownReason || null,
-            breakdownMinutes: bdMinutes,
-            changeoverTargetQuality: existing.changeoverTargetQuality || null,
-            efficiencyPct: eff.efficiencyPct,
-            status: (existing.status as any) || "RUNNING",
-            remarks: existing.remarks || "",
-          });
+          for (const existing of loomExistingList) {
+            const quality = existing.qualityType || alloc?.qualityCode || "";
+            const bdMinutes = existing.breakdownMinutes || 0;
+            const { r1Prod, r2Prod, r3Prod, r4Prod, r5Prod, r6Prod, totalProduction } = computeIntervalDeltas(existing);
+            const eff = computeLoomEfficiency(
+              totalProduction,
+              quality,
+              bdMinutes,
+              existingSheet.shiftHours || 12
+            );
+
+            entries.push({
+              id: existing.id,
+              loomNumber: i,
+              rowSequence: existing.rowSequence || 1,
+              operatorName: existing.operatorName || "",
+              size: existing.size || alloc?.size || "",
+              denier: existing.denier || alloc?.denier || "",
+              qualityType: quality,
+              initialReading: existing.initialReading,
+              r1Reading: existing.r1Reading,
+              r1Prod,
+              r2Reading: existing.r2Reading,
+              r2Prod,
+              r3Reading: existing.r3Reading,
+              r3Prod,
+              r4Reading: existing.r4Reading,
+              r4Prod,
+              r5Reading: existing.r5Reading,
+              r5Prod,
+              r6Reading: existing.r6Reading,
+              r6Prod,
+              totalProduction,
+              breakdownReason: existing.breakdownReason || null,
+              breakdownMinutes: bdMinutes,
+              changeoverTargetQuality: existing.changeoverTargetQuality || null,
+              efficiencyPct: eff.efficiencyPct,
+              status: (existing.status as any) || "RUNNING",
+              remarks: existing.remarks || "",
+            });
+          }
         } else {
           entries.push({
             loomNumber: i,
+            rowSequence: 1,
             operatorName: "",
             size: alloc?.size || "",
             denier: alloc?.denier || "",
@@ -197,6 +207,7 @@ export async function GET(request: NextRequest) {
         const alloc = loomAllocationMap.get(i);
         entries.push({
           loomNumber: i,
+          rowSequence: 1,
           operatorName: "",
           size: alloc?.size || "",
           denier: alloc?.denier || "",
@@ -425,6 +436,7 @@ export async function POST(request: NextRequest) {
       let totalRunningEffSum = 0;
       let runningWithEffCount = 0;
 
+      const loomRowSeqTracker = new Map<number, number>();
       const processedEntries = (entries as LoomReadingEntryItem[]).map((e) => {
         const { r1Prod, r2Prod, r3Prod, r4Prod, r5Prod, r6Prod, totalProduction } = computeIntervalDeltas(e);
         const bdMinutes = Number(e.breakdownMinutes) || 0;
@@ -446,8 +458,14 @@ export async function POST(request: NextRequest) {
           idleCount++;
         }
 
+        const loomNum = Number(e.loomNumber);
+        const nextSeq = (loomRowSeqTracker.get(loomNum) || 0) + 1;
+        loomRowSeqTracker.set(loomNum, nextSeq);
+        const rowSeq = typeof e.rowSequence === "number" && e.rowSequence > 0 ? e.rowSequence : nextSeq;
+
         return {
-          loomNumber: Number(e.loomNumber),
+          loomNumber: loomNum,
+          rowSequence: rowSeq,
           operatorName: e.operatorName?.trim() || null,
           size: e.size?.trim() || null,
           denier: e.denier?.trim() || null,
@@ -541,6 +559,7 @@ export async function POST(request: NextRequest) {
           data: processedEntries.map((item) => ({
             sheetId: savedSheet.id,
             loomNumber: item.loomNumber,
+            rowSequence: item.rowSequence,
             operatorName: item.operatorName,
             size: item.size,
             denier: item.denier,
@@ -748,15 +767,17 @@ export async function POST(request: NextRequest) {
         updates.push(
           db.loomReadingEntry.upsert({
             where: {
-              sheetId_loomNumber: {
+              sheetId_loomNumber_rowSequence: {
                 sheetId: sheet.id,
                 loomNumber: l,
+                rowSequence: 1,
               },
             },
             update: updateData,
             create: {
               sheetId: sheet.id,
               loomNumber: l,
+              rowSequence: 1,
               ...updateData,
             },
           })

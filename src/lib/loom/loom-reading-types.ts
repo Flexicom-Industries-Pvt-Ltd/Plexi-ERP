@@ -22,6 +22,7 @@ export type LoomBreakdownReason = typeof LOOM_BREAKDOWN_REASONS[number];
 export interface LoomReadingEntryItem {
   id?: string;
   loomNumber: number;
+  rowSequence?: number;
   operatorName: string | null;
   size: string | null;
   denier: string | null;

@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { LoomSummarySection } from "@/components/loom/LoomSummarySection";
 import { LoomChangeoverSection } from "@/components/loom/LoomChangeoverSection";
 import { LoomReadingSheetSection } from "@/components/loom/LoomReadingSheetSection";
+import { LoomRollCuttingSection } from "@/components/loom/LoomRollCuttingSection";
 
 export function LoomClient() {
   const searchParams = useSearchParams();
@@ -16,9 +17,12 @@ export function LoomClient() {
         <LoomChangeoverSection />
       ) : tabParam === "reading-sheet" || tabParam === "2-hours" || tabParam === "reading" ? (
         <LoomReadingSheetSection />
+      ) : tabParam === "roll-cutting" || tabParam === "cutting-report" ? (
+        <LoomRollCuttingSection />
       ) : (
         <LoomSummarySection />
       )}
     </div>
   );
 }
+

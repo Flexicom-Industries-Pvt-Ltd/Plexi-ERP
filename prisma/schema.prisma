@@ -1993,6 +1993,7 @@ model LoomReadingEntry {
   sheetId         String
   sheet           LoomReadingSheet @relation(fields: [sheetId], references: [id], onDelete: Cascade)
   loomNumber      Int              // 1 to 91
+  rowSequence     Int              @default(1) // 1 for primary row, 2+ for changeover split rows
   operatorName    String?
   size            String?          // e.g. "480", "500", "485"
   denier          String?          // e.g. "850", "1000"
@@ -2020,9 +2021,63 @@ model LoomReadingEntry {
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
-  @@unique([sheetId, loomNumber])
+  @@unique([sheetId, loomNumber, rowSequence])
   @@index([loomNumber])
   @@index([status])
 }
+
+model LoomRollCuttingReport {
+  id                    String                 @id @default(cuid())
+  date                  String                 // YYYY-MM-DD
+  shiftName             String                 // "Day Shift", "Night Shift", "Shift A", "Shift B"
+  supervisorName        String?                // Floor supervisor
+  preparedBy            String?                // User email / name
+  checkedBy             String?
+  approvedBy            String?
+  totalRollsCount       Int                    @default(0)
+  totalMeters           Float                  @default(0)
+  totalGrossWtKg        Float                  @default(0)
+  totalTareWtKg         Float                  @default(0)
+  totalNettWtKg         Float                  @default(0)
+  averageWeightPerMeter Float?                 @default(0) // (totalNettWtKg * 1000) / totalMeters in g/m
+  status                String                 @default("DRAFT") // "DRAFT" | "SUBMITTED" | "APPROVED"
+  remarks               String?
+  entries               LoomRollCuttingEntry[]
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+
+  @@unique([date, shiftName])
+  @@index([date])
+  @@index([shiftName])
+  @@index([status])
+}
+
+model LoomRollCuttingEntry {
+  id                String                @id @default(cuid())
+  reportId          String
+  report            LoomRollCuttingReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  sequence          Int                   @default(1) // S.No (1, 2, 3...)
+  rollNumber        String                // e.g. "CT-14376", "DT-14377"
+  loomNumber        Int                   // e.g. 4, 2, 3, 68...
+  size              String?               // Fabric width e.g. "490", "500", "485"
+  qualityType       String                // e.g. "Mahal/LPP/W", "UTCL/LPP/Y/67"
+  initialReading    Float                 // Loom meter counter start
+  finalReading      Float                 // Loom meter counter end / cut point
+  meter             Float                 @default(0) // Calculated: finalReading - initialReading
+  grossWeightKg     Float                 @default(0) // Gross scale weight in kg
+  tareWeightKg      Float                 @default(1.2) // Empty core weight in kg
+  nettWeightKg      Float                 @default(0) // Gross - Tare
+  avgWeightPerMeter Float?                @default(0) // (nettWeightKg * 1000) / meter in g/m
+  supervisorSign    String?               // Name / Initials
+  remarks           String?
+  productionRollId  String?               // Reference to ProductionRoll if synced to central roll stock
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+
+  @@index([rollNumber])
+  @@index([loomNumber])
+  @@index([qualityType])
+}
+
 
 
