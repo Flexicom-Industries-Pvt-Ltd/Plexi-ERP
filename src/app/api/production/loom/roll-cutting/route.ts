@@ -46,8 +46,8 @@ export async function GET(request: NextRequest) {
   try {
     const candidateShiftNames = getNormalizedShiftCandidates(shiftNameParam);
 
-    // Fetch existing report, shifts, operators, contractors, loom mappings, tape recipes, and last roll number concurrently
-    const [shifts, operators, contractors, mappings, tapeRecipes, existingReport, lastEntry] = await Promise.all([
+    // Fetch existing report, shifts, operators, contractors, supervisors, loom mappings, tape recipes, and last roll number concurrently
+    const [shifts, operators, contractors, supervisors, mappings, tapeRecipes, existingReport, lastEntry] = await Promise.all([
       db.shift.findMany({
         where: { isActive: true },
         orderBy: { name: "asc" },
@@ -57,6 +57,10 @@ export async function GET(request: NextRequest) {
         orderBy: [{ section: "asc" }, { name: "asc" }],
       }),
       db.contractor.findMany({
+        where: { isActive: true },
+        orderBy: { name: "asc" },
+      }),
+      db.supervisor.findMany({
         where: { isActive: true },
         orderBy: { name: "asc" },
       }),
@@ -250,6 +254,12 @@ export async function GET(request: NextRequest) {
         code: c.code,
         section: c.section,
       })),
+      availableSupervisors: supervisors.map((s) => ({
+        id: s.id,
+        name: s.name,
+        code: s.code,
+        department: s.department,
+      })),
       availableQualities,
       loomAllocations,
       suggestedNextRollNumber: suggestedNextRoll,
@@ -357,6 +367,7 @@ export async function POST(request: NextRequest) {
         },
         update: {
           supervisorName,
+          supervisorId: body.supervisorId || undefined,
           preparedBy: preparedBy || userEmail,
           checkedBy,
           approvedBy,
@@ -373,6 +384,7 @@ export async function POST(request: NextRequest) {
           date,
           shiftName: targetShiftName,
           supervisorName,
+          supervisorId: body.supervisorId || undefined,
           preparedBy: preparedBy || userEmail,
           checkedBy,
           approvedBy,
