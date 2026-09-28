@@ -20,6 +20,8 @@ import {
   Timer,
   Send,
   CloudCheck,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import {
   LoomReadingEntryItem,
@@ -354,10 +356,17 @@ export function LoomReadingSheetSection() {
   }, []);
 
   // Handle live reading and breakdown changes with instant recalculation
-  const handleEntryChange = (loomNumber: number, field: keyof LoomReadingEntryItem, value: any) => {
+  const handleEntryChange = (
+    loomNumber: number,
+    rowSequence: number = 1,
+    field: keyof LoomReadingEntryItem,
+    value: any
+  ) => {
     setEntries((prev) =>
       prev.map((item) => {
-        if (item.loomNumber !== loomNumber) return item;
+        if (item.loomNumber !== loomNumber || (item.rowSequence || 1) !== (rowSequence || 1)) {
+          return item;
+        }
 
         const updated: LoomReadingEntryItem = {
           ...item,
@@ -433,6 +442,77 @@ export function LoomReadingSheetSection() {
         return updated;
       })
     );
+  };
+
+  // Add a new quality change split row for the specified loom
+  const handleAddSplitRow = (loomNumber: number) => {
+    setEntries((prev) => {
+      const loomRows = prev.filter((e) => e.loomNumber === loomNumber);
+      const maxSeq = Math.max(...loomRows.map((e) => e.rowSequence || 1), 1);
+      const lastRow = loomRows[loomRows.length - 1];
+
+      const lastReading =
+        lastRow.r6Reading ??
+        lastRow.r5Reading ??
+        lastRow.r4Reading ??
+        lastRow.r3Reading ??
+        lastRow.r2Reading ??
+        lastRow.r1Reading ??
+        lastRow.initialReading ??
+        null;
+
+      const targetQuality = lastRow.changeoverTargetQuality || "";
+      const targetQObj = (data?.availableQualities || []).find(
+        (q) => q.code.toLowerCase().trim() === targetQuality.toLowerCase().trim()
+      );
+
+      const newRow: LoomReadingEntryItem = {
+        loomNumber,
+        rowSequence: maxSeq + 1,
+        operatorName: lastRow.operatorName,
+        size: targetQObj?.size || (targetQObj?.reedSpaceCm ? String(targetQObj.reedSpaceCm * 10) : lastRow.size),
+        denier: targetQObj?.denier ? String(targetQObj.denier) : lastRow.denier,
+        qualityType: targetQuality || "",
+        initialReading: lastReading,
+        r1Reading: null,
+        r1Prod: null,
+        r2Reading: null,
+        r2Prod: null,
+        r3Reading: null,
+        r3Prod: null,
+        r4Reading: null,
+        r4Prod: null,
+        r5Reading: null,
+        r5Prod: null,
+        r6Reading: null,
+        r6Prod: null,
+        totalProduction: 0,
+        breakdownReason: null,
+        breakdownMinutes: 0,
+        changeoverTargetQuality: null,
+        efficiencyPct: 0,
+        status: "RUNNING",
+        remarks: targetQuality ? `Changeover to ${targetQuality}` : "Quality Change",
+      };
+
+      const lastIdx = prev.findLastIndex((e) => e.loomNumber === loomNumber);
+      const updated = [...prev];
+      updated.splice(lastIdx + 1, 0, newRow);
+      return updated;
+    });
+
+    showNotification(`Added quality change split row for Loom #${loomNumber}`);
+    triggerAutoSave(true);
+  };
+
+  // Remove a split row for the specified loom
+  const handleRemoveSplitRow = (loomNumber: number, rowSequence: number) => {
+    if (rowSequence <= 1) return;
+    setEntries((prev) =>
+      prev.filter((e) => !(e.loomNumber === loomNumber && (e.rowSequence || 1) === rowSequence))
+    );
+    showNotification(`Removed split row for Loom #${loomNumber}`);
+    triggerAutoSave(true);
   };
 
   // Live Calculated KPIs
@@ -1117,12 +1197,16 @@ export function LoomReadingSheetSection() {
                   const isLpp = (e.qualityType || "").toUpperCase().includes("LPP");
                   const stdSpeed = isLpp ? "2.50 m/m" : "2.01 m/m";
                   const effVal = typeof e.efficiencyPct === "number" && e.efficiencyPct > 0 ? e.efficiencyPct : 0;
+                  const rowSeq = e.rowSequence || 1;
+                  const isSplitRow = rowSeq > 1;
 
                   return (
                     <tr
-                      key={e.loomNumber}
+                      key={e.id || `${e.loomNumber}-${rowSeq}`}
                       className={`hover:bg-slate-50 transition-colors group ${
-                        e.status === "STOP"
+                        isSplitRow
+                          ? "bg-amber-50/20"
+                          : e.status === "STOP"
                           ? "bg-rose-50/30"
                           : e.status === "CLEANING"
                           ? "bg-amber-50/30"
@@ -1131,9 +1215,11 @@ export function LoomReadingSheetSection() {
                           : "bg-slate-50/50 text-slate-400"
                       }`}
                     >
-                      {/* Sticky Loom Number Column */}
+                      {/* Sticky Loom Number Column with Split Action */}
                       <td className={`sticky left-0 z-10 py-2 px-3 text-center font-black font-mono text-sm border-r-2 border-slate-300 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)] ${
-                        e.status === "STOP"
+                        isSplitRow
+                          ? "bg-amber-100/90 text-amber-950"
+                          : e.status === "STOP"
                           ? "bg-rose-100/80 text-rose-950"
                           : e.status === "CLEANING"
                           ? "bg-amber-100/80 text-amber-950"
@@ -1141,14 +1227,30 @@ export function LoomReadingSheetSection() {
                           ? "bg-white text-slate-950 group-hover:bg-slate-50"
                           : "bg-slate-100 text-slate-500 group-hover:bg-slate-100"
                       }`}>
-                        #{e.loomNumber}
+                        <div className="flex items-center justify-center gap-1.5">
+                          <span>#{e.loomNumber}</span>
+                          {isSplitRow ? (
+                            <span className="text-[10px] font-bold text-amber-800 bg-amber-200/80 px-1 py-0.5 rounded">
+                              C/O
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleAddSplitRow(e.loomNumber)}
+                              title="Add quality changeover split row for this loom"
+                              className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-slate-200 text-slate-600 transition-opacity cursor-pointer"
+                            >
+                              <Plus className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
                       </td>
 
                       {/* Operator Name Dropdown (from Data Centre) */}
                       <td className="py-1.5 px-2.5 border-r border-slate-100">
                         <select
                           value={e.operatorName || ""}
-                          onChange={(ev) => handleEntryChange(e.loomNumber, "operatorName", ev.target.value)}
+                          onChange={(ev) => handleEntryChange(e.loomNumber, rowSeq, "operatorName", ev.target.value)}
                           onBlur={() => triggerAutoSave(true)}
                           className="w-full px-2.5 py-1.5 text-xs bg-slate-50/60 group-hover:bg-white focus:bg-white border border-slate-200 focus:border-slate-800 rounded-lg outline-none font-medium text-slate-800 cursor-pointer transition-all truncate"
                         >
@@ -1170,7 +1272,7 @@ export function LoomReadingSheetSection() {
                         <input
                           type="text"
                           value={e.size || ""}
-                          onChange={(ev) => handleEntryChange(e.loomNumber, "size", ev.target.value)}
+                          onChange={(ev) => handleEntryChange(e.loomNumber, rowSeq, "size", ev.target.value)}
                           onBlur={() => triggerAutoSave(true)}
                           placeholder="Size"
                           title="Auto-derived from assigned Quality"
@@ -1183,7 +1285,7 @@ export function LoomReadingSheetSection() {
                         <input
                           type="text"
                           value={e.denier || ""}
-                          onChange={(ev) => handleEntryChange(e.loomNumber, "denier", ev.target.value)}
+                          onChange={(ev) => handleEntryChange(e.loomNumber, rowSeq, "denier", ev.target.value)}
                           onBlur={() => triggerAutoSave(true)}
                           placeholder="DNR"
                           title="Auto-derived from assigned Quality"
@@ -1195,7 +1297,7 @@ export function LoomReadingSheetSection() {
                       <td className="py-1.5 px-2.5 border-r border-slate-100">
                         <select
                           value={e.qualityType || ""}
-                          onChange={(ev) => handleEntryChange(e.loomNumber, "qualityType", ev.target.value)}
+                          onChange={(ev) => handleEntryChange(e.loomNumber, rowSeq, "qualityType", ev.target.value)}
                           onBlur={() => triggerAutoSave(true)}
                           className="w-full px-2.5 py-1.5 text-xs font-bold text-slate-900 bg-slate-50/60 group-hover:bg-white focus:bg-white border border-slate-200 focus:border-slate-800 rounded-lg outline-none cursor-pointer transition-all truncate"
                         >
@@ -1220,6 +1322,7 @@ export function LoomReadingSheetSection() {
                           onChange={(ev) =>
                             handleEntryChange(
                               e.loomNumber,
+                              rowSeq,
                               "initialReading",
                               ev.target.value === "" ? null : parseFloat(ev.target.value)
                             )
@@ -1238,6 +1341,7 @@ export function LoomReadingSheetSection() {
                           onChange={(ev) =>
                             handleEntryChange(
                               e.loomNumber,
+                              rowSeq,
                               "r1Reading",
                               ev.target.value === "" ? null : parseFloat(ev.target.value)
                             )
@@ -1259,6 +1363,7 @@ export function LoomReadingSheetSection() {
                           onChange={(ev) =>
                             handleEntryChange(
                               e.loomNumber,
+                              rowSeq,
                               "r2Reading",
                               ev.target.value === "" ? null : parseFloat(ev.target.value)
                             )
@@ -1280,6 +1385,7 @@ export function LoomReadingSheetSection() {
                           onChange={(ev) =>
                             handleEntryChange(
                               e.loomNumber,
+                              rowSeq,
                               "r3Reading",
                               ev.target.value === "" ? null : parseFloat(ev.target.value)
                             )
@@ -1301,6 +1407,7 @@ export function LoomReadingSheetSection() {
                           onChange={(ev) =>
                             handleEntryChange(
                               e.loomNumber,
+                              rowSeq,
                               "r4Reading",
                               ev.target.value === "" ? null : parseFloat(ev.target.value)
                             )
@@ -1322,6 +1429,7 @@ export function LoomReadingSheetSection() {
                           onChange={(ev) =>
                             handleEntryChange(
                               e.loomNumber,
+                              rowSeq,
                               "r5Reading",
                               ev.target.value === "" ? null : parseFloat(ev.target.value)
                             )
@@ -1343,6 +1451,7 @@ export function LoomReadingSheetSection() {
                           onChange={(ev) =>
                             handleEntryChange(
                               e.loomNumber,
+                              rowSeq,
                               "r6Reading",
                               ev.target.value === "" ? null : parseFloat(ev.target.value)
                             )
@@ -1363,7 +1472,7 @@ export function LoomReadingSheetSection() {
                         <div className="flex items-center gap-1.5">
                           <select
                             value={e.breakdownReason || ""}
-                            onChange={(ev) => handleEntryChange(e.loomNumber, "breakdownReason", ev.target.value || null)}
+                            onChange={(ev) => handleEntryChange(e.loomNumber, rowSeq, "breakdownReason", ev.target.value || null)}
                             onBlur={() => triggerAutoSave(true)}
                             className="flex-1 text-xs font-semibold px-2 py-1 bg-white border border-amber-300 text-slate-800 rounded-lg outline-none hover:border-amber-500 focus:border-amber-600 shadow-2xs cursor-pointer"
                           >
@@ -1383,6 +1492,7 @@ export function LoomReadingSheetSection() {
                               onChange={(ev) =>
                                 handleEntryChange(
                                   e.loomNumber,
+                                  rowSeq,
                                   "breakdownMinutes",
                                   ev.target.value === "" ? 0 : Math.max(0, parseInt(ev.target.value, 10) || 0)
                                 )
@@ -1403,7 +1513,7 @@ export function LoomReadingSheetSection() {
                           <select
                             value={e.changeoverTargetQuality || ""}
                             onChange={(ev) =>
-                              handleEntryChange(e.loomNumber, "changeoverTargetQuality", ev.target.value || null)
+                              handleEntryChange(e.loomNumber, rowSeq, "changeoverTargetQuality", ev.target.value || null)
                             }
                             onBlur={() => triggerAutoSave(true)}
                             className="w-full text-xs font-extrabold px-2.5 py-1.5 bg-white border-2 border-amber-400 text-amber-950 rounded-lg outline-none focus:border-amber-600 shadow-2xs cursor-pointer"
@@ -1448,11 +1558,11 @@ export function LoomReadingSheetSection() {
                         )}
                       </td>
 
-                      {/* Remarks / Status */}
+                      {/* Remarks / Status / Actions */}
                       <td className="py-1.5 px-3 flex items-center gap-2">
                         <select
                           value={e.status}
-                          onChange={(ev) => handleEntryChange(e.loomNumber, "status", ev.target.value)}
+                          onChange={(ev) => handleEntryChange(e.loomNumber, rowSeq, "status", ev.target.value)}
                           onBlur={() => triggerAutoSave(true)}
                           className={`text-xs font-bold px-2 py-1 rounded-lg border outline-none cursor-pointer ${
                             e.status === "RUNNING"
@@ -1475,11 +1585,21 @@ export function LoomReadingSheetSection() {
                         <input
                           type="text"
                           value={e.remarks || ""}
-                          onChange={(ev) => handleEntryChange(e.loomNumber, "remarks", ev.target.value)}
+                          onChange={(ev) => handleEntryChange(e.loomNumber, rowSeq, "remarks", ev.target.value)}
                           onBlur={() => triggerAutoSave(true)}
                           placeholder="Notes..."
                           className="flex-1 min-w-[110px] px-2 py-1 text-xs bg-slate-50/40 group-hover:bg-white focus:bg-white border border-transparent hover:border-slate-200 focus:border-slate-800 rounded-lg outline-none transition-all placeholder:text-slate-300"
                         />
+                        {isSplitRow && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveSplitRow(e.loomNumber, rowSeq)}
+                            title="Remove this quality changeover split row"
+                            className="p-1 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                       </td>
                     </tr>
                   );
