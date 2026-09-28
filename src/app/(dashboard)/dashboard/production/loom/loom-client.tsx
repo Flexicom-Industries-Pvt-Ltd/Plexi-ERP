@@ -6,6 +6,7 @@ import { LoomSummarySection } from "@/components/loom/LoomSummarySection";
 import { LoomChangeoverSection } from "@/components/loom/LoomChangeoverSection";
 import { LoomReadingSheetSection } from "@/components/loom/LoomReadingSheetSection";
 import { LoomRollCuttingSection } from "@/components/loom/LoomRollCuttingSection";
+import { LoomProductionReportSection } from "@/components/loom/LoomProductionReportSection";
 
 export function LoomClient() {
   const searchParams = useSearchParams();
@@ -19,6 +20,8 @@ export function LoomClient() {
         <LoomReadingSheetSection />
       ) : tabParam === "roll-cutting" || tabParam === "cutting-report" ? (
         <LoomRollCuttingSection />
+      ) : tabParam === "production-report" || tabParam === "report" || tabParam === "reports" ? (
+        <LoomProductionReportSection />
       ) : (
         <LoomSummarySection />
       )}
