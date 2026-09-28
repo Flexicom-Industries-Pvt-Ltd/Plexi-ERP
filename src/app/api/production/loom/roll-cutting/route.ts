@@ -46,8 +46,8 @@ export async function GET(request: NextRequest) {
   try {
     const candidateShiftNames = getNormalizedShiftCandidates(shiftNameParam);
 
-    // Fetch existing report, shifts, operators, loom mappings, tape recipes, and last roll number concurrently
-    const [shifts, operators, mappings, tapeRecipes, existingReport, lastEntry] = await Promise.all([
+    // Fetch existing report, shifts, operators, contractors, loom mappings, tape recipes, and last roll number concurrently
+    const [shifts, operators, contractors, mappings, tapeRecipes, existingReport, lastEntry] = await Promise.all([
       db.shift.findMany({
         where: { isActive: true },
         orderBy: { name: "asc" },
@@ -55,6 +55,10 @@ export async function GET(request: NextRequest) {
       db.operator.findMany({
         where: { isActive: true },
         orderBy: [{ section: "asc" }, { name: "asc" }],
+      }),
+      db.contractor.findMany({
+        where: { isActive: true },
+        orderBy: { name: "asc" },
       }),
       db.loomMachineMapping.findMany({
         where: { isActive: true },
@@ -154,6 +158,7 @@ export async function GET(request: NextRequest) {
           tareWeightKg: e.tareWeightKg,
           nettWeightKg,
           avgWeightPerMeter,
+          contractor: e.contractor || "",
           supervisorSign: e.supervisorSign || "",
           remarks: e.remarks || "",
           productionRollId: e.productionRollId || null,
@@ -188,6 +193,7 @@ export async function GET(request: NextRequest) {
         String(e.loomNumber).includes(search) ||
         `#${e.loomNumber}`.includes(search) ||
         (e.qualityType && e.qualityType.toLowerCase().includes(search)) ||
+        (e.contractor && e.contractor.toLowerCase().includes(search)) ||
         (e.size && e.size.toLowerCase().includes(search)) ||
         (e.supervisorSign && e.supervisorSign.toLowerCase().includes(search)) ||
         (e.remarks && e.remarks.toLowerCase().includes(search))
@@ -237,6 +243,12 @@ export async function GET(request: NextRequest) {
         employeeCode: o.code,
         section: o.section,
         designation: o.designation,
+      })),
+      availableContractors: contractors.map((c) => ({
+        id: c.id,
+        name: c.name,
+        code: c.code,
+        section: c.section,
       })),
       availableQualities,
       loomAllocations,
@@ -307,6 +319,7 @@ export async function POST(request: NextRequest) {
           loomNumber: Number(e.loomNumber) || 1,
           size: e.size?.trim() || null,
           qualityType: (e.qualityType || "STANDARD").trim(),
+          contractor: e.contractor?.trim() || null,
           initialReading: initRdg,
           finalReading: finalRdg,
           meter,
@@ -388,6 +401,7 @@ export async function POST(request: NextRequest) {
             loomNumber: item.loomNumber,
             size: item.size,
             qualityType: item.qualityType,
+            contractor: item.contractor,
             initialReading: item.initialReading,
             finalReading: item.finalReading,
             meter: item.meter,

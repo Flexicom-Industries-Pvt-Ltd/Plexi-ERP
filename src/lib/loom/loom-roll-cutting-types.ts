@@ -5,6 +5,7 @@ export interface LoomRollCuttingEntryItem {
   loomNumber: number;        // e.g. 4, 2, 3, 68...
   size: string;              // Fabric width mm e.g. "490", "500"
   qualityType: string;       // e.g. "Mahal/LPP/W", "UTCL/LPP/Y/67"
+  contractor?: string;       // Contractor / Labour Agency name e.g. "Sharma Enterprise"
   initialReading: number | string;    // Counter start
   finalReading: number | string;      // Counter cut point
   meter: number;             // Calculated: finalReading - initialReading
@@ -129,3 +130,81 @@ export function generateNextRollNumber(previousRollNumber?: string): string {
 
   return `${previousRollNumber}-1`;
 }
+
+export interface RollCuttingContractorSummary {
+  contractor: string;
+  rollsCount: number;
+  totalMeters: number;
+  totalGrossWtKg: number;
+  totalNettWtKg: number;
+}
+
+export interface RollCuttingQualitySummary {
+  qualityType: string;
+  rollsCount: number;
+  totalMeters: number;
+  totalGrossWtKg: number;
+  totalNettWtKg: number;
+  avgWeightPerMeter: number;
+}
+
+/**
+ * Computes contractor-wise roll breakdown and totals.
+ */
+export function computeContractorRollSummary(entries: LoomRollCuttingEntryItem[]): RollCuttingContractorSummary[] {
+  const map = new Map<string, { rollsCount: number; totalMeters: number; totalGrossWtKg: number; totalNettWtKg: number }>();
+
+  for (const e of entries) {
+    const key = e.contractor?.trim() || "In-House / Direct";
+    const current = map.get(key) || { rollsCount: 0, totalMeters: 0, totalGrossWtKg: 0, totalNettWtKg: 0 };
+    current.rollsCount += 1;
+    current.totalMeters += Number(e.meter) || 0;
+    current.totalGrossWtKg += Number(e.grossWeightKg) || 0;
+    current.totalNettWtKg += Number(e.nettWeightKg) || 0;
+    map.set(key, current);
+  }
+
+  return Array.from(map.entries())
+    .map(([contractor, data]) => ({
+      contractor,
+      rollsCount: data.rollsCount,
+      totalMeters: Math.round(data.totalMeters * 100) / 100,
+      totalGrossWtKg: Math.round(data.totalGrossWtKg * 100) / 100,
+      totalNettWtKg: Math.round(data.totalNettWtKg * 100) / 100,
+    }))
+    .sort((a, b) => b.rollsCount - a.rollsCount || a.contractor.localeCompare(b.contractor));
+}
+
+/**
+ * Computes quality-wise roll breakdown and linear mass averages.
+ */
+export function computeQualityRollSummary(entries: LoomRollCuttingEntryItem[]): RollCuttingQualitySummary[] {
+  const map = new Map<string, { rollsCount: number; totalMeters: number; totalGrossWtKg: number; totalNettWtKg: number }>();
+
+  for (const e of entries) {
+    const key = e.qualityType?.trim() || "STANDARD";
+    const current = map.get(key) || { rollsCount: 0, totalMeters: 0, totalGrossWtKg: 0, totalNettWtKg: 0 };
+    current.rollsCount += 1;
+    current.totalMeters += Number(e.meter) || 0;
+    current.totalGrossWtKg += Number(e.grossWeightKg) || 0;
+    current.totalNettWtKg += Number(e.nettWeightKg) || 0;
+    map.set(key, current);
+  }
+
+  return Array.from(map.entries())
+    .map(([qualityType, data]) => {
+      const m = Math.round(data.totalMeters * 100) / 100;
+      const nett = Math.round(data.totalNettWtKg * 100) / 100;
+      const avg = m > 0 && nett > 0 ? Math.round(((nett * 1000) / m) * 10) / 10 : 0;
+      return {
+        qualityType,
+        rollsCount: data.rollsCount,
+        totalMeters: m,
+        totalGrossWtKg: Math.round(data.totalGrossWtKg * 100) / 100,
+        totalNettWtKg: nett,
+        avgWeightPerMeter: avg,
+      };
+    })
+    .sort((a, b) => b.rollsCount - a.rollsCount || a.qualityType.localeCompare(b.qualityType));
+}
+

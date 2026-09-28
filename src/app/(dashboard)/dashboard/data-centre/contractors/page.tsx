@@ -1,0 +1,29 @@
+import { Metadata } from "next";
+import { ContractorsClient } from "./contractors-client";
+
+export const metadata: Metadata = {
+  title: "Contractors | Data Centre",
+  description: "Register and manage labour contractors and workforce agencies across factory operations.",
+};
+
+export default function ContractorsPage() {
+  return (
+    <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
+      <div className="flex items-center justify-between space-y-2">
+        <div>
+          <span className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">
+            Data Centre
+          </span>
+          <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-slate-900 mt-1">
+            Contractor Master
+          </h2>
+          <p className="text-xs md:text-sm text-slate-500 mt-1">
+            Register and manage third-party contractors, labour agencies, and contractor-wise roll production attribution.
+          </p>
+        </div>
+      </div>
+
+      <ContractorsClient />
+    </div>
+  );
+}
