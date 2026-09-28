@@ -43,10 +43,15 @@ export function LoomRollCuttingPrintModal({
     hour12: true,
   });
 
-  const totalMeters = entries.reduce((s, e) => s + (e.meter || 0), 0);
-  const totalGross = entries.reduce((s, e) => s + (e.grossWeightKg || 0), 0);
-  const totalTare = entries.reduce((s, e) => s + (e.tareWeightKg || 1.2), 0);
-  const totalNett = entries.reduce((s, e) => s + (e.nettWeightKg || 0), 0);
+  const totalMeters = entries.reduce((s, e) => s + (Number(e.meter) || 0), 0);
+  const totalGross = entries.reduce((s, e) => s + (Number(e.grossWeightKg) || 0), 0);
+  const totalTare = entries.reduce((s, e) => {
+    const t = e.tareWeightKg !== "" && e.tareWeightKg !== null && e.tareWeightKg !== undefined
+      ? (!isNaN(Number(e.tareWeightKg)) ? Number(e.tareWeightKg) : 1.2)
+      : 1.2;
+    return s + t;
+  }, 0);
+  const totalNett = entries.reduce((s, e) => s + (Number(e.nettWeightKg) || 0), 0);
   const overallAvg = totalMeters > 0 && totalNett > 0 ? Math.round(((totalNett * 1000) / totalMeters) * 10) / 10 : 0;
   const uniqueLooms = new Set(entries.map((e) => e.loomNumber));
 
@@ -294,10 +299,14 @@ export function LoomRollCuttingPrintModal({
                           {entry.meter !== undefined && entry.meter !== null ? Number(entry.meter).toLocaleString() : "0"}
                         </td>
                         <td className="border border-slate-200 px-2 py-1 text-right font-mono text-slate-700">
-                          {entry.grossWeightKg?.toFixed(2) || "0.00"}
+                          {entry.grossWeightKg !== "" && entry.grossWeightKg !== null && entry.grossWeightKg !== undefined
+                            ? Number(entry.grossWeightKg).toFixed(2)
+                            : "0.00"}
                         </td>
                         <td className="border border-slate-200 px-2 py-1 text-right font-mono text-slate-400">
-                          {entry.tareWeightKg?.toFixed(2) || "1.20"}
+                          {entry.tareWeightKg !== "" && entry.tareWeightKg !== null && entry.tareWeightKg !== undefined
+                            ? Number(entry.tareWeightKg).toFixed(2)
+                            : "1.20"}
                         </td>
                         <td className="border border-slate-200 px-2 py-1 text-right font-mono font-black text-emerald-700 bg-emerald-50/60">
                           {entry.nettWeightKg?.toFixed(2) || "0.00"}
