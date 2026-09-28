@@ -18,6 +18,7 @@ import {
   Layers,
   Sparkles,
   X,
+  ArrowRightLeft,
 } from "lucide-react";
 import {
   LoomRollCuttingEntryItem,
@@ -788,16 +789,26 @@ export function LoomRollCuttingSection() {
 
       {/* Interactive Daily Floor Form Table */}
       <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
-        <div className="px-5 py-3.5 border-b bg-muted/40 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Scissors className="w-4 h-4 text-sky-600 dark:text-sky-400" />
-            <h3 className="font-semibold text-sm text-foreground">Floor Roll Cut Log Entries</h3>
-            <span className="text-xs font-mono text-muted-foreground">({entries.length} items)</span>
+        <div className="px-5 py-3.5 border-b bg-muted/40 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <div className="p-1.5 rounded-md bg-sky-500/10 text-sky-600 dark:text-sky-400">
+              <Scissors className="w-4 h-4" />
+            </div>
+            <div className="flex items-center gap-2">
+              <h3 className="font-bold text-sm text-foreground">Floor Roll Cut Log Entries</h3>
+              <span className="text-xs font-mono font-semibold px-2 py-0.5 rounded-full bg-muted text-foreground border border-border/60">
+                {entries.length} {entries.length === 1 ? "roll" : "rolls"}
+              </span>
+            </div>
+            <span className="hidden md:inline-flex items-center gap-1.5 text-xs text-muted-foreground border-l pl-3 ml-1">
+              <ArrowRightLeft className="w-3.5 h-3.5 text-sky-500" />
+              Scroll horizontally to view & edit all 16 floor columns
+            </span>
           </div>
 
           <button
             onClick={handleAddEntry}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground transition-colors cursor-pointer shadow-xs"
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground transition-colors cursor-pointer shadow-xs"
           >
             <Plus className="w-3.5 h-3.5" />
             Add Roll Row
@@ -805,79 +816,80 @@ export function LoomRollCuttingSection() {
         </div>
 
         <div className="overflow-x-auto min-h-[300px]">
-          <table className="w-full text-xs text-left border-collapse">
+          <table className="w-full text-xs text-left border-collapse min-w-[2140px]">
             <thead>
-              <tr className="bg-muted/70 border-b text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                <th className="p-2.5 text-center border-r w-12">S.No.</th>
-                <th className="p-2.5 border-r w-32">Roll No.</th>
-                <th className="p-2.5 border-r w-24 text-center">Loom #</th>
-                <th className="p-2.5 border-r w-20 text-center">Size (mm)</th>
-                <th className="p-2.5 border-r min-w-[150px]">Quality Code</th>
-                <th className="p-2.5 border-r min-w-[150px]">Contractor</th>
-                <th className="p-2.5 border-r w-24 text-right">Init Reading</th>
-                <th className="p-2.5 border-r w-24 text-right">Final Reading</th>
-                <th className="p-2.5 border-r w-20 text-right bg-muted/90 text-foreground font-bold">Meter</th>
-                <th className="p-2.5 border-r w-24 text-right">Gross Wt (kg)</th>
-                <th className="p-2.5 border-r w-24 text-right text-muted-foreground">Tare (kg)</th>
-                <th className="p-2.5 border-r w-24 text-right font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/5">Nett (kg)</th>
-                <th className="p-2.5 border-r w-20 text-right text-purple-600 dark:text-purple-400">Avg (g/m)</th>
-                <th className="p-2.5 border-r w-28 text-center">Sup. Sign</th>
-                <th className="p-2.5 border-r min-w-[140px]">Remarks</th>
-                <th className="p-2.5 text-center w-20">Actions</th>
+              <tr className="bg-muted/80 border-b text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200">
+                <th className="p-3 text-center border-r w-14 min-w-[56px]">S.No.</th>
+                <th className="p-3 border-r w-36 min-w-[144px]">Roll No.</th>
+                <th className="p-3 border-r w-36 min-w-[130px] text-center">Loom #</th>
+                <th className="p-3 border-r w-28 min-w-[100px] text-center">Size (mm)</th>
+                <th className="p-3 border-r w-80 min-w-[300px]">Quality Code</th>
+                <th className="p-3 border-r w-64 min-w-[240px]">Contractor</th>
+                <th className="p-3 border-r w-32 min-w-[120px] text-right">Init Reading</th>
+                <th className="p-3 border-r w-32 min-w-[120px] text-right">Final Reading</th>
+                <th className="p-3 border-r w-28 min-w-[110px] text-right bg-muted text-foreground font-extrabold">Meter</th>
+                <th className="p-3 border-r w-32 min-w-[120px] text-right">Gross Wt (kg)</th>
+                <th className="p-3 border-r w-28 min-w-[100px] text-right text-muted-foreground">Tare (kg)</th>
+                <th className="p-3 border-r w-32 min-w-[120px] text-right font-extrabold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10">Nett (kg)</th>
+                <th className="p-3 border-r w-28 min-w-[110px] text-right text-purple-600 dark:text-purple-400 font-extrabold bg-purple-500/10">Avg (g/m)</th>
+                <th className="p-3 border-r w-44 min-w-[160px] text-center">Sup. Sign</th>
+                <th className="p-3 border-r w-64 min-w-[220px]">Remarks</th>
+                <th className="p-3 text-center w-28 min-w-[100px]">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/60 font-sans">
               {entries.length > 0 ? (
                 entries.map((entry, idx) => (
-                  <tr key={entry.id || idx} className="hover:bg-muted/20 transition-colors group">
+                  <tr key={entry.id || idx} className="hover:bg-muted/30 transition-colors group">
                     {/* S.No */}
-                    <td className="p-2 text-center border-r font-mono text-muted-foreground font-bold">
+                    <td className="p-2.5 text-center border-r font-mono text-muted-foreground font-bold text-xs">
                       {idx + 1}
                     </td>
 
                     {/* Roll No */}
-                    <td className="p-1.5 border-r">
+                    <td className="p-2 border-r">
                       <input
                         type="text"
                         value={entry.rollNumber}
                         onChange={(e) => handleUpdateEntry(idx, "rollNumber", e.target.value)}
-                        className="w-full text-xs font-mono font-bold px-2 py-1.5 rounded border bg-background text-foreground focus:ring-1 focus:ring-primary outline-hidden uppercase"
+                        className="w-full text-xs font-mono font-bold px-3 py-2 rounded-lg border bg-background text-foreground focus:ring-2 focus:ring-primary/20 outline-hidden uppercase shadow-2xs"
                         placeholder="CT-14376"
                       />
                     </td>
 
                     {/* Loom No */}
-                    <td className="p-1.5 border-r">
+                    <td className="p-2 border-r">
                       <select
                         value={entry.loomNumber}
                         onChange={(e) => handleUpdateEntry(idx, "loomNumber", Number(e.target.value))}
-                        className="w-full text-xs font-mono font-bold px-2 py-1.5 rounded border bg-background text-sky-600 dark:text-sky-400 focus:ring-1 focus:ring-primary outline-hidden cursor-pointer text-center"
+                        className="w-full text-xs font-mono font-bold px-3 py-2 rounded-lg border bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border-sky-300 dark:border-sky-800 focus:ring-2 focus:ring-sky-500/20 outline-hidden cursor-pointer shadow-2xs"
                       >
                         {Array.from({ length: 91 }, (_, i) => i + 1).map((num) => (
                           <option key={num} value={num}>
-                            #{num}
+                            Loom #{num}
                           </option>
                         ))}
                       </select>
                     </td>
 
                     {/* Size */}
-                    <td className="p-1.5 border-r">
+                    <td className="p-2 border-r">
                       <input
                         type="text"
                         value={entry.size || ""}
                         onChange={(e) => handleUpdateEntry(idx, "size", e.target.value)}
-                        className="w-full text-xs font-mono text-center px-1.5 py-1.5 rounded border bg-background text-foreground focus:ring-1 focus:ring-primary outline-hidden"
+                        className="w-full text-xs font-mono font-bold text-center px-2 py-2 rounded-lg border bg-background text-foreground focus:ring-2 focus:ring-primary/20 outline-hidden shadow-2xs"
                         placeholder="490"
                       />
                     </td>
 
                     {/* Quality */}
-                    <td className="p-1.5 border-r">
+                    <td className="p-2 border-r">
                       <select
                         value={entry.qualityType}
+                        title={entry.qualityType}
                         onChange={(e) => handleUpdateEntry(idx, "qualityType", e.target.value)}
-                        className="w-full text-xs font-medium px-2 py-1.5 rounded border bg-background text-foreground focus:ring-1 focus:ring-primary outline-hidden cursor-pointer"
+                        className="w-full text-xs font-semibold px-3 py-2 rounded-lg border bg-background text-foreground focus:ring-2 focus:ring-primary/20 outline-hidden cursor-pointer shadow-2xs"
                       >
                         {availableQualities.map((q) => (
                           <option key={q.code} value={q.code}>
@@ -891,9 +903,10 @@ export function LoomRollCuttingSection() {
                     </td>
 
                     {/* Contractor */}
-                    <td className="p-1.5 border-r">
+                    <td className="p-2 border-r">
                       <select
                         value={entry.contractor || ""}
+                        title={entry.contractor || "In-House / Direct"}
                         onChange={(e) => {
                           if (e.target.value === "__NEW__") {
                             setTargetEntryIndexForNewContractor(idx);
@@ -902,7 +915,7 @@ export function LoomRollCuttingSection() {
                             handleUpdateEntry(idx, "contractor", e.target.value);
                           }
                         }}
-                        className="w-full text-xs font-medium px-2 py-1.5 rounded border bg-background text-foreground focus:ring-1 focus:ring-primary outline-hidden cursor-pointer"
+                        className="w-full text-xs font-medium px-3 py-2 rounded-lg border bg-background text-foreground focus:ring-2 focus:ring-primary/20 outline-hidden cursor-pointer shadow-2xs"
                       >
                         <option value="">In-House / Direct</option>
                         {availableContractors.map((c) => (
@@ -921,74 +934,80 @@ export function LoomRollCuttingSection() {
                     </td>
 
                     {/* Initial Reading */}
-                    <td className="p-1.5 border-r">
+                    <td className="p-2 border-r">
                       <input
                         type="number"
                         value={entry.initialReading !== undefined && entry.initialReading !== null ? entry.initialReading : ""}
                         onChange={(e) => handleUpdateEntry(idx, "initialReading", e.target.value)}
-                        className="w-full text-xs font-mono text-right px-2 py-1.5 rounded border bg-background text-foreground focus:ring-1 focus:ring-primary outline-hidden"
+                        className="w-full text-xs font-mono font-semibold text-right px-3 py-2 rounded-lg border bg-background text-foreground focus:ring-2 focus:ring-primary/20 outline-hidden shadow-2xs"
                         placeholder="0"
                       />
                     </td>
 
                     {/* Final Reading */}
-                    <td className="p-1.5 border-r">
+                    <td className="p-2 border-r">
                       <input
                         type="number"
                         value={entry.finalReading !== undefined && entry.finalReading !== null ? entry.finalReading : ""}
                         onChange={(e) => handleUpdateEntry(idx, "finalReading", e.target.value)}
-                        className="w-full text-xs font-mono text-right px-2 py-1.5 rounded border bg-background text-foreground focus:ring-1 focus:ring-primary outline-hidden"
+                        className="w-full text-xs font-mono font-semibold text-right px-3 py-2 rounded-lg border bg-background text-foreground focus:ring-2 focus:ring-primary/20 outline-hidden shadow-2xs"
                         placeholder="0"
                       />
                     </td>
 
                     {/* Meter (Auto-Calculated) */}
-                    <td className="p-2 border-r text-right font-mono font-bold text-foreground bg-muted/20">
-                      {entry.meter !== undefined && entry.meter !== null ? Number(entry.meter).toLocaleString() : "0"}
+                    <td className="p-2 border-r text-right bg-muted/20">
+                      <div className="px-3 py-2 rounded-lg bg-muted/60 border border-border/40 font-mono font-extrabold text-xs text-foreground text-right shadow-2xs">
+                        {entry.meter !== undefined && entry.meter !== null ? Number(entry.meter).toLocaleString() : "0"} m
+                      </div>
                     </td>
 
                     {/* Gross Wt */}
-                    <td className="p-1.5 border-r">
+                    <td className="p-2 border-r">
                       <input
                         type="number"
                         step="0.01"
                         value={entry.grossWeightKg !== undefined && entry.grossWeightKg !== null ? entry.grossWeightKg : ""}
                         onChange={(e) => handleUpdateEntry(idx, "grossWeightKg", e.target.value)}
-                        className="w-full text-xs font-mono text-right px-2 py-1.5 rounded border bg-background text-foreground focus:ring-1 focus:ring-primary outline-hidden font-semibold"
+                        className="w-full text-xs font-mono font-bold text-right px-3 py-2 rounded-lg border bg-background text-foreground focus:ring-2 focus:ring-primary/20 outline-hidden shadow-2xs"
                         placeholder="0.00"
                       />
                     </td>
 
                     {/* Tare Wt */}
-                    <td className="p-1.5 border-r">
+                    <td className="p-2 border-r">
                       <input
                         type="number"
                         step="0.01"
                         value={entry.tareWeightKg !== undefined && entry.tareWeightKg !== null ? entry.tareWeightKg : ""}
                         onChange={(e) => handleUpdateEntry(idx, "tareWeightKg", e.target.value)}
-                        className="w-full text-xs font-mono text-right px-2 py-1.5 rounded border bg-background text-muted-foreground focus:ring-1 focus:ring-primary outline-hidden font-semibold"
+                        className="w-full text-xs font-mono font-medium text-right px-3 py-2 rounded-lg border bg-background text-muted-foreground focus:ring-2 focus:ring-primary/20 outline-hidden shadow-2xs"
                         placeholder="1.20"
                       />
                     </td>
 
                     {/* Nett Wt (Auto-Calculated) */}
-                    <td className="p-2 border-r text-right font-mono font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/5">
-                      {entry.nettWeightKg !== undefined && entry.nettWeightKg !== null ? Number(entry.nettWeightKg).toFixed(2) : "0.00"}
+                    <td className="p-2 border-r text-right bg-emerald-500/5">
+                      <div className="px-3 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 font-mono font-extrabold text-xs text-emerald-600 dark:text-emerald-400 text-right shadow-2xs">
+                        {entry.nettWeightKg !== undefined && entry.nettWeightKg !== null ? Number(entry.nettWeightKg).toFixed(2) : "0.00"} kg
+                      </div>
                     </td>
 
                     {/* Avg g/m (Auto-Calculated) */}
-                    <td className="p-2 border-r text-right font-mono font-bold text-purple-600 dark:text-purple-400">
-                      {entry.avgWeightPerMeter !== undefined && entry.avgWeightPerMeter !== null ? Number(entry.avgWeightPerMeter).toFixed(1) : "0.0"}
+                    <td className="p-2 border-r text-right bg-purple-500/5">
+                      <div className="px-3 py-2 rounded-lg bg-purple-500/10 border border-purple-500/20 font-mono font-extrabold text-xs text-purple-600 dark:text-purple-400 text-right shadow-2xs">
+                        {entry.avgWeightPerMeter !== undefined && entry.avgWeightPerMeter !== null ? Number(entry.avgWeightPerMeter).toFixed(1) : "0.0"}
+                      </div>
                     </td>
 
                     {/* Sup. Sign */}
-                    <td className="p-1.5 border-r">
+                    <td className="p-2 border-r">
                       <input
                         type="text"
                         list="supervisors-datalist"
                         value={entry.supervisorSign || ""}
                         onChange={(e) => handleUpdateEntry(idx, "supervisorSign", e.target.value)}
-                        className="w-full text-xs text-center px-1.5 py-1.5 rounded border bg-background text-foreground focus:ring-1 focus:ring-primary outline-hidden"
+                        className="w-full text-xs text-center px-3 py-2 rounded-lg border bg-background text-foreground focus:ring-2 focus:ring-primary/20 outline-hidden shadow-2xs font-medium"
                         placeholder={supervisorName || "Sign"}
                       />
                       <datalist id="supervisors-datalist">
@@ -999,32 +1018,32 @@ export function LoomRollCuttingSection() {
                     </td>
 
                     {/* Remarks */}
-                    <td className="p-1.5 border-r">
+                    <td className="p-2 border-r">
                       <input
                         type="text"
                         value={entry.remarks || ""}
                         onChange={(e) => handleUpdateEntry(idx, "remarks", e.target.value)}
-                        className="w-full text-xs px-2 py-1.5 rounded border bg-background text-muted-foreground focus:ring-1 focus:ring-primary outline-hidden"
-                        placeholder="Notes..."
+                        className="w-full text-xs px-3 py-2 rounded-lg border bg-background text-foreground focus:ring-2 focus:ring-primary/20 outline-hidden shadow-2xs"
+                        placeholder="Notes / remarks..."
                       />
                     </td>
 
                     {/* Row Actions */}
-                    <td className="p-1.5 text-center">
-                      <div className="flex items-center justify-center gap-1">
+                    <td className="p-2 text-center">
+                      <div className="flex items-center justify-center gap-1.5">
                         <button
                           onClick={() => handleDuplicateEntry(idx)}
-                          className="p-1.5 rounded text-muted-foreground hover:text-sky-600 hover:bg-sky-500/10 transition-colors cursor-pointer"
+                          className="p-2 rounded-lg text-slate-500 hover:text-sky-600 hover:bg-sky-50 dark:hover:bg-sky-950/40 border border-transparent hover:border-sky-200 transition-colors cursor-pointer"
                           title="Duplicate row for next roll cut"
                         >
-                          <Copy className="w-3.5 h-3.5" />
+                          <Copy className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => handleDeleteEntry(idx)}
-                          className="p-1.5 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
+                          className="p-2 rounded-lg text-slate-500 hover:text-destructive hover:bg-destructive/10 border border-transparent hover:border-destructive/20 transition-colors cursor-pointer"
                           title="Delete entry"
                         >
-                          <Trash2 className="w-3.5 h-3.5" />
+                          <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
                     </td>
@@ -1057,29 +1076,29 @@ export function LoomRollCuttingSection() {
             </tbody>
             {entries.length > 0 && (
               <tfoot>
-                <tr className="bg-muted font-bold border-t-2 text-foreground">
-                  <td className="p-2.5 text-center border-r font-bold">TOTAL</td>
-                  <td className="p-2.5 border-r font-mono">{entries.length} Rolls</td>
-                  <td className="p-2.5 border-r text-center font-mono">{kpis.activeLoomsCount} Looms</td>
-                  <td className="p-2.5 border-r"></td>
-                  <td className="p-2.5 border-r"></td>
-                  <td className="p-2.5 border-r"></td>
-                  <td className="p-2.5 border-r"></td>
-                  <td className="p-2.5 border-r"></td>
-                  <td className="p-2.5 border-r text-right font-mono font-bold">{kpis.totalMeters.toLocaleString()}</td>
-                  <td className="p-2.5 border-r text-right font-mono">{kpis.totalGrossWtKg.toFixed(2)}</td>
-                  <td className="p-2.5 border-r text-right font-mono text-muted-foreground">{kpis.totalTareWtKg.toFixed(2)}</td>
-                  <td className="p-2.5 border-r text-right font-mono font-bold text-emerald-600 dark:text-emerald-400">{kpis.totalNettWtKg.toFixed(2)}</td>
-                  <td className="p-2.5 border-r text-right font-mono text-purple-600 dark:text-purple-400">{kpis.averageWeightPerMeter.toFixed(1)}</td>
-                  <td className="p-2.5 border-r"></td>
-                  <td className="p-2.5 border-r"></td>
-                  <td className="p-2.5 text-center">
+                <tr className="bg-muted font-bold border-t-2 text-foreground text-xs">
+                  <td className="p-3 text-center border-r font-extrabold">TOTAL</td>
+                  <td className="p-3 border-r font-mono font-bold">{entries.length} Rolls</td>
+                  <td className="p-3 border-r text-center font-mono font-bold text-sky-600 dark:text-sky-400">{kpis.activeLoomsCount} Looms</td>
+                  <td className="p-3 border-r"></td>
+                  <td className="p-3 border-r"></td>
+                  <td className="p-3 border-r"></td>
+                  <td className="p-3 border-r"></td>
+                  <td className="p-3 border-r"></td>
+                  <td className="p-3 border-r text-right font-mono font-extrabold text-foreground">{kpis.totalMeters.toLocaleString()} m</td>
+                  <td className="p-3 border-r text-right font-mono font-bold">{kpis.totalGrossWtKg.toFixed(2)} kg</td>
+                  <td className="p-3 border-r text-right font-mono font-medium text-muted-foreground">{kpis.totalTareWtKg.toFixed(2)} kg</td>
+                  <td className="p-3 border-r text-right font-mono font-extrabold text-emerald-600 dark:text-emerald-400">{kpis.totalNettWtKg.toFixed(2)} kg</td>
+                  <td className="p-3 border-r text-right font-mono font-extrabold text-purple-600 dark:text-purple-400">{kpis.averageWeightPerMeter.toFixed(1)} g/m</td>
+                  <td className="p-3 border-r"></td>
+                  <td className="p-3 border-r"></td>
+                  <td className="p-3 text-center">
                     <button
                       onClick={handleAddEntry}
-                      className="p-1 rounded bg-primary text-primary-foreground hover:bg-primary/90 transition-colors cursor-pointer"
+                      className="inline-flex items-center justify-center p-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors cursor-pointer shadow-xs"
                       title="Add another row"
                     >
-                      <Plus className="w-3.5 h-3.5" />
+                      <Plus className="w-4 h-4" />
                     </button>
                   </td>
                 </tr>
