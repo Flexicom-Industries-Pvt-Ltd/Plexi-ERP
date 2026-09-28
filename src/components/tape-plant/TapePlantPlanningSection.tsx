@@ -3,7 +3,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import { toast } from "sonner";
 import {
-  Save,
   CheckCircle,
   Loader2,
   Sparkles,
@@ -11,18 +10,11 @@ import {
   Trash2,
   Copy,
   Layers,
-  Check,
-  AlertCircle,
   FlaskConical,
   Eye,
   FileSpreadsheet,
-  Printer,
   SunMedium,
-  Moon,
 } from "lucide-react";
-import { SpreadsheetTable, ColumnDef } from "./SpreadsheetTable";
-import { RecipeQualityInput } from "./RecipeQualityInput";
-import { RecipeQualityBadge } from "./RecipeQualityBadge";
 import { PlanningPrintPreviewModal } from "./PlanningPrintPreviewModal";
 import { generateTapePlantPlanningExcel } from "@/lib/tape-plant/planning-export";
 import { DEFAULT_RECIPE_STRING, parseRecipeQuality } from "@/lib/tape-plant/recipe-format";
@@ -41,12 +33,6 @@ export const DEFAULT_MATERIALS: MaterialRow[] = [
   { material: "RP2", quantity: "", percentage: "" },
   { material: "HD RP", quantity: "", percentage: "" },
   { material: "TPT", quantity: "", percentage: "" },
-];
-
-const materialColumns: ColumnDef<MaterialRow>[] = [
-  { key: "material", label: "Raw Material", width: "180px", minWidth: 160, sticky: true },
-  { key: "quantity", label: "Quantity (KG)", width: "160px", minWidth: 140, type: "number", align: "right", placeholder: "0.0" },
-  { key: "percentage", label: "Composition (%)", width: "160px", minWidth: 140, type: "number", align: "right", placeholder: "0.0%" },
 ];
 
 export interface RecipePlanItem {
@@ -661,6 +647,117 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
     }
   };
 
+  // Track which rows have expanded material sub-rows
+  const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
+
+  const toggleRowExpand = (index: number) => {
+    setExpandedRows((prev) => {
+      const next = new Set(prev);
+      if (next.has(index)) next.delete(index);
+      else next.add(index);
+      return next;
+    });
+  };
+
+  // Helper to update a specific plan by index (for inline grid editing)
+  const updatePlanAt = (index: number, updates: Partial<RecipePlanItem>) => {
+    setRecipePlans((prev) =>
+      prev.map((plan, idx) => (idx === index ? { ...plan, ...updates } : plan))
+    );
+  };
+
+  // Handle planned qty change for a specific row (recalculates materials)
+  const handlePlannedQtyChangeForRow = (index: number, newQtyStr: string) => {
+    const qty = Number(newQtyStr) || 0;
+    const plan = recipePlans[index];
+    const updatedMaterials = plan.materials.map((m) => {
+      const pct = Number(m.percentage);
+      return {
+        ...m,
+        quantity: pct && qty > 0 ? Number(((qty * pct) / 100).toFixed(2)) : m.quantity,
+      };
+    });
+    updatePlanAt(index, { plannedQtyKg: newQtyStr, materials: updatedMaterials });
+  };
+
+  // Handle recipe code change for a specific row
+  const handleRecipeCodeChangeForRow = (index: number, newCode: string) => {
+    updatePlanAt(index, { recipeQuality: newCode });
+    const match = masterRecipes.find(
+      (r) => r.code?.toUpperCase() === newCode?.trim().toUpperCase()
+    );
+    if (match) {
+      applyRecipeMasterForRow(index, match);
+    }
+  };
+
+  // Apply master recipe to a specific row
+  const applyRecipeMasterForRow = (index: number, recipe: any) => {
+    const plan = recipePlans[index];
+    const plannedQty = plan.plannedQtyKg ? Number(plan.plannedQtyKg) : recipe.defaultQtyKg || 2500;
+
+    const computeQty = (percent: number | null | undefined) => {
+      if (!percent || !plannedQty) return "";
+      return Number(((plannedQty * Number(percent)) / 100).toFixed(2));
+    };
+
+    const updatedMaterials: MaterialRow[] = [
+      { material: "PP", percentage: recipe.ppPercent ?? "", quantity: computeQty(recipe.ppPercent) },
+      { material: "CC", percentage: recipe.ccPercent ?? "", quantity: computeQty(recipe.ccPercent) },
+      { material: "MB", percentage: recipe.mbPercent ?? "", quantity: computeQty(recipe.mbPercent) },
+      { material: "RP1", percentage: recipe.rp1Percent ?? "", quantity: computeQty(recipe.rp1Percent) },
+      { material: "RP2", percentage: recipe.rp2Percent ?? "", quantity: computeQty(recipe.rp2Percent) },
+      { material: "HD RP", percentage: recipe.hdrpPercent ?? "", quantity: computeQty(recipe.hdrpPercent) },
+      { material: "TPT", percentage: recipe.tptPercent ?? "", quantity: computeQty(recipe.tptPercent) },
+    ];
+
+    updatePlanAt(index, {
+      recipeQuality: recipe.code,
+      tapeType: recipe.tapeType || "PP",
+      denier: recipe.denier ?? "",
+      tapeWidth: recipe.tapeWidth ?? "500",
+      strength: recipe.strength ?? "",
+      eloPercent:
+        recipe.eloPercent !== null && recipe.eloPercent !== undefined
+          ? typeof recipe.eloPercent === "number" && recipe.eloPercent < 1
+            ? (recipe.eloPercent * 100).toFixed(0)
+            : recipe.eloPercent
+          : "",
+      bobbinMarking: recipe.bobbinMarking || "",
+      colour: recipe.colour || "",
+      spacerSize: recipe.spacerSize ? String(recipe.spacerSize) : "",
+      requiredAsh: recipe.requiredAsh ?? "",
+      ashPercent: recipe.ashPercent ?? "",
+      plannedQtyKg: plannedQty,
+      vistPercent: recipe.vistamaxPercent ?? "",
+      remarks: recipe.remarks || "",
+      materials: updatedMaterials,
+    });
+
+    toast.success(`Auto-fetched parameters & formulation for ${recipe.code}`);
+  };
+
+  // Handle materials change for a specific row
+  const handleMaterialsChangeForRow = (index: number, newMaterials: MaterialRow[]) => {
+    const plan = recipePlans[index];
+    const plannedQty = Number(plan.plannedQtyKg) || 0;
+    const processed = newMaterials.map((m) => {
+      const pct = m.percentage !== "" && m.percentage !== null && m.percentage !== undefined ? Number(m.percentage) : null;
+      const qty = m.quantity !== "" && m.quantity !== null && m.quantity !== undefined ? Number(m.quantity) : null;
+      let finalQty = m.quantity;
+      if (pct !== null && plannedQty > 0 && (qty === null || qty === 0)) {
+        finalQty = Number(((plannedQty * pct) / 100).toFixed(2));
+      }
+      return { ...m, quantity: finalQty };
+    });
+    updatePlanAt(index, { materials: processed });
+  };
+
+  // Cell input class for the grid
+  const cellInputClass = "w-full h-7 px-1.5 text-[11px] font-mono font-medium text-slate-800 bg-transparent border-0 outline-none focus:bg-sky-50 focus:ring-1 focus:ring-sky-300 rounded-sm transition-colors";
+  const cellInputNumClass = `${cellInputClass} text-right tabular-nums`;
+  const cellSelectClass = "w-full h-7 px-1 text-[11px] font-semibold text-slate-800 bg-transparent border-0 outline-none focus:bg-sky-50 focus:ring-1 focus:ring-sky-300 rounded-sm cursor-pointer transition-colors";
+
   if (loading) {
     return (
       <div className="flex items-center justify-center p-16 bg-white rounded-xl border border-slate-200">
@@ -671,16 +768,16 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
   }
 
   return (
-    <div className="space-y-4 w-full min-w-0 max-w-full">
-      {/* Top Header & Status Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3.5 sm:p-4 rounded-xl border border-slate-200 shadow-2xs min-w-0">
-        <div className="flex items-center gap-3">
+    <div className="space-y-3 w-full min-w-0 max-w-full">
+      {/* ── Compact Header Bar ── */}
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3 rounded-xl border border-slate-200 shadow-sm min-w-0">
+        <div className="flex items-center gap-3 min-w-0">
           <div className="p-2 bg-slate-100 text-slate-700 rounded-lg border border-slate-200 shrink-0">
             <Layers className="h-4 w-4" />
           </div>
-          <div>
+          <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <h2 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight">Tape Plant Planning</h2>
+              <h2 className="text-sm font-bold text-slate-900 tracking-tight">Tape Plant Planning</h2>
               <span
                 className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border ${
                   status === "SUBMITTED"
@@ -691,566 +788,431 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName }: TapePlant
                 {status === "SUBMITTED" ? "SUBMITTED" : "SAVED"}
               </span>
             </div>
-            <div className="flex items-center gap-2 text-xs text-slate-500 mt-0.5 font-mono">
-              <span className="font-sans font-semibold text-slate-700">{shiftName}</span>
+            <div className="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
+              <span className="font-semibold text-slate-700">{shiftName}</span>
               <span className="text-slate-300">•</span>
-              <span>{date}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Aggregate Stats & Submit Controls */}
-        <div className="flex items-center gap-3">
-          <div className="hidden sm:flex items-center gap-3 border-r border-slate-200 pr-3">
-            <div className="flex flex-col text-right">
-              <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Shift Planned</span>
-              <span className="text-sm font-bold font-mono text-slate-900">
-                {totalShiftPlannedKg.toLocaleString()} <span className="text-xs font-normal text-slate-400">KG</span>
-              </span>
-            </div>
-            {totalDayNightPlannedKg > 0 && (
-              <div className="flex flex-col text-right pl-3 border-l border-slate-200">
-                <span className="text-[10px] uppercase font-bold text-amber-600 flex items-center justify-end gap-1 tracking-wider">
-                  <SunMedium className="h-3 w-3" /> Day+Night
-                </span>
-                <span className="text-sm font-bold font-mono text-amber-700">
-                  {totalDayNightPlannedKg.toLocaleString()} <span className="text-xs font-normal text-amber-600/70">KG</span>
-                </span>
-              </div>
-            )}
-          </div>
-
-          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-            {/* Auto-save Status Indicator */}
-            {autoSaving ? (
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 text-slate-600 border border-slate-200 text-xs font-medium rounded-lg h-8">
-                <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
-                <span className="hidden sm:inline">Auto-saving...</span>
-              </div>
-            ) : lastAutoSavedAt ? (
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-medium rounded-lg h-8">
-                <CheckCircle className="h-3.5 w-3.5 text-emerald-600" />
-                <span className="hidden sm:inline">Auto-saved {lastAutoSavedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</span>
-              </div>
-            ) : null}
-
-            <button
-              type="button"
-              onClick={() => setShowPrintModal(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold rounded-lg transition-all active:scale-95 h-8 cursor-pointer"
-              title="Preview printable planning document and print"
-            >
-              <Eye className="h-3.5 w-3.5 text-slate-500" />
-              <span>Preview & Print</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={handleExportExcel}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold rounded-lg transition-all active:scale-95 h-8 cursor-pointer"
-              title="Download full multi-recipe planning Excel spreadsheet (.xlsx)"
-            >
-              <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600" />
-              <span>Export Excel</span>
-            </button>
-
-            <button
-              type="button"
-              disabled={saving}
-              onClick={() => handleSave("SUBMITTED")}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-lg shadow-xs transition-all active:scale-95 disabled:opacity-50 h-8 cursor-pointer"
-            >
-              {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle className="h-3.5 w-3.5" />}
-              Submit Plan
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Qualities Vertical List & Actions */}
-      <div className="bg-white rounded-xl border border-slate-200 p-3.5 shadow-2xs space-y-2.5">
-        <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-100">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-              Qualities ({recipePlans.length})
-            </span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              onClick={handleDuplicateCurrentRecipe}
-              className="text-[11px] font-semibold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 px-2.5 py-1 rounded-md transition-colors inline-flex items-center gap-1 cursor-pointer"
-              title="Duplicate current quality specs to a new entry"
-            >
-              <Copy className="h-3 w-3" /> Duplicate Quality
-            </button>
-            <button
-              type="button"
-              onClick={handleAddRecipe}
-              className="text-[11px] font-bold text-slate-900 bg-slate-100 hover:bg-slate-200 border border-slate-200 px-3 py-1 rounded-md transition-colors inline-flex items-center gap-1 cursor-pointer"
-            >
-              <Plus className="h-3.5 w-3.5" /> Add Quality
-            </button>
-          </div>
-        </div>
-
-        {/* Vertical List of Qualities (Down by Down) */}
-        <div className="flex flex-col gap-1.5">
-          {recipePlans.map((plan, index) => {
-            const isSelected = activeRecipeIndex === index;
-            return (
-              <div
-                key={plan.id}
-                onClick={() => setActiveRecipeIndex(index)}
-                className={`group flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl text-xs font-medium cursor-pointer transition-all border ${
-                  isSelected
-                    ? "bg-sky-50/70 border-sky-400 text-slate-900 border-l-4 border-l-sky-500 shadow-2xs"
-                    : "bg-white text-slate-700 border-slate-200 hover:border-slate-300 hover:bg-slate-50/70 border-l-4 border-l-transparent"
-                }`}
-              >
-                <div className="flex flex-wrap items-center gap-2.5 min-w-0">
-                  <span
-                    className={`h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 transition-colors ${
-                      isSelected ? "bg-sky-500 text-white font-black shadow-2xs" : "bg-slate-100 text-slate-600 border border-slate-200"
-                    }`}
-                  >
-                    {index + 1}
+              <span className="font-mono">{date}</span>
+              <span className="text-slate-300">•</span>
+              <span className="font-mono font-bold text-slate-900">{recipePlans.length} Qualities</span>
+              <span className="text-slate-300">•</span>
+              <span className="font-mono font-bold text-slate-900">{totalShiftPlannedKg.toLocaleString()} KG</span>
+              {totalDayNightPlannedKg > 0 && (
+                <>
+                  <span className="text-slate-300">•</span>
+                  <span className="font-mono font-bold text-amber-700">
+                    <SunMedium className="h-3 w-3 inline mr-0.5" />
+                    D+N {totalDayNightPlannedKg.toLocaleString()} KG
                   </span>
-                  <span className={`font-mono text-xs sm:text-sm tracking-tight truncate ${isSelected ? "font-black text-sky-950" : "font-bold text-slate-800"}`}>
-                    {plan.recipeQuality || `Quality #${index + 1}`}
-                  </span>
-                  {/* Shift Badge */}
-                  {plan.shiftName || plan.shiftId || shiftId === "ALL" ? (
-                    <span
-                      className={`text-[9px] font-bold px-1.5 py-0.2 rounded border uppercase shrink-0 ${
-                        (plan.shiftName || plan.shiftId || "").toLowerCase().includes("night")
-                          ? "bg-purple-50 text-purple-700 border-purple-200"
-                          : "bg-blue-50 text-blue-700 border-blue-200"
-                      }`}
-                    >
-                      {(plan.shiftName || (plan.shiftId === "shift_night" ? "Night" : "Day")).replace(/Shift/i, "").trim()}
-                    </span>
-                  ) : null}
-                  {plan.isDayNight && (
-                    <span className="text-[9px] font-bold px-1.5 py-0.2 rounded border shrink-0 bg-amber-50 text-amber-800 border-amber-200">
-                      Day+Night
-                    </span>
-                  )}
-                  {plan.carriedOverFromShift && (
-                    <span className="text-[9px] font-medium px-1.5 py-0.2 rounded border shrink-0 bg-slate-100 text-slate-600 border-slate-200">
-                      From {plan.carriedOverFromShift}
-                    </span>
-                  )}
-                </div>
-
-                <div className="flex items-center gap-2.5 shrink-0">
-                  <span
-                    className={`text-xs font-mono px-2 py-0.5 rounded font-bold border ${
-                      isSelected ? "text-sky-950 bg-sky-100/70 border-sky-200" : "text-slate-700 bg-slate-50 border-slate-200"
-                    }`}
-                  >
-                    {Number(plan.plannedQtyKg) ? `${Number(plan.plannedQtyKg).toLocaleString()} KG` : "0 KG"}
-                  </span>
-
-                  {recipePlans.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleRemoveRecipe(index);
-                      }}
-                      className="p-1 rounded transition-colors cursor-pointer text-slate-400 hover:text-red-600 hover:bg-red-50"
-                      title="Remove this quality"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Active Recipe Configuration Card */}
-      <div className="space-y-4 w-full min-w-0 max-w-full">
-        {/* Day + Night 2-Shift Run Minimalist Strip */}
-        <div className={`px-3.5 py-2 rounded-xl border transition-all flex flex-wrap items-center justify-between gap-2.5 ${
-          currentPlan.isDayNight
-            ? "bg-amber-50/60 border-amber-200"
-            : "bg-white border-slate-200"
-        }`}>
-          <div className="flex items-center gap-2.5 min-w-0">
-            <SunMedium className={`h-4 w-4 shrink-0 ${currentPlan.isDayNight ? "text-amber-600" : "text-slate-400"}`} />
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs font-semibold text-slate-800">
-                2-Shift Continuous Run (Day + Night)
-              </span>
-              {currentPlan.isDayNight && (
-                <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
-                  24h Continuous
-                </span>
-              )}
-              {currentPlan.carriedOverFromShift && (
-                <span className="px-1.5 py-0.2 rounded text-[10px] font-medium bg-slate-100 text-slate-600 border border-slate-200">
-                  From {currentPlan.carriedOverFromShift}
-                </span>
+                </>
               )}
             </div>
           </div>
+        </div>
 
-          <button
-            type="button"
-            onClick={() => {
-              const nextVal = !currentPlan.isDayNight;
-              updateCurrentPlan({ isDayNight: nextVal });
-            }}
-            className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer shrink-0 border ${
-              currentPlan.isDayNight
-                ? "bg-amber-500 hover:bg-amber-600 text-slate-950 border-amber-500 font-bold shadow-2xs"
-                : "bg-white hover:bg-slate-50 text-slate-700 border-slate-200"
-            }`}
-          >
-            {currentPlan.isDayNight ? (
-              <>
-                <Check className="h-3 w-3" />
-                <span>Active Across Shifts</span>
-              </>
-            ) : (
-              <span>Enable Day + Night</span>
-            )}
+        <div className="flex flex-wrap items-center gap-1.5">
+          {/* Auto-save indicator */}
+          {autoSaving ? (
+            <div className="inline-flex items-center gap-1.5 px-2 py-1 bg-slate-50 text-slate-600 border border-slate-200 text-[11px] font-medium rounded-lg h-7">
+              <Loader2 className="h-3 w-3 animate-spin text-primary" />
+              <span className="hidden sm:inline">Saving…</span>
+            </div>
+          ) : lastAutoSavedAt ? (
+            <div className="inline-flex items-center gap-1 px-2 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-medium rounded-lg h-7">
+              <CheckCircle className="h-3 w-3" />
+              <span className="hidden sm:inline">{lastAutoSavedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+            </div>
+          ) : null}
+
+          <button type="button" onClick={handleAddRecipe}
+            className="inline-flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-[11px] font-semibold rounded-lg transition-all h-7 cursor-pointer">
+            <Plus className="h-3 w-3" /> Add Quality
+          </button>
+          <button type="button" onClick={() => setShowPrintModal(true)}
+            className="inline-flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-[11px] font-semibold rounded-lg transition-all h-7 cursor-pointer">
+            <Eye className="h-3 w-3 text-slate-500" /> Print
+          </button>
+          <button type="button" onClick={handleExportExcel}
+            className="inline-flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-[11px] font-semibold rounded-lg transition-all h-7 cursor-pointer">
+            <FileSpreadsheet className="h-3 w-3 text-emerald-600" /> Excel
+          </button>
+          <button type="button" disabled={saving} onClick={() => handleSave("SUBMITTED")}
+            className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-semibold rounded-lg shadow-sm transition-all disabled:opacity-50 h-7 cursor-pointer">
+            {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle className="h-3 w-3" />}
+            Submit
           </button>
         </div>
+      </div>
 
-        {/* 1. Recipe / Quality ID Selection & Master Quick Pick */}
-        <div className="bg-white rounded-xl border border-slate-200 p-3.5 sm:p-4 space-y-3 min-w-0">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                Quality ID — Run #{activeRecipeIndex + 1}
-              </span>
-              {matchingMaster ? (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded text-[10px] font-bold">
-                  <Check className="h-3 w-3" /> Master Synced
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-100 text-slate-600 border border-slate-200 rounded text-[10px] font-medium">
-                  Custom
-                </span>
-              )}
-            </div>
-
-            {/* Quick Master Catalog Select */}
-            {masterRecipes.length > 0 && (
-              <div className="flex items-center gap-2 max-w-full">
-                <span className="text-[11px] font-medium text-slate-500 shrink-0">Master Recipe:</span>
-                <select
-                  value={matchingMaster ? matchingMaster.code : ""}
-                  onChange={(e) => {
-                    const selected = masterRecipes.find((r) => r.code === e.target.value);
-                    if (selected) applyRecipeMaster(selected);
-                  }}
-                  className="h-7 px-2 text-xs font-mono font-semibold text-slate-800 bg-slate-50 border border-slate-200 rounded-lg hover:bg-white focus:outline-none focus:ring-1 focus:ring-slate-400 transition-all cursor-pointer max-w-[240px] sm:max-w-xs md:max-w-sm truncate"
-                >
-                  <option value="">— Select Recipe Master —</option>
-                  {masterRecipes.map((r) => (
-                    <option key={r.code} value={r.code}>
-                      {r.code} ({r.tapeType} • {r.colour || ""} • {r.bobbinMarking || ""})
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-          </div>
-
-          <RecipeQualityInput
-            value={currentPlan.recipeQuality}
-            onChange={handleRecipeCodeChange}
-            masterPresets={masterRecipes.map((r) => ({
-              code: r.code,
-              label: `${r.tapeType} • ${r.colour || ""} • ${r.bobbinMarking || ""}`,
-            }))}
-            label="Standard Code"
-            required
-            onSyncSpecifications={({ tapeType: synType, colour: synColour, tapeWidth: synWidth }) => {
-              updateCurrentPlan({
-                ...(synType === "PP" || synType === "LPP" ? { tapeType: synType } : {}),
-                ...(synColour ? { colour: synColour } : {}),
-                ...(synWidth ? { tapeWidth: synWidth } : {}),
-              });
-              toast.success(`Synchronized specifications for Recipe Run #${activeRecipeIndex + 1}`);
+      {/* ── Master Recipe Quick Pick (appears when master recipes exist) ── */}
+      {masterRecipes.length > 0 && (
+        <div className="flex items-center gap-3 bg-white px-3.5 py-2 rounded-xl border border-slate-200">
+          <Sparkles className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+          <span className="text-[11px] font-medium text-slate-500 shrink-0">Quick Apply Master:</span>
+          <select
+            value=""
+            onChange={(e) => {
+              const selected = masterRecipes.find((r) => r.code === e.target.value);
+              if (selected) {
+                const targetIndex = activeRecipeIndex;
+                applyRecipeMasterForRow(targetIndex, selected);
+              }
             }}
-          />
+            className="h-7 px-2 text-[11px] font-mono font-semibold text-slate-800 bg-slate-50 border border-slate-200 rounded-lg hover:bg-white focus:outline-none focus:ring-1 focus:ring-slate-400 cursor-pointer flex-1 max-w-md truncate"
+          >
+            <option value="">— Select Recipe to apply to active row —</option>
+            {masterRecipes.map((r) => (
+              <option key={r.code} value={r.code}>
+                {r.code} ({r.tapeType} • {r.colour || ""} • {r.bobbinMarking || ""})
+              </option>
+            ))}
+          </select>
         </div>
+      )}
 
-        {/* 2. Shift Specifications & Parameters Table */}
-        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden min-w-0">
-          <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
-            <div className="flex flex-wrap items-center gap-2 min-w-0">
-              <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                Specifications & Parameters
-              </h3>
-              <RecipeQualityBadge value={currentPlan.recipeQuality} />
-            </div>
-            <span className="text-xs text-slate-500 font-mono">
-              Planned: <strong className="text-slate-900 font-bold">{Number(currentPlan.plannedQtyKg).toLocaleString() || 0} KG</strong>
-            </span>
-          </div>
+      {/* ── Excel-Like Data Grid ── */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-[11px] border-collapse min-w-[1400px]">
+            {/* Column Headers */}
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-200">
+                <th className="sticky left-0 z-20 bg-slate-50 border-r border-slate-200 px-2 py-2 text-left font-bold text-slate-600 uppercase tracking-wider w-8">#</th>
+                <th className="sticky left-8 z-20 bg-slate-50 border-r border-slate-200 px-2 py-2 text-left font-bold text-slate-600 uppercase tracking-wider min-w-[180px]">Quality / Recipe</th>
+                <th className="px-2 py-2 text-center font-bold text-slate-600 uppercase tracking-wider border-r border-slate-200 w-[70px]">Shift</th>
+                <th className="px-2 py-2 text-center font-bold text-slate-600 uppercase tracking-wider border-r border-slate-200 w-[60px]">Type</th>
+                <th className="px-2 py-2 text-right font-bold text-slate-600 uppercase tracking-wider border-r border-slate-200 w-[70px]">Denier</th>
+                <th className="px-2 py-2 text-right font-bold text-slate-600 uppercase tracking-wider border-r border-slate-200 w-[80px]">Width mm</th>
+                <th className="px-2 py-2 text-right font-bold text-slate-600 uppercase tracking-wider border-r border-slate-200 w-[70px]">Str gpd</th>
+                <th className="px-2 py-2 text-right font-bold text-slate-600 uppercase tracking-wider border-r border-slate-200 w-[65px]">ELO %</th>
+                <th className="px-2 py-2 text-left font-bold text-slate-600 uppercase tracking-wider border-r border-slate-200 w-[90px]">Bobbin</th>
+                <th className="px-2 py-2 text-left font-bold text-slate-600 uppercase tracking-wider border-r border-slate-200 w-[80px]">Colour</th>
+                <th className="px-2 py-2 text-left font-bold text-slate-600 uppercase tracking-wider border-r border-slate-200 w-[70px]">Spacer</th>
+                <th className="px-2 py-2 text-right font-bold text-slate-600 uppercase tracking-wider border-r border-slate-200 w-[65px]">Req Ash</th>
+                <th className="px-2 py-2 text-right font-bold text-slate-600 uppercase tracking-wider border-r border-slate-200 w-[60px]">Ash %</th>
+                <th className="px-2 py-2 text-right font-bold text-slate-900 uppercase tracking-wider border-r border-slate-200 w-[90px] bg-slate-100">Plan KG</th>
+                <th className="px-2 py-2 text-left font-bold text-slate-600 uppercase tracking-wider border-r border-slate-200 w-[65px]">Omega</th>
+                <th className="px-2 py-2 text-right font-bold text-slate-600 uppercase tracking-wider border-r border-slate-200 w-[60px]">Vist %</th>
+                <th className="px-2 py-2 text-left font-bold text-slate-600 uppercase tracking-wider border-r border-slate-200 min-w-[120px]">Remarks</th>
+                <th className="px-2 py-2 text-center font-bold text-slate-600 uppercase tracking-wider w-[90px]">Actions</th>
+              </tr>
+            </thead>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 divide-x divide-y divide-slate-200 border-b border-slate-200 text-xs min-w-0">
-            {/* PP / LPP */}
-            <div className="p-2.5 bg-white">
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">PP / LPP</label>
-              <select
-                id="param-tapeType"
-                value={currentPlan.tapeType}
-                onChange={(e) => updateCurrentPlan({ tapeType: e.target.value })}
-                onKeyDown={(e) => handleParamKeyDown(e, "param-tapeType")}
-                className="w-full h-8 px-2 text-xs font-semibold text-slate-800 bg-slate-50/50 border border-slate-200 rounded focus:bg-white focus:ring-1 focus:ring-slate-400 outline-none cursor-pointer"
-              >
-                <option value="PP">PP</option>
-                <option value="LPP">LPP</option>
-              </select>
-            </div>
+            <tbody>
+              {recipePlans.map((plan, index) => {
+                const isActive = activeRecipeIndex === index;
+                const isExpanded = expandedRows.has(index);
+                const rowBg = isActive ? "bg-sky-50/40" : index % 2 === 0 ? "bg-white" : "bg-slate-50/30";
+                const rowMaterialTotalQty = plan.materials.reduce((sum, m) => sum + (Number(m.quantity) || 0), 0);
+                const rowMaterialTotalPct = plan.materials.reduce((sum, m) => sum + (Number(m.percentage) || 0), 0);
 
-            {/* Denier */}
-            <div className="p-2.5 bg-white">
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Denier</label>
-              <input
-                id="param-denier"
-                type="number"
-                value={currentPlan.denier}
-                placeholder="e.g. 800"
-                onChange={(e) => updateCurrentPlan({ denier: e.target.value })}
-                onKeyDown={(e) => handleParamKeyDown(e, "param-denier")}
-                className="w-full h-8 px-2.5 text-xs font-mono font-semibold text-slate-800 bg-slate-50/50 border border-slate-200 rounded focus:bg-white focus:ring-1 focus:ring-slate-400 outline-none text-right"
-              />
-            </div>
+                return (
+                  <React.Fragment key={plan.id}>
+                    {/* ── Main Row ── */}
+                    <tr
+                      className={`${rowBg} border-b border-slate-100 hover:bg-sky-50/30 transition-colors ${isActive ? "ring-1 ring-inset ring-sky-200" : ""}`}
+                      onClick={() => setActiveRecipeIndex(index)}
+                    >
+                      {/* # */}
+                      <td className="sticky left-0 z-10 bg-inherit border-r border-slate-200 px-2 py-1 text-center">
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); toggleRowExpand(index); }}
+                          className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold transition-all cursor-pointer ${
+                            isActive
+                              ? "bg-sky-500 text-white shadow-sm"
+                              : "bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-200"
+                          }`}
+                          title={isExpanded ? "Collapse materials" : "Expand materials"}
+                        >
+                          {isExpanded ? "▾" : index + 1}
+                        </button>
+                      </td>
 
-            {/* Tape Width */}
-            <div className="p-2.5 bg-white">
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Tape Width (mm)</label>
-              <input
-                id="param-tapeWidth"
-                type="number"
-                step="0.01"
-                value={currentPlan.tapeWidth}
-                placeholder="e.g. 2.5"
-                onChange={(e) => updateCurrentPlan({ tapeWidth: e.target.value })}
-                onKeyDown={(e) => handleParamKeyDown(e, "param-tapeWidth")}
-                className="w-full h-8 px-2.5 text-xs font-mono font-semibold text-slate-800 bg-slate-50/50 border border-slate-200 rounded focus:bg-white focus:ring-1 focus:ring-slate-400 outline-none text-right"
-              />
-            </div>
+                      {/* Quality / Recipe */}
+                      <td className="sticky left-8 z-10 bg-inherit border-r border-slate-200 px-1 py-1">
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="text"
+                            value={plan.recipeQuality}
+                            onChange={(e) => handleRecipeCodeChangeForRow(index, e.target.value)}
+                            onFocus={() => setActiveRecipeIndex(index)}
+                            placeholder="Enter Quality ID"
+                            className={`${cellInputClass} font-bold text-slate-900 ${isActive ? "bg-sky-50" : ""}`}
+                            list={`master-recipes-${index}`}
+                          />
+                          <datalist id={`master-recipes-${index}`}>
+                            {masterRecipes.map((r) => (
+                              <option key={r.code} value={r.code}>{r.tapeType} • {r.colour || ""}</option>
+                            ))}
+                          </datalist>
+                          {plan.isDayNight && (
+                            <span className="text-[8px] font-bold px-1 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200 shrink-0 leading-none">D+N</span>
+                          )}
+                        </div>
+                      </td>
 
-            {/* Strength */}
-            <div className="p-2.5 bg-white">
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Strength (gpd)</label>
-              <input
-                id="param-strength"
-                type="number"
-                step="0.01"
-                value={currentPlan.strength}
-                placeholder="e.g. 4.8"
-                onChange={(e) => updateCurrentPlan({ strength: e.target.value })}
-                onKeyDown={(e) => handleParamKeyDown(e, "param-strength")}
-                className="w-full h-8 px-2.5 text-xs font-mono font-semibold text-slate-800 bg-slate-50/50 border border-slate-200 rounded focus:bg-white focus:ring-1 focus:ring-slate-400 outline-none text-right"
-              />
-            </div>
+                      {/* Shift */}
+                      <td className="border-r border-slate-200 px-1 py-1 text-center">
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); updatePlanAt(index, { isDayNight: !plan.isDayNight }); }}
+                          className={`text-[10px] font-bold px-1.5 py-0.5 rounded border cursor-pointer transition-colors ${
+                            plan.isDayNight
+                              ? "bg-amber-100 text-amber-900 border-amber-300 hover:bg-amber-200"
+                              : (plan.shiftName || plan.shiftId || "").toLowerCase().includes("night")
+                              ? "bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100"
+                              : "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
+                          }`}
+                          title="Click to toggle Day+Night"
+                        >
+                          {plan.isDayNight ? "D+N" : (plan.shiftName || (plan.shiftId === "shift_night" ? "Night" : "Day")).replace(/Shift/i, "").trim().slice(0, 5)}
+                        </button>
+                      </td>
 
-            {/* ELO % */}
-            <div className="p-2.5 bg-white">
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">ELO %</label>
-              <input
-                id="param-eloPercent"
-                type="number"
-                step="0.01"
-                value={currentPlan.eloPercent}
-                placeholder="e.g. 22.5"
-                onChange={(e) => updateCurrentPlan({ eloPercent: e.target.value })}
-                onKeyDown={(e) => handleParamKeyDown(e, "param-eloPercent")}
-                className="w-full h-8 px-2.5 text-xs font-mono font-semibold text-slate-800 bg-slate-50/50 border border-slate-200 rounded focus:bg-white focus:ring-1 focus:ring-slate-400 outline-none text-right"
-              />
-            </div>
+                      {/* PP / LPP */}
+                      <td className="border-r border-slate-200 px-0.5 py-1">
+                        <select
+                          value={plan.tapeType}
+                          onChange={(e) => updatePlanAt(index, { tapeType: e.target.value })}
+                          onFocus={() => setActiveRecipeIndex(index)}
+                          className={cellSelectClass}
+                        >
+                          <option value="PP">PP</option>
+                          <option value="LPP">LPP</option>
+                        </select>
+                      </td>
 
-            {/* Bobbin Marking */}
-            <div className="p-2.5 bg-white">
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Bobbin Marking</label>
-              <input
-                id="param-bobbinMarking"
-                type="text"
-                value={currentPlan.bobbinMarking}
-                placeholder="e.g. Red Strip"
-                onChange={(e) => updateCurrentPlan({ bobbinMarking: e.target.value })}
-                onKeyDown={(e) => handleParamKeyDown(e, "param-bobbinMarking")}
-                className="w-full h-8 px-2.5 text-xs font-semibold text-slate-800 bg-slate-50/50 border border-slate-200 rounded focus:bg-white focus:ring-1 focus:ring-slate-400 outline-none"
-              />
-            </div>
+                      {/* Denier */}
+                      <td className="border-r border-slate-200 px-0.5 py-1">
+                        <input type="number" value={plan.denier} placeholder="—"
+                          onChange={(e) => updatePlanAt(index, { denier: e.target.value })}
+                          onFocus={() => setActiveRecipeIndex(index)}
+                          className={cellInputNumClass} />
+                      </td>
 
-            {/* Colour */}
-            <div className="p-2.5 bg-white">
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Colour</label>
-              <input
-                id="param-colour"
-                type="text"
-                value={currentPlan.colour}
-                placeholder="e.g. Yellow"
-                onChange={(e) => updateCurrentPlan({ colour: e.target.value })}
-                onKeyDown={(e) => handleParamKeyDown(e, "param-colour")}
-                className="w-full h-8 px-2.5 text-xs font-semibold text-slate-800 bg-slate-50/50 border border-slate-200 rounded focus:bg-white focus:ring-1 focus:ring-slate-400 outline-none"
-              />
-            </div>
+                      {/* Width */}
+                      <td className="border-r border-slate-200 px-0.5 py-1">
+                        <input type="number" step="0.01" value={plan.tapeWidth} placeholder="—"
+                          onChange={(e) => updatePlanAt(index, { tapeWidth: e.target.value })}
+                          onFocus={() => setActiveRecipeIndex(index)}
+                          className={cellInputNumClass} />
+                      </td>
 
-            {/* Spacer Size */}
-            <div className="p-2.5 bg-white">
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Spacer Size</label>
-              <input
-                id="param-spacerSize"
-                type="text"
-                value={currentPlan.spacerSize}
-                placeholder="e.g. 3.0 mm"
-                onChange={(e) => updateCurrentPlan({ spacerSize: e.target.value })}
-                onKeyDown={(e) => handleParamKeyDown(e, "param-spacerSize")}
-                className="w-full h-8 px-2.5 text-xs font-semibold text-slate-800 bg-slate-50/50 border border-slate-200 rounded focus:bg-white focus:ring-1 focus:ring-slate-400 outline-none"
-              />
-            </div>
+                      {/* Strength */}
+                      <td className="border-r border-slate-200 px-0.5 py-1">
+                        <input type="number" step="0.01" value={plan.strength} placeholder="—"
+                          onChange={(e) => updatePlanAt(index, { strength: e.target.value })}
+                          onFocus={() => setActiveRecipeIndex(index)}
+                          className={cellInputNumClass} />
+                      </td>
 
-            {/* Required Ash */}
-            <div className="p-2.5 bg-white">
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Required Ash</label>
-              <input
-                id="param-requiredAsh"
-                type="number"
-                step="0.01"
-                value={currentPlan.requiredAsh}
-                placeholder="e.g. 1.2"
-                onChange={(e) => updateCurrentPlan({ requiredAsh: e.target.value })}
-                onKeyDown={(e) => handleParamKeyDown(e, "param-requiredAsh")}
-                className="w-full h-8 px-2.5 text-xs font-mono font-semibold text-slate-800 bg-slate-50/50 border border-slate-200 rounded focus:bg-white focus:ring-1 focus:ring-slate-400 outline-none text-right"
-              />
-            </div>
+                      {/* ELO % */}
+                      <td className="border-r border-slate-200 px-0.5 py-1">
+                        <input type="number" step="0.01" value={plan.eloPercent} placeholder="—"
+                          onChange={(e) => updatePlanAt(index, { eloPercent: e.target.value })}
+                          onFocus={() => setActiveRecipeIndex(index)}
+                          className={cellInputNumClass} />
+                      </td>
 
-            {/* Ash % */}
-            <div className="p-2.5 bg-white">
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Ash %</label>
-              <input
-                id="param-ashPercent"
-                type="number"
-                step="0.01"
-                value={currentPlan.ashPercent}
-                placeholder="e.g. 1.15"
-                onChange={(e) => updateCurrentPlan({ ashPercent: e.target.value })}
-                onKeyDown={(e) => handleParamKeyDown(e, "param-ashPercent")}
-                className="w-full h-8 px-2.5 text-xs font-mono font-semibold text-slate-800 bg-slate-50/50 border border-slate-200 rounded focus:bg-white focus:ring-1 focus:ring-slate-400 outline-none text-right"
-              />
-            </div>
+                      {/* Bobbin Marking */}
+                      <td className="border-r border-slate-200 px-0.5 py-1">
+                        <input type="text" value={plan.bobbinMarking} placeholder="—"
+                          onChange={(e) => updatePlanAt(index, { bobbinMarking: e.target.value })}
+                          onFocus={() => setActiveRecipeIndex(index)}
+                          className={cellInputClass} />
+                      </td>
 
-            {/* Planned QTY (KG) */}
-            <div className="p-2.5 bg-slate-50/70 border-2 border-slate-800/10">
-              <label className="block text-[10px] font-bold text-slate-900 uppercase tracking-wider mb-1">
-                Planned Qty (KG) <span className="text-red-500">*</span>
-              </label>
-              <input
-                id="param-plannedQtyKg"
-                type="number"
-                value={currentPlan.plannedQtyKg}
-                placeholder="0"
-                onChange={(e) => handlePlannedQtyChange(e.target.value)}
-                onKeyDown={(e) => handleParamKeyDown(e, "param-plannedQtyKg")}
-                className="w-full h-8 px-2.5 text-xs font-mono font-bold text-slate-900 bg-white border border-slate-300 rounded focus:ring-1 focus:ring-slate-900 outline-none text-right shadow-2xs"
-              />
-            </div>
+                      {/* Colour */}
+                      <td className="border-r border-slate-200 px-0.5 py-1">
+                        <input type="text" value={plan.colour} placeholder="—"
+                          onChange={(e) => updatePlanAt(index, { colour: e.target.value })}
+                          onFocus={() => setActiveRecipeIndex(index)}
+                          className={cellInputClass} />
+                      </td>
 
-            {/* Omega */}
-            <div className="p-2.5 bg-white">
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Omega</label>
-              <input
-                id="param-omega"
-                type="text"
-                value={currentPlan.omega}
-                placeholder="Code"
-                onChange={(e) => updateCurrentPlan({ omega: e.target.value })}
-                onKeyDown={(e) => handleParamKeyDown(e, "param-omega")}
-                className="w-full h-8 px-2.5 text-xs font-semibold text-slate-800 bg-slate-50/50 border border-slate-200 rounded focus:bg-white focus:ring-1 focus:ring-slate-400 outline-none"
-              />
-            </div>
+                      {/* Spacer */}
+                      <td className="border-r border-slate-200 px-0.5 py-1">
+                        <input type="text" value={plan.spacerSize} placeholder="—"
+                          onChange={(e) => updatePlanAt(index, { spacerSize: e.target.value })}
+                          onFocus={() => setActiveRecipeIndex(index)}
+                          className={cellInputClass} />
+                      </td>
 
-            {/* Vist % */}
-            <div className="p-2.5 bg-white">
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Vist... %</label>
-              <input
-                id="param-vistPercent"
-                type="number"
-                step="0.01"
-                value={currentPlan.vistPercent}
-                placeholder="%"
-                onChange={(e) => updateCurrentPlan({ vistPercent: e.target.value })}
-                onKeyDown={(e) => handleParamKeyDown(e, "param-vistPercent")}
-                className="w-full h-8 px-2.5 text-xs font-mono font-semibold text-slate-800 bg-slate-50/50 border border-slate-200 rounded focus:bg-white focus:ring-1 focus:ring-slate-400 outline-none text-right"
-              />
-            </div>
-          </div>
+                      {/* Required Ash */}
+                      <td className="border-r border-slate-200 px-0.5 py-1">
+                        <input type="number" step="0.01" value={plan.requiredAsh} placeholder="—"
+                          onChange={(e) => updatePlanAt(index, { requiredAsh: e.target.value })}
+                          onFocus={() => setActiveRecipeIndex(index)}
+                          className={cellInputNumClass} />
+                      </td>
 
-          {/* Remarks Row */}
-          <div className="p-2.5 bg-slate-50/50 flex items-center gap-3">
-            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider shrink-0">Remarks</label>
-            <input
-              id="param-remarks"
-              type="text"
-              value={currentPlan.remarks}
-              placeholder="Optional notes or shift instructions"
-              onChange={(e) => updateCurrentPlan({ remarks: e.target.value })}
-              onKeyDown={(e) => handleParamKeyDown(e, "param-remarks")}
-              className="flex-1 h-7 px-2.5 text-xs text-slate-800 bg-white border border-slate-200 rounded focus:ring-1 focus:ring-slate-400 outline-none"
-            />
-          </div>
-        </div>
+                      {/* Ash % */}
+                      <td className="border-r border-slate-200 px-0.5 py-1">
+                        <input type="number" step="0.01" value={plan.ashPercent} placeholder="—"
+                          onChange={(e) => updatePlanAt(index, { ashPercent: e.target.value })}
+                          onFocus={() => setActiveRecipeIndex(index)}
+                          className={cellInputNumClass} />
+                      </td>
 
-        {/* 3. Material Composition Formula Spreadsheet */}
-        <div className="bg-white rounded-xl border border-slate-200 p-3.5 sm:p-4 space-y-2.5">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
-              <FlaskConical className="h-3.5 w-3.5 text-slate-600" />
-              Material Composition (Formula #{activeRecipeIndex + 1})
-            </h3>
-            <div className="flex items-center gap-3 text-xs">
-              <span className="text-slate-500 font-medium">
-                Total Qty: <strong className="font-mono text-slate-900 font-bold">{totalActiveMaterialQty.toLocaleString()} KG</strong>
-              </span>
-              <span
-                className={`font-mono text-xs px-2 py-0.5 rounded font-bold border ${
-                  totalActivePercentage === 100
-                    ? "bg-emerald-50 text-emerald-800 border-emerald-200"
-                    : totalActivePercentage > 100
-                    ? "bg-red-50 text-red-700 border-red-200"
-                    : "bg-slate-100 text-slate-700 border-slate-200"
-                }`}
-              >
-                {totalActivePercentage.toFixed(1)}%
-              </span>
-            </div>
-          </div>
+                      {/* Planned KG — highlighted */}
+                      <td className="border-r border-slate-200 px-0.5 py-1 bg-slate-50">
+                        <input type="number" value={plan.plannedQtyKg} placeholder="0"
+                          onChange={(e) => handlePlannedQtyChangeForRow(index, e.target.value)}
+                          onFocus={() => setActiveRecipeIndex(index)}
+                          className={`${cellInputNumClass} font-bold text-slate-900 bg-white border border-slate-200 rounded`} />
+                      </td>
 
-          <SpreadsheetTable<MaterialRow>
-            data={currentPlan.materials}
-            columns={materialColumns}
-            onChange={handleMaterialsChange}
-            allowAddRow={true}
-            allowDeleteRow={true}
-            onAddRow={() =>
-              updateCurrentPlan({
-                materials: [...currentPlan.materials, { material: "", quantity: "", percentage: "" }],
-              })
-            }
-            onDeleteRow={(idx) =>
-              updateCurrentPlan({
-                materials: currentPlan.materials.filter((_, i) => i !== idx),
-              })
-            }
-          />
+                      {/* Omega */}
+                      <td className="border-r border-slate-200 px-0.5 py-1">
+                        <input type="text" value={plan.omega} placeholder="—"
+                          onChange={(e) => updatePlanAt(index, { omega: e.target.value })}
+                          onFocus={() => setActiveRecipeIndex(index)}
+                          className={cellInputClass} />
+                      </td>
+
+                      {/* Vist % */}
+                      <td className="border-r border-slate-200 px-0.5 py-1">
+                        <input type="number" step="0.01" value={plan.vistPercent} placeholder="—"
+                          onChange={(e) => updatePlanAt(index, { vistPercent: e.target.value })}
+                          onFocus={() => setActiveRecipeIndex(index)}
+                          className={cellInputNumClass} />
+                      </td>
+
+                      {/* Remarks */}
+                      <td className="border-r border-slate-200 px-0.5 py-1">
+                        <input type="text" value={plan.remarks} placeholder="Notes…"
+                          onChange={(e) => updatePlanAt(index, { remarks: e.target.value })}
+                          onFocus={() => setActiveRecipeIndex(index)}
+                          className={cellInputClass} />
+                      </td>
+
+                      {/* Actions */}
+                      <td className="px-1 py-1">
+                        <div className="flex items-center justify-center gap-0.5">
+                          <button type="button" onClick={(e) => { e.stopPropagation(); toggleRowExpand(index); }}
+                            className={`p-1 rounded transition-colors cursor-pointer ${isExpanded ? "text-sky-600 bg-sky-50" : "text-slate-400 hover:text-sky-600 hover:bg-sky-50"}`}
+                            title="Toggle material formula">
+                            <FlaskConical className="h-3.5 w-3.5" />
+                          </button>
+                          <button type="button" onClick={(e) => { e.stopPropagation(); const dup = { ...JSON.parse(JSON.stringify(plan)), id: `temp-${Date.now()}-${Math.random().toString(36).slice(2, 7)}` }; setRecipePlans((prev) => [...prev.slice(0, index + 1), dup, ...prev.slice(index + 1)]); setActiveRecipeIndex(index + 1); toast.info(`Duplicated quality as row #${index + 2}`); }}
+                            className="p-1 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+                            title="Duplicate row">
+                            <Copy className="h-3.5 w-3.5" />
+                          </button>
+                          {recipePlans.length > 1 && (
+                            <button type="button" onClick={(e) => { e.stopPropagation(); handleRemoveRecipe(index); }}
+                              className="p-1 rounded text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                              title="Remove row">
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+
+                    {/* ── Expandable Materials Sub-Row ── */}
+                    {isExpanded && (
+                      <tr className={`${isActive ? "bg-sky-50/20" : "bg-slate-50/50"} border-b border-slate-200`}>
+                        <td className="sticky left-0 z-10 bg-inherit border-r border-slate-200"></td>
+                        <td colSpan={17} className="px-3 py-2.5">
+                          <div className="flex flex-wrap items-start gap-4">
+                            {/* Material mini-table */}
+                            <div className="flex-1 min-w-[320px]">
+                              <div className="flex items-center gap-2 mb-1.5">
+                                <FlaskConical className="h-3 w-3 text-slate-500" />
+                                <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">
+                                  Material Composition — {plan.recipeQuality || `#${index + 1}`}
+                                </span>
+                                <span
+                                  className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border ${
+                                    rowMaterialTotalPct === 100
+                                      ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                      : rowMaterialTotalPct > 100
+                                      ? "bg-red-50 text-red-700 border-red-200"
+                                      : "bg-slate-100 text-slate-600 border-slate-200"
+                                  }`}
+                                >
+                                  {rowMaterialTotalPct.toFixed(1)}%
+                                </span>
+                                <span className="text-[10px] font-mono text-slate-500">
+                                  = {rowMaterialTotalQty.toLocaleString()} KG
+                                </span>
+                              </div>
+                              <table className="w-full text-[11px] border-collapse border border-slate-200 rounded-lg overflow-hidden">
+                                <thead>
+                                  <tr className="bg-slate-100">
+                                    <th className="px-2 py-1 text-left font-bold text-slate-600 border-r border-slate-200 w-[100px]">Material</th>
+                                    <th className="px-2 py-1 text-right font-bold text-slate-600 border-r border-slate-200 w-[100px]">Qty (KG)</th>
+                                    <th className="px-2 py-1 text-right font-bold text-slate-600 w-[80px]">%</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {plan.materials.map((m, mIdx) => (
+                                    <tr key={mIdx} className="border-t border-slate-100 hover:bg-sky-50/30">
+                                      <td className="px-2 py-0.5 border-r border-slate-200">
+                                        <input type="text" value={m.material}
+                                          onChange={(e) => {
+                                            const newMats = [...plan.materials];
+                                            newMats[mIdx] = { ...newMats[mIdx], material: e.target.value };
+                                            handleMaterialsChangeForRow(index, newMats);
+                                          }}
+                                          className="w-full h-6 px-1 text-[11px] font-semibold text-slate-800 bg-transparent outline-none focus:bg-sky-50 rounded-sm" />
+                                      </td>
+                                      <td className="px-2 py-0.5 border-r border-slate-200">
+                                        <input type="number" value={m.quantity} placeholder="0"
+                                          onChange={(e) => {
+                                            const newMats = [...plan.materials];
+                                            newMats[mIdx] = { ...newMats[mIdx], quantity: e.target.value };
+                                            handleMaterialsChangeForRow(index, newMats);
+                                          }}
+                                          className="w-full h-6 px-1 text-[11px] font-mono text-slate-800 bg-transparent outline-none focus:bg-sky-50 rounded-sm text-right" />
+                                      </td>
+                                      <td className="px-2 py-0.5">
+                                        <input type="number" value={m.percentage} placeholder="0"
+                                          onChange={(e) => {
+                                            const newMats = [...plan.materials];
+                                            newMats[mIdx] = { ...newMats[mIdx], percentage: e.target.value };
+                                            handleMaterialsChangeForRow(index, newMats);
+                                          }}
+                                          className="w-full h-6 px-1 text-[11px] font-mono text-slate-800 bg-transparent outline-none focus:bg-sky-50 rounded-sm text-right" />
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                              <div className="flex items-center gap-2 mt-1">
+                                <button type="button" onClick={() => updatePlanAt(index, { materials: [...plan.materials, { material: "", quantity: "", percentage: "" }] })}
+                                  className="text-[10px] font-semibold text-slate-500 hover:text-slate-700 hover:bg-slate-100 px-2 py-0.5 rounded transition-colors cursor-pointer inline-flex items-center gap-0.5">
+                                  <Plus className="h-2.5 w-2.5" /> Add Material
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                );
+              })}
+            </tbody>
+
+            {/* Footer row — Add Quality */}
+            <tfoot>
+              <tr className="border-t border-slate-200 bg-slate-50/50">
+                <td className="sticky left-0 z-10 bg-slate-50/50 border-r border-slate-200"></td>
+                <td colSpan={17} className="px-3 py-2">
+                  <button type="button" onClick={handleAddRecipe}
+                    className="text-[11px] font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 px-2.5 py-1 rounded-md transition-colors inline-flex items-center gap-1 cursor-pointer">
+                    <Plus className="h-3 w-3" /> Add Quality Row
+                  </button>
+                </td>
+              </tr>
+            </tfoot>
+          </table>
         </div>
       </div>
 
-      {/* Interactive Print & Preview Document Modal */}
+      {/* Print Preview Modal (untouched) */}
       <PlanningPrintPreviewModal
         open={showPrintModal}
         onClose={() => setShowPrintModal(false)}
