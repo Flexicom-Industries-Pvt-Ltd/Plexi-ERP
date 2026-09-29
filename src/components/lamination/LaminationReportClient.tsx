@@ -36,6 +36,7 @@ import {
   CheckCircle2,
   Loader2,
   Sparkles,
+  Film,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -301,36 +302,38 @@ export function LaminationReportClient() {
 
   return (
     <div className="space-y-5 font-sans pb-16">
-      {/* Top Banner & Title */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-xl border border-slate-200/80 shadow-xs">
+      {/* Header Banner */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-5">
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-xs font-semibold uppercase tracking-wider text-sky-600 bg-sky-50 px-2 py-0.5 rounded-md">
-              Lamination Module
-            </span>
-            <Badge
-              variant="outline"
-              className={
-                status === "APPROVED"
-                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                  : status === "SUBMITTED"
-                  ? "bg-sky-50 text-sky-700 border-sky-200"
-                  : "bg-amber-50 text-amber-700 border-amber-200"
-              }
-            >
-              {status}
-            </Badge>
+          <div className="flex items-center gap-2.5">
+            <div className="p-2.5 rounded-xl bg-sky-500/10 text-sky-600">
+              <Film className="w-6 h-6" />
+            </div>
+            <div>
+              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-3">
+                Lamination Product Report
+                <Badge
+                  variant="outline"
+                  className={
+                    status === "APPROVED"
+                      ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                      : status === "SUBMITTED"
+                      ? "bg-sky-50 text-sky-700 border-sky-200"
+                      : "bg-amber-50 text-amber-700 border-amber-200"
+                  }
+                >
+                  {status}
+                </Badge>
+              </h1>
+              <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+                Physical floor log entry with roll stock consumption, coating calculations, and real-time validation.
+              </p>
+            </div>
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-            Lamination Product Report
-          </h1>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Log production, roll output, and coating efficiency with live roll stock synchronization.
-          </p>
         </div>
 
-        {/* Global Actions */}
-        <div className="flex items-center flex-wrap gap-2">
+        {/* Global Action Buttons */}
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             variant="outline"
             size="sm"
@@ -463,7 +466,7 @@ export function LaminationReportClient() {
       </div>
 
       {/* KPI Cards Summary */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2.5 min-w-0">
         <div className="bg-white p-3 rounded-lg border border-slate-200/80 shadow-2xs">
           <div className="text-[11px] font-medium text-slate-500 uppercase">Rolls</div>
           <div className="text-lg font-bold text-slate-800">{entries.length}</div>

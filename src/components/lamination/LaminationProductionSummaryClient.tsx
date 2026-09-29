@@ -9,6 +9,7 @@ import {
   User,
   Search,
   Printer,
+  FileSpreadsheet,
   Download,
   RefreshCw,
   Layers,
@@ -32,6 +33,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { exportProductionSummaryExcel } from "@/lib/lamination/production-summary-export";
+import { ProductionSummaryPrintModal } from "./ProductionSummaryPrintModal";
 
 const SHIFTS = ["ALL", "Day Shift", "Night Shift"];
 
@@ -43,6 +45,7 @@ export function LaminationProductionSummaryClient() {
   const [shiftFilter, setShiftFilter] = useState<string>("ALL");
   const [contractorFilter, setContractorFilter] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [isPrintModalOpen, setIsPrintModalOpen] = useState<boolean>(false);
 
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [summaryData, setSummaryData] = useState<{
@@ -120,14 +123,66 @@ export function LaminationProductionSummaryClient() {
   };
 
   const handlePrint = () => {
-    window.print();
+    setIsPrintModalOpen(true);
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5 font-sans pb-16">
+      {/* Header Banner */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-5">
+        <div>
+          <div className="flex items-center gap-2.5">
+            <div className="p-2.5 rounded-xl bg-sky-500/10 text-sky-600">
+              <BarChart3 className="w-6 h-6" />
+            </div>
+            <div>
+              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-3">
+                Production Summary & Analytics
+              </h1>
+              <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+                Aggregate shift performance, contractor volume, operator output, and quality metrics with export capabilities.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Global Action Buttons */}
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={fetchSummary}
+            className="h-9 text-xs border-slate-200 hover:bg-slate-50"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${isLoading ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportExcel}
+            className="h-9 text-xs border-slate-200 hover:bg-slate-50"
+          >
+            <FileSpreadsheet className="h-4 w-4 mr-1.5 text-emerald-600" />
+            Excel Export
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handlePrint}
+            className="h-9 text-xs border-slate-200 hover:bg-slate-50"
+          >
+            <Printer className="h-4 w-4 mr-1.5 text-sky-600" />
+            Print Report
+          </Button>
+        </div>
+      </div>
+
       {/* Filter Header Bar */}
-      <div className="bg-white p-3.5 rounded-lg border border-slate-200 shadow-sm">
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 items-end">
+      <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3.5 items-end">
           {/* From Date */}
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
@@ -195,36 +250,6 @@ export function LaminationProductionSummaryClient() {
                 ))}
               </SelectContent>
             </Select>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={fetchSummary}
-              className="h-9 text-xs flex-1"
-            >
-              <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${isLoading ? "animate-spin" : ""}`} />
-              Refresh
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleExportExcel}
-              className="h-9 text-xs text-emerald-700 border-emerald-200 hover:bg-emerald-50"
-            >
-              <Download className="h-3.5 w-3.5 mr-1" />
-              Excel
-            </Button>
-            <Button
-              size="sm"
-              onClick={handlePrint}
-              className="h-9 text-xs bg-sky-600 hover:bg-sky-700 text-white"
-            >
-              <Printer className="h-3.5 w-3.5 mr-1" />
-              Print
-            </Button>
           </div>
         </div>
       </div>
@@ -580,6 +605,23 @@ export function LaminationProductionSummaryClient() {
           </div>
         </TabsContent>
       </Tabs>
+
+      <ProductionSummaryPrintModal
+        isOpen={isPrintModalOpen}
+        onClose={() => setIsPrintModalOpen(false)}
+        data={{
+          overall: summaryData.overall,
+          contractorSummary: summaryData.contractorSummary,
+          operatorSummary: summaryData.operatorSummary,
+          qualitySummary: summaryData.qualitySummary,
+          filters: {
+            dateFrom,
+            dateTo,
+            shiftFilter,
+            contractorFilter,
+          },
+        }}
+      />
     </div>
   );
 }
