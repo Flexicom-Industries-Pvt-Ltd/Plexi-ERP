@@ -138,4 +138,70 @@ describe("GateService Stock Validation", () => {
       expect(db.gateEntry.create).toHaveBeenCalled();
     });
   });
+
+  describe("listGateEntries with pagination and date filter", () => {
+    it("should apply date filter correctly", async () => {
+      const mockEntries = [
+        {
+          id: "ge-10",
+          entryNumber: "GE-20260929-001",
+          arrivalTime: new Date("2026-09-29T10:00:00.000Z"),
+          stockDetails: [],
+        },
+      ];
+
+      vi.mocked(db.gateEntry.findMany).mockResolvedValue(mockEntries as any);
+      vi.mocked(db.gateEntry.count).mockResolvedValue(1);
+
+      const result = await GateService.listGateEntries({
+        date: "2026-09-29",
+        page: 1,
+        limit: 20,
+      });
+
+      expect(result.entries).toEqual(mockEntries);
+      expect(result.meta).toBeDefined();
+      expect(result.meta?.page).toBe(1);
+      expect(result.meta?.total).toBe(1);
+
+      expect(db.gateEntry.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            arrivalTime: expect.objectContaining({
+              gte: expect.any(Date),
+              lte: expect.any(Date),
+            }),
+          }),
+        })
+      );
+    });
+
+    it("should handle date range filters", async () => {
+      vi.mocked(db.gateEntry.findMany).mockResolvedValue([]);
+      vi.mocked(db.gateEntry.count).mockResolvedValue(0);
+
+      const result = await GateService.listGateEntries({
+        dateFrom: "2026-09-01",
+        dateTo: "2026-09-29",
+        page: 2,
+        limit: 10,
+      });
+
+      expect(result.entries).toEqual([]);
+      expect(result.meta?.page).toBe(2);
+      expect(result.meta?.limit).toBe(10);
+      expect(db.gateEntry.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          skip: 10,
+          take: 10,
+          where: expect.objectContaining({
+            arrivalTime: expect.objectContaining({
+              gte: expect.any(Date),
+              lte: expect.any(Date),
+            }),
+          }),
+        })
+      );
+    });
+  });
 });

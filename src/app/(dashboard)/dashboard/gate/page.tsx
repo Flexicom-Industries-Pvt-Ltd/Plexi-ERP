@@ -1,8 +1,8 @@
 import { requirePermission } from "@/lib/permissions";
 import { Module } from "@/generated/prisma";
 import { Metadata } from "next";
-import { db } from "@/lib/db";
 import { getGateStats } from "@/lib/gate/get-gate-stats";
+import { GateService } from "@/services/gate.service";
 import { GateClient } from "./gate-client";
 
 export const metadata: Metadata = {
@@ -15,13 +15,8 @@ export const dynamic = "force-dynamic";
 export default async function GatePage() {
   await requirePermission(Module.SECURITY_GATE, "canRead");
 
-  const [initialEntries, initialStats] = await Promise.all([
-    db.gateEntry.findMany({
-      orderBy: { arrivalTime: "desc" },
-      include: {
-        stockDetails: true,
-      },
-    }),
+  const [initialData, initialStats] = await Promise.all([
+    GateService.listGateEntries({ page: 1, limit: 20 }, { paginate: true }),
     getGateStats(),
   ]);
 
@@ -36,7 +31,8 @@ export default async function GatePage() {
         </p>
       </div>
       <GateClient
-        initialEntries={JSON.parse(JSON.stringify(initialEntries))}
+        initialEntries={JSON.parse(JSON.stringify(initialData.entries))}
+        initialMeta={initialData.meta}
         initialStats={initialStats}
       />
     </div>
