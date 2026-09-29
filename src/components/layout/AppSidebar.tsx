@@ -63,6 +63,8 @@ const loomItems = [
 const laminationItems = [
   { title: "Production Report", url: "/dashboard/production/lamination" },
   { title: "Raw Material Entry", url: "/dashboard/production/lamination/raw-materials" },
+  { title: "Wastage Report", url: "/dashboard/production/lamination/wastage" },
+  { title: "Production Summary", url: "/dashboard/production/lamination/summary" },
 ];
 
 const settingsItems = [
