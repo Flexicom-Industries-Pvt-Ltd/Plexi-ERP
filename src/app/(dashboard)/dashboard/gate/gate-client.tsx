@@ -14,7 +14,9 @@ import {
   ArrowRight,
   ShieldCheck,
   ChevronRight,
+  ChevronLeft,
   ChevronDown,
+  Calendar,
   Edit,
   Trash2,
   XCircle
@@ -25,6 +27,14 @@ import { cn } from "@/lib/utils";
 
 type GateClientProps = {
   initialEntries?: any[];
+  initialMeta?: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    hasNext: boolean;
+    hasPrev: boolean;
+  };
   initialStats?: {
     inside: number;
     waiting: number;
@@ -38,6 +48,7 @@ type GateClientProps = {
 
 export function GateClient({
   initialEntries = [],
+  initialMeta,
   initialStats = {
     inside: 0,
     waiting: 0,
@@ -57,19 +68,52 @@ export function GateClient({
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [purposeFilter, setPurposeFilter] = useState<string>("");
 
+  // Date Filtering
+  const [dateFilterMode, setDateFilterMode] = useState<"all" | "today" | "single" | "range">("all");
+  const [selectedSingleDate, setSelectedSingleDate] = useState<string>("");
+  const [dateFrom, setDateFrom] = useState<string>("");
+  const [dateTo, setDateTo] = useState<string>("");
+
+  // Pagination State
+  const [page, setPage] = useState<number>(initialMeta?.page || 1);
+  const [pageSize, setPageSize] = useState<number>(initialMeta?.limit || 20);
+  const [pagination, setPagination] = useState({
+    page: initialMeta?.page || 1,
+    limit: initialMeta?.limit || 20,
+    total: initialMeta?.total ?? initialEntries.length,
+    totalPages: initialMeta?.totalPages || Math.ceil(initialEntries.length / 20) || 1,
+    hasNext: initialMeta?.hasNext ?? false,
+    hasPrev: initialMeta?.hasPrev ?? false,
+  });
+
   // Actions state
   const [deleteEntryId, setDeleteEntryId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [editEntry, setEditEntry] = useState<any | null>(null);
   const [isEditing, setIsEditing] = useState(false);
 
-  const fetchEntries = useCallback(async () => {
+  const fetchEntries = useCallback(async (targetPage: number = 1, customLimit?: number) => {
     setLoading(true);
+    const currentPage = targetPage;
+    const currentLimit = customLimit ?? pageSize;
     try {
       const params = new URLSearchParams();
-      if (search) params.set("truckNumber", search);
+      if (search.trim()) params.set("search", search.trim());
       if (statusFilter) params.set("status", statusFilter);
       if (purposeFilter) params.set("purpose", purposeFilter);
+
+      if (dateFilterMode === "today") {
+        const todayStr = new Date().toISOString().slice(0, 10);
+        params.set("date", todayStr);
+      } else if (dateFilterMode === "single" && selectedSingleDate) {
+        params.set("date", selectedSingleDate);
+      } else if (dateFilterMode === "range") {
+        if (dateFrom) params.set("dateFrom", dateFrom);
+        if (dateTo) params.set("dateTo", dateTo);
+      }
+
+      params.set("page", String(currentPage));
+      params.set("limit", String(currentLimit));
 
       const [res, statsRes] = await Promise.all([
         fetch(`/api/gate?${params.toString()}`),
@@ -83,6 +127,27 @@ export function GateClient({
         ? data.data
         : [];
       setEntries(entriesList);
+
+      if (data?.meta) {
+        setPagination({
+          page: data.meta.page ?? currentPage,
+          limit: data.meta.limit ?? currentLimit,
+          total: data.meta.total ?? entriesList.length,
+          totalPages: data.meta.totalPages ?? (Math.ceil((data.meta.total ?? entriesList.length) / currentLimit) || 1),
+          hasNext: Boolean(data.meta.hasNext),
+          hasPrev: Boolean(data.meta.hasPrev),
+        });
+      } else {
+        setPagination({
+          page: currentPage,
+          limit: currentLimit,
+          total: entriesList.length,
+          totalPages: Math.ceil(entriesList.length / currentLimit) || 1,
+          hasNext: false,
+          hasPrev: currentPage > 1,
+        });
+      }
+
       if (statsRes.ok) {
         setStats(await statsRes.json());
       }
@@ -91,19 +156,64 @@ export function GateClient({
     } finally {
       setLoading(false);
     }
-  }, [search, statusFilter, purposeFilter]);
+  }, [search, statusFilter, purposeFilter, dateFilterMode, selectedSingleDate, dateFrom, dateTo, pageSize]);
 
   // Only refetch when user changes search or filter controls
   const isFirstMount = useState(true);
   useEffect(() => {
     if (isFirstMount[0]) {
       isFirstMount[1](false);
-      if (!search && !statusFilter && !purposeFilter && initialEntries.length > 0) {
+      if (
+        !search &&
+        !statusFilter &&
+        !purposeFilter &&
+        dateFilterMode === "all" &&
+        initialEntries.length > 0
+      ) {
         return;
       }
     }
-    fetchEntries();
-  }, [search, statusFilter, purposeFilter, fetchEntries]);
+    setPage(1);
+    fetchEntries(1);
+  }, [search, statusFilter, purposeFilter, dateFilterMode, selectedSingleDate, dateFrom, dateTo, fetchEntries]);
+
+  const handlePageChange = (newPage: number) => {
+    if (newPage < 1 || newPage > pagination.totalPages || newPage === pagination.page || loading) return;
+    setPage(newPage);
+    fetchEntries(newPage);
+  };
+
+  const handlePageSizeChange = (newSize: number) => {
+    setPageSize(newSize);
+    setPage(1);
+    fetchEntries(1, newSize);
+  };
+
+  const getPageNumbers = (current: number, total: number): (number | "...")[] => {
+    if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+    const pages: (number | "...")[] = [1];
+    if (current > 3) pages.push("...");
+    for (let i = Math.max(2, current - 1); i <= Math.min(total - 1, current + 1); i++) {
+      pages.push(i);
+    }
+    if (current < total - 2) pages.push("...");
+    pages.push(total);
+    return pages;
+  };
+
+  const isFilterActive = Boolean(
+    search || statusFilter || purposeFilter || dateFilterMode !== "all"
+  );
+
+  const resetFilters = () => {
+    setSearch("");
+    setStatusFilter("");
+    setPurposeFilter("");
+    setDateFilterMode("all");
+    setSelectedSingleDate("");
+    setDateFrom("");
+    setDateTo("");
+  };
 
   // Optimistic Delete
   const handleDelete = async () => {
@@ -236,54 +346,161 @@ export function GateClient({
       </div>
 
       {/* ── Desktop Toolbar ── */}
-      <div className="hidden md:flex flex-row gap-4 p-4 bg-white rounded-xl border border-slate-200 shadow-sm justify-between items-center">
-        <div className="flex items-center gap-3">
-          <div className="relative min-w-[240px]">
+      <div className="hidden md:flex flex-row flex-wrap gap-3 p-3.5 bg-white rounded-xl border border-slate-200 shadow-sm justify-between items-center">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <div className="relative min-w-[220px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <input
               type="text"
-              placeholder="Search truck number..."
+              placeholder="Search truck, driver, customer..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-slate-50 transition-all"
+              className="w-full pl-9 pr-8 py-1.5 text-xs sm:text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-slate-50 transition-all"
             />
+            {search && (
+              <button
+                onClick={() => setSearch("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+              >
+                <XCircle className="h-3.5 w-3.5" />
+              </button>
+            )}
           </div>
 
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-slate-50"
+            className="px-2.5 py-1.5 text-xs sm:text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-slate-50 text-slate-700 cursor-pointer"
           >
             <option value="">All Statuses</option>
             {Object.values(GateEntryStatus).map(s => (
-              <option key={s} value={s}>{s.replace("_", " ")}</option>
+              <option key={s} value={s}>{s.replace(/_/g, " ")}</option>
             ))}
           </select>
 
           <select
             value={purposeFilter}
             onChange={(e) => setPurposeFilter(e.target.value)}
-            className="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-slate-50"
+            className="px-2.5 py-1.5 text-xs sm:text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-slate-50 text-slate-700 cursor-pointer"
           >
             <option value="">All Purposes</option>
             {Object.values(GatePurpose).map(p => (
               <option key={p} value={p}>{p}</option>
             ))}
           </select>
+
+          {/* Date Filter Bar */}
+          <div className="flex items-center gap-1 bg-slate-100/90 p-1 rounded-lg border border-slate-200">
+            <Calendar className="h-3.5 w-3.5 text-slate-500 ml-1 mr-0.5 shrink-0" />
+            <div className="flex items-center gap-0.5">
+              <button
+                type="button"
+                onClick={() => setDateFilterMode("all")}
+                className={cn(
+                  "px-2 py-0.5 text-xs font-semibold rounded transition-all cursor-pointer",
+                  dateFilterMode === "all"
+                    ? "bg-white text-slate-900 shadow-2xs font-bold"
+                    : "text-slate-600 hover:text-slate-900"
+                )}
+              >
+                All
+              </button>
+              <button
+                type="button"
+                onClick={() => setDateFilterMode("today")}
+                className={cn(
+                  "px-2 py-0.5 text-xs font-semibold rounded transition-all cursor-pointer",
+                  dateFilterMode === "today"
+                    ? "bg-white text-slate-900 shadow-2xs font-bold"
+                    : "text-slate-600 hover:text-slate-900"
+                )}
+              >
+                Today
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setDateFilterMode("single");
+                  if (!selectedSingleDate) setSelectedSingleDate(new Date().toISOString().slice(0, 10));
+                }}
+                className={cn(
+                  "px-2 py-0.5 text-xs font-semibold rounded transition-all cursor-pointer",
+                  dateFilterMode === "single"
+                    ? "bg-white text-slate-900 shadow-2xs font-bold"
+                    : "text-slate-600 hover:text-slate-900"
+                )}
+              >
+                Date
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setDateFilterMode("range");
+                  if (!dateFrom) setDateFrom(new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10));
+                  if (!dateTo) setDateTo(new Date().toISOString().slice(0, 10));
+                }}
+                className={cn(
+                  "px-2 py-0.5 text-xs font-semibold rounded transition-all cursor-pointer",
+                  dateFilterMode === "range"
+                    ? "bg-white text-slate-900 shadow-2xs font-bold"
+                    : "text-slate-600 hover:text-slate-900"
+                )}
+              >
+                Range
+              </button>
+            </div>
+
+            {dateFilterMode === "single" && (
+              <input
+                type="date"
+                value={selectedSingleDate}
+                onChange={(e) => setSelectedSingleDate(e.target.value)}
+                className="text-xs font-medium text-slate-800 bg-white border border-slate-200 rounded px-1.5 py-0.5 outline-none cursor-pointer ml-1"
+              />
+            )}
+
+            {dateFilterMode === "range" && (
+              <div className="flex items-center gap-1 text-xs ml-1">
+                <input
+                  type="date"
+                  value={dateFrom}
+                  onChange={(e) => setDateFrom(e.target.value)}
+                  className="text-xs font-medium text-slate-800 bg-white border border-slate-200 rounded px-1.5 py-0.5 outline-none cursor-pointer"
+                />
+                <span className="text-slate-400 text-[10px]">to</span>
+                <input
+                  type="date"
+                  value={dateTo}
+                  onChange={(e) => setDateTo(e.target.value)}
+                  className="text-xs font-medium text-slate-800 bg-white border border-slate-200 rounded px-1.5 py-0.5 outline-none cursor-pointer"
+                />
+              </div>
+            )}
+          </div>
+
+          {isFilterActive && (
+            <button
+              type="button"
+              onClick={resetFilters}
+              className="text-xs text-slate-500 hover:text-slate-800 underline underline-offset-2 shrink-0 cursor-pointer ml-1"
+            >
+              Clear filters
+            </button>
+          )}
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5">
           <button
-            onClick={fetchEntries}
+            onClick={() => fetchEntries(pagination.page)}
             disabled={loading}
-            className="inline-flex items-center justify-center p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors border border-slate-200 bg-white disabled:opacity-50"
+            className="inline-flex items-center justify-center p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors border border-slate-200 bg-white disabled:opacity-50 cursor-pointer"
             title="Refresh"
           >
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
           </button>
           <Link
             href="/dashboard/gate/new"
-            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-primary text-white hover:bg-primary/90 transition-colors shadow-sm"
+            className="inline-flex items-center gap-2 px-3.5 py-2 text-xs sm:text-sm font-semibold rounded-lg bg-primary text-white hover:bg-primary/90 transition-colors shadow-xs shrink-0"
           >
             <Plus className="h-4 w-4" />
             New Entry
@@ -299,7 +516,7 @@ export function GateClient({
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <input
               type="text"
-              placeholder="Search truck..."
+              placeholder="Search truck, driver..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full pl-8 pr-7 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-slate-50 transition-all"
@@ -315,7 +532,7 @@ export function GateClient({
           </div>
 
           <button
-            onClick={fetchEntries}
+            onClick={() => fetchEntries(pagination.page)}
             disabled={loading}
             className="p-2 text-slate-600 hover:bg-slate-100 rounded-lg border border-slate-200 bg-white disabled:opacity-50 shrink-0"
             title="Refresh"
@@ -354,6 +571,64 @@ export function GateClient({
               <option key={p} value={p}>{p}</option>
             ))}
           </select>
+        </div>
+
+        {/* Third Row: Mobile Date Filter */}
+        <div className="flex flex-col gap-1.5 pt-1.5 border-t border-slate-100">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-semibold text-slate-500 flex items-center gap-1">
+              <Calendar className="h-3 w-3" /> Date Filter:
+            </span>
+            <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-md">
+              {(["all", "today", "single", "range"] as const).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => {
+                    setDateFilterMode(m);
+                    if (m === "single" && !selectedSingleDate) {
+                      setSelectedSingleDate(new Date().toISOString().slice(0, 10));
+                    } else if (m === "range") {
+                      if (!dateFrom) setDateFrom(new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10));
+                      if (!dateTo) setDateTo(new Date().toISOString().slice(0, 10));
+                    }
+                  }}
+                  className={cn(
+                    "px-2 py-0.5 text-[10px] font-semibold rounded capitalize transition-all",
+                    dateFilterMode === m
+                      ? "bg-white text-slate-900 shadow-2xs font-bold"
+                      : "text-slate-600"
+                  )}
+                >
+                  {m}
+                </button>
+              ))}
+            </div>
+          </div>
+          {dateFilterMode === "single" && (
+            <input
+              type="date"
+              value={selectedSingleDate}
+              onChange={(e) => setSelectedSingleDate(e.target.value)}
+              className="w-full text-xs font-medium text-slate-800 bg-slate-50 border border-slate-200 rounded-md px-2 py-1 outline-none"
+            />
+          )}
+          {dateFilterMode === "range" && (
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                className="w-full text-xs font-medium text-slate-800 bg-slate-50 border border-slate-200 rounded-md px-2 py-1 outline-none"
+              />
+              <input
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                className="w-full text-xs font-medium text-slate-800 bg-slate-50 border border-slate-200 rounded-md px-2 py-1 outline-none"
+              />
+            </div>
+          )}
         </div>
       </div>
 
@@ -618,6 +893,85 @@ export function GateClient({
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* ── Pagination Component ── */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 border-t border-slate-200 bg-slate-50/80 text-xs text-slate-600">
+          <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-start">
+            <p className="text-slate-500">
+              Showing{" "}
+              <span className="font-semibold text-slate-800">
+                {pagination.total > 0 ? (pagination.page - 1) * pagination.limit + 1 : 0}
+              </span>{" "}
+              to{" "}
+              <span className="font-semibold text-slate-800">
+                {Math.min(pagination.page * pagination.limit, pagination.total)}
+              </span>{" "}
+              of{" "}
+              <span className="font-semibold text-slate-800">{pagination.total.toLocaleString()}</span>{" "}
+              entries
+            </p>
+
+            <div className="flex items-center gap-1.5 ml-2">
+              <span className="text-slate-400 hidden sm:inline">Per page:</span>
+              <select
+                value={pageSize}
+                onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+                className="px-2 py-1 bg-white border border-slate-200 rounded text-xs font-medium text-slate-700 outline-none focus:ring-1 focus:ring-primary cursor-pointer"
+              >
+                <option value={10}>10</option>
+                <option value={20}>20</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => handlePageChange(pagination.page - 1)}
+              disabled={pagination.page <= 1 || loading}
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-slate-700 font-medium cursor-pointer"
+              title="Previous Page"
+            >
+              <ChevronLeft className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Prev</span>
+            </button>
+
+            <div className="flex items-center gap-1">
+              {getPageNumbers(pagination.page, pagination.totalPages).map((p, i) =>
+                p === "..." ? (
+                  <span key={`dots-${i}`} className="px-1.5 text-slate-400 select-none">
+                    …
+                  </span>
+                ) : (
+                  <button
+                    key={p}
+                    onClick={() => handlePageChange(p as number)}
+                    disabled={loading}
+                    className={cn(
+                      "inline-flex items-center justify-center h-8 w-8 text-xs font-semibold rounded-lg transition-colors cursor-pointer",
+                      p === pagination.page
+                        ? "bg-primary text-white shadow-2xs font-bold"
+                        : "border border-slate-200 bg-white hover:bg-slate-100 text-slate-700"
+                    )}
+                  >
+                    {p}
+                  </button>
+                )
+              )}
+            </div>
+
+            <button
+              onClick={() => handlePageChange(pagination.page + 1)}
+              disabled={pagination.page >= pagination.totalPages || loading}
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-slate-700 font-medium cursor-pointer"
+              title="Next Page"
+            >
+              <span className="hidden sm:inline">Next</span>
+              <ChevronRight className="h-3.5 w-3.5" />
+            </button>
+          </div>
         </div>
       </div>
 
