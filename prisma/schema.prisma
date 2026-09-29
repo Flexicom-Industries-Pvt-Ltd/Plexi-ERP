@@ -2128,6 +2128,8 @@ model LaminationProductionReport {
   shiftName           String                      // "Day Shift", "Night Shift", etc.
   operatorName        String?
   operatorId          String?
+  contractorName      String?
+  contractorId        String?
   helperCount         Int                         @default(0) // No. of Helper
   supervisorName      String?
   status              String                      @default("DRAFT") // "DRAFT" | "SUBMITTED" | "APPROVED"
@@ -2232,4 +2234,34 @@ model LaminationRawMaterialReportEntry {
   @@index([reportId])
   @@index([materialName])
 }
+
+model LaminationWastageReport {
+  id                String   @id @default(cuid())
+  date              String   // YYYY-MM-DD
+  shiftName         String   // "Day Shift", "Night Shift", etc.
+  operatorName      String?
+  operatorId        String?
+  contractorName    String?
+  contractorId      String?
+  supervisorName    String?
+  rawMaterialUsedKg Float    @default(0) // Base Qty for Lumps (pulled from Raw Material Manual Total)
+  lumpsWastageKg    Float    @default(0) // Manual input
+  lumpsWastagePct   Float    @default(0) // (lumpsWastageKg / rawMaterialUsedKg) * 100
+  fabricNetWeightKg Float    @default(0) // Base Qty for Fabric (pulled from Production Sheet totalNetWtBefore)
+  fabricWastageKg   Float    @default(0) // Manual input
+  fabricWastagePct  Float    @default(0) // (fabricWastageKg / fabricNetWeightKg) * 100
+  totalBaseKg       Float    @default(0) // rawMaterialUsedKg + fabricNetWeightKg
+  totalWastageKg    Float    @default(0) // lumpsWastageKg + fabricWastageKg
+  totalWastagePct   Float    @default(0) // (totalWastageKg / totalBaseKg) * 100
+  status            String   @default("DRAFT") // "DRAFT" | "SUBMITTED" | "APPROVED"
+  remarks           String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([date, shiftName])
+  @@index([date])
+  @@index([shiftName])
+  @@index([status])
+}
+
 
