@@ -2175,3 +2175,61 @@ model LaminationProductionEntry {
   @@index([quality])
   @@index([loomNumber])
 }
+
+model LaminationRawMaterial {
+  id         String   @id @default(cuid())
+  name       String   // e.g. "PP Granules", "LDPE Granules", "White Masterbatch"
+  code       String?  // e.g. "PP-01", "LD-01"
+  percentage Float    // Standard recipe usage percentage e.g. 60.0
+  unit       String   @default("kg")
+  sequence   Int      @default(0)
+  isActive   Boolean  @default(true)
+  remarks    String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([isActive])
+  @@index([sequence])
+}
+
+model LaminationRawMaterialReport {
+  id             String                             @id @default(cuid())
+  date           String                             // YYYY-MM-DD
+  shiftName      String                             // "Day Shift", "Night Shift", etc.
+  operatorName   String?
+  operatorId     String?
+  supervisorName String?
+  manualTotalKg  Float                              @default(0)
+  machineTotalKg Float                              @default(0)
+  diffTotalKg    Float                              @default(0)
+  status         String                             @default("DRAFT") // "DRAFT" | "SUBMITTED" | "APPROVED"
+  remarks        String?
+  entries        LaminationRawMaterialReportEntry[]
+  createdAt      DateTime                           @default(now())
+  updatedAt      DateTime                           @updatedAt
+
+  @@unique([date, shiftName])
+  @@index([date])
+  @@index([shiftName])
+  @@index([status])
+}
+
+model LaminationRawMaterialReportEntry {
+  id            String                      @id @default(cuid())
+  reportId      String
+  report        LaminationRawMaterialReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  rawMaterialId String?                     // Optional link to LaminationRawMaterial master
+  materialName  String                      // Name of material e.g. "PP Granules"
+  percentage    Float                       // Percentage at time of entry e.g. 60.0
+  manualKg      Float                       @default(0) // (manualTotalKg * percentage) / 100
+  machineKg     Float                       @default(0) // Editable machine meter/hopper reading
+  diffKg        Float                       @default(0) // manualKg - machineKg
+  sequence      Int                         @default(0)
+  remarks       String?
+  createdAt     DateTime                    @default(now())
+  updatedAt     DateTime                    @updatedAt
+
+  @@index([reportId])
+  @@index([materialName])
+}
+

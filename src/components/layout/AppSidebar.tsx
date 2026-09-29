@@ -62,6 +62,7 @@ const loomItems = [
 
 const laminationItems = [
   { title: "Production Report", url: "/dashboard/production/lamination" },
+  { title: "Raw Material Entry", url: "/dashboard/production/lamination/raw-materials" },
 ];
 
 const settingsItems = [
@@ -85,6 +86,7 @@ const dataCentreItems = [
   { title: "Manpower Rules", url: "/dashboard/data-centre/manpower-rules" },
   { title: "Tape Plant Recipe", url: "/dashboard/data-centre/tape-plant-recipe" },
   { title: "Loom Machine Mapping", url: "/dashboard/data-centre/loom-machine-mapping" },
+  { title: "Lamination Raw Material", url: "/dashboard/data-centre/lamination-raw-materials" },
 ];
 
 type AppSidebarProps = {
