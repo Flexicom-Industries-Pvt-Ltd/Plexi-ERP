@@ -18,6 +18,8 @@ import {
   TrendingUp,
   BarChart3,
   Award,
+  Maximize2,
+  Minimize2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,6 +48,17 @@ export function LaminationProductionSummaryClient() {
   const [contractorFilter, setContractorFilter] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [isPrintModalOpen, setIsPrintModalOpen] = useState<boolean>(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Close fullscreen on Escape
+  useEffect(() => {
+    if (!isFullscreen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsFullscreen(false);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isFullscreen]);
 
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [summaryData, setSummaryData] = useState<{
@@ -330,25 +343,55 @@ export function LaminationProductionSummaryClient() {
       </div>
 
       {/* Analytics Tabs: Contractor-wise, Operator-wise, Quality-wise */}
-      <Tabs defaultValue="contractor" className="space-y-3">
-        <TabsList className="bg-slate-100 p-1 border border-slate-200">
-          <TabsTrigger value="contractor" className="text-xs font-semibold">
-            <Building className="h-3.5 w-3.5 mr-1.5" />
-            Contractor-Wise
-          </TabsTrigger>
-          <TabsTrigger value="operator" className="text-xs font-semibold">
-            <User className="h-3.5 w-3.5 mr-1.5" />
-            Operator-Wise
-          </TabsTrigger>
-          <TabsTrigger value="quality" className="text-xs font-semibold">
-            <Layers className="h-3.5 w-3.5 mr-1.5" />
-            Quality-Wise
-          </TabsTrigger>
-          <TabsTrigger value="shifts" className="text-xs font-semibold">
-            <Film className="h-3.5 w-3.5 mr-1.5" />
-            Shift Log ({summaryData.reports.length})
-          </TabsTrigger>
-        </TabsList>
+      <div
+        className={
+          isFullscreen
+            ? "fixed inset-0 z-50 bg-background flex flex-col p-4 md:p-6 shadow-2xl overflow-y-auto"
+            : "space-y-3"
+        }
+      >
+        <Tabs defaultValue="contractor" className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsFullscreen(!isFullscreen)}
+                className="h-8.5 px-2.5 text-xs border-slate-300 hover:bg-slate-100 flex items-center gap-1.5 cursor-pointer active:scale-95"
+                title={isFullscreen ? "Collapse back to normal view (Esc)" : "Expand summary to fullscreen"}
+              >
+                {isFullscreen ? (
+                  <>
+                    <Minimize2 className="h-3.5 w-3.5 text-sky-600" />
+                    <span>Collapse</span>
+                  </>
+                ) : (
+                  <>
+                    <Maximize2 className="h-3.5 w-3.5 text-sky-600" />
+                    <span>Expand</span>
+                  </>
+                )}
+              </Button>
+            </div>
+            <TabsList className="bg-slate-100 p-1 border border-slate-200">
+              <TabsTrigger value="contractor" className="text-xs font-semibold cursor-pointer">
+                <Building className="h-3.5 w-3.5 mr-1.5" />
+                Contractor-Wise
+              </TabsTrigger>
+              <TabsTrigger value="operator" className="text-xs font-semibold cursor-pointer">
+                <User className="h-3.5 w-3.5 mr-1.5" />
+                Operator-Wise
+              </TabsTrigger>
+              <TabsTrigger value="quality" className="text-xs font-semibold cursor-pointer">
+                <Layers className="h-3.5 w-3.5 mr-1.5" />
+                Quality-Wise
+              </TabsTrigger>
+              <TabsTrigger value="shifts" className="text-xs font-semibold cursor-pointer">
+                <Film className="h-3.5 w-3.5 mr-1.5" />
+                Shift Log ({summaryData.reports.length})
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
         {/* 1. CONTRACTOR-WISE TAB */}
         <TabsContent value="contractor" className="space-y-3">
@@ -605,6 +648,7 @@ export function LaminationProductionSummaryClient() {
           </div>
         </TabsContent>
       </Tabs>
+    </div>
 
       <ProductionSummaryPrintModal
         isOpen={isPrintModalOpen}

@@ -23,6 +23,8 @@ import {
   AlertTriangle,
   SlidersHorizontal,
   Lock,
+  Maximize2,
+  Minimize2,
 } from "lucide-react";
 import {
   LoomSummaryDataset,
@@ -80,6 +82,17 @@ export function LoomSummarySection() {
   // Reset All Confirmation Modal State
   const [resetConfirmModalOpen, setResetConfirmModalOpen] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Close fullscreen on Escape
+  useEffect(() => {
+    if (!isFullscreen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsFullscreen(false);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isFullscreen]);
 
   const fetchSummary = useCallback(async () => {
     setLoading(true);
@@ -597,33 +610,61 @@ export function LoomSummarySection() {
       </div>
 
       {/* 3. View Switcher & Minimalist Filter Bar */}
-      <div className="bg-white p-3 rounded-xl border border-slate-200/90 shadow-2xs space-y-2.5">
-        <div className="flex flex-wrap items-center justify-between gap-2.5 text-xs">
-          {/* View Mode Toggle */}
-          <div className="inline-flex rounded-lg bg-slate-100 p-0.5 text-xs font-medium">
-            <button
-              type="button"
-              onClick={() => setActiveView("recipes")}
-              className={`px-3 py-1 rounded-md transition-all cursor-pointer ${
-                activeView === "recipes"
-                  ? "bg-white text-slate-900 shadow-2xs font-semibold"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              Recipe Schedule ({recipeList.length})
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveView("looms")}
-              className={`px-3 py-1 rounded-md transition-all cursor-pointer ${
-                activeView === "looms"
-                  ? "bg-white text-slate-900 shadow-2xs font-semibold"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              Loom Shed (1–91)
-            </button>
-          </div>
+      <div
+        className={
+          isFullscreen
+            ? "fixed inset-0 z-50 bg-background flex flex-col p-4 md:p-6 shadow-2xl overflow-y-auto space-y-4"
+            : "space-y-4"
+        }
+      >
+        <div className="bg-white p-3 rounded-xl border border-slate-200/90 shadow-2xs space-y-2.5">
+          <div className="flex flex-wrap items-center justify-between gap-2.5 text-xs">
+            <div className="flex items-center gap-2">
+              {/* Top-Left Fullscreen Expand / Collapse Toggle */}
+              <button
+                type="button"
+                onClick={() => setIsFullscreen(!isFullscreen)}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 transition-all shadow-2xs cursor-pointer active:scale-95 shrink-0"
+                title={isFullscreen ? "Collapse back to normal view (Esc)" : "Expand sheet to fullscreen"}
+              >
+                {isFullscreen ? (
+                  <>
+                    <Minimize2 className="h-3.5 w-3.5 text-sky-600" />
+                    <span>Collapse</span>
+                  </>
+                ) : (
+                  <>
+                    <Maximize2 className="h-3.5 w-3.5 text-sky-600" />
+                    <span>Expand</span>
+                  </>
+                )}
+              </button>
+              {/* View Mode Toggle */}
+              <div className="inline-flex rounded-lg bg-slate-100 p-0.5 text-xs font-medium">
+                <button
+                  type="button"
+                  onClick={() => setActiveView("recipes")}
+                  className={`px-3 py-1 rounded-md transition-all cursor-pointer ${
+                    activeView === "recipes"
+                      ? "bg-white text-slate-900 shadow-2xs font-semibold"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  Recipe Schedule ({recipeList.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveView("looms")}
+                  className={`px-3 py-1 rounded-md transition-all cursor-pointer ${
+                    activeView === "looms"
+                      ? "bg-white text-slate-900 shadow-2xs font-semibold"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  Loom Shed (1–91)
+                </button>
+              </div>
+            </div>
 
           {/* Date & Shift Filter Strip */}
           <div className="flex flex-wrap items-center gap-1.5">
@@ -1018,6 +1059,7 @@ export function LoomSummarySection() {
           </div>
         </div>
       )}
+    </div>
 
       {/* ======================================================== */}
       {/* MODAL 1: SINGLE LOOM QUICK ASSIGN MODAL                  */}
