@@ -10,6 +10,7 @@ import {
 } from "@/lib/lamination/lamination-types";
 import { RollStockPickerModal } from "./RollStockPickerModal";
 import { LaminationReportPrintModal } from "./LaminationReportPrintModal";
+import { QualityAutocomplete } from "./QualityAutocomplete";
 import { exportLaminationReportExcel } from "@/lib/lamination/lamination-report-export";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -107,11 +108,41 @@ export function LaminationReportClient() {
     }
   }, []);
 
+  const [availableQualities, setAvailableQualities] = useState<string[]>([]);
+
+  // Fetch available distinct qualities across roll cutting, recipes, and past records
+  const fetchQualities = useCallback(async () => {
+    try {
+      const res = await fetch("/api/production/lamination/qualities");
+      const json = await res.json();
+      if (json.success && Array.isArray(json.qualities)) {
+        setAvailableQualities(json.qualities);
+      }
+    } catch (err) {
+      console.error("Failed to load qualities:", err);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchQualities();
+  }, [fetchQualities]);
+
   useEffect(() => {
     if (date && shiftName) {
       fetchReport(date, shiftName);
     }
   }, [date, shiftName, fetchReport]);
+
+  // Combined set of master qualities + any dynamically entered in active sheet
+  const allQualities = useMemo(() => {
+    const set = new Set<string>(availableQualities);
+    entries.forEach((e) => {
+      if (e.quality && e.quality.trim()) {
+        set.add(e.quality.trim());
+      }
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [availableQualities, entries]);
 
   // Derived column totals
   const totals = useMemo(() => computeLaminationReportTotals(entries), [entries]);
@@ -511,7 +542,7 @@ export function LaminationReportClient() {
         </div>
 
         {/* Data Grid */}
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto min-h-[380px]">
           {loading ? (
             <div className="py-20 flex flex-col items-center justify-center gap-2 text-slate-400">
               <Loader2 className="h-7 w-7 animate-spin text-sky-600" />
@@ -538,7 +569,7 @@ export function LaminationReportClient() {
               <thead>
                 <tr className="border-b bg-slate-100 text-slate-700 font-semibold">
                   <th className="py-2.5 px-2 text-center w-10">S.No.</th>
-                  <th className="py-2.5 px-3 min-w-[130px]">Quality</th>
+                  <th className="py-2.5 px-3 min-w-[170px]">Quality</th>
                   <th className="py-2.5 px-2 text-center w-16">Width</th>
                   <th className="py-2.5 px-2 text-center w-16">Loom #</th>
                   <th className="py-2.5 px-2.5 min-w-[95px]">Roll No.</th>
@@ -574,12 +605,12 @@ export function LaminationReportClient() {
                       </td>
 
                       {/* Quality */}
-                      <td className="py-2 px-3">
-                        <Input
+                      <td className="py-2 px-2.5 min-w-[170px]">
+                        <QualityAutocomplete
                           value={entry.quality}
-                          onChange={(e) => handleUpdateEntry(index, "quality", e.target.value)}
-                          className="h-8 text-xs font-semibold text-slate-800 bg-transparent border-slate-200 focus:bg-white"
-                          placeholder="Quality Name"
+                          onChange={(val) => handleUpdateEntry(index, "quality", val)}
+                          qualities={allQualities}
+                          placeholder="Type Quality..."
                         />
                       </td>
 
