@@ -37,6 +37,8 @@ import {
   Loader2,
   Sparkles,
   Film,
+  Maximize2,
+  Minimize2,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -73,6 +75,17 @@ export function LaminationReportClient() {
   // Modals
   const [rollPickerOpen, setRollPickerOpen] = useState(false);
   const [printModalOpen, setPrintModalOpen] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Close fullscreen on Escape
+  useEffect(() => {
+    if (!isFullscreen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsFullscreen(false);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isFullscreen]);
 
   // Fetch report for Date and Shift
   const fetchReport = useCallback(async (targetDate: string, targetShift: string) => {
@@ -516,14 +529,40 @@ export function LaminationReportClient() {
       </div>
 
       {/* Main Table Area */}
-      <div className="bg-white rounded-xl border border-slate-200/80 shadow-xs overflow-hidden">
+      <div
+        className={
+          isFullscreen
+            ? "fixed inset-0 z-50 bg-background flex flex-col p-4 md:p-6 shadow-2xl overflow-hidden"
+            : "bg-white rounded-xl border border-slate-200/80 shadow-xs overflow-hidden"
+        }
+      >
         {/* Table Toolbar */}
         <div className="p-3.5 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2 bg-slate-50/50">
           <div className="flex items-center gap-2">
+            {/* Top-Left Fullscreen Expand / Collapse Toggle */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsFullscreen(!isFullscreen)}
+              className="h-8.5 text-xs border-slate-300 hover:bg-slate-100 flex items-center gap-1.5 cursor-pointer active:scale-95"
+              title={isFullscreen ? "Collapse back to normal view (Esc)" : "Expand table to fullscreen"}
+            >
+              {isFullscreen ? (
+                <>
+                  <Minimize2 className="h-3.5 w-3.5 text-sky-600" />
+                  <span>Collapse</span>
+                </>
+              ) : (
+                <>
+                  <Maximize2 className="h-3.5 w-3.5 text-sky-600" />
+                  <span>Expand</span>
+                </>
+              )}
+            </Button>
             <Button
               size="sm"
               onClick={() => setRollPickerOpen(true)}
-              className="h-8.5 text-xs bg-sky-600 hover:bg-sky-700 text-white shadow-xs"
+              className="h-8.5 text-xs bg-sky-600 hover:bg-sky-700 text-white shadow-xs cursor-pointer"
             >
               <Layers className="h-4 w-4 mr-1.5" />
               Import from Roll Stock
@@ -532,7 +571,7 @@ export function LaminationReportClient() {
               variant="outline"
               size="sm"
               onClick={handleAddManualRow}
-              className="h-8.5 text-xs border-slate-300 hover:bg-slate-100"
+              className="h-8.5 text-xs border-slate-300 hover:bg-slate-100 cursor-pointer"
             >
               <Plus className="h-4 w-4 mr-1" />
               Add Blank Row
@@ -545,7 +584,7 @@ export function LaminationReportClient() {
         </div>
 
         {/* Data Grid */}
-        <div className="overflow-x-auto min-h-[380px]">
+        <div className={isFullscreen ? "overflow-x-auto overflow-y-auto flex-1 border rounded-lg bg-card" : "overflow-x-auto min-h-[380px]"}>
           {loading ? (
             <div className="py-20 flex flex-col items-center justify-center gap-2 text-slate-400">
               <Loader2 className="h-7 w-7 animate-spin text-sky-600" />

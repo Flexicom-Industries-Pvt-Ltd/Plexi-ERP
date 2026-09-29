@@ -19,6 +19,8 @@ import {
   RotateCcw,
   ArrowRightLeft,
   Send,
+  Maximize2,
+  Minimize2,
 } from "lucide-react";
 import { RecipeQualityBadge } from "./RecipeQualityBadge";
 import { BobbinStockPrintPreviewModal } from "./BobbinStockPrintPreviewModal";
@@ -58,6 +60,17 @@ export function BobbinStockSummarySection({
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Close fullscreen on Escape
+  useEffect(() => {
+    if (!isFullscreen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsFullscreen(false);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isFullscreen]);
 
   // Optional Filters: Default to All Till Date (Cumulative)
   const [dateFilterMode, setDateFilterMode] = useState<"all" | "single" | "range">("all");
@@ -362,11 +375,33 @@ export function BobbinStockSummarySection({
       </div>
 
       {/* Main Table Card */}
-      <div className="bg-white rounded-xl border border-slate-200/80 shadow-2xs overflow-hidden">
+      <div className={`bg-white rounded-xl border border-slate-200/80 shadow-2xs overflow-hidden ${
+        isFullscreen
+          ? "fixed inset-0 z-50 rounded-none border-0 p-4 md:p-6 flex flex-col bg-background h-screen w-screen"
+          : ""
+      }`}>
         {/* Table Control Header & Optional Filter Bar */}
-        <div className="p-4 border-b border-slate-100 bg-white flex flex-col gap-3">
+        <div className="p-4 border-b border-slate-100 bg-white flex flex-col gap-3 shrink-0">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-2.5">
+              <button
+                type="button"
+                onClick={() => setIsFullscreen((prev) => !prev)}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 shadow-2xs transition-colors cursor-pointer"
+                title={isFullscreen ? "Collapse (Esc)" : "Expand to Fullscreen"}
+              >
+                {isFullscreen ? (
+                  <>
+                    <Minimize2 className="h-3.5 w-3.5 text-slate-600" />
+                    <span>Collapse</span>
+                  </>
+                ) : (
+                  <>
+                    <Maximize2 className="h-3.5 w-3.5 text-slate-600" />
+                    <span>Expand</span>
+                  </>
+                )}
+              </button>
               <h2 className="text-sm font-semibold text-slate-900 tracking-tight">Bobbin & Crate Stock Summary</h2>
               <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200/60">
                 {dateFilterMode === "all" ? "All Till Date" : "Filtered"}
@@ -543,7 +578,7 @@ export function BobbinStockSummarySection({
         </div>
 
         {/* Table Content */}
-        <div className="overflow-x-auto">
+        <div className={isFullscreen ? "overflow-auto flex-1" : "overflow-x-auto"}>
           <table className="w-full text-left border-collapse min-w-[900px] text-xs">
             <thead>
               <tr className="bg-slate-50/75 border-b border-slate-200 text-[11px] font-medium text-slate-600 uppercase tracking-wider">

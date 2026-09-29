@@ -22,6 +22,8 @@ import {
   CloudCheck,
   Plus,
   Trash2,
+  Maximize2,
+  Minimize2,
 } from "lucide-react";
 import {
   LoomReadingEntryItem,
@@ -136,6 +138,17 @@ export function LoomReadingSheetSection() {
 
   // Modal States
   const [previewModalOpen, setPreviewModalOpen] = useState<boolean>(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Close fullscreen on Escape
+  useEffect(() => {
+    if (!isFullscreen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsFullscreen(false);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isFullscreen]);
   const [bulkModalOpen, setBulkModalOpen] = useState<boolean>(false);
   const [bulkStartLoom, setBulkStartLoom] = useState<string>("31");
   const [bulkEndLoom, setBulkEndLoom] = useState<string>("34");
@@ -1098,15 +1111,41 @@ export function LoomReadingSheetSection() {
       </div>
 
       {/* Interactive Bi-Hourly Reading Table */}
-      <div className="bg-white border border-slate-200 rounded-2xl shadow-2xs overflow-hidden">
+      <div
+        className={
+          isFullscreen
+            ? "fixed inset-0 z-50 bg-background flex flex-col p-4 md:p-6 shadow-2xl overflow-hidden"
+            : "bg-white border border-slate-200 rounded-2xl shadow-2xs overflow-hidden"
+        }
+      >
         {/* Horizontal Scroll Guidance Header */}
         <div className="px-5 py-2.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between text-xs text-slate-500">
-          <span className="font-bold text-slate-800">Circular Loom 2-Hours Shift Log Grid (Looms #1 to #91)</span>
+          <div className="flex items-center gap-2.5">
+            <button
+              type="button"
+              onClick={() => setIsFullscreen(!isFullscreen)}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 transition-all shadow-2xs cursor-pointer active:scale-95 shrink-0"
+              title={isFullscreen ? "Collapse back to normal view (Esc)" : "Expand sheet to fullscreen"}
+            >
+              {isFullscreen ? (
+                <>
+                  <Minimize2 className="h-3.5 w-3.5 text-sky-600" />
+                  <span>Collapse</span>
+                </>
+              ) : (
+                <>
+                  <Maximize2 className="h-3.5 w-3.5 text-sky-600" />
+                  <span>Expand</span>
+                </>
+              )}
+            </button>
+            <span className="font-bold text-slate-800">Circular Loom 2-Hours Shift Log Grid (Looms #1 to #91)</span>
+          </div>
           <span className="text-[11px] font-medium text-slate-400 bg-white px-2.5 py-1 rounded-lg border border-slate-200">
             ← Scroll horizontally to view all intervals, breakdown reasons, and target changeover qualities →
           </span>
         </div>
-        <div className="overflow-x-auto max-h-[75vh]">
+        <div className={isFullscreen ? "overflow-x-auto overflow-y-auto flex-1 border rounded-lg bg-card" : "overflow-x-auto max-h-[75vh]"}>
           <table className="w-full text-left text-xs border-collapse min-w-[2550px]">
             <thead>
               <tr className="bg-slate-100/90 border-b border-slate-200 text-slate-700 font-bold uppercase text-[11px]">

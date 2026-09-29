@@ -19,6 +19,8 @@ import {
   FileText,
   RotateCcw,
   Trash2,
+  Maximize2,
+  Minimize2,
 } from "lucide-react";
 import { RecipeQualityBadge } from "./RecipeQualityBadge";
 import { BobbinIssueModal } from "./BobbinIssueModal";
@@ -85,6 +87,17 @@ export function BobbinIssueSection({ onNavigateToBobbinStock }: BobbinIssueSecti
   const [activeSubTab, setActiveSubTab] = useState<"issues" | "ledger">("issues");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Close fullscreen on Escape
+  useEffect(() => {
+    if (!isFullscreen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsFullscreen(false);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isFullscreen]);
 
   // Filters
   const [dateFilterMode, setDateFilterMode] = useState<"all" | "single" | "range">("all");
@@ -432,11 +445,34 @@ export function BobbinIssueSection({ onNavigateToBobbinStock }: BobbinIssueSecti
       </div>
 
       {/* Main Container Card */}
-      <div className="bg-white rounded-xl border border-slate-200/80 shadow-2xs overflow-hidden">
+      <div className={`bg-white rounded-xl border border-slate-200/80 shadow-2xs overflow-hidden ${
+        isFullscreen
+          ? "fixed inset-0 z-50 rounded-none border-0 p-4 md:p-6 flex flex-col bg-background h-screen w-screen"
+          : ""
+      }`}>
         {/* Header & Sub-tab Switcher */}
-        <div className="p-4 border-b border-slate-100 bg-white flex flex-col gap-3">
+        <div className="p-4 border-b border-slate-100 bg-white flex flex-col gap-3 shrink-0">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setIsFullscreen((prev) => !prev)}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 shadow-2xs transition-colors cursor-pointer"
+                title={isFullscreen ? "Collapse (Esc)" : "Expand to Fullscreen"}
+              >
+                {isFullscreen ? (
+                  <>
+                    <Minimize2 className="h-3.5 w-3.5 text-slate-600" />
+                    <span>Collapse</span>
+                  </>
+                ) : (
+                  <>
+                    <Maximize2 className="h-3.5 w-3.5 text-slate-600" />
+                    <span>Expand</span>
+                  </>
+                )}
+              </button>
+
               {/* Sleek Subtab Pill Control */}
               <div className="inline-flex rounded-lg bg-slate-100 p-0.5 text-xs font-medium border border-slate-200/60">
                 <button
@@ -663,7 +699,7 @@ export function BobbinIssueSection({ onNavigateToBobbinStock }: BobbinIssueSecti
 
         {/* Tab View 1: Outgoing Bobbin Issues */}
         {activeSubTab === "issues" && (
-          <div className="overflow-x-auto">
+          <div className={isFullscreen ? "overflow-auto flex-1" : "overflow-x-auto"}>
             <table className="w-full text-left border-collapse min-w-[800px] text-xs">
               <thead>
                 <tr className="bg-slate-50/75 border-b border-slate-200 text-[11px] font-medium text-slate-600 uppercase tracking-wider">
@@ -819,7 +855,7 @@ export function BobbinIssueSection({ onNavigateToBobbinStock }: BobbinIssueSecti
 
         {/* Tab View 2: Consolidated Transactions Ledger */}
         {activeSubTab === "ledger" && (
-          <div className="overflow-x-auto">
+          <div className={isFullscreen ? "overflow-auto flex-1" : "overflow-x-auto"}>
             <table className="w-full text-left border-collapse min-w-[800px] text-xs">
               <thead>
                 <tr className="bg-slate-50/75 border-b border-slate-200 text-[11px] font-medium text-slate-600 uppercase tracking-wider">

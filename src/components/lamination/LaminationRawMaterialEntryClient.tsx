@@ -18,6 +18,8 @@ import {
   ArrowRight,
   RotateCcw,
   FlaskConical,
+  Maximize2,
+  Minimize2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -61,6 +63,17 @@ export function LaminationRawMaterialEntryClient() {
 
   // Print Modal
   const [isPrintModalOpen, setIsPrintModalOpen] = useState<boolean>(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Close fullscreen on Escape
+  useEffect(() => {
+    if (!isFullscreen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsFullscreen(false);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isFullscreen]);
 
   // Fetch report for Date + Shift
   const fetchReport = async () => {
@@ -310,11 +323,33 @@ export function LaminationRawMaterialEntryClient() {
       : "text-slate-700 bg-slate-100 border-slate-200";
 
   return (
-    <div className="space-y-5 font-sans pb-16">
+    <div className={`space-y-5 font-sans pb-16 ${
+      isFullscreen
+        ? "fixed inset-0 z-50 bg-background p-4 md:p-6 overflow-auto h-screen w-screen pb-6"
+        : ""
+    }`}>
       {/* Header Banner */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-5">
         <div>
           <div className="flex items-center gap-2.5">
+            <button
+              type="button"
+              onClick={() => setIsFullscreen((prev) => !prev)}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg border bg-white hover:bg-slate-50 text-slate-700 transition-colors cursor-pointer shadow-2xs"
+              title={isFullscreen ? "Collapse (Esc)" : "Expand to Fullscreen"}
+            >
+              {isFullscreen ? (
+                <>
+                  <Minimize2 className="w-3.5 h-3.5" />
+                  <span>Collapse</span>
+                </>
+              ) : (
+                <>
+                  <Maximize2 className="w-3.5 h-3.5" />
+                  <span>Expand</span>
+                </>
+              )}
+            </button>
             <div className="p-2.5 rounded-xl bg-purple-500/10 text-purple-600">
               <FlaskConical className="w-6 h-6" />
             </div>
