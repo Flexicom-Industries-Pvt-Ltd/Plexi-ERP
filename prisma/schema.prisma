@@ -19,6 +19,7 @@ enum Module {
   PRODUCTION
   TAPE_PLANT
   LOOM
+  LAMINATION
   QUALITY_CONTROL
   RECYCLING_PLANT
   MAINTENANCE
@@ -2121,6 +2122,56 @@ model Supervisor {
   @@index([isActive])
 }
 
+model LaminationProductionReport {
+  id                  String                      @id @default(cuid())
+  date                String                      // YYYY-MM-DD
+  shiftName           String                      // "Day Shift", "Night Shift", etc.
+  operatorName        String?
+  operatorId          String?
+  helperCount         Int                         @default(0) // No. of Helper
+  supervisorName      String?
+  status              String                      @default("DRAFT") // "DRAFT" | "SUBMITTED" | "APPROVED"
+  remarks             String?
+  totalRollMtrs       Float                       @default(0)
+  totalNetWtBefore    Float                       @default(0)
+  avgWtBefore         Float?                      @default(0)
+  totalProductionMtrs Float                       @default(0)
+  totalNetWtAfter     Float                       @default(0)
+  avgWtAfter          Float?                      @default(0)
+  avgCoating          Float?                      @default(0)
+  entries             LaminationProductionEntry[]
+  createdAt           DateTime                    @default(now())
+  updatedAt           DateTime                    @updatedAt
 
+  @@unique([date, shiftName])
+  @@index([date])
+  @@index([shiftName])
+  @@index([status])
+}
 
+model LaminationProductionEntry {
+  id                     String                     @id @default(cuid())
+  reportId               String
+  report                 LaminationProductionReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  sequence               Int                        @default(1)
+  quality                String                     // e.g. "NUVOCO SI", "UlCL YL SI", "White VIP"
+  size                   String?                    // e.g. "500"
+  loomNumber             Int                        // e.g. 88, 41, 51
+  rollNumber             String                     // e.g. "DI13614"
+  rollMeter              Float                      @default(0) // Roll Mtr. from roll stock
+  netWeightBefore        Float                      @default(0) // Net Wt. from roll stock in kg
+  avgWeightBefore        Float                      @default(0) // Avg Wt. from roll stock in g/m: (netWeightBefore / rollMeter) * 1000
+  productionMeter        Float                      @default(0) // Production in mtrs entered by operator
+  netWeightAfter         Float                      @default(0) // Net Wt. after prod in kg
+  avgWeightAfter         Float                      @default(0) // (netWeightAfter / productionMeter) * 1000 in g/m
+  coating                Float                      @default(0) // ((netWeightAfter - netWeightBefore) / productionMeter) * 1000 in g/m
+  remarks                String?
+  loomRollCuttingEntryId String?
+  createdAt              DateTime                   @default(now())
+  updatedAt              DateTime                   @updatedAt
 
+  @@index([reportId])
+  @@index([rollNumber])
+  @@index([quality])
+  @@index([loomNumber])
+}
