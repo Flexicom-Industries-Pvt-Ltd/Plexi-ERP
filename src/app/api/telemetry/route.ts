@@ -50,14 +50,24 @@ export async function GET() {
       { url: string; httpMethod: string; avgDuration: number; maxDuration: number; count: bigint }[]
     >`
       SELECT 
-        url, 
+        REGEXP_REPLACE(
+          REGEXP_REPLACE(
+            REGEXP_REPLACE(url, 'GE-[0-9]{8}-[0-9]{3,}', '[id]', 'g'),
+            '/c[a-z0-9]{20,}',
+            '/[id]',
+            'g'
+          ),
+          '/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}',
+          '/[id]',
+          'g'
+        ) AS url, 
         "httpMethod", 
         AVG("durationMs") as "avgDuration",
         MAX("durationMs") as "maxDuration",
         COUNT(*) as count
       FROM "LogEntry"
       WHERE timestamp >= NOW() - INTERVAL '24 hours' AND url IS NOT NULL
-      GROUP BY url, "httpMethod"
+      GROUP BY 1, "httpMethod"
       HAVING COUNT(*) > 5
       ORDER BY "avgDuration" DESC
       LIMIT 10;
