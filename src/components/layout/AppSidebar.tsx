@@ -14,6 +14,7 @@ import {
   Database,
   Layers,
   Grid,
+  Film,
 } from "lucide-react";
 
 import {
@@ -59,6 +60,13 @@ const loomItems = [
   { title: "Production Report", url: "/dashboard/production/loom?tab=production-report" },
 ];
 
+const laminationItems = [
+  { title: "Production Report", url: "/dashboard/production/lamination" },
+  { title: "Raw Material Entry", url: "/dashboard/production/lamination/raw-materials" },
+  { title: "Wastage Report", url: "/dashboard/production/lamination/wastage" },
+  { title: "Production Summary", url: "/dashboard/production/lamination/summary" },
+];
+
 const settingsItems = [
   { title: "General Settings", url: "/dashboard/settings/organization" },
   { title: "Users", url: "/dashboard/settings/users" },
@@ -80,6 +88,7 @@ const dataCentreItems = [
   { title: "Manpower Rules", url: "/dashboard/data-centre/manpower-rules" },
   { title: "Tape Plant Recipe", url: "/dashboard/data-centre/tape-plant-recipe" },
   { title: "Loom Machine Mapping", url: "/dashboard/data-centre/loom-machine-mapping" },
+  { title: "Lamination Raw Material", url: "/dashboard/data-centre/lamination-raw-materials" },
 ];
 
 type AppSidebarProps = {
@@ -92,6 +101,7 @@ export function AppSidebar({ user, allowedModules, ...props }: AppSidebarProps) 
   const router = useRouter();
   const [tapePlantOpen, setTapePlantOpen] = useState(pathname.startsWith("/dashboard/production/tape-plant"));
   const [loomOpen, setLoomOpen] = useState(pathname.startsWith("/dashboard/production/loom"));
+  const [laminationOpen, setLaminationOpen] = useState(pathname.startsWith("/dashboard/production/lamination"));
   const [settingsOpen, setSettingsOpen] = useState(pathname.startsWith("/dashboard/settings"));
   const [dataCentreOpen, setDataCentreOpen] = useState(pathname.startsWith("/dashboard/data-centre"));
 
@@ -117,6 +127,7 @@ export function AppSidebar({ user, allowedModules, ...props }: AppSidebarProps) 
   const hasDataCentreAccess = isSuperAdmin || Boolean(allowedModules["DATA_CENTRE"]);
   const hasTapePlantAccess = isSuperAdmin || Boolean(allowedModules["TAPE_PLANT"]);
   const hasLoomAccess = isSuperAdmin || Boolean(allowedModules["LOOM"]);
+  const hasLaminationAccess = isSuperAdmin || Boolean(allowedModules["LAMINATION"]) || Boolean(allowedModules["PRODUCTION"]);
 
   const visibleNavItems = navItems.filter(
     (item) => (!item.module || isSuperAdmin || allowedModules[item.module]),
@@ -197,6 +208,35 @@ export function AppSidebar({ user, allowedModules, ...props }: AppSidebarProps) 
                         <SidebarMenuSubItem key={subItem.url}>
                           <SidebarMenuSubButton
                             render={<Link href={subItem.url} onClick={() => setCurrentSearch(`?tab=${subTab}`)} />}
+                            isActive={isSubActive}
+                          >
+                            <span>{subItem.title}</span>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      );
+                    })}
+                  </SidebarMenuSub>
+                </CollapsibleContent>
+              </SidebarMenuItem>
+            </Collapsible>
+          )}
+
+          {hasLaminationAccess && (
+            <Collapsible open={laminationOpen} onOpenChange={setLaminationOpen} className="group/collapsible">
+              <SidebarMenuItem>
+                <CollapsibleTrigger render={<SidebarMenuButton tooltip="Lamination" />}>
+                    <Film className="h-4 w-4" />
+                    <span>Lamination</span>
+                    <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180" />
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <SidebarMenuSub>
+                    {laminationItems.map((subItem) => {
+                      const isSubActive = pathname === subItem.url || pathname.startsWith(subItem.url + "/");
+                      return (
+                        <SidebarMenuSubItem key={subItem.url}>
+                          <SidebarMenuSubButton
+                            render={<Link href={subItem.url} />}
                             isActive={isSubActive}
                           >
                             <span>{subItem.title}</span>
