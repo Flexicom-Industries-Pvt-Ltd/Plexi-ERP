@@ -14,7 +14,7 @@ export async function requireLaminationApiPermission(action: LaminationAction) {
     isSuperAdminRole(session.user.role) ||
     permissions.some(
       (p: { module: string; [key: string]: unknown }) =>
-        (p.module === "LAMINATION" || p.module === "PRODUCTION" || p.module === "ALL") &&
+        (p.module === "LAMINATION" || p.module === "PRODUCTION" || p.module === "DATA_CENTRE" || p.module === "ALL") &&
         Boolean(p[action])
     );
 
