@@ -16,6 +16,8 @@ import {
   Trash2,
   Layers,
   Scale,
+  Maximize2,
+  Minimize2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -71,6 +73,17 @@ export function LaminationWastageClient() {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isPending, startTransition] = useTransition();
   const [isPrintModalOpen, setIsPrintModalOpen] = useState<boolean>(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Close fullscreen on Escape
+  useEffect(() => {
+    if (!isFullscreen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsFullscreen(false);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isFullscreen]);
 
   // Fetch contractors from Data Centre
   useEffect(() => {
@@ -199,10 +212,85 @@ export function LaminationWastageClient() {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5 font-sans pb-16">
+      {/* Header Banner */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-5">
+        <div>
+          <div className="flex items-center gap-2.5">
+            <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-600">
+              <Scale className="w-6 h-6" />
+            </div>
+            <div>
+              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-3">
+                Lamination Wastage Report
+                <Badge
+                  variant="outline"
+                  className={
+                    status === "APPROVED"
+                      ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                      : status === "SUBMITTED"
+                      ? "bg-sky-50 text-sky-700 border-sky-200"
+                      : "bg-amber-50 text-amber-700 border-amber-200"
+                  }
+                >
+                  {status}
+                </Badge>
+              </h1>
+              <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+                Track shift lumps and fabric trim wastage with live percentage calculation against production net weights.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Global Action Buttons */}
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => exportWastageReportExcel(currentReportData)}
+            className="h-9 text-xs border-slate-200 hover:bg-slate-50"
+          >
+            <FileSpreadsheet className="h-4 w-4 mr-1.5 text-emerald-600" />
+            Excel Export
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsPrintModalOpen(true)}
+            className="h-9 text-xs border-slate-200 hover:bg-slate-50"
+          >
+            <Printer className="h-4 w-4 mr-1.5 text-sky-600" />
+            Print Report
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleReSyncSources}
+            title="Re-sync base numbers from shift reports"
+            className="h-9 text-xs border-slate-200 hover:bg-slate-50"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${isLoading ? "animate-spin" : ""}`} />
+            Sync Sources
+          </Button>
+
+          <Button
+            size="sm"
+            onClick={handleSave}
+            disabled={isPending || isLoading}
+            className="h-9 text-xs bg-sky-600 hover:bg-sky-700 text-white shadow-xs"
+          >
+            <Save className="h-4 w-4 mr-1.5" />
+            {isPending ? "Saving..." : "Save Shift Wastage"}
+          </Button>
+        </div>
+      </div>
+
       {/* Shift & Date Header */}
-      <div className="bg-white p-3.5 rounded-lg border border-slate-200 shadow-sm">
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 items-end">
+      <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3.5 items-end">
           {/* Date */}
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
@@ -289,35 +377,26 @@ export function LaminationWastageClient() {
             )}
           </div>
 
-          {/* Actions */}
-          <div className="flex items-center gap-2">
-            <Button
-              onClick={handleSave}
-              disabled={isPending || isLoading}
-              size="sm"
-              className="h-9 flex-1 text-xs bg-sky-600 hover:bg-sky-700 text-white font-medium"
+          {/* Status */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">
+              Status
+            </label>
+            <Select
+              value={status}
+              onValueChange={(val: any) => {
+                if (val) setStatus(val);
+              }}
             >
-              <Save className="h-3.5 w-3.5 mr-1.5" />
-              {isPending ? "Saving..." : "Save Report"}
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={handleReSyncSources}
-              title="Re-sync base numbers from shift reports"
-              className="h-9 w-9 text-slate-600 hover:text-sky-600"
-            >
-              <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`} />
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => setIsPrintModalOpen(true)}
-              title="Print Wastage Report"
-              className="h-9 w-9 text-slate-700 hover:text-slate-900"
-            >
-              <Printer className="h-3.5 w-3.5" />
-            </Button>
+              <SelectTrigger className="h-9 text-xs">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="DRAFT" className="text-xs">Draft</SelectItem>
+                <SelectItem value="SUBMITTED" className="text-xs">Submitted</SelectItem>
+                <SelectItem value="APPROVED" className="text-xs">Approved</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
@@ -436,9 +515,34 @@ export function LaminationWastageClient() {
       </div>
 
       {/* Main Wastage Table */}
-      <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
+      <div
+        className={
+          isFullscreen
+            ? "fixed inset-0 z-50 bg-background flex flex-col p-4 md:p-6 shadow-2xl overflow-hidden"
+            : "bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden"
+        }
+      >
         <div className="p-3 bg-slate-50/70 border-b border-slate-200 flex items-center justify-between">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsFullscreen(!isFullscreen)}
+              className="h-7 px-2 text-xs border-slate-300 hover:bg-slate-100 flex items-center gap-1.5 cursor-pointer active:scale-95"
+              title={isFullscreen ? "Collapse back to normal view (Esc)" : "Expand table to fullscreen"}
+            >
+              {isFullscreen ? (
+                <>
+                  <Minimize2 className="h-3.5 w-3.5 text-sky-600" />
+                  <span>Collapse</span>
+                </>
+              ) : (
+                <>
+                  <Maximize2 className="h-3.5 w-3.5 text-sky-600" />
+                  <span>Expand</span>
+                </>
+              )}
+            </Button>
             <span className="h-2 w-2 rounded-full bg-sky-600"></span>
             <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
               Shift Wastage Breakdown & Percentage Calculations
@@ -449,7 +553,7 @@ export function LaminationWastageClient() {
           </span>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className={isFullscreen ? "overflow-x-auto overflow-y-auto flex-1 border rounded-lg bg-card" : "overflow-x-auto"}>
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-100/60 border-b border-slate-200 text-slate-700 text-[11px] font-semibold uppercase tracking-wider">

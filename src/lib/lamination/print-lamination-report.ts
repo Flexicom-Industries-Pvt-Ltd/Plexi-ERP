@@ -2,39 +2,71 @@ import { LaminationProductionReportData, computeLaminationReportTotals } from ".
 
 export function generateLaminationReportHtml(data: LaminationProductionReportData): string {
   const totals = computeLaminationReportTotals(data.entries);
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const genTimestamp = new Date().toLocaleString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
 
-  // Group entries by quality to display nicely, or display each row serially
-  // Notice in the Excel report, when a quality has multiple consecutive rolls, the Quality and Width are shown on the first row of that group or clearly identified!
-  const rowsHtml = data.entries
-    .map((entry, index) => {
-      // Check if previous entry has same quality to match the clean grouped style from the Excel sheet
-      const prevEntry = index > 0 ? data.entries[index - 1] : null;
-      const isNewQuality = !prevEntry || prevEntry.quality !== entry.quality;
+  const docDate = (data.date || new Date().toISOString().slice(0, 10)).replace(/[^a-zA-Z0-9]/g, "");
+  const docRef = `LAM-PR-${docDate}-${(data.shiftName || "SHIFT").toUpperCase().replace(/\s+/g, "")}`;
 
-      return `
-        <tr>
-          <td style="text-align: center; font-weight: 500;">${entry.sequence || index + 1}</td>
-          <td style="font-weight: ${isNewQuality ? "bold" : "normal"}; color: #1e293b;">
-            ${entry.quality || "—"}
-          </td>
-          <td style="text-align: center;">${entry.size || "—"}</td>
-          <td style="text-align: center; font-weight: 500;">${entry.loomNumber || "—"}</td>
-          <td style="font-family: monospace; font-weight: 600; text-align: center;">${entry.rollNumber || "—"}</td>
-          <td style="text-align: right;">${entry.rollMeter > 0 ? entry.rollMeter.toLocaleString() : "—"}</td>
-          <td style="text-align: right;">${entry.netWeightBefore > 0 ? entry.netWeightBefore.toFixed(1) : "—"}</td>
-          <td style="text-align: right; background-color: #f8fafc;">${entry.avgWeightBefore > 0 ? entry.avgWeightBefore.toFixed(1) : "—"}</td>
-          <td style="text-align: right; font-weight: 600; color: #0284c7;">${entry.productionMeter > 0 ? entry.productionMeter.toLocaleString() : "—"}</td>
-          <td style="text-align: right; font-weight: 600;">${entry.netWeightAfter > 0 ? entry.netWeightAfter.toFixed(1) : "—"}</td>
-          <td style="text-align: right; font-weight: 600; background-color: #f0f9ff; color: #0369a1;">${entry.avgWeightAfter > 0 ? entry.avgWeightAfter.toFixed(1) : "—"}</td>
-          <td style="text-align: right; font-weight: 600; background-color: #f0fdf4; color: #15803d;">${entry.coating !== 0 ? entry.coating.toFixed(1) : "—"}</td>
-          <td>${entry.remarks || ""}</td>
-        </tr>
-      `;
-    })
-    .join("");
+  const rowsHtml = data.entries.length > 0
+    ? data.entries
+        .map((entry, index) => {
+          const prevEntry = index > 0 ? data.entries[index - 1] : null;
+          const isNewQuality = !prevEntry || prevEntry.quality !== entry.quality;
 
-  return `
-<!DOCTYPE html>
+          return `
+            <tr style="${index % 2 === 1 ? "background-color: #f8fafc;" : "background-color: #ffffff;"}">
+              <td style="text-align: center; font-weight: 700; font-size: 7.5pt; color: #475569;">${entry.sequence || index + 1}</td>
+              <td style="font-weight: ${isNewQuality ? "800" : "500"}; font-size: 8pt; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                ${entry.quality || "—"}
+              </td>
+              <td style="text-align: center; font-family: monospace; font-size: 7.5pt; font-weight: 600; color: #334155;">
+                ${entry.size || "—"}
+              </td>
+              <td style="text-align: center; font-family: monospace; font-size: 8pt; font-weight: 800; color: #0284c7;">
+                #${entry.loomNumber || "—"}
+              </td>
+              <td style="text-align: center; font-family: monospace; font-size: 8pt; font-weight: 800; color: #0f172a; background: #f8fafc;">
+                ${entry.rollNumber || "—"}
+              </td>
+              <td style="text-align: right; font-family: monospace; font-size: 7.5pt; color: #334155;">
+                ${entry.rollMeter > 0 ? entry.rollMeter.toLocaleString() : "—"}
+              </td>
+              <td style="text-align: right; font-family: monospace; font-size: 7.5pt; color: #334155;">
+                ${entry.netWeightBefore > 0 ? entry.netWeightBefore.toFixed(1) : "—"}
+              </td>
+              <td style="text-align: right; font-family: monospace; font-size: 7.5pt; color: #64748b; background-color: #f8fafc;">
+                ${entry.avgWeightBefore > 0 ? entry.avgWeightBefore.toFixed(1) : "—"}
+              </td>
+              <td style="text-align: right; font-family: monospace; font-size: 8pt; font-weight: 800; color: #0284c7; background: #f0f9ff;">
+                ${entry.productionMeter > 0 ? entry.productionMeter.toLocaleString() : "—"}
+              </td>
+              <td style="text-align: right; font-family: monospace; font-size: 8pt; font-weight: 800; color: #0f172a;">
+                ${entry.netWeightAfter > 0 ? entry.netWeightAfter.toFixed(1) : "—"}
+              </td>
+              <td style="text-align: right; font-family: monospace; font-size: 7.5pt; font-weight: 700; color: #0369a1; background-color: #f0f9ff;">
+                ${entry.avgWeightAfter > 0 ? entry.avgWeightAfter.toFixed(1) : "—"}
+              </td>
+              <td style="text-align: right; font-family: monospace; font-size: 8pt; font-weight: 800; color: #15803d; background-color: #f0fdf4;">
+                ${entry.coating !== 0 ? entry.coating.toFixed(1) : "—"}
+              </td>
+              <td style="font-size: 7pt; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                ${entry.remarks || ""}
+              </td>
+            </tr>
+          `;
+        })
+        .join("")
+    : `<tr><td colspan="13" style="text-align: center; padding: 24px; color: #64748b; font-style: italic;">No production entries logged for this shift.</td></tr>`;
+
+  return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -42,109 +74,149 @@ export function generateLaminationReportHtml(data: LaminationProductionReportDat
   <style>
     @page {
       size: A4 landscape;
-      margin: 10mm 8mm 10mm 8mm;
+      margin: 8mm 8mm 8mm 8mm;
     }
     * {
       box-sizing: border-box;
       margin: 0;
       padding: 0;
-    }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
-      font-size: 11px;
-      color: #0f172a;
-      background: #ffffff;
-      padding: 10px;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
     }
-    .header-container {
-      text-align: center;
-      margin-bottom: 12px;
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      font-size: 8pt;
+      color: #0f172a;
+      background: #ffffff;
+      padding: 4px;
+      line-height: 1.25;
+    }
+
+    /* Enterprise Standard Company Letterhead */
+    .company-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
       border-bottom: 2px solid #0f172a;
-      padding-bottom: 6px;
+      padding-bottom: 4px;
+      margin-bottom: 5px;
     }
     .company-title {
-      font-size: 17px;
-      font-weight: 800;
+      font-size: 13pt;
+      font-weight: 900;
       letter-spacing: 0.5px;
+      color: #000000;
       text-transform: uppercase;
-      color: #0f172a;
     }
-    .company-address {
-      font-size: 10.5px;
+    .company-sub {
+      font-size: 6.5pt;
       color: #475569;
+      margin-top: 1px;
+    }
+    .doc-main-heading {
+      display: inline-block;
+      border: 1.5px solid #0f172a;
+      background: #f8fafc;
+      padding: 2px 14px;
+      font-size: 8.5pt;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-top: 3px;
+      margin-bottom: 2px;
+    }
+    .doc-meta-strip {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-items: center;
+      gap: 12px;
+      font-size: 6.5pt;
+      color: #334155;
       margin-top: 2px;
     }
-    .report-title {
-      font-size: 14px;
-      font-weight: 700;
-      letter-spacing: 1px;
-      margin-top: 5px;
-      text-transform: uppercase;
-      color: #1e3a8a;
+    .doc-meta-strip strong {
+      color: #000000;
     }
-    .meta-table {
+
+    /* KPI Summary Row */
+    .kpi-table {
       width: 100%;
       border-collapse: collapse;
-      margin-bottom: 10px;
-      font-size: 11px;
+      margin-bottom: 5px;
       background-color: #f8fafc;
-      border: 1px solid #cbd5e1;
-    }
-    .meta-table td {
-      padding: 6px 10px;
-      border: 1px solid #cbd5e1;
-    }
-    .meta-label {
-      font-weight: 700;
-      color: #334155;
-      text-transform: uppercase;
-      font-size: 10px;
-    }
-    .meta-value {
-      font-weight: 600;
-      color: #0f172a;
-    }
-    table.data-table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-bottom: 14px;
-      font-size: 10px;
-    }
-    table.data-table th,
-    table.data-table td {
       border: 1px solid #94a3b8;
-      padding: 5px 6px;
     }
-    table.data-table th {
-      background-color: #e2e8f0;
-      color: #0f172a;
-      font-weight: 700;
+    .kpi-table td {
+      padding: 3px 5px;
+      border: 1px solid #cbd5e1;
+      vertical-align: middle;
       text-align: center;
-      text-transform: uppercase;
-      font-size: 9.5px;
-      letter-spacing: 0.2px;
     }
-    .subhead-unlam {
-      background-color: #f1f5f9;
+    .kpi-label {
+      font-size: 6pt;
+      font-weight: 700;
+      text-transform: uppercase;
       color: #475569;
     }
+    .kpi-val {
+      font-size: 8.5pt;
+      font-weight: 800;
+      font-family: monospace;
+      color: #0f172a;
+      margin-top: 1px;
+    }
+
+    /* Fixed-Layout Main Table */
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 6px;
+      font-size: 7pt;
+      table-layout: fixed;
+    }
+    .data-table th {
+      background-color: #e2e8f0 !important;
+      border: 1px solid #64748b !important;
+      padding: 3px 2px;
+      font-weight: 900;
+      font-size: 6.5pt;
+      text-transform: uppercase;
+      text-align: center;
+      color: #0f172a;
+    }
+    .data-table td {
+      border: 1px solid #cbd5e1 !important;
+      padding: 3px 3px;
+      vertical-align: middle;
+    }
+    .subhead-unlam {
+      background-color: #f1f5f9 !important;
+      color: #334155 !important;
+      font-weight: 800;
+      border-bottom: 1.5px solid #64748b !important;
+    }
     .subhead-lam {
-      background-color: #e0f2fe;
-      color: #0369a1;
+      background-color: #e0f2fe !important;
+      color: #0369a1 !important;
+      font-weight: 800;
+      border-bottom: 1.5px solid #0284c7 !important;
     }
     tr.totals-row td {
-      font-weight: 800;
-      background-color: #f1f5f9;
-      border-top: 2px solid #0f172a;
-      border-bottom: 2px solid #0f172a;
+      font-weight: 900 !important;
+      font-size: 7.5pt !important;
+      background-color: #f1f5f9 !important;
+      border-top: 2px solid #0f172a !important;
+      border-bottom: 2px solid #0f172a !important;
+      padding: 4px 3px;
     }
+
+    /* Signatures Strip */
     .signatures-container {
       display: flex;
       justify-content: space-between;
-      margin-top: 30px;
-      padding: 0 20px;
+      margin-top: 14px;
+      padding: 0 16px;
       page-break-inside: avoid;
     }
     .sig-box {
@@ -152,77 +224,117 @@ export function generateLaminationReportHtml(data: LaminationProductionReportDat
       width: 180px;
     }
     .sig-line {
-      border-top: 1px solid #475569;
-      margin-top: 36px;
-      padding-top: 4px;
-      font-weight: 600;
-      font-size: 10.5px;
-      color: #334155;
-    }
-    @media print {
-      body {
-        padding: 0;
-      }
-      .no-print {
-        display: none !important;
-      }
+      border-top: 1.5px solid #0f172a;
+      margin-top: 24px;
+      padding-top: 3px;
+      font-weight: 700;
+      font-size: 7pt;
+      text-transform: uppercase;
+      color: #0f172a;
     }
   </style>
 </head>
 <body>
-  <div class="header-container">
-    <div class="company-title">FLEXICOM INDUSTRIES PVT. LIMITED</div>
-    <div class="company-address">Sidco Industrial Estate, Ghatti Kathua, Phase-II, (J & K) 184143</div>
-    <div class="report-title">LAMINATION PRODUCT REPORT</div>
+  <!-- Standardized Letterhead Strip -->
+  <div class="company-header">
+    <div style="width: 70px;">
+      <img src="${origin}/logo.png" style="height: 38px; width: auto;" onerror="this.style.display='none'" />
+    </div>
+    <div style="flex: 1; text-align: center;">
+      <div class="company-title">FLEXICOM INDUSTRIES PVT. LIMITED</div>
+      <div class="company-sub">SIDCO INDUSTRIAL ESTATE, PHASE-II, KATHUA (J&K) 184143 • LAMINATION DIVISION</div>
+      <div class="doc-main-heading">LAMINATION PRODUCT REPORT</div>
+      <div class="doc-meta-strip">
+        <span>Doc Ref: <strong>${docRef}</strong></span>
+        <span>Date: <strong>${data.date}</strong></span>
+        <span>Shift: <strong>${data.shiftName}</strong></span>
+        <span>Supervisor: <strong>${data.supervisorName || "—"}</strong></span>
+        <span>Operator: <strong>${data.operatorName || "—"}</strong></span>
+        <span>Helpers: <strong>${String(data.helperCount || 0).padStart(2, "0")}</strong></span>
+        <span>Generated: <strong>${genTimestamp}</strong></span>
+      </div>
+    </div>
+    <div style="width: 70px; text-align: right;">
+      <span style="font-size: 6.5pt; font-weight: 800; border: 1px solid #94a3b8; padding: 2px 4px; background: #f8fafc; border-radius: 2px;">
+        A4 LANDSCAPE
+      </span>
+    </div>
   </div>
 
-  <table class="meta-table">
+  <!-- KPI Strip (7 Cards) -->
+  <table class="kpi-table">
     <tr>
-      <td width="25%"><span class="meta-label">Date:</span> <span class="meta-value">${data.date}</span></td>
-      <td width="25%"><span class="meta-label">Shift:</span> <span class="meta-value">${data.shiftName}</span></td>
-      <td width="25%"><span class="meta-label">Operator:</span> <span class="meta-value">${data.operatorName || "—"}</span></td>
-      <td width="25%"><span class="meta-label">No. of Helper:</span> <span class="meta-value">${String(data.helperCount || 0).padStart(2, "0")}</span></td>
+      <td style="width: 14%;">
+        <div class="kpi-label">Total Rolls</div>
+        <div class="kpi-val">${data.entries.length}</div>
+      </td>
+      <td style="width: 14%;">
+        <div class="kpi-label">Input Roll Mtrs</div>
+        <div class="kpi-val">${totals.totalRollMtrs.toLocaleString()} M</div>
+      </td>
+      <td style="width: 14%;">
+        <div class="kpi-label">Input Net Wt</div>
+        <div class="kpi-val">${totals.totalNetWtBefore.toFixed(1)} Kg</div>
+      </td>
+      <td style="width: 14%;">
+        <div class="kpi-label">Avg Input Wt</div>
+        <div class="kpi-val">${totals.avgWtBefore.toFixed(1)} g/m</div>
+      </td>
+      <td style="width: 15%; background: #f0f9ff;">
+        <div class="kpi-label" style="color: #0369a1;">Output Prod Mtrs</div>
+        <div class="kpi-val" style="color: #0284c7;">${totals.totalProductionMtrs.toLocaleString()} M</div>
+      </td>
+      <td style="width: 15%; background: #f0f9ff;">
+        <div class="kpi-label" style="color: #0369a1;">Output Net Wt</div>
+        <div class="kpi-val" style="color: #0369a1;">${totals.totalNetWtAfter.toFixed(1)} Kg</div>
+      </td>
+      <td style="width: 14%; background: #f0fdf4;">
+        <div class="kpi-label" style="color: #15803d;">Avg Coating</div>
+        <div class="kpi-val" style="color: #15803d;">${totals.avgCoating.toFixed(1)} g/m</div>
+      </td>
     </tr>
   </table>
 
+  <!-- Fixed-width Data Table (Strict 100% width budget) -->
   <table class="data-table">
     <thead>
       <tr>
-        <th rowspan="2" width="3%">S.No.</th>
-        <th rowspan="2" width="12%">Quality</th>
-        <th rowspan="2" width="5%">Width</th>
-        <th colspan="5" class="subhead-unlam" style="border-bottom: 1px solid #94a3b8;">Unlaminated Roll (From Roll Stock)</th>
-        <th colspan="4" class="subhead-lam" style="border-bottom: 1px solid #94a3b8;">Laminated Output</th>
-        <th rowspan="2" width="10%">Remarks</th>
+        <th rowspan="2" style="width: 3%;">Seq</th>
+        <th rowspan="2" style="width: 14%;">Quality Name</th>
+        <th rowspan="2" style="width: 6%;">Size</th>
+        <th rowspan="2" style="width: 6%;">Loom#</th>
+        <th rowspan="2" style="width: 9%;">Roll Number</th>
+        <th colspan="3" class="subhead-unlam" style="width: 23%;">Raw Fabric (Before Lamination)</th>
+        <th colspan="3" class="subhead-lam" style="width: 23%;">Laminated Fabric (After Lamination)</th>
+        <th rowspan="2" style="width: 8%; background-color: #ecfdf5 !important; color: #15803d !important;">Coating<br>(g/m)</th>
+        <th rowspan="2" style="width: 8%;">Remarks</th>
       </tr>
       <tr>
-        <th width="5%" class="subhead-unlam">Loom #</th>
-        <th width="7%" class="subhead-unlam">Roll No.</th>
-        <th width="6%" class="subhead-unlam">Roll Mtr.</th>
-        <th width="6%" class="subhead-unlam">Net Wt. (Kg)</th>
-        <th width="6%" class="subhead-unlam">Avg Wt. (g/m)</th>
-        <th width="6%" class="subhead-lam">Production (M)</th>
-        <th width="6%" class="subhead-lam">Net Wt. (Kg)</th>
-        <th width="6%" class="subhead-lam">Avg (g/m)</th>
-        <th width="6%" class="subhead-lam">Coating (g/m)</th>
+        <th class="subhead-unlam" style="width: 8%;">Mtr</th>
+        <th class="subhead-unlam" style="width: 8%;">Net Wt (kg)</th>
+        <th class="subhead-unlam" style="width: 7%;">Avg (g/m)</th>
+        <th class="subhead-lam" style="width: 8%;">Prod Mtr</th>
+        <th class="subhead-lam" style="width: 8%;">Net Wt (kg)</th>
+        <th class="subhead-lam" style="width: 7%;">Avg (g/m)</th>
       </tr>
     </thead>
     <tbody>
-      ${rowsHtml || `<tr><td colspan="13" style="text-align:center; padding: 20px; color: #64748b;">No production entries recorded</td></tr>`}
+      ${rowsHtml}
       <tr class="totals-row">
-        <td colspan="5" style="text-align: right; padding-right: 8px;">TOTAL:</td>
-        <td style="text-align: right;">${totals.totalRollMtrs.toLocaleString()}</td>
-        <td style="text-align: right;">${totals.totalNetWtBefore.toFixed(1)}</td>
-        <td style="text-align: right; background-color: #f1f5f9;">${totals.avgWtBefore.toFixed(1)}</td>
-        <td style="text-align: right; color: #0284c7;">${totals.totalProductionMtrs.toLocaleString()}</td>
-        <td style="text-align: right;">${totals.totalNetWtAfter.toFixed(1)}</td>
-        <td style="text-align: right; background-color: #e0f2fe; color: #0369a1;">${totals.avgWtAfter.toFixed(1)}</td>
-        <td style="text-align: right; background-color: #dcfce7; color: #15803d;">${totals.avgCoating.toFixed(1)}</td>
+        <td colspan="5" style="text-align: right; padding-right: 8px;">SHIFT TOTAL:</td>
+        <td style="text-align: right; font-family: monospace;">${totals.totalRollMtrs.toLocaleString()}</td>
+        <td style="text-align: right; font-family: monospace;">${totals.totalNetWtBefore.toFixed(1)}</td>
+        <td style="text-align: right; font-family: monospace; background-color: #f1f5f9;">${totals.avgWtBefore.toFixed(1)}</td>
+        <td style="text-align: right; font-family: monospace; color: #0284c7; background: #f0f9ff;">${totals.totalProductionMtrs.toLocaleString()}</td>
+        <td style="text-align: right; font-family: monospace;">${totals.totalNetWtAfter.toFixed(1)}</td>
+        <td style="text-align: right; font-family: monospace; background-color: #e0f2fe; color: #0369a1;">${totals.avgWtAfter.toFixed(1)}</td>
+        <td style="text-align: right; font-family: monospace; background-color: #dcfce7; color: #15803d;">${totals.avgCoating.toFixed(1)}</td>
         <td></td>
       </tr>
     </tbody>
   </table>
 
+  <!-- Official Signatures -->
   <div class="signatures-container">
     <div class="sig-box">
       <div class="sig-line">Operator Signature</div>
@@ -235,42 +347,58 @@ export function generateLaminationReportHtml(data: LaminationProductionReportDat
     </div>
   </div>
 </body>
-</html>
-  `.trim();
+</html>`.trim();
 }
 
 /**
- * Triggers native browser print via hidden iframe
+ * Triggers native browser print via hidden iframe with robust fallback
  */
 export function printLaminationReport(data: LaminationProductionReportData): void {
   const html = generateLaminationReportHtml(data);
-  const iframe = document.createElement("iframe");
-  iframe.style.position = "fixed";
-  iframe.style.right = "0";
-  iframe.style.bottom = "0";
-  iframe.style.width = "0";
-  iframe.style.height = "0";
-  iframe.style.border = "none";
-  iframe.style.visibility = "hidden";
-  document.body.appendChild(iframe);
-
-  const doc = iframe.contentWindow?.document;
-  if (!doc) {
-    document.body.removeChild(iframe);
-    return;
+  let iframe = document.getElementById("lamination-print-iframe") as HTMLIFrameElement | null;
+  if (!iframe) {
+    iframe = document.createElement("iframe");
+    iframe.id = "lamination-print-iframe";
+    iframe.style.position = "fixed";
+    iframe.style.right = "0";
+    iframe.style.bottom = "0";
+    iframe.style.width = "0";
+    iframe.style.height = "0";
+    iframe.style.border = "0";
+    document.body.appendChild(iframe);
   }
 
-  doc.open();
-  doc.write(html);
-  doc.close();
+  const doc = iframe.contentWindow?.document || iframe.contentDocument;
+  if (doc && iframe.contentWindow) {
+    doc.open();
+    doc.write(html);
+    doc.close();
 
-  iframe.contentWindow?.focus();
-  setTimeout(() => {
-    iframe.contentWindow?.print();
-    setTimeout(() => {
-      if (document.body.contains(iframe)) {
-        document.body.removeChild(iframe);
+    const triggerPrint = () => {
+      try {
+        iframe?.contentWindow?.focus();
+        iframe?.contentWindow?.print();
+      } catch (err) {
+        console.error("Iframe print failed, falling back to window print", err);
+        fallbackWindowPrint(html);
       }
-    }, 1000);
-  }, 350);
+    };
+
+    setTimeout(triggerPrint, 250);
+  } else {
+    fallbackWindowPrint(html);
+  }
+}
+
+function fallbackWindowPrint(html: string): void {
+  const win = window.open("", "_blank", "width=1200,height=800");
+  if (win) {
+    win.document.open();
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    setTimeout(() => {
+      win.print();
+    }, 300);
+  }
 }

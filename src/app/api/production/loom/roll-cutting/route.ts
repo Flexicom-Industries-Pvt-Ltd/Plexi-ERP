@@ -47,7 +47,8 @@ export async function GET(request: NextRequest) {
     const candidateShiftNames = getNormalizedShiftCandidates(shiftNameParam);
 
     // Fetch existing report, shifts, operators, contractors, supervisors, loom mappings, tape recipes, and last roll number concurrently
-    const [shifts, operators, contractors, supervisors, mappings, tapeRecipes, existingReport, lastEntry] = await Promise.all([
+    // Fetch existing report, shifts, operators, contractors, supervisors, loom mappings, tape recipes, last roll number, and recent bobbin issues concurrently
+    const [shifts, operators, contractors, supervisors, mappings, tapeRecipes, existingReport, lastEntry, recentBobbinIssues, recentRollEntries] = await Promise.all([
       db.shift.findMany({
         where: { isActive: true },
         orderBy: { name: "asc" },
@@ -87,6 +88,27 @@ export async function GET(request: NextRequest) {
         orderBy: { createdAt: "desc" },
         select: { rollNumber: true },
       }),
+      db.tapePlantBobbinIssue.findMany({
+        where: { status: { not: "CANCELLED" } },
+        orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+        take: 100,
+        select: {
+          id: true,
+          date: true,
+          recipeQuality: true,
+          loomNumber: true,
+          loomAllocations: true,
+        },
+      }),
+      db.loomRollCuttingEntry.findMany({
+        orderBy: { createdAt: "desc" },
+        take: 200,
+        select: {
+          loomNumber: true,
+          qualityType: true,
+          size: true,
+        },
+      }),
     ]);
 
     // Build qualities catalog
@@ -122,20 +144,82 @@ export async function GET(request: NextRequest) {
       });
     });
 
-    const availableQualities = Array.from(qualityMap.values()).sort((a, b) => a.code.localeCompare(b.code));
-
     // Build loom allocation quick-reference map
+    const TOTAL_LOOMS = 91;
     const loomAllocations: Record<number, { qualityCode: string; size: string; denier: string }> = {};
+
+    // 1. Authoritative loom mappings (from Loom Summary / Loom Machine Mapping)
     for (const mapping of mappings) {
       const qSpec = qualityMap.get(mapping.qualityCode);
-      for (const loomNum of mapping.loomNumbers) {
-        loomAllocations[loomNum] = {
-          qualityCode: mapping.qualityCode,
-          size: qSpec?.size || (mapping.reedSpaceCm ? String(mapping.reedSpaceCm * 10) : ""),
-          denier: qSpec?.denier ? String(qSpec.denier) : (mapping.denier ? String(mapping.denier) : ""),
+      const reedSize = mapping.reedSpaceCm ? String(mapping.reedSpaceCm * 10) : "";
+      for (const loomNum of mapping.loomNumbers || []) {
+        if (typeof loomNum === "number" && loomNum >= 1 && loomNum <= TOTAL_LOOMS) {
+          loomAllocations[loomNum] = {
+            qualityCode: mapping.qualityCode,
+            size: qSpec?.size || reedSize || (mapping.tapeWidth ? String(mapping.tapeWidth) : ""),
+            denier: qSpec?.denier ? String(qSpec.denier) : (mapping.denier ? String(mapping.denier) : ""),
+          };
+        }
+      }
+    }
+
+    // 2. Active bobbin issue allocations for looms without mapping
+    for (const issue of recentBobbinIssues) {
+      const rec = (issue.recipeQuality || "").trim();
+      if (!rec) continue;
+      const qSpec = qualityMap.get(rec);
+      const multiAlloc = Array.isArray(issue.loomAllocations) ? (issue.loomAllocations as any[]) : [];
+      if (multiAlloc.length > 0) {
+        for (const alloc of multiAlloc) {
+          const lNum = Number(alloc.loomNumber);
+          if (lNum && lNum >= 1 && lNum <= TOTAL_LOOMS && !loomAllocations[lNum]) {
+            loomAllocations[lNum] = {
+              qualityCode: rec,
+              size: qSpec?.size || "",
+              denier: qSpec?.denier ? String(qSpec.denier) : "",
+            };
+          }
+        }
+      } else if (issue.loomNumber) {
+        const lNum = Number(issue.loomNumber);
+        if (lNum && lNum >= 1 && lNum <= TOTAL_LOOMS && !loomAllocations[lNum]) {
+          loomAllocations[lNum] = {
+            qualityCode: rec,
+            size: qSpec?.size || "",
+            denier: qSpec?.denier ? String(qSpec.denier) : "",
+          };
+        }
+      }
+    }
+
+    // 3. Fallback from recent roll cutting entries for unmapped looms
+    for (const entry of recentRollEntries) {
+      const lNum = Number(entry.loomNumber);
+      if (lNum && lNum >= 1 && lNum <= TOTAL_LOOMS && !loomAllocations[lNum] && entry.qualityType) {
+        const qSpec = qualityMap.get(entry.qualityType);
+        loomAllocations[lNum] = {
+          qualityCode: entry.qualityType,
+          size: entry.size || qSpec?.size || "",
+          denier: qSpec?.denier ? String(qSpec.denier) : "",
         };
       }
     }
+
+    // Ensure all allocated qualities exist in availableQualities catalog
+    Object.values(loomAllocations).forEach((alloc) => {
+      if (alloc.qualityCode && !qualityMap.has(alloc.qualityCode)) {
+        qualityMap.set(alloc.qualityCode, {
+          code: alloc.qualityCode,
+          colorGroup: "Standard",
+          colour: "White",
+          denier: alloc.denier ? Number(alloc.denier) : null,
+          reedSpaceCm: alloc.size ? Number(alloc.size) / 10 : null,
+          size: alloc.size || "",
+        });
+      }
+    });
+
+    const availableQualities = Array.from(qualityMap.values()).sort((a, b) => a.code.localeCompare(b.code));
 
     // Process entries
     let entries: LoomRollCuttingEntryItem[] = [];

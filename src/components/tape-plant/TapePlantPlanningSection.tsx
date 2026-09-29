@@ -14,6 +14,8 @@ import {
   Eye,
   FileSpreadsheet,
   SunMedium,
+  Maximize2,
+  Minimize2,
 } from "lucide-react";
 import { PlanningPrintPreviewModal } from "./PlanningPrintPreviewModal";
 import { generateTapePlantPlanningExcel } from "@/lib/tape-plant/planning-export";
@@ -105,6 +107,17 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName, shifts }: T
   const lastSavedPayloadRef = useRef("");
   const [status, setStatus] = useState("SAVED");
   const [showPrintModal, setShowPrintModal] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Close fullscreen on Escape
+  useEffect(() => {
+    if (!isFullscreen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsFullscreen(false);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isFullscreen]);
 
   // Available shifts
   const [availableShifts, setAvailableShifts] = useState<{ id: string; name: string }[]>(shifts || []);
@@ -929,8 +942,44 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName, shifts }: T
       </div>
 
       {/* ── Excel-Like Data Grid ── */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto min-h-[380px]">
+      <div
+        className={
+          isFullscreen
+            ? "fixed inset-0 z-50 bg-background flex flex-col p-4 md:p-6 shadow-2xl overflow-hidden"
+            : "bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden"
+        }
+      >
+        <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            {/* Top-Left Fullscreen Expand / Collapse Toggle */}
+            <button
+              type="button"
+              onClick={() => setIsFullscreen(!isFullscreen)}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 transition-all shadow-2xs cursor-pointer active:scale-95 shrink-0"
+              title={isFullscreen ? "Collapse back to normal view (Esc)" : "Expand planning sheet to fullscreen"}
+            >
+              {isFullscreen ? (
+                <>
+                  <Minimize2 className="h-3.5 w-3.5 text-sky-600" />
+                  <span>Collapse</span>
+                </>
+              ) : (
+                <>
+                  <Maximize2 className="h-3.5 w-3.5 text-sky-600" />
+                  <span>Expand</span>
+                </>
+              )}
+            </button>
+            <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+              Tape Plant Planning Sheet Grid
+            </span>
+          </div>
+          <span className="text-[11px] text-slate-500 font-medium">
+            {recipePlans.length} {recipePlans.length === 1 ? "recipe plan" : "recipe plans"}
+          </span>
+        </div>
+
+        <div className={isFullscreen ? "overflow-x-auto overflow-y-auto flex-1 border rounded-lg bg-card" : "overflow-x-auto min-h-[380px]"}>
           <table className="w-full text-xs border-collapse min-w-[1450px]">
             {/* Column Headers */}
             <thead>

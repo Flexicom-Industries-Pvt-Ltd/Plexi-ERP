@@ -36,6 +36,9 @@ import {
   CheckCircle2,
   Loader2,
   Sparkles,
+  Film,
+  Maximize2,
+  Minimize2,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -72,6 +75,17 @@ export function LaminationReportClient() {
   // Modals
   const [rollPickerOpen, setRollPickerOpen] = useState(false);
   const [printModalOpen, setPrintModalOpen] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Close fullscreen on Escape
+  useEffect(() => {
+    if (!isFullscreen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsFullscreen(false);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isFullscreen]);
 
   // Fetch report for Date and Shift
   const fetchReport = useCallback(async (targetDate: string, targetShift: string) => {
@@ -301,36 +315,38 @@ export function LaminationReportClient() {
 
   return (
     <div className="space-y-5 font-sans pb-16">
-      {/* Top Banner & Title */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-xl border border-slate-200/80 shadow-xs">
+      {/* Header Banner */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-5">
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-xs font-semibold uppercase tracking-wider text-sky-600 bg-sky-50 px-2 py-0.5 rounded-md">
-              Lamination Module
-            </span>
-            <Badge
-              variant="outline"
-              className={
-                status === "APPROVED"
-                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                  : status === "SUBMITTED"
-                  ? "bg-sky-50 text-sky-700 border-sky-200"
-                  : "bg-amber-50 text-amber-700 border-amber-200"
-              }
-            >
-              {status}
-            </Badge>
+          <div className="flex items-center gap-2.5">
+            <div className="p-2.5 rounded-xl bg-sky-500/10 text-sky-600">
+              <Film className="w-6 h-6" />
+            </div>
+            <div>
+              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-3">
+                Lamination Product Report
+                <Badge
+                  variant="outline"
+                  className={
+                    status === "APPROVED"
+                      ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                      : status === "SUBMITTED"
+                      ? "bg-sky-50 text-sky-700 border-sky-200"
+                      : "bg-amber-50 text-amber-700 border-amber-200"
+                  }
+                >
+                  {status}
+                </Badge>
+              </h1>
+              <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+                Physical floor log entry with roll stock consumption, coating calculations, and real-time validation.
+              </p>
+            </div>
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-            Lamination Product Report
-          </h1>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Log production, roll output, and coating efficiency with live roll stock synchronization.
-          </p>
         </div>
 
-        {/* Global Actions */}
-        <div className="flex items-center flex-wrap gap-2">
+        {/* Global Action Buttons */}
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             variant="outline"
             size="sm"
@@ -463,7 +479,7 @@ export function LaminationReportClient() {
       </div>
 
       {/* KPI Cards Summary */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2.5 min-w-0">
         <div className="bg-white p-3 rounded-lg border border-slate-200/80 shadow-2xs">
           <div className="text-[11px] font-medium text-slate-500 uppercase">Rolls</div>
           <div className="text-lg font-bold text-slate-800">{entries.length}</div>
@@ -513,14 +529,40 @@ export function LaminationReportClient() {
       </div>
 
       {/* Main Table Area */}
-      <div className="bg-white rounded-xl border border-slate-200/80 shadow-xs overflow-hidden">
+      <div
+        className={
+          isFullscreen
+            ? "fixed inset-0 z-50 bg-background flex flex-col p-4 md:p-6 shadow-2xl overflow-hidden"
+            : "bg-white rounded-xl border border-slate-200/80 shadow-xs overflow-hidden"
+        }
+      >
         {/* Table Toolbar */}
         <div className="p-3.5 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2 bg-slate-50/50">
           <div className="flex items-center gap-2">
+            {/* Top-Left Fullscreen Expand / Collapse Toggle */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsFullscreen(!isFullscreen)}
+              className="h-8.5 text-xs border-slate-300 hover:bg-slate-100 flex items-center gap-1.5 cursor-pointer active:scale-95"
+              title={isFullscreen ? "Collapse back to normal view (Esc)" : "Expand table to fullscreen"}
+            >
+              {isFullscreen ? (
+                <>
+                  <Minimize2 className="h-3.5 w-3.5 text-sky-600" />
+                  <span>Collapse</span>
+                </>
+              ) : (
+                <>
+                  <Maximize2 className="h-3.5 w-3.5 text-sky-600" />
+                  <span>Expand</span>
+                </>
+              )}
+            </Button>
             <Button
               size="sm"
               onClick={() => setRollPickerOpen(true)}
-              className="h-8.5 text-xs bg-sky-600 hover:bg-sky-700 text-white shadow-xs"
+              className="h-8.5 text-xs bg-sky-600 hover:bg-sky-700 text-white shadow-xs cursor-pointer"
             >
               <Layers className="h-4 w-4 mr-1.5" />
               Import from Roll Stock
@@ -529,7 +571,7 @@ export function LaminationReportClient() {
               variant="outline"
               size="sm"
               onClick={handleAddManualRow}
-              className="h-8.5 text-xs border-slate-300 hover:bg-slate-100"
+              className="h-8.5 text-xs border-slate-300 hover:bg-slate-100 cursor-pointer"
             >
               <Plus className="h-4 w-4 mr-1" />
               Add Blank Row
@@ -542,7 +584,7 @@ export function LaminationReportClient() {
         </div>
 
         {/* Data Grid */}
-        <div className="overflow-x-auto min-h-[380px]">
+        <div className={isFullscreen ? "overflow-x-auto overflow-y-auto flex-1 border rounded-lg bg-card" : "overflow-x-auto min-h-[380px]"}>
           {loading ? (
             <div className="py-20 flex flex-col items-center justify-center gap-2 text-slate-400">
               <Loader2 className="h-7 w-7 animate-spin text-sky-600" />

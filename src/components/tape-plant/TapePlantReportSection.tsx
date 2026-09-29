@@ -23,6 +23,8 @@ import {
   ArrowUpRight,
   ShieldCheck,
   ChevronDown,
+  Maximize2,
+  Minimize2,
 } from "lucide-react";
 import { RecipeQualityBadge } from "./RecipeQualityBadge";
 import {
@@ -47,6 +49,17 @@ export function TapePlantReportSection({ shifts }: TapePlantReportSectionProps) 
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<TapePlantReportDataset | null>(null);
   const [activeTab, setActiveTab] = useState<ReportSubTab>("all");
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Close fullscreen on Escape
+  useEffect(() => {
+    if (!isFullscreen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsFullscreen(false);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isFullscreen]);
 
   const [dateFrom, setDateFrom] = useState(() => {
     const d = new Date();
@@ -389,20 +402,45 @@ export function TapePlantReportSection({ shifts }: TapePlantReportSectionProps) 
         </div>
       </div>
 
-      {/* Report View Navigation Sub-Tabs */}
-      <div className="flex flex-wrap items-center gap-1.5 border-b border-slate-200 pb-2">
-        <button
-          type="button"
-          onClick={() => setActiveTab("all")}
-          className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-            activeTab === "all"
-              ? "bg-slate-900 text-white shadow-xs"
-              : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
-          }`}
-        >
-          <BarChart3 className="h-4 w-4" />
-          <span>Master Overview (All)</span>
-        </button>
+      {/* Report View Container */}
+      <div className={`space-y-4 ${
+        isFullscreen
+          ? "fixed inset-0 z-50 bg-background p-4 md:p-6 flex flex-col overflow-hidden"
+          : ""
+      }`}>
+        {/* Report View Navigation Sub-Tabs */}
+        <div className="flex flex-wrap items-center gap-1.5 border-b border-slate-200 pb-2 shrink-0">
+          <button
+            type="button"
+            onClick={() => setIsFullscreen((prev) => !prev)}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition-all border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 shadow-2xs cursor-pointer"
+            title={isFullscreen ? "Collapse (Esc)" : "Expand to Fullscreen"}
+          >
+            {isFullscreen ? (
+              <>
+                <Minimize2 className="h-4 w-4 text-slate-600" />
+                <span>Collapse</span>
+              </>
+            ) : (
+              <>
+                <Maximize2 className="h-4 w-4 text-slate-600" />
+                <span>Expand</span>
+              </>
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab("all")}
+            className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+              activeTab === "all"
+                ? "bg-slate-900 text-white shadow-xs"
+                : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+            }`}
+          >
+            <BarChart3 className="h-4 w-4" />
+            <span>Master Overview (All)</span>
+          </button>
 
         <button
           type="button"
@@ -496,7 +534,7 @@ export function TapePlantReportSection({ shifts }: TapePlantReportSectionProps) 
           No production records match the selected date range ({dateFrom} to {dateTo}) and filters.
         </div>
       ) : (
-        <div className="space-y-6">
+        <div className={isFullscreen ? "flex-1 overflow-auto space-y-6" : "space-y-6"}>
           {/* TAB 1: MASTER OVERVIEW OR SHIFT-WISE TABLE */}
           {(activeTab === "all" || activeTab === "shift") && (
             <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
@@ -983,6 +1021,7 @@ export function TapePlantReportSection({ shifts }: TapePlantReportSectionProps) 
           )}
         </div>
       )}
+      </div>
     </div>
   );
 }

@@ -232,7 +232,12 @@ export function AppSidebar({ user, allowedModules, ...props }: AppSidebarProps) 
                 <CollapsibleContent>
                   <SidebarMenuSub>
                     {laminationItems.map((subItem) => {
-                      const isSubActive = pathname === subItem.url || pathname.startsWith(subItem.url + "/");
+                      // For the base lamination URL, only match exactly to prevent
+                      // highlighting "Production Report" when on /summary, /wastage, etc.
+                      const isBaseUrl = subItem.url === "/dashboard/production/lamination";
+                      const isSubActive = isBaseUrl
+                        ? pathname === subItem.url
+                        : pathname === subItem.url || pathname.startsWith(subItem.url + "/");
                       return (
                         <SidebarMenuSubItem key={subItem.url}>
                           <SidebarMenuSubButton

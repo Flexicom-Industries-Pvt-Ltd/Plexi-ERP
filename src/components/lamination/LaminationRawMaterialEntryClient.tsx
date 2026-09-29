@@ -17,6 +17,9 @@ import {
   Layers,
   ArrowRight,
   RotateCcw,
+  FlaskConical,
+  Maximize2,
+  Minimize2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -60,6 +63,17 @@ export function LaminationRawMaterialEntryClient() {
 
   // Print Modal
   const [isPrintModalOpen, setIsPrintModalOpen] = useState<boolean>(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Close fullscreen on Escape
+  useEffect(() => {
+    if (!isFullscreen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsFullscreen(false);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isFullscreen]);
 
   // Fetch report for Date + Shift
   const fetchReport = async () => {
@@ -309,10 +323,109 @@ export function LaminationRawMaterialEntryClient() {
       : "text-slate-700 bg-slate-100 border-slate-200";
 
   return (
-    <div className="space-y-4">
+    <div className={`space-y-5 font-sans pb-16 ${
+      isFullscreen
+        ? "fixed inset-0 z-50 bg-background p-4 md:p-6 overflow-auto h-screen w-screen pb-6"
+        : ""
+    }`}>
+      {/* Header Banner */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-5">
+        <div>
+          <div className="flex items-center gap-2.5">
+            <button
+              type="button"
+              onClick={() => setIsFullscreen((prev) => !prev)}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg border bg-white hover:bg-slate-50 text-slate-700 transition-colors cursor-pointer shadow-2xs"
+              title={isFullscreen ? "Collapse (Esc)" : "Expand to Fullscreen"}
+            >
+              {isFullscreen ? (
+                <>
+                  <Minimize2 className="w-3.5 h-3.5" />
+                  <span>Collapse</span>
+                </>
+              ) : (
+                <>
+                  <Maximize2 className="w-3.5 h-3.5" />
+                  <span>Expand</span>
+                </>
+              )}
+            </button>
+            <div className="p-2.5 rounded-xl bg-purple-500/10 text-purple-600">
+              <FlaskConical className="w-6 h-6" />
+            </div>
+            <div>
+              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-3">
+                Raw Material Entry & Reconciliation
+                <Badge
+                  variant="outline"
+                  className={
+                    status === "APPROVED"
+                      ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                      : status === "SUBMITTED"
+                      ? "bg-sky-50 text-sky-700 border-sky-200"
+                      : "bg-amber-50 text-amber-700 border-amber-200"
+                  }
+                >
+                  {status}
+                </Badge>
+              </h1>
+              <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+                Compare theoretical manual recipe targets against actual machine dispenser inputs to evaluate shift material variance.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Global Action Buttons */}
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => exportRawMaterialReportExcel(currentReportData)}
+            disabled={entries.length === 0}
+            className="h-9 text-xs border-slate-200 hover:bg-slate-50"
+          >
+            <FileSpreadsheet className="h-4 w-4 mr-1.5 text-emerald-600" />
+            Excel Export
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsPrintModalOpen(true)}
+            disabled={entries.length === 0}
+            className="h-9 text-xs border-slate-200 hover:bg-slate-50"
+          >
+            <Printer className="h-4 w-4 mr-1.5 text-sky-600" />
+            Print Report
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleSyncWithMaster}
+            title="Sync with Data Centre Master"
+            className="h-9 text-xs border-slate-200 hover:bg-slate-50"
+          >
+            <RotateCcw className="h-3.5 w-3.5 mr-1 text-slate-600" />
+            Sync Master
+          </Button>
+
+          <Button
+            size="sm"
+            onClick={handleSave}
+            disabled={isPending || isLoading}
+            className="h-9 text-xs bg-sky-600 hover:bg-sky-700 text-white shadow-xs"
+          >
+            <Save className="h-4 w-4 mr-1.5" />
+            {isPending ? "Saving..." : "Save Shift Report"}
+          </Button>
+        </div>
+      </div>
+
       {/* Shift & Date Control Bar */}
-      <div className="bg-white p-3.5 rounded-lg border border-slate-200 shadow-sm">
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 items-end">
+      <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3.5 items-end">
           {/* Date */}
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
@@ -387,49 +500,18 @@ export function LaminationRawMaterialEntryClient() {
               </SelectContent>
             </Select>
           </div>
-
-          {/* Top Actions */}
-          <div className="flex items-center gap-2">
-            <Button
-              onClick={handleSave}
-              disabled={isPending || isLoading}
-              size="sm"
-              className="h-9 flex-1 text-xs bg-sky-600 hover:bg-sky-700 text-white font-medium"
-            >
-              <Save className="h-3.5 w-3.5 mr-1.5" />
-              {isPending ? "Saving..." : "Save Shift Report"}
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={handleSyncWithMaster}
-              title="Sync with Data Centre Master"
-              className="h-9 w-9 text-slate-600 hover:text-sky-600"
-            >
-              <RotateCcw className="h-3.5 w-3.5" />
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => setIsPrintModalOpen(true)}
-              title="Print Consumption Sheet"
-              className="h-9 w-9 text-slate-700 hover:text-slate-900"
-            >
-              <Printer className="h-3.5 w-3.5" />
-            </Button>
-          </div>
         </div>
 
         {/* Remarks Input */}
-        <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center gap-2">
-          <span className="text-xs font-medium text-slate-500 whitespace-nowrap">
+        <div className="mt-3.5 pt-3 border-t border-slate-100 flex items-center gap-2">
+          <span className="text-xs font-semibold text-slate-600 whitespace-nowrap">
             Shift Remarks:
           </span>
           <Input
             placeholder="Optional production notes, hopper balance, polymer grades..."
             value={remarks}
             onChange={(e) => setRemarks(e.target.value)}
-            className="h-8 text-xs bg-slate-50/50"
+            className="h-8.5 text-xs bg-slate-50/50"
           />
         </div>
       </div>

@@ -18,6 +18,8 @@ import {
   X,
   Sparkles,
   SlidersHorizontal,
+  Maximize2,
+  Minimize2,
 } from "lucide-react";
 import {
   LoomChangeoverLogItem,
@@ -45,6 +47,17 @@ export function LoomChangeoverSection() {
   const [filterDate, setFilterDate] = useState("");
   const [filterShift, setFilterShift] = useState("ALL");
   const [filterStatus, setFilterStatus] = useState("ALL");
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Close fullscreen on Escape
+  useEffect(() => {
+    if (!isFullscreen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsFullscreen(false);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isFullscreen]);
 
   const [logs, setLogs] = useState<LoomChangeoverLogItem[]>([]);
   const [availableQualities, setAvailableQualities] = useState<AvailableQuality[]>([]);
@@ -362,8 +375,38 @@ export function LoomChangeoverSection() {
       </div>
 
       {/* Log-Wise Changeover Records Table */}
-      <div className="bg-white border border-slate-200/80 rounded-2xl shadow-2xs overflow-hidden">
-        <div className="overflow-x-auto">
+      <div className={`bg-white border border-slate-200/80 rounded-2xl shadow-2xs overflow-hidden ${
+        isFullscreen
+          ? "fixed inset-0 z-50 rounded-none border-0 p-4 md:p-6 flex flex-col bg-background h-screen w-screen"
+          : ""
+      }`}>
+        <div className="p-3 border-b border-slate-100 flex items-center justify-between gap-3 shrink-0">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setIsFullscreen((prev) => !prev)}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg border bg-white hover:bg-slate-50 text-slate-700 transition-colors cursor-pointer shadow-2xs"
+              title={isFullscreen ? "Collapse (Esc)" : "Expand to Fullscreen"}
+            >
+              {isFullscreen ? (
+                <>
+                  <Minimize2 className="h-3.5 w-3.5" />
+                  <span>Collapse</span>
+                </>
+              ) : (
+                <>
+                  <Maximize2 className="h-3.5 w-3.5" />
+                  <span>Expand</span>
+                </>
+              )}
+            </button>
+            <span className="text-xs font-bold text-slate-800">Changeover Event Log</span>
+          </div>
+          <span className="text-xs text-slate-400 font-medium">
+            {logs.length} event(s)
+          </span>
+        </div>
+        <div className={isFullscreen ? "overflow-auto flex-1" : "overflow-x-auto"}>
           <table className="w-full text-left text-xs border-collapse min-w-[980px]">
             <thead>
               <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-600 font-bold uppercase text-[10.5px]">
