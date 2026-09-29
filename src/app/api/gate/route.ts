@@ -26,6 +26,9 @@ export async function GET(request: NextRequest) {
   const purpose = searchParams.get("purpose");
   const truckNumber = searchParams.get("truckNumber");
   const search = searchParams.get("search");
+  const date = searchParams.get("date");
+  const dateFrom = searchParams.get("dateFrom");
+  const dateTo = searchParams.get("dateTo");
   const page = searchParams.get("page");
   const limit = searchParams.get("limit");
 
@@ -35,6 +38,9 @@ export async function GET(request: NextRequest) {
       purpose,
       truckNumber,
       search,
+      date,
+      dateFrom,
+      dateTo,
       page,
       limit,
     });
