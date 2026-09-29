@@ -19,6 +19,8 @@ import {
   AlertTriangle,
   ArrowUpDown,
   Filter,
+  Maximize2,
+  Minimize2,
 } from "lucide-react";
 import {
   LoomWiseRow,
@@ -55,6 +57,17 @@ export function LoomProductionReportSection() {
   const [activeCriteria, setActiveCriteria] = useState<ViewCriteria>("LOOM");
   const [tableSearch, setTableSearch] = useState("");
   const [printMenuOpen, setPrintMenuOpen] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Close fullscreen on Escape
+  useEffect(() => {
+    if (!isFullscreen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsFullscreen(false);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isFullscreen]);
 
   // Data State
   const [kpis, setKpis] = useState<ReportKpis>({
@@ -490,19 +503,44 @@ export function LoomProductionReportSection() {
       </div>
 
       {/* Segmented Criteria Selector & Table Search */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-b pb-3">
-        {/* Segmented Tabs */}
-        <div className="inline-flex items-center p-1 rounded-xl bg-muted/80 border text-xs font-semibold gap-1">
-          <button
-            onClick={() => setActiveCriteria("LOOM")}
-            className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-              activeCriteria === "LOOM"
-                ? "bg-background text-foreground shadow-xs font-bold"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            Loom-Wise ({loomWise.length})
-          </button>
+      <div className={`space-y-4 ${
+        isFullscreen
+          ? "fixed inset-0 z-50 bg-background p-4 md:p-6 flex flex-col overflow-hidden"
+          : ""
+      }`}>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-b pb-3 shrink-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setIsFullscreen((prev) => !prev)}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg border bg-background hover:bg-muted text-foreground transition-colors cursor-pointer shadow-2xs"
+              title={isFullscreen ? "Collapse (Esc)" : "Expand to Fullscreen"}
+            >
+              {isFullscreen ? (
+                <>
+                  <Minimize2 className="w-3.5 h-3.5" />
+                  <span>Collapse</span>
+                </>
+              ) : (
+                <>
+                  <Maximize2 className="w-3.5 h-3.5" />
+                  <span>Expand</span>
+                </>
+              )}
+            </button>
+
+            {/* Segmented Tabs */}
+            <div className="inline-flex items-center p-1 rounded-xl bg-muted/80 border text-xs font-semibold gap-1">
+              <button
+                onClick={() => setActiveCriteria("LOOM")}
+                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                  activeCriteria === "LOOM"
+                    ? "bg-background text-foreground shadow-xs font-bold"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Loom-Wise ({loomWise.length})
+              </button>
           <button
             onClick={() => setActiveCriteria("SUPERVISOR")}
             className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
@@ -534,8 +572,9 @@ export function LoomProductionReportSection() {
             Consolidated View
           </button>
         </div>
+      </div>
 
-        {/* Local Table Search */}
+      {/* Local Table Search */}
         <div className="relative w-full sm:w-64">
           <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-muted-foreground" />
           <input
@@ -548,8 +587,9 @@ export function LoomProductionReportSection() {
         </div>
       </div>
 
-      {/* CRITERIA SECTION 1: LOOM-WISE REPORT */}
-      {(activeCriteria === "LOOM" || activeCriteria === "CONSOLIDATED") && (
+      <div className={isFullscreen ? "flex-1 overflow-auto space-y-6" : "space-y-6"}>
+        {/* CRITERIA SECTION 1: LOOM-WISE REPORT */}
+        {(activeCriteria === "LOOM" || activeCriteria === "CONSOLIDATED") && (
         <div className="space-y-3">
           {activeCriteria === "CONSOLIDATED" && (
             <div className="flex items-center justify-between">
@@ -912,6 +952,8 @@ export function LoomProductionReportSection() {
           </div>
         </div>
       )}
+        </div>
+      </div>
     </div>
   );
 }

@@ -20,6 +20,8 @@ import {
   X,
   SlidersHorizontal,
   Package,
+  Maximize2,
+  Minimize2,
 } from "lucide-react";
 import {
   LoomRollStockItem,
@@ -62,6 +64,17 @@ export function LoomRollStockSection() {
 
   const [copiedRoll, setCopiedRoll] = useState<string | null>(null);
   const [printModalOpen, setPrintModalOpen] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Close fullscreen on Escape
+  useEffect(() => {
+    if (!isFullscreen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsFullscreen(false);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isFullscreen]);
 
   // Fetch function
   const fetchStockData = useCallback(async () => {
@@ -497,9 +510,34 @@ export function LoomRollStockSection() {
       </div>
 
       {/* 5. Roll Stock Main Table */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+      <div
+        className={
+          isFullscreen
+            ? "fixed inset-0 z-50 bg-background flex flex-col p-4 md:p-6 shadow-2xl overflow-hidden"
+            : "bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden"
+        }
+      >
         <div className="p-4 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 bg-slate-50/50">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
+            {/* Top-Left Fullscreen Expand / Collapse Toggle */}
+            <button
+              type="button"
+              onClick={() => setIsFullscreen(!isFullscreen)}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 transition-all shadow-2xs cursor-pointer active:scale-95 shrink-0"
+              title={isFullscreen ? "Collapse back to normal view (Esc)" : "Expand sheet to fullscreen"}
+            >
+              {isFullscreen ? (
+                <>
+                  <Minimize2 className="h-3.5 w-3.5 text-sky-600" />
+                  <span>Collapse</span>
+                </>
+              ) : (
+                <>
+                  <Maximize2 className="h-3.5 w-3.5 text-sky-600" />
+                  <span>Expand</span>
+                </>
+              )}
+            </button>
             <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
               Roll Stock Inventory Register
             </h2>
@@ -513,7 +551,7 @@ export function LoomRollStockSection() {
           </div>
         </div>
 
-        <div className="overflow-x-auto min-w-full">
+        <div className={isFullscreen ? "overflow-x-auto overflow-y-auto flex-1 border rounded-lg bg-card" : "overflow-x-auto min-w-full"}>
           <table className="w-full text-left text-xs border-collapse">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-semibold text-slate-600 uppercase tracking-wider">

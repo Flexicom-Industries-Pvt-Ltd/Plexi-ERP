@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useRef, useState, useCallback } from "react";
-import { Plus, Trash2, Copy, Eraser } from "lucide-react";
+import { Plus, Trash2, Copy, Eraser, Maximize2, Minimize2 } from "lucide-react";
 
 export type ColumnDef<T> = {
   key: string;
@@ -53,6 +53,17 @@ export function SpreadsheetTable<T extends Record<string, any>>({
 }: SpreadsheetTableProps<T>) {
   const tableRef = useRef<HTMLTableElement>(null);
   const [activeCell, setActiveCell] = useState<{ row: number; col: number } | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Close fullscreen on Escape key
+  React.useEffect(() => {
+    if (!isFullscreen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsFullscreen(false);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isFullscreen]);
 
   const handleCellChange = useCallback(
     (rowIndex: number, columnKey: string, value: any) => {
@@ -265,12 +276,39 @@ export function SpreadsheetTable<T extends Record<string, any>>({
   }
 
   return (
-    <div className="w-full min-w-0 max-w-full bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
-      {(title || subtitle || actions || allowAddRow) && (
+    <div
+      className={
+        isFullscreen
+          ? "fixed inset-0 z-50 bg-background flex flex-col p-4 md:p-6 shadow-2xl overflow-hidden"
+          : "w-full min-w-0 max-w-full bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col"
+      }
+    >
+      {(title || subtitle || actions || allowAddRow || true) && (
         <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5 bg-slate-50/80 border-b border-slate-200 min-w-0">
-          <div className="min-w-0">
-            {title && <h3 className="text-sm font-bold text-slate-800 truncate">{title}</h3>}
-            {subtitle && <p className="text-xs text-slate-500 mt-0.5 truncate">{subtitle}</p>}
+          <div className="flex items-center gap-3 min-w-0">
+            {/* Top-Left Fullscreen Expand / Collapse Toggle */}
+            <button
+              type="button"
+              onClick={() => setIsFullscreen(!isFullscreen)}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 transition-all shadow-2xs cursor-pointer active:scale-95 shrink-0"
+              title={isFullscreen ? "Collapse back to normal view (Esc)" : "Expand sheet to fullscreen"}
+            >
+              {isFullscreen ? (
+                <>
+                  <Minimize2 className="h-3.5 w-3.5 text-sky-600" />
+                  <span>Collapse</span>
+                </>
+              ) : (
+                <>
+                  <Maximize2 className="h-3.5 w-3.5 text-sky-600" />
+                  <span>Expand</span>
+                </>
+              )}
+            </button>
+            <div className="min-w-0">
+              {title && <h3 className="text-sm font-bold text-slate-800 truncate">{title}</h3>}
+              {subtitle && <p className="text-xs text-slate-500 mt-0.5 truncate">{subtitle}</p>}
+            </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             {actions}
@@ -288,7 +326,13 @@ export function SpreadsheetTable<T extends Record<string, any>>({
         </div>
       )}
 
-      <div className="w-full min-w-0 overflow-x-auto relative max-h-[620px] scrollbar-thin scrollbar-thumb-slate-300">
+      <div
+        className={
+          isFullscreen
+            ? "w-full min-w-0 overflow-x-auto overflow-y-auto flex-1 relative scrollbar-thin scrollbar-thumb-slate-300 border rounded-lg bg-card"
+            : "w-full min-w-0 overflow-x-auto relative max-h-[620px] scrollbar-thin scrollbar-thumb-slate-300"
+        }
+      >
         <table ref={tableRef} className="w-full text-xs border-collapse text-left border-spacing-0">
           <thead className="bg-slate-100/90 sticky top-0 z-20 backdrop-blur-sm border-b border-slate-200 shadow-sm">
             {hasGroups ? (

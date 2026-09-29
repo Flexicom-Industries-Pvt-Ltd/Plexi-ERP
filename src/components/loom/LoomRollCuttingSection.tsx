@@ -19,6 +19,8 @@ import {
   Sparkles,
   X,
   ArrowRightLeft,
+  Maximize2,
+  Minimize2,
 } from "lucide-react";
 import {
   LoomRollCuttingEntryItem,
@@ -93,6 +95,17 @@ export function LoomRollCuttingSection() {
   const [loomAllocations, setLoomAllocations] = useState<Record<number, { qualityCode: string; size: string; denier: string }>>({});
   const [suggestedRollNumber, setSuggestedRollNumber] = useState("CT-14376");
   const [printModalOpen, setPrintModalOpen] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Close fullscreen on Escape
+  useEffect(() => {
+    if (!isFullscreen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsFullscreen(false);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isFullscreen]);
 
   // Quick contractor modal state
   const [quickContractorModalOpen, setQuickContractorModalOpen] = useState(false);
@@ -314,14 +327,44 @@ export function LoomRollCuttingSection() {
 
       if (field === "loomNumber") {
         const loomNum = Number(value);
+        current.loomNumber = isNaN(loomNum) ? 0 : loomNum;
         const alloc = loomAllocations[loomNum];
-        if (alloc) {
-          if (!current.qualityType || current.qualityType === "STANDARD") {
-            current.qualityType = alloc.qualityCode;
-          }
-          if (!current.size) {
+        if (alloc && alloc.qualityCode) {
+          current.qualityType = alloc.qualityCode;
+          if (alloc.size) {
             current.size = alloc.size;
           }
+        } else if (loomNum >= 1 && loomNum <= 91) {
+          // Asynchronously query live Loom Summary if allocation wasn't preloaded
+          fetch(`/api/production/loom/summary?loomNumber=${loomNum}`)
+            .then((res) => (res.ok ? res.json() : null))
+            .then((data) => {
+              if (data?.allLoomSummaries) {
+                const matched = data.allLoomSummaries.find((l: any) => l.loomNumber === loomNum);
+                if (matched?.activeRecipe) {
+                  setLoomAllocations((prev) => ({
+                    ...prev,
+                    [loomNum]: {
+                      qualityCode: matched.activeRecipe,
+                      size: matched.size || "",
+                      denier: matched.denier ? String(matched.denier) : "",
+                    },
+                  }));
+                  setEntries((prevEntries) => {
+                    const next = [...prevEntries];
+                    if (next[index] && next[index].loomNumber === loomNum) {
+                      next[index] = {
+                        ...next[index],
+                        qualityType: matched.activeRecipe,
+                        size: matched.size || next[index].size,
+                      };
+                    }
+                    return next;
+                  });
+                }
+              }
+            })
+            .catch(() => {});
         }
       }
 
@@ -422,8 +465,8 @@ export function LoomRollCuttingSection() {
       sequence: entries.length + 1,
       rollNumber: nextRoll,
       loomNumber: defaultLoom,
-      size: alloc?.size || "490",
-      qualityType: alloc?.qualityCode || (availableQualities[0]?.code || "Mahal/LPP/W"),
+      size: alloc?.size || lastEntry?.size || "490",
+      qualityType: alloc?.qualityCode || lastEntry?.qualityType || availableQualities[0]?.code || "Mahal/LPP/W",
       contractor: lastEntry?.contractor || (availableContractors[0]?.name || ""),
       initialReading: 0,
       finalReading: 0,
@@ -788,9 +831,35 @@ export function LoomRollCuttingSection() {
       </div>
 
       {/* Interactive Daily Floor Form Table */}
-      <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
+      <div
+        className={
+          isFullscreen
+            ? "fixed inset-0 z-50 bg-background flex flex-col p-4 md:p-6 shadow-2xl overflow-hidden"
+            : "rounded-xl border bg-card shadow-sm overflow-hidden"
+        }
+      >
         <div className="px-5 py-3.5 border-b bg-muted/40 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
+            {/* Top-Left Fullscreen Expand / Collapse button */}
+            <button
+              type="button"
+              onClick={() => setIsFullscreen(!isFullscreen)}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg border bg-background hover:bg-muted text-foreground transition-all shadow-2xs cursor-pointer active:scale-95"
+              title={isFullscreen ? "Collapse back to normal view (Esc)" : "Expand sheet to fullscreen"}
+            >
+              {isFullscreen ? (
+                <>
+                  <Minimize2 className="w-3.5 h-3.5 text-sky-500" />
+                  <span>Collapse</span>
+                </>
+              ) : (
+                <>
+                  <Maximize2 className="w-3.5 h-3.5 text-sky-500" />
+                  <span>Expand</span>
+                </>
+              )}
+            </button>
+
             <div className="p-1.5 rounded-md bg-sky-500/10 text-sky-600 dark:text-sky-400">
               <Scissors className="w-4 h-4" />
             </div>
@@ -815,7 +884,7 @@ export function LoomRollCuttingSection() {
           </button>
         </div>
 
-        <div className="overflow-x-auto min-h-[300px]">
+        <div className={isFullscreen ? "overflow-x-auto overflow-y-auto flex-1 border rounded-lg bg-card" : "overflow-x-auto min-h-[300px]"}>
           <table className="w-full text-xs text-left border-collapse min-w-[2140px]">
             <thead>
               <tr className="bg-slate-900 border-b border-slate-800 text-xs font-bold uppercase tracking-wider text-white">
@@ -857,19 +926,28 @@ export function LoomRollCuttingSection() {
                       />
                     </td>
 
-                    {/* Loom No */}
+                    {/* Loom No - Fast Typing Input with Datalist */}
                     <td className="p-2 border-r">
-                      <select
-                        value={entry.loomNumber}
-                        onChange={(e) => handleUpdateEntry(idx, "loomNumber", Number(e.target.value))}
-                        className="w-full text-xs font-mono font-bold px-3 py-2 rounded-lg border bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border-sky-300 dark:border-sky-800 focus:ring-2 focus:ring-sky-500/20 outline-hidden cursor-pointer shadow-2xs"
-                      >
-                        {Array.from({ length: 91 }, (_, i) => i + 1).map((num) => (
-                          <option key={num} value={num}>
-                            Loom #{num}
-                          </option>
-                        ))}
-                      </select>
+                      <input
+                        type="number"
+                        min={1}
+                        max={91}
+                        list="roll-cutting-loom-options"
+                        value={entry.loomNumber || ""}
+                        onChange={(e) => {
+                          const val = e.target.value === "" ? 0 : Number(e.target.value);
+                          handleUpdateEntry(idx, "loomNumber", val);
+                        }}
+                        onBlur={(e) => {
+                          const val = Number(e.target.value);
+                          if (!isNaN(val) && val >= 1 && val <= 91) {
+                            handleUpdateEntry(idx, "loomNumber", val);
+                          }
+                        }}
+                        className="w-full text-xs font-mono font-bold text-center px-3 py-2 rounded-lg border bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border-sky-300 dark:border-sky-800 focus:ring-2 focus:ring-sky-500/20 outline-hidden shadow-2xs"
+                        placeholder="1-91"
+                        title="Type Loom # (1-91) - Quality and specs auto-populate instantly"
+                      />
                     </td>
 
                     {/* Size */}
@@ -1105,6 +1183,13 @@ export function LoomRollCuttingSection() {
               </tfoot>
             )}
           </table>
+          <datalist id="roll-cutting-loom-options">
+            {Array.from({ length: 91 }, (_, i) => i + 1).map((num) => (
+              <option key={num} value={num}>
+                Loom #{num} {loomAllocations[num]?.qualityCode ? `• ${loomAllocations[num].qualityCode}` : ""}
+              </option>
+            ))}
+          </datalist>
         </div>
       </div>
 

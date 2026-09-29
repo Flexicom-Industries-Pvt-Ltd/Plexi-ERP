@@ -7,301 +7,339 @@ export function generateRawMaterialReportHtml(data: LaminationRawMaterialReportD
   const totalPercentage = Number(
     data.entries.reduce((sum, e) => sum + (Number(e.percentage) || 0), 0).toFixed(1)
   );
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const genTimestamp = new Date().toLocaleString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
 
-  const rowsHtml = (data.entries || [])
-    .map((e, idx) => {
-      const diffVal = Number(e.diffKg.toFixed(2));
-      const diffColor = diffVal > 0 ? "#15803d" : diffVal < 0 ? "#b45309" : "#334155";
-      const diffSign = diffVal > 0 ? `+${diffVal}` : `${diffVal}`;
+  const docDate = (data.date || new Date().toISOString().slice(0, 10)).replace(/[^a-zA-Z0-9]/g, "");
+  const docRef = `LAM-RM-${docDate}-${(data.shiftName || "SHIFT").toUpperCase().replace(/\s+/g, "")}`;
 
-      return `
-        <tr>
-          <td style="text-align: center; font-weight: 500;">${idx + 1}</td>
-          <td style="font-weight: 600; text-align: left; padding-left: 8px;">${e.materialName}</td>
-          <td style="text-align: right; padding-right: 8px;">${Number(e.percentage).toFixed(1)}%</td>
-          <td style="text-align: right; padding-right: 8px; font-weight: 500;">${Number(e.manualKg).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-          <td style="text-align: right; padding-right: 8px; font-weight: 500;">${Number(e.machineKg).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-          <td style="text-align: right; padding-right: 8px; font-weight: 700; color: ${diffColor};">${diffSign}</td>
-          <td style="text-align: left; padding-left: 6px; font-size: 8.5pt;">${e.remarks || "—"}</td>
-        </tr>
-      `;
-    })
-    .join("");
+  const rowsHtml = (data.entries || []).length > 0
+    ? data.entries
+        .map((e, idx) => {
+          const diffVal = Number(e.diffKg.toFixed(2));
+          const diffColor = diffVal > 0 ? "#15803d" : diffVal < 0 ? "#b45309" : "#334155";
+          const diffSign = diffVal > 0 ? `+${diffVal}` : `${diffVal}`;
+
+          return `
+            <tr style="${idx % 2 === 1 ? "background-color: #f8fafc;" : "background-color: #ffffff;"}">
+              <td style="text-align: center; font-weight: 700; color: #475569;">${idx + 1}</td>
+              <td style="font-weight: 700; text-align: left; padding-left: 8px; color: #0f172a;">${e.materialName}</td>
+              <td style="text-align: right; padding-right: 8px; font-weight: 700; color: #0284c7; background-color: #f0f9ff;">${Number(e.percentage).toFixed(1)}%</td>
+              <td style="text-align: right; padding-right: 8px; font-family: monospace; font-weight: 700;">${Number(e.manualKg).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+              <td style="text-align: right; padding-right: 8px; font-family: monospace; font-weight: 700;">${Number(e.machineKg).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+              <td style="text-align: right; padding-right: 8px; font-family: monospace; font-weight: 800; color: ${diffColor}; background-color: ${diffVal > 0 ? "#f0fdf4" : diffVal < 0 ? "#fffbeb" : "#f8fafc"};">${diffSign}</td>
+              <td style="text-align: left; padding-left: 6px; font-size: 7.5pt; color: #64748b;">${e.remarks || "—"}</td>
+            </tr>
+          `;
+        })
+        .join("")
+    : `<tr><td colspan="7" style="text-align: center; padding: 20px; color: #64748b; font-style: italic;">No raw material consumption entries recorded.</td></tr>`;
 
   const netDiffSign = diffTotal > 0 ? `+${diffTotal}` : `${diffTotal}`;
   const netDiffColor = diffTotal > 0 ? "#15803d" : diffTotal < 0 ? "#b45309" : "#0f172a";
 
-  return `
-<!DOCTYPE html>
+  return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Lamination Raw Material Report - ${data.date} (${data.shiftName})</title>
+  <title>Lamination Raw Material Consumption - ${data.date} (${data.shiftName})</title>
   <style>
     @page {
       size: A4 portrait;
-      margin: 10mm 12mm 10mm 12mm;
+      margin: 10mm 10mm 10mm 10mm;
     }
     * {
       box-sizing: border-box;
+      margin: 0;
+      padding: 0;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
     }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-      margin: 0;
-      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      font-size: 8pt;
       color: #0f172a;
       background: #ffffff;
-      font-size: 9pt;
+      padding: 4px;
       line-height: 1.3;
     }
-    .header-container {
-      text-align: center;
-      border-bottom: 2px solid #0284c7;
-      padding-bottom: 6px;
-      margin-bottom: 10px;
+
+    /* Enterprise Standard Company Letterhead */
+    .company-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 2px solid #0f172a;
+      padding-bottom: 4px;
+      margin-bottom: 8px;
     }
     .company-title {
-      font-size: 15pt;
-      font-weight: 800;
+      font-size: 13pt;
+      font-weight: 900;
       letter-spacing: 0.5px;
-      color: #0369a1;
+      color: #000000;
       text-transform: uppercase;
-      margin: 0;
     }
-    .company-address {
-      font-size: 8pt;
+    .company-sub {
+      font-size: 6.5pt;
       color: #475569;
+      margin-top: 1px;
+    }
+    .doc-main-heading {
+      display: inline-block;
+      border: 1.5px solid #0f172a;
+      background: #f8fafc;
+      padding: 2px 14px;
+      font-size: 8.5pt;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-top: 3px;
+      margin-bottom: 2px;
+    }
+    .doc-meta-strip {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-items: center;
+      gap: 12px;
+      font-size: 6.5pt;
+      color: #334155;
       margin-top: 2px;
     }
-    .report-title {
-      font-size: 11pt;
-      font-weight: 700;
-      letter-spacing: 1.5px;
-      text-transform: uppercase;
-      color: #0f172a;
-      margin-top: 6px;
+    .doc-meta-strip strong {
+      color: #000000;
     }
-    .meta-table {
+
+    /* KPI Summary Row */
+    .kpi-table {
       width: 100%;
       border-collapse: collapse;
-      margin-bottom: 12px;
-      border: 1px solid #cbd5e1;
-      background: #f8fafc;
+      margin-bottom: 10px;
+      background-color: #f8fafc;
+      border: 1px solid #94a3b8;
     }
-    .meta-table td {
+    .kpi-table td {
       padding: 5px 8px;
-      font-size: 8.5pt;
-      border: 1px solid #e2e8f0;
+      border: 1px solid #cbd5e1;
+      vertical-align: middle;
+      text-align: center;
     }
-    .meta-label {
-      font-weight: 600;
-      color: #475569;
-      display: inline-block;
-      margin-right: 4px;
-    }
-    .meta-value {
+    .kpi-label {
+      font-size: 6pt;
       font-weight: 700;
-      color: #0f172a;
+      text-transform: uppercase;
+      color: #475569;
     }
+    .kpi-val {
+      font-size: 10pt;
+      font-weight: 800;
+      font-family: monospace;
+      color: #0f172a;
+      margin-top: 1px;
+    }
+
+    /* Fixed-Layout Main Table */
     .data-table {
       width: 100%;
       border-collapse: collapse;
-      margin-bottom: 16px;
-      border: 1px solid #94a3b8;
-    }
-    .data-table th, .data-table td {
-      border: 1px solid #cbd5e1;
-      padding: 6px 6px;
-      font-size: 9pt;
+      margin-bottom: 12px;
+      font-size: 8pt;
+      table-layout: fixed;
     }
     .data-table th {
-      background-color: #f1f5f9;
-      font-weight: 700;
-      text-transform: uppercase;
-      font-size: 8pt;
-      color: #1e293b;
-      text-align: center;
-    }
-    .subhead-manual {
-      background-color: #f0f9ff !important;
-      color: #0369a1 !important;
-    }
-    .subhead-machine {
-      background-color: #f5f3ff !important;
-      color: #6d28d9 !important;
-    }
-    .subhead-diff {
-      background-color: #f0fdf4 !important;
-      color: #15803d !important;
-    }
-    .totals-row td {
-      background-color: #f8fafc;
-      font-weight: 700;
-      border-top: 2px solid #64748b;
-      border-bottom: 2px solid #64748b;
-      padding: 7px 6px;
-    }
-    .summary-cards-table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-bottom: 20px;
-    }
-    .summary-card {
-      border: 1px solid #cbd5e1;
-      padding: 8px 12px;
-      text-align: center;
-      background: #ffffff;
-    }
-    .summary-card-title {
+      background-color: #e2e8f0 !important;
+      border: 1px solid #64748b !important;
+      padding: 5px 4px;
+      font-weight: 900;
       font-size: 7.5pt;
-      font-weight: 700;
       text-transform: uppercase;
-      color: #64748b;
-      margin-bottom: 2px;
-    }
-    .summary-card-value {
-      font-size: 13pt;
-      font-weight: 800;
+      text-align: center;
       color: #0f172a;
     }
-    .signatures-table {
-      width: 100%;
-      margin-top: 36px;
-      border-collapse: collapse;
+    .data-table td {
+      border: 1px solid #cbd5e1 !important;
+      padding: 5px 6px;
+      vertical-align: middle;
     }
-    .signatures-table td {
-      width: 33.33%;
+    tr.totals-row td {
+      font-weight: 900 !important;
+      font-size: 8.5pt !important;
+      background-color: #f1f5f9 !important;
+      border-top: 2px solid #0f172a !important;
+      border-bottom: 2px solid #0f172a !important;
+      padding: 6px 6px;
+    }
+
+    /* Signatures Strip */
+    .signatures-container {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 24px;
+      padding: 0 20px;
+      page-break-inside: avoid;
+    }
+    .sig-box {
       text-align: center;
-      vertical-align: bottom;
-      padding: 0 16px;
+      width: 180px;
     }
     .sig-line {
-      border-top: 1px solid #475569;
-      padding-top: 5px;
-      font-weight: 600;
-      font-size: 8.5pt;
-      color: #334155;
-    }
-    @media print {
-      body {
-        margin: 0;
-        padding: 0;
-      }
+      border-top: 1.5px solid #0f172a;
+      margin-top: 32px;
+      padding-top: 4px;
+      font-weight: 700;
+      font-size: 7.5pt;
+      text-transform: uppercase;
+      color: #0f172a;
     }
   </style>
 </head>
 <body>
-  <div class="header-container">
-    <div class="company-title">FLEXICOM INDUSTRIES PVT. LIMITED</div>
-    <div class="company-address">Sidco Industrial Estate, Ghatti Kathua, Phase-II, (J & K) 184143</div>
-    <div class="report-title">LAMINATION RAW MATERIAL CONSUMPTION & VARIANCE REPORT</div>
+  <!-- Standardized Letterhead Strip -->
+  <div class="company-header">
+    <div style="width: 70px;">
+      <img src="${origin}/logo.png" style="height: 38px; width: auto;" onerror="this.style.display='none'" />
+    </div>
+    <div style="flex: 1; text-align: center;">
+      <div class="company-title">FLEXICOM INDUSTRIES PVT. LIMITED</div>
+      <div class="company-sub">SIDCO INDUSTRIAL ESTATE, PHASE-II, KATHUA (J&K) 184143 • LAMINATION DIVISION</div>
+      <div class="doc-main-heading">LAMINATION RAW MATERIAL CONSUMPTION & VARIANCE REPORT</div>
+      <div class="doc-meta-strip">
+        <span>Doc Ref: <strong>${docRef}</strong></span>
+        <span>Date: <strong>${data.date}</strong></span>
+        <span>Shift: <strong>${data.shiftName}</strong></span>
+        <span>Operator: <strong>${data.operatorName || "—"}</strong></span>
+        <span>Status: <strong>${data.status || "DRAFT"}</strong></span>
+        <span>Generated: <strong>${genTimestamp}</strong></span>
+      </div>
+    </div>
+    <div style="width: 70px; text-align: right;">
+      <span style="font-size: 6.5pt; font-weight: 800; border: 1px solid #94a3b8; padding: 2px 4px; background: #f8fafc; border-radius: 2px;">
+        A4 PORTRAIT
+      </span>
+    </div>
   </div>
 
-  <table class="meta-table">
+  <!-- KPI Strip (4 Cards) -->
+  <table class="kpi-table">
     <tr>
-      <td width="25%"><span class="meta-label">Date:</span> <span class="meta-value">${data.date}</span></td>
-      <td width="25%"><span class="meta-label">Shift:</span> <span class="meta-value">${data.shiftName}</span></td>
-      <td width="25%"><span class="meta-label">Operator:</span> <span class="meta-value">${data.operatorName || "—"}</span></td>
-      <td width="25%"><span class="meta-label">Status:</span> <span class="meta-value">${data.status}</span></td>
-    </tr>
-    ${data.remarks ? `
-    <tr>
-      <td colspan="4"><span class="meta-label">Shift Remarks:</span> <span class="meta-value">${data.remarks}</span></td>
-    </tr>` : ""}
-  </table>
-
-  <!-- KPI Reconciliation Summary -->
-  <table class="summary-cards-table">
-    <tr>
-      <td width="30%" class="summary-card" style="border-right: none; background: #f0f9ff;">
-        <div class="summary-card-title">Manual Target Usage</div>
-        <div class="summary-card-value" style="color: #0369a1;">${manualTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })} <span style="font-size: 8.5pt; font-weight: 500;">kg</span></div>
+      <td style="width: 25%; background: #f0f9ff;">
+        <div class="kpi-label" style="color: #0369a1;">Manual Target (kg)</div>
+        <div class="kpi-val" style="color: #0284c7;">${manualTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })} Kg</div>
       </td>
-      <td width="5%" style="text-align: center; font-size: 14pt; font-weight: 800; color: #64748b;">−</td>
-      <td width="30%" class="summary-card" style="border-left: none; border-right: none; background: #f5f3ff;">
-        <div class="summary-card-title">Actual Machine Input</div>
-        <div class="summary-card-value" style="color: #6d28d9;">${machineTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })} <span style="font-size: 8.5pt; font-weight: 500;">kg</span></div>
+      <td style="width: 25%; background: #faf5ff;">
+        <div class="kpi-label" style="color: #6b21a8;">Machine Actual (kg)</div>
+        <div class="kpi-val" style="color: #7e22ce;">${machineTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })} Kg</div>
       </td>
-      <td width="5%" style="text-align: center; font-size: 14pt; font-weight: 800; color: #64748b;">=</td>
-      <td width="30%" class="summary-card" style="border-left: none; background: #f0fdf4;">
-        <div class="summary-card-title">Variance (Diff = Manual − Machine)</div>
-        <div class="summary-card-value" style="color: ${netDiffColor};">${netDiffSign} <span style="font-size: 8.5pt; font-weight: 500;">kg</span></div>
+      <td style="width: 25%; background: ${diffTotal > 0 ? "#f0fdf4" : diffTotal < 0 ? "#fffbeb" : "#f8fafc"};">
+        <div class="kpi-label" style="color: ${netDiffColor};">Net Variance (Diff)</div>
+        <div class="kpi-val" style="color: ${netDiffColor};">${netDiffSign} Kg</div>
+      </td>
+      <td style="width: 25%;">
+        <div class="kpi-label">Recipe Target Sum</div>
+        <div class="kpi-val">${totalPercentage}%</div>
       </td>
     </tr>
   </table>
 
-  <!-- Detailed Consumption Comparison Table -->
+  <!-- Fixed-width Data Table (Strict 100% width budget) -->
   <table class="data-table">
     <thead>
       <tr>
-        <th width="5%">S.No.</th>
-        <th width="32%" style="text-align: left; padding-left: 8px;">Raw Material</th>
-        <th width="10%">Recipe %</th>
-        <th width="16%" class="subhead-manual">Manual Qty (kg)</th>
-        <th width="16%" class="subhead-machine">Machine Qty (kg)</th>
-        <th width="13%" class="subhead-diff">Diff (kg)</th>
-        <th width="8%">Remarks</th>
+        <th style="width: 6%;">Sr</th>
+        <th style="width: 28%; text-align: left; padding-left: 8px;">Raw Material Name</th>
+        <th style="width: 12%;">Recipe %</th>
+        <th style="width: 16%;">Manual Target (kg)</th>
+        <th style="width: 16%;">Machine Actual (kg)</th>
+        <th style="width: 12%;">Diff (kg)</th>
+        <th style="width: 10%;">Remarks</th>
       </tr>
     </thead>
     <tbody>
       ${rowsHtml}
-    </tbody>
-    <tfoot>
       <tr class="totals-row">
-        <td colspan="2" style="text-align: center;">TOTAL USAGE / BATCH</td>
-        <td style="text-align: right; padding-right: 8px;">${totalPercentage}%</td>
-        <td style="text-align: right; padding-right: 8px; color: #0369a1;">${manualTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-        <td style="text-align: right; padding-right: 8px; color: #6d28d9;">${machineTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-        <td style="text-align: right; padding-right: 8px; color: ${netDiffColor};">${netDiffSign}</td>
+        <td colspan="2" style="text-align: right; padding-right: 8px;">SHIFT TOTAL:</td>
+        <td style="text-align: right; padding-right: 8px; color: #0284c7;">${totalPercentage}%</td>
+        <td style="text-align: right; padding-right: 8px; font-family: monospace;">${manualTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+        <td style="text-align: right; padding-right: 8px; font-family: monospace;">${machineTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+        <td style="text-align: right; padding-right: 8px; font-family: monospace; color: ${netDiffColor};">${netDiffSign}</td>
         <td></td>
       </tr>
-    </tfoot>
+    </tbody>
   </table>
 
-  <!-- Signatures -->
-  <table class="signatures-table">
-    <tr>
-      <td>
-        <div class="sig-line">Operator / Technician</div>
-      </td>
-      <td>
-        <div class="sig-line">Shift Supervisor</div>
-      </td>
-      <td>
-        <div class="sig-line">Plant Head / Manager</div>
-      </td>
-    </tr>
-  </table>
+  <!-- Official Signatures -->
+  <div class="signatures-container">
+    <div class="sig-box">
+      <div class="sig-line">Operator / Technician</div>
+    </div>
+    <div class="sig-box">
+      <div class="sig-line">Shift Incharge</div>
+    </div>
+    <div class="sig-box">
+      <div class="sig-line">Plant Head / QA</div>
+    </div>
+  </div>
 </body>
-</html>
-  `;
+</html>`.trim();
 }
 
-export function printRawMaterialReport(data: LaminationRawMaterialReportData) {
+/**
+ * Triggers native browser print via hidden iframe with robust fallback
+ */
+export function printRawMaterialReport(data: LaminationRawMaterialReportData): void {
   const html = generateRawMaterialReportHtml(data);
-  const printIframe = document.createElement("iframe");
-  printIframe.style.position = "fixed";
-  printIframe.style.right = "0";
-  printIframe.style.bottom = "0";
-  printIframe.style.width = "0";
-  printIframe.style.height = "0";
-  printIframe.style.border = "none";
-  printIframe.srcdoc = html;
+  let iframe = document.getElementById("lamination-rm-print-iframe") as HTMLIFrameElement | null;
+  if (!iframe) {
+    iframe = document.createElement("iframe");
+    iframe.id = "lamination-rm-print-iframe";
+    iframe.style.position = "fixed";
+    iframe.style.right = "0";
+    iframe.style.bottom = "0";
+    iframe.style.width = "0";
+    iframe.style.height = "0";
+    iframe.style.border = "0";
+    document.body.appendChild(iframe);
+  }
 
-  document.body.appendChild(printIframe);
+  const doc = iframe.contentWindow?.document || iframe.contentDocument;
+  if (doc && iframe.contentWindow) {
+    doc.open();
+    doc.write(html);
+    doc.close();
 
-  printIframe.onload = () => {
-    try {
-      printIframe.contentWindow?.focus();
-      printIframe.contentWindow?.print();
-    } catch (e) {
-      console.error("Print trigger failed:", e);
-    } finally {
-      setTimeout(() => {
-        document.body.removeChild(printIframe);
-      }, 2000);
-    }
-  };
+    const triggerPrint = () => {
+      try {
+        iframe?.contentWindow?.focus();
+        iframe?.contentWindow?.print();
+      } catch (err) {
+        console.error("Iframe print failed, falling back to window print", err);
+        fallbackWindowPrint(html);
+      }
+    };
+
+    setTimeout(triggerPrint, 250);
+  } else {
+    fallbackWindowPrint(html);
+  }
+}
+
+function fallbackWindowPrint(html: string): void {
+  const win = window.open("", "_blank", "width=1100,height=800");
+  if (win) {
+    win.document.open();
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    setTimeout(() => {
+      win.print();
+    }, 300);
+  }
 }
