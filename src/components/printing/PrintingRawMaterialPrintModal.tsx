@@ -6,7 +6,7 @@ import {
   computePrintingRawMaterialTotals,
 } from "@/lib/printing/printing-types";
 import { printPrintingRawMaterialReport } from "@/lib/printing/print-printing-raw-materials";
-import { Droplets, Printer, X, Scale, Gauge, Percent } from "lucide-react";
+import { FileText, Printer, X } from "lucide-react";
 
 interface PrintingRawMaterialPrintModalProps {
   open: boolean;
@@ -24,19 +24,31 @@ export function PrintingRawMaterialPrintModal({
     [data.entries, data.totalPrintMtrs]
   );
 
-  if (!open) return null;
+  if (!open || !data) return null;
 
   const docDate = (data.date || new Date().toISOString().slice(0, 10)).replace(/[^a-zA-Z0-9]/g, "");
   const docRef = `PRN-RM-${docDate}-${(data.shiftName || "SHIFT").toUpperCase().replace(/\s+/g, "")}`;
+  const genTimestamp = new Date().toLocaleString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
+
+  const handlePrint = () => {
+    printPrintingRawMaterialReport(data);
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/75 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-150">
       <div className="bg-white rounded-xl shadow-2xl border border-slate-300 w-full max-w-5xl max-h-[92vh] flex flex-col overflow-hidden">
-        {/* Top Control Bar */}
+        {/* Modal Top Control Bar */}
         <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 bg-slate-900 text-white border-b border-slate-800 shrink-0">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-white/10 text-white rounded-lg">
-              <Droplets className="h-5 w-5" />
+              <FileText className="h-5 w-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
@@ -45,174 +57,216 @@ export function PrintingRawMaterialPrintModal({
                 </h2>
                 <span
                   className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-sm border ${
-                    data.status === "APPROVED"
-                      ? "bg-emerald-500/20 text-emerald-300 border-emerald-400/40"
-                      : data.status === "SUBMITTED"
-                      ? "bg-blue-500/20 text-blue-300 border-blue-400/40"
-                      : "bg-amber-500/20 text-amber-300 border-amber-400/40"
+                    data.status === "SUBMITTED" || data.status === "APPROVED"
+                      ? "bg-emerald-900/40 text-emerald-300 border-emerald-500/40"
+                      : "bg-amber-900/40 text-amber-300 border-amber-500/40"
                   }`}
                 >
-                  {data.status}
+                  {data.status || "DRAFT"}
                 </span>
               </div>
-              <p className="text-xs text-slate-400 font-mono">
-                {docRef} · {data.date} · {data.shiftName}
+              <p className="text-xs text-slate-400">
+                {data.shiftName} • {data.date} • Total: {totals.totalConsumedKg.toFixed(2)} Kg ({totals.overallMileage.toLocaleString()} m/kg) • Ref: {docRef}
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
             <button
-              onClick={() => printPrintingRawMaterialReport(data)}
-              className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-md shadow-xs transition-colors"
+              onClick={handlePrint}
+              className="px-4 py-1.5 text-xs font-bold rounded-lg bg-white hover:bg-slate-100 text-slate-900 transition-all inline-flex items-center gap-1.5 shadow-sm cursor-pointer"
             >
-              <Printer className="h-4 w-4" />
-              Print / Save PDF
+              <Printer className="h-3.5 w-3.5 text-slate-900" />
+              <span>Print Document</span>
             </button>
+
             <button
               onClick={() => onOpenChange(false)}
-              className="p-2 text-slate-400 hover:text-white rounded-md hover:bg-white/10 transition-colors"
-              title="Close"
+              className="p-1.5 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition-all cursor-pointer ml-1"
+              title="Close Preview"
             >
               <X className="h-5 w-5" />
             </button>
           </div>
         </div>
 
-        {/* Preview Scrollable Body */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-slate-50">
-          {/* Header Summary Card */}
-          <div className="bg-white p-5 rounded-lg border border-slate-200 shadow-xs">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <div>
-                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Date</span>
-                <p className="text-sm font-bold text-slate-900 mt-0.5">{data.date}</p>
+        {/* Scrollable Preview Canvas */}
+        <div className="flex-1 overflow-auto p-4 sm:p-6 bg-slate-100/80">
+          <div className="max-w-[960px] mx-auto bg-white rounded-xl shadow-lg border border-slate-200 p-6 font-sans text-slate-900">
+            {/* Standard Company Letterhead */}
+            <div className="border-b-2 border-slate-900 pb-3 mb-4">
+              <div className="flex items-center justify-between gap-4">
+                <div className="w-16">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src="/logo.png"
+                    alt="Flexicom Logo"
+                    className="h-10 w-auto object-contain"
+                    onError={(e) => {
+                      (e.target as HTMLElement).style.display = "none";
+                    }}
+                  />
+                </div>
+                <div className="flex-1 text-center">
+                  <div className="text-base font-extrabold tracking-wide uppercase text-slate-950">
+                    Flexicom Industries Pvt. Limited
+                  </div>
+                  <div className="text-[11px] font-semibold text-slate-600 tracking-tight">
+                    SIDCO INDUSTRIAL ESTATE, PHASE-II, KATHUA (J&K) 184143 • PRINTING DIVISION
+                  </div>
+                  <div className="inline-block border border-slate-900 bg-slate-50 px-4 py-0.5 text-xs font-black tracking-wider text-slate-900 mt-1 uppercase">
+                    PRINTING RAW MATERIAL CONSUMPTION & MILEAGE REPORT
+                  </div>
+                </div>
+                <div className="w-16 text-right">
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
+                    A4 PORTRAIT
+                  </span>
+                </div>
               </div>
-              <div>
-                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Shift</span>
-                <p className="text-sm font-bold text-slate-900 mt-0.5">{data.shiftName}</p>
-              </div>
-              <div>
-                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Operator</span>
-                <p className="text-sm font-semibold text-slate-700 mt-0.5">{data.operatorName || "—"}</p>
-              </div>
-              <div>
-                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Supervisor</span>
-                <p className="text-sm font-semibold text-slate-700 mt-0.5">{data.supervisorName || "—"}</p>
+
+              {/* Metadata strip */}
+              <div className="mt-3 pt-2 border-t border-slate-200 flex flex-wrap items-center justify-between text-xs text-slate-600 font-medium">
+                <div>Doc Ref: <strong className="text-slate-900">{docRef}</strong></div>
+                <div>Date: <strong className="text-slate-900">{data.date}</strong></div>
+                <div>Shift: <strong className="text-slate-900">{data.shiftName}</strong></div>
+                <div>Operator: <strong className="text-slate-900">{data.operatorName || "—"}</strong></div>
+                <div>Supervisor: <strong className="text-slate-900">{data.supervisorName || "—"}</strong></div>
+                <div>Generated: <strong className="text-slate-900">{genTimestamp}</strong></div>
               </div>
             </div>
-          </div>
 
-          {/* KPI Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="bg-white border border-slate-200 rounded-lg p-4 shadow-xs">
-              <span className="text-xs font-semibold text-slate-500 uppercase">Printed Metres</span>
-              <div className="text-2xl font-black text-blue-700 font-mono mt-1">
-                {totals.totalPrintMtrs.toLocaleString()} <span className="text-xs font-normal">m</span>
+            {/* Bento KPI Strip */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+              <div className="p-3 rounded-lg border border-sky-200 bg-sky-50/50">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-sky-700">Printed Metres (Base)</div>
+                <div className="text-base font-black text-sky-800 mt-0.5">
+                  {totals.totalPrintMtrs.toLocaleString()} m
+                </div>
               </div>
-              <span className="text-xs text-slate-500">Base production length</span>
-            </div>
 
-            <div className="bg-white border border-slate-200 rounded-lg p-4 shadow-xs">
-              <span className="text-xs font-semibold text-slate-500 uppercase">Total Consumed (L)</span>
-              <div className="text-2xl font-black text-indigo-700 font-mono mt-1">
-                {totals.totalConsumedLitre.toFixed(2)} <span className="text-xs font-normal">L</span>
+              <div className="p-3 rounded-lg border border-emerald-200 bg-emerald-50/50">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Total Volume</div>
+                <div className="text-base font-black text-emerald-800 mt-0.5">
+                  {totals.totalConsumedLitre.toFixed(2)} L
+                </div>
               </div>
-              <span className="text-xs text-slate-500">Liquid volume</span>
-            </div>
 
-            <div className="bg-white border border-slate-200 rounded-lg p-4 shadow-xs">
-              <span className="text-xs font-semibold text-slate-500 uppercase">Total Consumed (Kg)</span>
-              <div className="text-2xl font-black text-emerald-700 font-mono mt-1">
-                {totals.totalConsumedKg.toFixed(2)} <span className="text-xs font-normal">kg</span>
+              <div className="p-3 rounded-lg border border-purple-200 bg-purple-50/50">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-purple-700">Total Consumed</div>
+                <div className="text-base font-black text-purple-900 mt-0.5">
+                  {totals.totalConsumedKg.toFixed(2)} Kg
+                </div>
               </div>
-              <span className="text-xs text-slate-500">x 0.82 density conversion</span>
-            </div>
 
-            <div className="bg-white border border-slate-200 rounded-lg p-4 shadow-xs">
-              <span className="text-xs font-semibold text-slate-500 uppercase">Overall Mileage</span>
-              <div className="text-2xl font-black text-purple-700 font-mono mt-1">
-                {totals.overallMileage.toLocaleString()} <span className="text-xs font-normal">m/kg</span>
+              <div className="p-3 rounded-lg border border-amber-200 bg-amber-50/50">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-amber-700">Overall Mileage</div>
+                <div className="text-base font-black text-amber-900 mt-0.5">
+                  {totals.overallMileage.toLocaleString()} m/kg
+                </div>
               </div>
-              <span className="text-xs text-slate-500">Total output per kg</span>
-            </div>
-          </div>
-
-          {/* Consumption Entries Table */}
-          <div className="bg-white rounded-lg border border-slate-200 overflow-hidden shadow-xs">
-            <div className="px-4 py-3 border-b border-slate-200 bg-slate-100/60 flex items-center justify-between">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
-                Raw Material Consumption Breakdown
-              </h3>
-              <span className="text-xs font-medium text-slate-500">
-                {calculatedEntries.length} Items recorded
-              </span>
             </div>
 
-            <table className="w-full text-left text-xs text-slate-700">
-              <thead className="bg-slate-50 border-b border-slate-200 font-semibold text-slate-600 uppercase tracking-wider">
-                <tr>
-                  <th className="px-3 py-2.5 text-center w-10">#</th>
-                  <th className="px-3 py-2.5">Material Name</th>
-                  <th className="px-3 py-2.5 text-center">Unit</th>
-                  <th className="px-3 py-2.5 text-right">Consumed (L)</th>
-                  <th className="px-3 py-2.5 text-center">Factor</th>
-                  <th className="px-3 py-2.5 text-right">Consumed (Kg)</th>
-                  <th className="px-3 py-2.5 text-right">Ratio (%)</th>
-                  <th className="px-3 py-2.5 text-right">Mileage (m/kg)</th>
-                  <th className="px-3 py-2.5">Remarks</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200">
-                {calculatedEntries.map((row, idx) => (
-                  <tr key={idx} className="hover:bg-slate-50/50">
-                    <td className="px-3 py-2 text-center font-bold text-slate-400">{idx + 1}</td>
-                    <td className="px-3 py-2 font-semibold text-slate-900">{row.materialName}</td>
-                    <td className="px-3 py-2 text-center">
-                      <span className="font-mono text-[11px] font-bold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded-sm">
-                        {row.unit || "LITRE"}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2 text-right font-mono text-blue-700 font-medium">
-                      {(Number(row.consumedLitre) || 0) > 0 ? Number(row.consumedLitre).toFixed(2) : "—"}
-                    </td>
-                    <td className="px-3 py-2 text-center font-mono text-slate-500">
-                      {(Number(row.conversionFactor) || 0.82).toFixed(2)}
-                    </td>
-                    <td className="px-3 py-2 text-right font-mono font-bold text-emerald-700">
-                      {(Number(row.consumedKg) || 0).toFixed(2)}
-                    </td>
-                    <td className="px-3 py-2 text-right font-mono font-bold text-purple-700">
-                      {(Number(row.ratioPercent) || 0) > 0 ? `${Number(row.ratioPercent).toFixed(1)}%` : "—"}
-                    </td>
-                    <td className="px-3 py-2 text-right font-mono font-bold text-blue-800">
-                      {(Number(row.mileage) || 0) > 0 ? `${Number(row.mileage).toLocaleString()} m/kg` : "—"}
-                    </td>
-                    <td className="px-3 py-2 text-slate-500 text-[11px]">{row.remarks || "—"}</td>
+            {/* High-Fidelity Data Table */}
+            <div className="overflow-x-auto border border-slate-300 rounded-lg">
+              <table className="w-full border-collapse text-xs">
+                <thead>
+                  <tr className="bg-slate-100 text-slate-800 text-[11px] font-bold uppercase border-b border-slate-300">
+                    <th className="p-2.5 text-center border-r border-slate-300 w-10">#</th>
+                    <th className="p-2.5 text-left border-r border-slate-300">Raw Material (Inks / Solvents)</th>
+                    <th className="p-2.5 text-center border-r border-slate-300 w-16">Unit</th>
+                    <th className="p-2.5 text-right border-r border-slate-300 w-28">Consumed (L)</th>
+                    <th className="p-2.5 text-center border-r border-slate-300 w-16">Factor</th>
+                    <th className="p-2.5 text-right border-r border-slate-300 w-28 bg-blue-50/60 text-blue-950 font-bold">Consumed (Kg)</th>
+                    <th className="p-2.5 text-right border-r border-slate-300 w-20">Ratio %</th>
+                    <th className="p-2.5 text-right border-r border-slate-300 w-28 bg-emerald-50/60 text-emerald-950 font-bold">Mileage</th>
+                    <th className="p-2.5 text-left w-32">Remarks</th>
                   </tr>
-                ))}
-                {/* Total Row */}
-                <tr className="bg-slate-100 font-bold border-t-2 border-slate-300">
-                  <td colSpan={3} className="px-3 py-2 text-right uppercase tracking-wider text-slate-800">
-                    Totals:
-                  </td>
-                  <td className="px-3 py-2 text-right font-mono text-blue-700">
-                    {totals.totalConsumedLitre.toFixed(2)} L
-                  </td>
-                  <td className="px-3 py-2 text-center font-mono text-slate-500">—</td>
-                  <td className="px-3 py-2 text-right font-mono text-emerald-800 text-sm">
-                    {totals.totalConsumedKg.toFixed(2)} kg
-                  </td>
-                  <td className="px-3 py-2 text-right font-mono text-purple-800">
-                    {totals.totalConsumedKg > 0 ? "100.0%" : "—"}
-                  </td>
-                  <td className="px-3 py-2 text-right font-mono text-blue-900 text-sm">
-                    {totals.overallMileage.toLocaleString()} m/kg
-                  </td>
-                  <td className="px-3 py-2"></td>
-                </tr>
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-slate-200">
+                  {calculatedEntries.length === 0 ? (
+                    <tr>
+                      <td colSpan={9} className="p-4 text-center text-slate-400 italic">
+                        No raw material consumption entries recorded.
+                      </td>
+                    </tr>
+                  ) : (
+                    calculatedEntries.map((row, idx) => (
+                      <tr key={idx} className={idx % 2 === 1 ? "bg-slate-50/50" : "bg-white"}>
+                        <td className="p-2.5 text-center font-bold text-slate-400 border-r border-slate-200">{idx + 1}</td>
+                        <td className="p-2.5 font-bold text-slate-900 border-r border-slate-200">{row.materialName}</td>
+                        <td className="p-2.5 text-center font-mono text-[11px] text-slate-600 border-r border-slate-200">
+                          {row.unit || "LITRE"}
+                        </td>
+                        <td className="p-2.5 text-right font-mono text-blue-700 border-r border-slate-200">
+                          {(Number(row.consumedLitre) || 0) > 0 ? Number(row.consumedLitre).toFixed(2) : "—"}
+                        </td>
+                        <td className="p-2.5 text-center font-mono text-slate-500 border-r border-slate-200">
+                          {(Number(row.conversionFactor) || 0.82).toFixed(2)}
+                        </td>
+                        <td className="p-2.5 text-right font-mono font-bold text-blue-900 bg-blue-50/30 border-r border-slate-200">
+                          {(Number(row.consumedKg) || 0).toFixed(2)} kg
+                        </td>
+                        <td className="p-2.5 text-right font-mono font-bold text-purple-700 border-r border-slate-200">
+                          {(Number(row.ratioPercent) || 0) > 0 ? `${Number(row.ratioPercent).toFixed(1)}%` : "—"}
+                        </td>
+                        <td className="p-2.5 text-right font-mono font-bold text-emerald-800 bg-emerald-50/30 border-r border-slate-200">
+                          {(Number(row.mileage) || 0) > 0 ? `${Number(row.mileage).toLocaleString()} m/kg` : "—"}
+                        </td>
+                        <td className="p-2.5 text-slate-500 text-[11px]">{row.remarks || "—"}</td>
+                      </tr>
+                    ))
+                  )}
+
+                  {/* Totals Row */}
+                  <tr className="bg-slate-100 font-extrabold text-slate-900 border-t-2 border-slate-800">
+                    <td colSpan={3} className="p-2.5 text-right pr-4 uppercase tracking-wider text-[11px]">
+                      Totals:
+                    </td>
+                    <td className="p-2.5 text-right font-mono text-blue-700 border-r border-slate-300">
+                      {totals.totalConsumedLitre.toFixed(2)} L
+                    </td>
+                    <td className="p-2.5 text-center font-mono text-slate-400 border-r border-slate-300">—</td>
+                    <td className="p-2.5 text-right font-mono text-blue-900 bg-blue-100/50 border-r border-slate-300">
+                      {totals.totalConsumedKg.toFixed(2)} kg
+                    </td>
+                    <td className="p-2.5 text-right font-mono text-purple-800 border-r border-slate-300">
+                      {totals.totalConsumedKg > 0 ? "100.0%" : "—"}
+                    </td>
+                    <td className="p-2.5 text-right font-mono text-emerald-900 bg-emerald-100/50 border-r border-slate-300">
+                      {totals.overallMileage.toLocaleString()} m/kg
+                    </td>
+                    <td className="p-2.5"></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            {/* Remarks if any */}
+            {data.remarks && (
+              <div className="mt-4 p-3 rounded-lg border border-slate-200 bg-slate-50 text-xs">
+                <span className="font-bold text-slate-700 uppercase tracking-wider text-[10px] block mb-0.5">
+                  Remarks / Notes:
+                </span>
+                <p className="text-slate-800">{data.remarks}</p>
+              </div>
+            )}
+
+            {/* Official Signatures Strip */}
+            <div className="flex justify-between items-end mt-12 pt-4 px-4">
+              <div className="text-center w-40">
+                <div className="border-t border-slate-900 pt-1 text-xs font-bold text-slate-800 uppercase">Operator Signature</div>
+              </div>
+              <div className="text-center w-40">
+                <div className="border-t border-slate-900 pt-1 text-xs font-bold text-slate-800 uppercase">Supervisor Signature</div>
+              </div>
+              <div className="text-center w-40">
+                <div className="border-t border-slate-900 pt-1 text-xs font-bold text-slate-800 uppercase">Quality In-Charge</div>
+              </div>
+              <div className="text-center w-40">
+                <div className="border-t border-slate-900 pt-1 text-xs font-bold text-slate-800 uppercase">Plant Head / Manager</div>
+              </div>
+            </div>
           </div>
         </div>
       </div>

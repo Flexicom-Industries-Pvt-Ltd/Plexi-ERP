@@ -30,7 +30,7 @@ export function PrintingProductionSummaryClient() {
   const [customerSearch, setCustomerSearch] = useState<string>("");
   const [qualitySearch, setQualitySearch] = useState<string>("");
 
-  const [activeTab, setActiveTab] = useState<"customers" | "qualities" | "history">("customers");
+  const [activeTab, setActiveTab] = useState<"customers" | "qualities">("customers");
 
   const [loading, setLoading] = useState(false);
   const [printModalOpen, setPrintModalOpen] = useState(false);
@@ -319,19 +319,6 @@ export function PrintingProductionSummaryClient() {
               <Award className="w-4 h-4 text-emerald-600" />
               Quality-Wise Printing ({summaryData?.qualities.length || 0})
             </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveTab("history")}
-              className={`py-3.5 px-4 text-xs font-bold border-b-2 flex items-center gap-2 transition-all ${
-                activeTab === "history"
-                  ? "border-primary text-slate-900 bg-white shadow-xs"
-                  : "border-transparent text-slate-500 hover:text-slate-900"
-              }`}
-            >
-              <Clock className="w-4 h-4 text-purple-600" />
-              Shift Production History ({summaryData?.history.length || 0})
-            </button>
           </div>
         </div>
 
@@ -496,77 +483,6 @@ export function PrintingProductionSummaryClient() {
                       100.0%
                     </td>
                   </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {/* Tab 3: Shift Production History */}
-        {activeTab === "history" && (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs text-slate-700">
-              <thead className="bg-slate-100/70 border-b border-slate-200 text-slate-600 font-bold uppercase tracking-wider">
-                <tr>
-                  <th className="px-4 py-3">Date</th>
-                  <th className="px-4 py-3">Shift</th>
-                  <th className="px-4 py-3">Operator</th>
-                  <th className="px-4 py-3">Supervisor</th>
-                  <th className="px-4 py-3 text-center">Rolls</th>
-                  <th className="px-4 py-3 text-right">Printed (m)</th>
-                  <th className="px-4 py-3 text-right">Fabric Length (m)</th>
-                  <th className="px-4 py-3 text-right">Variance (m)</th>
-                  <th className="px-4 py-3 text-right">Efficiency %</th>
-                  <th className="px-4 py-3 text-center">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200">
-                {!summaryData?.history || summaryData.history.length === 0 ? (
-                  <tr>
-                    <td colSpan={10} className="px-4 py-12 text-center text-slate-400 italic">
-                      No shift history recorded yet.
-                    </td>
-                  </tr>
-                ) : (
-                  summaryData.history.map((h, i) => (
-                    <tr key={i} className="hover:bg-slate-50/60 transition-colors">
-                      <td className="px-4 py-3 font-bold text-slate-900">{h.date}</td>
-                      <td className="px-4 py-3">{h.shiftName}</td>
-                      <td className="px-4 py-3 text-slate-600">{h.operatorName || "—"}</td>
-                      <td className="px-4 py-3 text-slate-600">{h.supervisorName || "—"}</td>
-                      <td className="px-4 py-3 text-center font-mono font-bold text-slate-800">
-                        {h.totalRolls}
-                      </td>
-                      <td className="px-4 py-3 text-right font-mono font-bold text-blue-700">
-                        {h.printMtrs.toLocaleString()}
-                      </td>
-                      <td className="px-4 py-3 text-right font-mono">{h.productionMtrs.toLocaleString()}</td>
-                      <td
-                        className={`px-4 py-3 text-right font-mono font-bold ${
-                          h.varianceMtrs >= 0 ? "text-emerald-700" : "text-red-700"
-                        }`}
-                      >
-                        {h.varianceMtrs >= 0 ? "+" : ""}
-                        {h.varianceMtrs.toLocaleString()}
-                      </td>
-                      <td className="px-4 py-3 text-right font-mono font-extrabold text-amber-700">
-                        {h.efficiencyPercent.toFixed(1)}%
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <span
-                          className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
-                            h.status === "APPROVED"
-                              ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                              : h.status === "SUBMITTED"
-                              ? "bg-blue-50 text-blue-700 border border-blue-200"
-                              : "bg-amber-50 text-amber-700 border border-amber-200"
-                          }`}
-                        >
-                          {h.status}
-                        </span>
-                      </td>
-                    </tr>
-                  ))
                 )}
               </tbody>
             </table>
