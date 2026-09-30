@@ -44,6 +44,7 @@ export function PrintingWastageClient() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [isAutoSaving, setIsAutoSaving] = useState(false);
+  const [autoSaveError, setAutoSaveError] = useState<string | null>(null);
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
   const [printModalOpen, setPrintModalOpen] = useState(false);
 
@@ -120,8 +121,18 @@ export function PrintingWastageClient() {
     async (targetStatus?: "DRAFT" | "SUBMITTED" | "APPROVED", silent = false) => {
       if (!date || !shiftName) return;
 
+      const hasAnyData =
+        Boolean(laminationFabricWasteKg) ||
+        Boolean(printFabricWasteKg) ||
+        Boolean(remarks.trim()) ||
+        Boolean(operatorName.trim()) ||
+        Boolean(supervisorName.trim());
+
+      if (!hasAnyData && (!targetStatus || targetStatus === "DRAFT")) return;
+
       if (!silent) setSaving(true);
       else setIsAutoSaving(true);
+      setAutoSaveError(null);
 
       const newStatus = targetStatus || status;
 
@@ -165,6 +176,8 @@ export function PrintingWastageClient() {
           );
         }
       } catch (err: any) {
+        console.error("Printing wastage auto-save error:", err);
+        setAutoSaveError(err.message || "Auto-save failed");
         if (!silent) toast.error(err.message || "Failed to save wastage report");
       } finally {
         setSaving(false);
@@ -189,7 +202,14 @@ export function PrintingWastageClient() {
   // Debounced Auto-Save Trigger (auto save as draft)
   useEffect(() => {
     if (isInitialLoadRef.current || loading) return;
-    if (!laminationFabricWasteKg && !printFabricWasteKg && !remarks && !operatorName && !supervisorName) return;
+    const hasAnyData =
+      Boolean(laminationFabricWasteKg) ||
+      Boolean(printFabricWasteKg) ||
+      Boolean(remarks.trim()) ||
+      Boolean(operatorName.trim()) ||
+      Boolean(supervisorName.trim());
+
+    if (!hasAnyData) return;
 
     if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
 
@@ -264,6 +284,14 @@ export function PrintingWastageClient() {
                   <span className="inline-flex items-center gap-1.5 text-xs text-amber-700 bg-amber-50/80 px-2.5 py-0.5 rounded-full border border-amber-200 font-medium">
                     <Loader2 className="h-3 w-3 animate-spin text-amber-600" />
                     Auto-saving...
+                  </span>
+                ) : autoSaveError ? (
+                  <span
+                    className="inline-flex items-center gap-1.5 text-xs text-rose-700 bg-rose-50/80 px-2.5 py-0.5 rounded-full border border-rose-200 font-medium cursor-help"
+                    title={autoSaveError}
+                  >
+                    <AlertCircle className="h-3 w-3 text-rose-600" />
+                    Auto-save failed
                   </span>
                 ) : lastSavedAt ? (
                   <span className="inline-flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50/80 px-2.5 py-0.5 rounded-full border border-emerald-200 font-medium">

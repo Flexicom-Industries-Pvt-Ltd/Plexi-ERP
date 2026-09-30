@@ -116,7 +116,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const authResult = await requireConvertexApiPermission("canCreate");
+  const authResult = await requireConvertexApiPermission("canWrite");
   if (!authResult.ok) {
     return NextResponse.json({ error: authResult.error }, { status: authResult.status });
   }
@@ -152,11 +152,33 @@ export async function POST(request: NextRequest) {
     });
     const priorMtdKg = priorMtdRecords.reduce((acc, r) => acc + (r.totalWastageKg || 0), 0);
 
+    // Safely filter rows that have content
+    const hasRowContent = (e: any) =>
+      Boolean(
+        (e.rollNumber && String(e.rollNumber).trim()) ||
+        (e.partyName && String(e.partyName).trim()) ||
+        (e.grade && String(e.grade).trim()) ||
+        (e.loomNumber && String(e.loomNumber).trim()) ||
+        Number(e.productionPcs) > 0 ||
+        Number(e.rollMtr) > 0 ||
+        Number(e.netWeight) > 0 ||
+        Number(e.openingMeterReading) > 0 ||
+        Number(e.closingMeterReading) > 0 ||
+        Number(e.loomFabricWasteKg) > 0 ||
+        Number(e.lamFabricWasteKg) > 0 ||
+        Number(e.printFabricWasteKg) > 0 ||
+        Number(e.machineWasteKg) > 0 ||
+        (e.remarks && String(e.remarks).trim())
+      );
+
+    const validEntries = Array.isArray(entries) ? entries.filter(hasRowContent) : [];
+
     // Recalculate row metrics
     let runningShiftWaste = 0;
-    const calculatedEntries: ConvertexReportItem[] = entries.map((entry: any, index: number) => {
+    const calculatedEntries: ConvertexReportItem[] = validEntries.map((entry: any, index: number) => {
       const row = calculateConvertexRow({
         ...entry,
+        rollNumber: String(entry.rollNumber || "").trim(),
         sequence: index + 1,
       });
       runningShiftWaste += row.totalWastageKg;
@@ -239,23 +261,23 @@ export async function POST(request: NextRequest) {
             companyName: e.companyName?.trim() || null,
             unitName: e.unitName?.trim() || null,
             grade: e.grade?.trim() || null,
-            targetProductionPcs: e.targetProductionPcs || null,
+            targetProductionPcs: e.targetProductionPcs ? Number(e.targetProductionPcs) : null,
             partyName: e.partyName?.trim() || null,
-            rollNumber: e.rollNumber.trim(),
+            rollNumber: String(e.rollNumber || "").trim(),
             loomNumber: e.loomNumber?.trim() || null,
-            rollMtr: e.rollMtr,
-            netWeight: e.netWeight,
-            avgWeight: e.avgWeight,
-            openingMeterReading: e.openingMeterReading,
-            closingMeterReading: e.closingMeterReading,
-            productionPcs: e.productionPcs,
-            loomFabricWasteKg: e.loomFabricWasteKg,
-            lamFabricWasteKg: e.lamFabricWasteKg,
-            printFabricWasteKg: e.printFabricWasteKg,
-            machineWasteKg: e.machineWasteKg,
-            totalWastageKg: e.totalWastageKg,
-            totalWastagePct: e.totalWastagePct,
-            totalWastageMtdKg: e.totalWastageMtdKg || finalMtdKg,
+            rollMtr: Number(e.rollMtr) || 0,
+            netWeight: Number(e.netWeight) || 0,
+            avgWeight: Number(e.avgWeight) || 0,
+            openingMeterReading: Number(e.openingMeterReading) || 0,
+            closingMeterReading: Number(e.closingMeterReading) || 0,
+            productionPcs: Number(e.productionPcs) || 0,
+            loomFabricWasteKg: Number(e.loomFabricWasteKg) || 0,
+            lamFabricWasteKg: Number(e.lamFabricWasteKg) || 0,
+            printFabricWasteKg: Number(e.printFabricWasteKg) || 0,
+            machineWasteKg: Number(e.machineWasteKg) || 0,
+            totalWastageKg: Number(e.totalWastageKg) || 0,
+            totalWastagePct: Number(e.totalWastagePct) || 0,
+            totalWastageMtdKg: Number(e.totalWastageMtdKg) || finalMtdKg,
             remarks: e.remarks?.trim() || null,
           })),
         });

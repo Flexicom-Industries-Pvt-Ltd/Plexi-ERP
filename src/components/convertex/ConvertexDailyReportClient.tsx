@@ -22,6 +22,7 @@ import {
   Scale,
   Sparkles,
   FileCheck,
+  AlertCircle,
 } from "lucide-react";
 import {
   ConvertexReportItem,
@@ -83,6 +84,7 @@ export function ConvertexDailyReportClient() {
   const [loading, setLoading] = useState<boolean>(true);
   const [saving, setSaving] = useState<boolean>(false);
   const [isAutoSaving, setIsAutoSaving] = useState<boolean>(false);
+  const [autoSaveError, setAutoSaveError] = useState<string | null>(null);
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
   const [isPrintModalOpen, setIsPrintModalOpen] = useState<boolean>(false);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
@@ -153,6 +155,9 @@ export function ConvertexDailyReportClient() {
               sequence: idx + 1,
             })
           );
+          while (parsed.length < 5) {
+            parsed.push(createEmptyConvertexRow(parsed.length + 1));
+          }
           setEntries(parsed);
         } else {
           setEntries([
@@ -163,6 +168,7 @@ export function ConvertexDailyReportClient() {
             createEmptyConvertexRow(5),
           ]);
         }
+        setLastSavedAt(format(new Date(rep.updatedAt || Date.now()), "hh:mm a"));
       } else {
         // No report exists for this shift
         setStatus("DRAFT");
@@ -174,6 +180,7 @@ export function ConvertexDailyReportClient() {
           createEmptyConvertexRow(4),
           createEmptyConvertexRow(5),
         ]);
+        setLastSavedAt(null);
       }
     } catch (err: any) {
       toast.error(err.message || "Failed to load Convertex production report");
@@ -271,19 +278,58 @@ export function ConvertexDailyReportClient() {
   // Compute live totals
   const totals = useMemo(() => computeConvertexTotals(entries), [entries]);
 
+  // Helper to determine if a row has any user entered data
+  const hasRowData = useCallback((e: ConvertexReportItem) => {
+    return Boolean(
+      (e.rollNumber && e.rollNumber.trim()) ||
+      (e.partyName && e.partyName.trim()) ||
+      (e.grade && e.grade.trim()) ||
+      (e.loomNumber && e.loomNumber.trim()) ||
+      Number(e.productionPcs) > 0 ||
+      Number(e.rollMtr) > 0 ||
+      Number(e.netWeight) > 0 ||
+      Number(e.openingMeterReading) > 0 ||
+      Number(e.closingMeterReading) > 0 ||
+      Number(e.loomFabricWasteKg) > 0 ||
+      Number(e.lamFabricWasteKg) > 0 ||
+      Number(e.printFabricWasteKg) > 0 ||
+      Number(e.machineWasteKg) > 0 ||
+      (e.remarks && e.remarks.trim())
+    );
+  }, []);
+
   // Save handler (supports manual submit or silent auto-save)
   const handleSave = useCallback(
     async (targetStatus?: "DRAFT" | "SUBMITTED" | "APPROVED", silent = false) => {
       if (!date || !shiftName) return;
 
-      const validEntries = entries.filter((e) => e.rollNumber && e.rollNumber.trim() !== "");
-      if (validEntries.length === 0 && !silent) {
-        toast.error("Please add at least one entry with a valid Roll Number");
-        return;
+      const filledEntries = entries.filter(hasRowData);
+
+      // Check if there is anything to save
+      const hasAnyData =
+        filledEntries.length > 0 ||
+        Boolean(operatorName.trim()) ||
+        Boolean(supervisorName.trim()) ||
+        Boolean(remarks.trim());
+
+      if (!hasAnyData && (!targetStatus || targetStatus === "DRAFT")) return;
+
+      // When submitting for final approval, require at least 1 entry with a valid Roll Number
+      if (targetStatus === "SUBMITTED") {
+        if (filledEntries.length === 0) {
+          toast.error("Please add at least one entry before submitting for approval");
+          return;
+        }
+        const hasMissingRolls = filledEntries.some((e) => !e.rollNumber?.trim());
+        if (hasMissingRolls) {
+          toast.error("All production entries must have a valid Roll Number before submission");
+          return;
+        }
       }
 
       if (!silent) setSaving(true);
       else setIsAutoSaving(true);
+      setAutoSaveError(null);
 
       const newStatus = targetStatus || status;
 
@@ -311,7 +357,7 @@ export function ConvertexDailyReportClient() {
           totalWastageKg: totals.totalWastageKg,
           totalWastagePct: totals.totalWastagePct,
           totalWastageMtdKg: totals.totalWastageMtdKg,
-          entries: validEntries.map((e, idx) => ({ ...e, sequence: idx + 1 })),
+          entries: filledEntries.map((e, idx) => ({ ...e, sequence: idx + 1 })),
         };
 
         const res = await fetch("/api/production/convertex/reports", {
@@ -325,7 +371,6 @@ export function ConvertexDailyReportClient() {
           throw new Error(err.error || "Failed to save Convertex report");
         }
 
-        const resData = await res.json();
         setStatus(newStatus);
         setLastSavedAt(format(new Date(), "hh:mm:ss a"));
 
@@ -336,15 +381,10 @@ export function ConvertexDailyReportClient() {
               : "Convertex report saved successfully"
           );
         }
-
-        if (resData.report && Array.isArray(resData.report.entries) && resData.report.entries.length > 0) {
-          setEntries(
-            resData.report.entries.map((e: any, idx: number) =>
-              calculateConvertexRow({ ...e, sequence: idx + 1 })
-            )
-          );
-        }
+        // Local entries state is intentionally preserved so user typing, empty rows, and focus are never lost
       } catch (err: any) {
+        console.error("Convertex auto-save error:", err);
+        setAutoSaveError(err.message || "Auto-save failed");
         if (!silent) toast.error(err.message || "Failed to save Convertex report");
       } finally {
         setSaving(false);
@@ -363,14 +403,20 @@ export function ConvertexDailyReportClient() {
       remarks,
       totals,
       entries,
+      hasRowData,
     ]
   );
 
   // Debounced auto-save effect (1200ms)
   useEffect(() => {
     if (isInitialLoadRef.current || loading) return;
-    const hasData = entries.some((e) => e.rollNumber.trim() !== "");
-    if (!hasData && !remarks && !operatorName && !supervisorName) return;
+    const hasAnyData =
+      entries.some(hasRowData) ||
+      Boolean(remarks.trim()) ||
+      Boolean(operatorName.trim()) ||
+      Boolean(supervisorName.trim());
+
+    if (!hasAnyData) return;
 
     if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
 
@@ -381,7 +427,7 @@ export function ConvertexDailyReportClient() {
     return () => {
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     };
-  }, [entries, remarks, operatorName, supervisorName, loading, handleSave]);
+  }, [entries, remarks, operatorName, supervisorName, loading, handleSave, hasRowData]);
 
   const reportDataForPrint: ConvertexDailyReportData = useMemo(() => {
     return {
@@ -438,6 +484,14 @@ export function ConvertexDailyReportClient() {
                 <span className="inline-flex items-center gap-1.5 text-xs text-amber-700 bg-amber-50/80 px-2.5 py-0.5 rounded-full border border-amber-200 font-medium">
                   <Loader2 className="h-3 w-3 animate-spin text-amber-600" />
                   Auto-saving...
+                </span>
+              ) : autoSaveError ? (
+                <span
+                  className="inline-flex items-center gap-1.5 text-xs text-rose-700 bg-rose-50/80 px-2.5 py-0.5 rounded-full border border-rose-200 font-medium cursor-help"
+                  title={autoSaveError}
+                >
+                  <AlertCircle className="h-3 w-3 text-rose-600" />
+                  Auto-save failed
                 </span>
               ) : lastSavedAt ? (
                 <span className="inline-flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50/80 px-2.5 py-0.5 rounded-full border border-emerald-200 font-medium">
