@@ -20,6 +20,7 @@ enum Module {
   TAPE_PLANT
   LOOM
   LAMINATION
+  PRINTING
   QUALITY_CONTROL
   RECYCLING_PLANT
   MAINTENANCE
@@ -2262,6 +2263,58 @@ model LaminationWastageReport {
   @@index([date])
   @@index([shiftName])
   @@index([status])
+}
+
+model PrintingDailyReport {
+  id                  String                     @id @default(cuid())
+  date                String                     // YYYY-MM-DD
+  shiftName           String                     // "Day Shift", "Night Shift", etc.
+  machineNo           String                     @default("Machine-1") // "Machine-1", "Machine-2", etc.
+  companyName         String?                    @default("FLEXICOM INDUSTRIES PVT. LIMITED")
+  unitName            String?                    @default("Unit-1")
+  operatorName        String?
+  operatorId          String?
+  supervisorName      String?
+  status              String                     @default("DRAFT") // "DRAFT" | "SUBMITTED" | "APPROVED"
+  remarks             String?
+  totalRolls          Int                        @default(0)
+  totalProductionMtrs Float                      @default(0)
+  totalNetWt          Float                      @default(0)
+  avgWeightGsm        Float?                     @default(0) // (totalNetWt / totalProductionMtrs) * 1000
+  totalPrintMtrs      Float                      @default(0)
+  varianceMtrs        Float                      @default(0) // totalPrintMtrs - totalProductionMtrs
+  efficiencyPercent   Float                      @default(0) // (totalPrintMtrs / totalProductionMtrs) * 100
+  entries             PrintingDailyReportEntry[]
+  createdAt           DateTime                   @default(now())
+  updatedAt           DateTime                   @updatedAt
+
+  @@unique([date, shiftName, machineNo])
+  @@index([date])
+  @@index([shiftName])
+  @@index([machineNo])
+  @@index([status])
+}
+
+model PrintingDailyReportEntry {
+  id              String              @id @default(cuid())
+  reportId        String
+  report          PrintingDailyReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  sequence        Int                 @default(1)
+  quality         String              // e.g. "Ambuja", "Ambuja PPC", "T Rapan Yellow", "Rady"
+  rollNumber      String              // e.g. "D14332", "D14339"
+  loomNumber      String              // e.g. "42 S1", "68 S1"
+  productionMeter Float               @default(0) // Production in Metre
+  netWeight       Float               @default(0) // Net Wt. in kg
+  avgWeight       Float               @default(0) // Avg. = (netWeight / productionMeter) * 1000 in g/m
+  printMeter      Float               @default(0) // Print in Metre
+  remarks         String?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  @@index([reportId])
+  @@index([rollNumber])
+  @@index([quality])
+  @@index([loomNumber])
 }
 
 
