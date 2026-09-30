@@ -1,13 +1,13 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { format } from "date-fns";
 import { toast } from "sonner";
 import {
   Droplets,
   Plus,
   Trash2,
   Printer,
-  Save,
   RefreshCw,
   Gauge,
   Percent,
@@ -20,6 +20,7 @@ import {
   ChevronRight,
   Layers,
   Sparkles,
+  Loader2,
 } from "lucide-react";
 import {
   PrintingRawMaterialReportData,
@@ -48,7 +49,12 @@ export function PrintingRawMaterialEntryClient() {
 
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [isAutoSaving, setIsAutoSaving] = useState(false);
+  const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
   const [printModalOpen, setPrintModalOpen] = useState(false);
+
+  const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const isInitialLoadRef = useRef<boolean>(true);
 
   // 1. Fetch Master Materials from Data Centre
   useEffect(() => {
@@ -69,6 +75,7 @@ export function PrintingRawMaterialEntryClient() {
   // 2. Fetch Report for Date & Shift
   const loadReport = useCallback(async () => {
     if (!date || !shiftName) return;
+    isInitialLoadRef.current = true;
     setLoading(true);
     try {
       const res = await fetch(
@@ -114,6 +121,9 @@ export function PrintingRawMaterialEntryClient() {
       toast.error(err.message || "Failed to load raw material report");
     } finally {
       setLoading(false);
+      setTimeout(() => {
+        isInitialLoadRef.current = false;
+      }, 500);
     }
   }, [date, shiftName]);
 
@@ -171,64 +181,90 @@ export function PrintingRawMaterialEntryClient() {
     return computePrintingRawMaterialTotals(entries, totalPrintMtrs);
   }, [entries, totalPrintMtrs]);
 
-  // Save handler
-  const handleSave = async (targetStatus?: "DRAFT" | "SUBMITTED" | "APPROVED") => {
-    if (!date || !shiftName) {
-      toast.error("Please specify Date and Shift");
-      return;
-    }
+  // Save handler (manual submit or silent auto-save)
+  const handleSave = useCallback(
+    async (targetStatus?: "DRAFT" | "SUBMITTED" | "APPROVED", silent = false) => {
+      if (!date || !shiftName) return;
 
+      const validEntries = entries.filter((e) => e.materialName.trim());
+      if (validEntries.length === 0) {
+        if (!silent) {
+          toast.error("Please add at least one raw material consumption entry");
+        }
+        return;
+      }
+
+      if (!silent) setSaving(true);
+      else setIsAutoSaving(true);
+
+      const newStatus = targetStatus || status;
+
+      try {
+        const payload: PrintingRawMaterialReportData = {
+          date,
+          shiftName,
+          operatorName: operatorName.trim() || undefined,
+          supervisorName: supervisorName.trim() || undefined,
+          totalPrintMtrs,
+          totalConsumedLitre: totals.totalConsumedLitre,
+          totalConsumedKg: totals.totalConsumedKg,
+          overallMileage: totals.overallMileage,
+          status: newStatus,
+          remarks: remarks.trim() || undefined,
+          entries: validEntries,
+        };
+
+        const res = await fetch("/api/production/printing/raw-materials", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.error || "Failed to save raw material report");
+        }
+
+        const resData = await res.json();
+        setStatus(newStatus);
+        setLastSavedAt(format(new Date(), "hh:mm:ss a"));
+
+        if (!silent) {
+          toast.success(
+            newStatus === "SUBMITTED"
+              ? "Raw material report submitted successfully!"
+              : "Raw material report saved successfully"
+          );
+        }
+        if (resData.report && Array.isArray(resData.report.entries)) {
+          setEntries(resData.report.entries);
+        }
+      } catch (err: any) {
+        if (!silent) toast.error(err.message || "Failed to save raw material report");
+      } finally {
+        setSaving(false);
+        setIsAutoSaving(false);
+      }
+    },
+    [date, shiftName, entries, status, operatorName, supervisorName, totalPrintMtrs, totals, remarks]
+  );
+
+  // Debounced Auto-Save Trigger (auto save as draft)
+  useEffect(() => {
+    if (isInitialLoadRef.current || loading) return;
     const validEntries = entries.filter((e) => e.materialName.trim());
-    if (validEntries.length === 0) {
-      toast.error("Please add at least one raw material consumption entry");
-      return;
-    }
+    if (validEntries.length === 0 && !remarks && !operatorName && !supervisorName) return;
 
-    setSaving(true);
-    const newStatus = targetStatus || status;
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
 
-    try {
-      const payload: PrintingRawMaterialReportData = {
-        date,
-        shiftName,
-        operatorName: operatorName.trim() || undefined,
-        supervisorName: supervisorName.trim() || undefined,
-        totalPrintMtrs,
-        totalConsumedLitre: totals.totalConsumedLitre,
-        totalConsumedKg: totals.totalConsumedKg,
-        overallMileage: totals.overallMileage,
-        status: newStatus,
-        remarks: remarks.trim() || undefined,
-        entries: validEntries,
-      };
+    autoSaveTimerRef.current = setTimeout(() => {
+      handleSave("DRAFT", true);
+    }, 1200);
 
-      const res = await fetch("/api/production/printing/raw-materials", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || "Failed to save raw material report");
-      }
-
-      const resData = await res.json();
-      toast.success(
-        newStatus === "SUBMITTED"
-          ? "Raw material report submitted successfully!"
-          : "Raw material report saved successfully"
-      );
-      setStatus(newStatus);
-      if (resData.report) {
-        setEntries(resData.report.entries || []);
-      }
-    } catch (err: any) {
-      toast.error(err.message || "Failed to save raw material report");
-    } finally {
-      setSaving(false);
-    }
-  };
+    return () => {
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    };
+  }, [entries, remarks, operatorName, supervisorName, loading, handleSave]);
 
   const reportDataForPrint: PrintingRawMaterialReportData = useMemo(() => {
     return {
@@ -267,6 +303,19 @@ export function PrintingRawMaterialEntryClient() {
               >
                 {status}
               </span>
+
+              {/* Auto-Save Live Status Pill */}
+              {isAutoSaving ? (
+                <span className="inline-flex items-center gap-1.5 text-xs text-amber-700 bg-amber-50/80 px-2.5 py-0.5 rounded-full border border-amber-200 font-medium">
+                  <Loader2 className="h-3 w-3 animate-spin text-amber-600" />
+                  Auto-saving...
+                </span>
+              ) : lastSavedAt ? (
+                <span className="inline-flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50/80 px-2.5 py-0.5 rounded-full border border-emerald-200 font-medium">
+                  <CheckCircle2 className="h-3 w-3 text-emerald-600" />
+                  All changes saved ({lastSavedAt})
+                </span>
+              ) : null}
             </div>
             <h1 className="text-2xl font-bold tracking-tight text-slate-900 mt-1">
               Raw Material Consumption Entry
@@ -293,16 +342,6 @@ export function PrintingRawMaterialEntryClient() {
             >
               <Printer className="w-4 h-4 text-slate-500" />
               Print Report
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleSave("DRAFT")}
-              disabled={saving}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-semibold shadow-xs transition-colors"
-            >
-              <Save className="w-4 h-4 text-slate-500" />
-              Save Draft
             </button>
 
             <button
