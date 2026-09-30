@@ -2296,25 +2296,52 @@ model PrintingDailyReport {
 }
 
 model PrintingDailyReportEntry {
-  id              String              @id @default(cuid())
-  reportId        String
-  report          PrintingDailyReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
-  sequence        Int                 @default(1)
-  quality         String              // e.g. "Ambuja", "Ambuja PPC", "T Rapan Yellow", "Rady"
-  rollNumber      String              // e.g. "D14332", "D14339"
-  loomNumber      String              // e.g. "42 S1", "68 S1"
-  productionMeter Float               @default(0) // Production in Metre
-  netWeight       Float               @default(0) // Net Wt. in kg
-  avgWeight       Float               @default(0) // Avg. = (netWeight / productionMeter) * 1000 in g/m
-  printMeter      Float               @default(0) // Print in Metre
-  remarks         String?
-  createdAt       DateTime            @default(now())
-  updatedAt       DateTime            @updatedAt
+  id                   String              @id @default(cuid())
+  reportId             String
+  report               PrintingDailyReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  sequence             Int                 @default(1)
+  companyName          String?             // Company Name e.g. "Ambuja", "UltraTech"
+  unitName             String?             // Unit Name e.g. "Ropar", "Unit-1"
+  grade                String?             // Grade e.g. "PPC", "OPC"
+  targetProductionMtrs Float?              // Target Production (in metre)
+  drumSize             String?             // Drum Size / Cut Length e.g. "20mm", "380mm"
+  quality              String              // e.g. "Ambuja", "Ambuja PPC", "T Rapan Yellow", "Rady"
+  rollNumber           String              // e.g. "D14332", "D14339"
+  loomNumber           String              // e.g. "42 S1", "68 S1"
+  productionMeter      Float               @default(0) // Production in Metre
+  netWeight            Float               @default(0) // Net Wt. in kg
+  avgWeight            Float               @default(0) // Avg. = (netWeight / productionMeter) * 1000 in g/m
+  printMeter           Float               @default(0) // Print in Metre
+  remarks              String?
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
 
   @@index([reportId])
+  @@index([companyName])
   @@index([rollNumber])
   @@index([quality])
   @@index([loomNumber])
 }
+
+model PartyPrintingDetail {
+  id                   String   @id @default(cuid())
+  companyName          String   // Company / Party Name e.g. "Ambuja", "UltraTech"
+  unitName             String?  // Unit Name e.g. "Ropar", "Unit-1"
+  grade                String?  // Grade e.g. "PPC", "OPC"
+  drumSize             String?  // Drum Size / Cut Length e.g. "20mm", "380mm"
+  targetProductionMtrs Float?   // Target Production (in metre)
+  quality              String?  // Default / Associated Quality
+  remarks              String?
+  isActive             Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@index([companyName])
+  @@index([unitName])
+  @@index([grade])
+  @@index([drumSize])
+  @@index([isActive])
+}
+
 
 

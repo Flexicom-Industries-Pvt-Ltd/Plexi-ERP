@@ -197,9 +197,16 @@ export async function POST(request: NextRequest) {
           data: calculatedEntries.map((e) => ({
             reportId: report.id,
             sequence: e.sequence,
-            quality: e.quality?.trim() || "STANDARD",
-            rollNumber: e.rollNumber?.trim() || "—",
-            loomNumber: String(e.loomNumber || "—"),
+            companyName: e.companyName?.trim() || null,
+            unitName: e.unitName?.trim() || null,
+            grade: e.grade?.trim() || null,
+            targetProductionMtrs: e.targetProductionMtrs !== undefined && e.targetProductionMtrs !== null && e.targetProductionMtrs !== ""
+              ? Number(e.targetProductionMtrs)
+              : null,
+            drumSize: e.drumSize?.trim() || null,
+            quality: e.quality?.trim() || "",
+            rollNumber: e.rollNumber?.trim() || "",
+            loomNumber: String(e.loomNumber || ""),
             productionMeter: Number(e.productionMeter) || 0,
             netWeight: Number(e.netWeight) || 0,
             avgWeight: Number(e.avgWeight) || 0,
@@ -207,6 +214,49 @@ export async function POST(request: NextRequest) {
             remarks: e.remarks?.trim() || null,
           })),
         });
+
+        // Auto-save new company details to Data Centre PartyPrintingDetail master
+        for (const e of calculatedEntries) {
+          const comp = e.companyName?.trim();
+          if (comp) {
+            const uName = e.unitName?.trim() || null;
+            const grd = e.grade?.trim() || null;
+            const dSize = e.drumSize?.trim() || null;
+            const tgt = e.targetProductionMtrs ? Number(e.targetProductionMtrs) : null;
+            const qlt = e.quality?.trim() || null;
+
+            const existingParty = await tx.partyPrintingDetail.findFirst({
+              where: {
+                companyName: { equals: comp, mode: "insensitive" },
+                unitName: uName ? { equals: uName, mode: "insensitive" } : null,
+                grade: grd ? { equals: grd, mode: "insensitive" } : null,
+                drumSize: dSize ? { equals: dSize, mode: "insensitive" } : null,
+              },
+            });
+
+            if (!existingParty) {
+              await tx.partyPrintingDetail.create({
+                data: {
+                  companyName: comp,
+                  unitName: uName,
+                  grade: grd,
+                  drumSize: dSize,
+                  targetProductionMtrs: tgt,
+                  quality: qlt,
+                  isActive: true,
+                },
+              });
+            } else if (tgt || qlt) {
+              await tx.partyPrintingDetail.update({
+                where: { id: existingParty.id },
+                data: {
+                  targetProductionMtrs: tgt ?? existingParty.targetProductionMtrs,
+                  quality: qlt ?? existingParty.quality,
+                },
+              });
+            }
+          }
+        }
       }
 
       return tx.printingDailyReport.findUnique({
