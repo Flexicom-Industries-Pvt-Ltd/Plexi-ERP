@@ -1,6 +1,11 @@
 export interface PrintingReportItem {
   id?: string;
   sequence: number;
+  companyName?: string;
+  unitName?: string;
+  grade?: string;
+  targetProductionMtrs?: number | string;
+  drumSize?: string;
   quality: string;
   rollNumber: string;
   loomNumber: string;
@@ -11,8 +16,23 @@ export interface PrintingReportItem {
   remarks?: string;
 }
 
+export interface PartyPrintingDetailItem {
+  id: string;
+  companyName: string;
+  unitName?: string | null;
+  grade?: string | null;
+  drumSize?: string | null;
+  targetProductionMtrs?: number | null;
+  quality?: string | null;
+  remarks?: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface PrintingSummaryTotals {
   totalRolls: number;
+  totalTargetMtrs: number;
   totalProductionMtrs: number;
   totalNetWt: number;
   avgWeightGsm: number;
@@ -25,7 +45,7 @@ export interface PrintingDailyReportData {
   id?: string;
   date: string;
   shiftName: string;
-  machineNo: string;
+  machineNo?: string;
   companyName?: string;
   unitName?: string;
   operatorName?: string;
@@ -71,25 +91,37 @@ export function calculatePrintingRow(item: PrintingReportItem): PrintingReportIt
  * Computes aggregate summary totals across all rows in a printing report
  */
 export function computePrintingTotals(entries: PrintingReportItem[]): PrintingSummaryTotals {
+  let totalTargetMtrs = 0;
   let totalProductionMtrs = 0;
   let totalNetWt = 0;
   let totalPrintMtrs = 0;
   let totalRolls = 0;
 
   for (const entry of entries) {
+    const targetMtr = Number(entry.targetProductionMtrs) || 0;
     const prodMtr = Number(entry.productionMeter) || 0;
     const netWt = Number(entry.netWeight) || 0;
     const printMtr = Number(entry.printMeter) || 0;
-    const hasData = Boolean(entry.rollNumber || prodMtr > 0 || netWt > 0 || printMtr > 0);
+    const hasData = Boolean(
+      entry.companyName ||
+      entry.rollNumber ||
+      entry.quality ||
+      targetMtr > 0 ||
+      prodMtr > 0 ||
+      netWt > 0 ||
+      printMtr > 0
+    );
 
     if (hasData) {
       totalRolls += 1;
+      totalTargetMtrs += targetMtr;
       totalProductionMtrs += prodMtr;
       totalNetWt += netWt;
       totalPrintMtrs += printMtr;
     }
   }
 
+  totalTargetMtrs = Math.round(totalTargetMtrs * 100) / 100;
   totalProductionMtrs = Math.round(totalProductionMtrs * 100) / 100;
   totalNetWt = Math.round(totalNetWt * 100) / 100;
   totalPrintMtrs = Math.round(totalPrintMtrs * 100) / 100;
@@ -108,6 +140,7 @@ export function computePrintingTotals(entries: PrintingReportItem[]): PrintingSu
 
   return {
     totalRolls,
+    totalTargetMtrs,
     totalProductionMtrs,
     totalNetWt,
     avgWeightGsm,
