@@ -22,7 +22,7 @@ export function PrintingReportPrintModal({
   if (!open) return null;
 
   const docDate = (data.date || new Date().toISOString().slice(0, 10)).replace(/[^a-zA-Z0-9]/g, "");
-  const docRef = `PRN-${(data.machineNo || "M1").toUpperCase().replace(/\s+/g, "")}-${docDate}-${(data.shiftName || "SHIFT").toUpperCase().replace(/\s+/g, "")}`;
+  const docRef = `PRN-${docDate}-${(data.shiftName || "SHIFT").toUpperCase().replace(/\s+/g, "")}`;
   const genTimestamp = new Date().toLocaleString("en-IN", {
     day: "2-digit",
     month: "short",
@@ -40,11 +40,9 @@ export function PrintingReportPrintModal({
     exportPrintingReportExcel(data);
   };
 
-  const machineTitle = (data.machineNo || "Machine-1").toUpperCase();
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/75 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-150">
-      <div className="bg-white rounded-xl shadow-2xl border border-slate-300 w-full max-w-6xl max-h-[94vh] flex flex-col overflow-hidden">
+      <div className="bg-white rounded-xl shadow-2xl border border-slate-300 w-full max-w-7xl max-h-[94vh] flex flex-col overflow-hidden">
         {/* Modal Top Control Bar */}
         <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 bg-slate-900 text-white border-b border-slate-800 shrink-0">
           <div className="flex items-center gap-3">
@@ -54,252 +52,248 @@ export function PrintingReportPrintModal({
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-sm sm:text-base font-bold text-white tracking-tight">
-                  Printing {machineTitle} Daily Production Report Preview
+                  Printing Daily Production Report Preview
                 </h2>
                 <span
                   className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-sm border ${
-                    data.status === "SUBMITTED" || data.status === "APPROVED"
-                      ? "bg-emerald-900/40 text-emerald-300 border-emerald-500/40"
-                      : "bg-amber-900/40 text-amber-300 border-amber-500/40"
+                    data.status === "APPROVED"
+                      ? "bg-emerald-500/20 text-emerald-300 border-emerald-400/40"
+                      : data.status === "SUBMITTED"
+                      ? "bg-blue-500/20 text-blue-300 border-blue-400/40"
+                      : "bg-amber-500/20 text-amber-300 border-amber-400/40"
                   }`}
                 >
                   {data.status}
                 </span>
               </div>
-              <p className="text-[11px] text-slate-400 font-mono">
-                Ref: {docRef} • {data.date} • {data.shiftName}
+              <p className="text-xs text-slate-400">
+                A4 Landscape Formal Enterprise Printout • Ref: {docRef}
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2">
             <button
-              type="button"
               onClick={handleExportExcel}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-200 bg-slate-800 hover:bg-slate-700 hover:text-white rounded-lg border border-slate-700 shadow-2xs transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition-colors shadow-xs"
             >
-              <FileSpreadsheet className="h-4 w-4 text-emerald-400" />
-              <span>Export Excel</span>
+              <FileSpreadsheet className="h-3.5 w-3.5" />
+              Download Excel
             </button>
             <button
-              type="button"
               onClick={handlePrint}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-white bg-primary hover:bg-primary/90 rounded-lg shadow-sm transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-primary hover:bg-primary/90 text-white transition-colors shadow-xs"
             >
-              <Printer className="h-4 w-4" />
-              <span>Print Sheet</span>
+              <Printer className="h-3.5 w-3.5" />
+              Print Sheet
             </button>
             <button
-              type="button"
               onClick={() => onOpenChange(false)}
-              className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+              className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-white/10 transition-colors ml-1"
             >
-              <X className="h-5 w-5" />
+              <X className="h-4 w-4" />
             </button>
           </div>
         </div>
 
-        {/* Printable View Body */}
+        {/* Scrollable Document Paper Preview */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-slate-100 flex justify-center">
-          <div className="bg-white shadow-md border border-slate-300 rounded-md p-6 max-w-5xl w-full text-slate-900 text-xs">
+          <div className="bg-white shadow-xl border border-slate-300 w-full max-w-6xl p-6 text-slate-900 font-sans text-xs">
             {/* Header Letterhead */}
             <div className="flex items-center justify-between border-b-2 border-slate-900 pb-3 mb-3">
-              <div className="flex items-center gap-3">
-                <img
-                  src="/logo.png"
-                  alt="Flexicom Logo"
-                  className="h-10 w-auto object-contain"
-                  onError={(e) => {
-                    (e.target as HTMLElement).style.display = "none";
-                  }}
-                />
-                <div>
-                  <h1 className="text-base font-black text-slate-950 uppercase tracking-tight">
-                    {data.companyName || "FLEXICOM INDUSTRIES PVT. LIMITED"}
-                  </h1>
-                  <p className="text-[10px] text-slate-500 font-medium">
-                    SIDCO INDUSTRIAL ESTATE, PHASE-II, KATHUA (J&K) 184143 • PRINTING DIVISION
-                  </p>
+              <div className="w-16">
+                <img src="/logo.png" alt="Logo" className="h-10 w-auto object-contain" />
+              </div>
+              <div className="flex-1 text-center">
+                <div className="text-base font-black tracking-tight text-slate-950 uppercase">
+                  FLEXICOM INDUSTRIES PVT. LIMITED
+                </div>
+                <div className="text-[10px] text-slate-500 font-semibold tracking-wide mt-0.5">
+                  SIDCO INDUSTRIAL ESTATE, PHASE-II, KATHUA (J&K) 184143 • PRINTING DIVISION
+                </div>
+                <div className="inline-block border border-slate-900 bg-slate-50 px-4 py-0.5 text-[11px] font-black tracking-wider uppercase mt-1 mb-1">
+                  PRINTING MACHINE DAILY PRODUCTION REPORT
+                </div>
+                <div className="flex flex-wrap justify-center items-center gap-x-4 gap-y-1 text-[10px] text-slate-600 mt-0.5">
+                  <span>Doc Ref: <strong className="text-slate-900 font-mono">{docRef}</strong></span>
+                  <span>Date: <strong className="text-slate-900">{data.date}</strong></span>
+                  <span>Shift: <strong className="text-slate-900">{data.shiftName}</strong></span>
+                  <span>Supervisor: <strong className="text-slate-900">{data.supervisorName || "—"}</strong></span>
+                  <span>Operator: <strong className="text-slate-900">{data.operatorName || "—"}</strong></span>
+                  <span>Generated: <strong className="text-slate-900">{genTimestamp}</strong></span>
                 </div>
               </div>
-              <div className="text-right">
-                <div className="font-mono text-xs font-bold text-sky-700">{docRef}</div>
-                <div className="text-[10px] text-slate-400">Generated: {genTimestamp}</div>
+              <div className="w-16 text-right">
+                <span className="text-[9px] font-bold border border-slate-300 px-1.5 py-0.5 rounded-sm bg-slate-50 text-slate-500">
+                  A4 LANDSCAPE
+                </span>
               </div>
             </div>
 
-            {/* Document Subtitle and Metadata */}
-            <div className="text-center mb-4">
-              <div className="inline-block border border-slate-900 bg-slate-50 px-4 py-1 text-xs font-black uppercase tracking-wider mb-2">
-                PRINTING {machineTitle} — DAILY PRODUCTION REPORT
-              </div>
-              <div className="flex flex-wrap items-center justify-center gap-4 text-[11px] text-slate-600">
-                <div>Date: <strong className="text-slate-900">{data.date}</strong></div>
-                <div>Shift: <strong className="text-slate-900">{data.shiftName}</strong></div>
-                <div>Machine: <strong className="text-slate-900">{machineTitle}</strong></div>
-                <div>Operator: <strong className="text-slate-900">{data.operatorName || "—"}</strong></div>
-                <div>Supervisor: <strong className="text-slate-900">{data.supervisorName || "—"}</strong></div>
-                <div>Status: <strong className="text-slate-900">{data.status}</strong></div>
-              </div>
-            </div>
-
-            {/* KPI Summary Cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 border border-slate-300 rounded bg-slate-50/70 p-2.5 mb-4 text-center">
+            {/* KPI Strip */}
+            <div className="grid grid-cols-4 sm:grid-cols-8 gap-2 bg-slate-50 p-2.5 rounded-lg border border-slate-200 mb-4 text-center">
               <div>
-                <span className="block text-[10px] text-slate-500 uppercase font-semibold">Total Rolls</span>
-                <span className="text-sm font-black font-mono text-slate-900">{totals.totalRolls}</span>
+                <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">Total Rolls</div>
+                <div className="text-sm font-black text-slate-900 font-mono">{totals.totalRolls}</div>
               </div>
               <div>
-                <span className="block text-[10px] text-slate-500 uppercase font-semibold">Production (Fabric)</span>
-                <span className="text-sm font-black font-mono text-slate-900">
-                  {totals.totalProductionMtrs.toLocaleString()} <span className="text-[10px] font-normal text-slate-400">m</span>
-                </span>
+                <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">Target Prod</div>
+                <div className="text-sm font-black text-blue-700 font-mono">{totals.totalTargetMtrs.toLocaleString()}m</div>
               </div>
               <div>
-                <span className="block text-[10px] text-slate-500 uppercase font-semibold">Net Weight</span>
-                <span className="text-sm font-black font-mono text-slate-900">
-                  {totals.totalNetWt.toLocaleString()} <span className="text-[10px] font-normal text-slate-400">kg</span>
-                </span>
+                <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">Fabric Prod</div>
+                <div className="text-sm font-black text-sky-700 font-mono">{totals.totalProductionMtrs.toLocaleString()}m</div>
               </div>
               <div>
-                <span className="block text-[10px] text-slate-500 uppercase font-semibold">Average GSM</span>
-                <span className="text-sm font-black font-mono text-sky-700">
-                  {totals.avgWeightGsm} <span className="text-[10px] font-normal text-slate-400">g/m</span>
-                </span>
+                <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">Net Wt.</div>
+                <div className="text-sm font-black text-slate-900 font-mono">{totals.totalNetWt.toFixed(1)} kg</div>
               </div>
               <div>
-                <span className="block text-[10px] text-slate-500 uppercase font-semibold">Print in Metre</span>
-                <span className="text-sm font-black font-mono text-emerald-700">
-                  {totals.totalPrintMtrs.toLocaleString()} <span className="text-[10px] font-normal text-slate-400">m</span>
-                </span>
+                <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">Avg GSM</div>
+                <div className="text-sm font-black text-blue-600 font-mono">{totals.avgWeightGsm.toFixed(1)}</div>
               </div>
               <div>
-                <span className="block text-[10px] text-slate-500 uppercase font-semibold">Variance / Gap</span>
-                <span className={`text-sm font-black font-mono ${totals.varianceMtrs >= 0 ? "text-emerald-700" : "text-rose-700"}`}>
-                  {totals.varianceMtrs >= 0 ? "+" : ""}{totals.varianceMtrs.toLocaleString()} <span className="text-[10px] font-normal text-slate-400">m</span>
-                </span>
+                <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">Total Printed</div>
+                <div className="text-sm font-black text-emerald-700 font-mono">{totals.totalPrintMtrs.toLocaleString()}m</div>
               </div>
               <div>
-                <span className="block text-[10px] text-slate-500 uppercase font-semibold">Efficiency</span>
-                <span className="text-sm font-black font-mono text-indigo-700">
-                  {totals.efficiencyPercent}%
-                </span>
+                <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">Variance</div>
+                <div className={`text-sm font-black font-mono ${totals.varianceMtrs < 0 ? "text-rose-600" : "text-emerald-700"}`}>
+                  {totals.varianceMtrs > 0 ? `+${totals.varianceMtrs}` : totals.varianceMtrs}m
+                </div>
+              </div>
+              <div>
+                <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold">Efficiency</div>
+                <div className="text-sm font-black text-primary font-mono">{totals.efficiencyPercent.toFixed(1)}%</div>
               </div>
             </div>
 
             {/* Table */}
-            <div className="border border-slate-900 rounded overflow-hidden mb-4">
-              <table className="w-full text-left text-xs border-collapse">
+            <div className="overflow-x-auto border border-slate-300 mb-4">
+              <table className="w-full text-[10px] border-collapse">
                 <thead>
-                  <tr className="bg-slate-900 text-white font-bold text-[10px] uppercase">
-                    <th className="py-2 px-2 text-center w-8 border-r border-slate-700">#</th>
-                    <th className="py-2 px-3 border-r border-slate-700">quality</th>
-                    <th className="py-2 px-3 text-center border-r border-slate-700">Roll No.</th>
-                    <th className="py-2 px-3 text-center border-r border-slate-700">Loom No.</th>
-                    <th className="py-2 px-3 text-right border-r border-slate-700">Production in Metre</th>
-                    <th className="py-2 px-3 text-right border-r border-slate-700">Net Wt. (kg)</th>
-                    <th className="py-2 px-3 text-right border-r border-slate-700">Avg. (g/m)</th>
-                    <th className="py-2 px-3 text-right border-r border-slate-700">Print in Metre</th>
-                    <th className="py-2 px-3">Remarks</th>
+                  <tr className="bg-slate-200 text-slate-900 font-bold uppercase text-center border-b border-slate-300">
+                    <th className="p-1 border-r border-slate-300 w-8">Sl.</th>
+                    <th className="p-1 border-r border-slate-300 text-left">Company Name</th>
+                    <th className="p-1 border-r border-slate-300">Unit</th>
+                    <th className="p-1 border-r border-slate-300">Grade</th>
+                    <th className="p-1 border-r border-slate-300 text-right">Target (m)</th>
+                    <th className="p-1 border-r border-slate-300">Drum Size</th>
+                    <th className="p-1 border-r border-slate-300 text-left">Quality</th>
+                    <th className="p-1 border-r border-slate-300">Roll No.</th>
+                    <th className="p-1 border-r border-slate-300">Loom</th>
+                    <th className="p-1 border-r border-slate-300 text-right">Prod (m)</th>
+                    <th className="p-1 border-r border-slate-300 text-right">Net Wt</th>
+                    <th className="p-1 border-r border-slate-300 text-right">Avg</th>
+                    <th className="p-1 border-r border-slate-300 text-right">Print (m)</th>
+                    <th className="p-1 text-left">Remarks</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-200">
+                <tbody>
                   {data.entries.length === 0 ? (
                     <tr>
-                      <td colSpan={9} className="py-8 text-center text-slate-400 italic">
-                        No production records entered.
+                      <td colSpan={14} className="p-6 text-center text-slate-400 italic">
+                        No production entries recorded for this report.
                       </td>
                     </tr>
                   ) : (
-                    data.entries.map((entry, idx) => {
-                      const prodMtr = Number(entry.productionMeter) || 0;
-                      const netWt = Number(entry.netWeight) || 0;
-                      const avg = Number(entry.avgWeight) || 0;
-                      const printMtr = Number(entry.printMeter) || 0;
-
-                      return (
-                        <tr key={entry.id || idx} className={idx % 2 === 1 ? "bg-slate-50/70" : "bg-white"}>
-                          <td className="py-2 px-2 text-center font-bold text-slate-500 border-r border-slate-200">
-                            {entry.sequence || idx + 1}
-                          </td>
-                          <td className="py-2 px-3 font-semibold text-slate-900 border-r border-slate-200">
-                            {entry.quality || "—"}
-                          </td>
-                          <td className="py-2 px-3 text-center font-mono font-bold text-slate-800 border-r border-slate-200">
-                            {entry.rollNumber || "—"}
-                          </td>
-                          <td className="py-2 px-3 text-center font-mono font-semibold text-sky-700 border-r border-slate-200">
-                            {entry.loomNumber || "—"}
-                          </td>
-                          <td className="py-2 px-3 text-right font-mono font-semibold text-slate-800 border-r border-slate-200">
-                            {prodMtr > 0 ? prodMtr.toLocaleString() : "—"}
-                          </td>
-                          <td className="py-2 px-3 text-right font-mono text-slate-800 border-r border-slate-200">
-                            {netWt > 0 ? netWt.toFixed(1) : "—"}
-                          </td>
-                          <td className="py-2 px-3 text-right font-mono font-bold text-sky-700 bg-sky-50/50 border-r border-slate-200">
-                            {avg > 0 ? avg.toFixed(1) : "—"}
-                          </td>
-                          <td className="py-2 px-3 text-right font-mono font-bold text-emerald-800 bg-emerald-50/50 border-r border-slate-200">
-                            {printMtr > 0 ? printMtr.toLocaleString() : "—"}
-                          </td>
-                          <td className="py-2 px-3 text-slate-500 text-[11px]">
-                            {entry.remarks || ""}
-                          </td>
-                        </tr>
-                      );
-                    })
+                    data.entries.map((entry, idx) => (
+                      <tr key={entry.id || idx} className={idx % 2 === 1 ? "bg-slate-50/60" : "bg-white"}>
+                        <td className="p-1 border-r border-b border-slate-200 text-center font-bold text-slate-500">
+                          {entry.sequence || idx + 1}
+                        </td>
+                        <td className="p-1 border-r border-b border-slate-200 font-bold text-slate-900">
+                          {entry.companyName || "—"}
+                        </td>
+                        <td className="p-1 border-r border-b border-slate-200 text-center text-slate-700">
+                          {entry.unitName || "—"}
+                        </td>
+                        <td className="p-1 border-r border-b border-slate-200 text-center text-slate-700">
+                          {entry.grade || "—"}
+                        </td>
+                        <td className="p-1 border-r border-b border-slate-200 text-right font-mono text-blue-700">
+                          {entry.targetProductionMtrs ? Number(entry.targetProductionMtrs).toLocaleString() : "—"}
+                        </td>
+                        <td className="p-1 border-r border-b border-slate-200 text-center font-mono text-slate-700">
+                          {entry.drumSize || "—"}
+                        </td>
+                        <td className="p-1 border-r border-b border-slate-200 font-semibold text-slate-800">
+                          {entry.quality || "—"}
+                        </td>
+                        <td className="p-1 border-r border-b border-slate-200 text-center font-mono font-bold text-slate-900">
+                          {entry.rollNumber || "—"}
+                        </td>
+                        <td className="p-1 border-r border-b border-slate-200 text-center font-mono font-semibold text-blue-600">
+                          {entry.loomNumber ? `#${entry.loomNumber}` : "—"}
+                        </td>
+                        <td className="p-1 border-r border-b border-slate-200 text-right font-mono font-bold text-slate-800">
+                          {entry.productionMeter ? Number(entry.productionMeter).toLocaleString() : "—"}
+                        </td>
+                        <td className="p-1 border-r border-b border-slate-200 text-right font-mono text-slate-700">
+                          {entry.netWeight ? Number(entry.netWeight).toFixed(1) : "—"}
+                        </td>
+                        <td className="p-1 border-r border-b border-slate-200 text-right font-mono font-semibold text-blue-700 bg-blue-50/40">
+                          {entry.avgWeight ? Number(entry.avgWeight).toFixed(1) : "—"}
+                        </td>
+                        <td className="p-1 border-r border-b border-slate-200 text-right font-mono font-bold text-emerald-700 bg-emerald-50/40">
+                          {entry.printMeter ? Number(entry.printMeter).toLocaleString() : "—"}
+                        </td>
+                        <td className="p-1 border-b border-slate-200 text-slate-600 truncate max-w-[120px]">
+                          {entry.remarks || ""}
+                        </td>
+                      </tr>
+                    ))
                   )}
-                </tbody>
-                <tfoot>
-                  <tr className="bg-slate-100 font-bold border-t-2 border-slate-900">
-                    <td colSpan={4} className="py-2.5 px-3 text-right border-r border-slate-200">
-                      TOTALS:
+                  {/* Totals Row */}
+                  <tr className="bg-slate-100 font-bold border-t-2 border-b-2 border-slate-900 text-slate-950">
+                    <td className="p-1.5 text-center">Σ</td>
+                    <td colSpan={3} className="p-1.5 uppercase font-black text-slate-900">
+                      Total Summary
                     </td>
-                    <td className="py-2.5 px-3 text-right font-mono font-black text-slate-900 border-r border-slate-200">
+                    <td className="p-1.5 text-right font-mono text-blue-700">
+                      {totals.totalTargetMtrs.toLocaleString()}
+                    </td>
+                    <td colSpan={4}></td>
+                    <td className="p-1.5 text-right font-mono text-sky-800 font-black">
                       {totals.totalProductionMtrs.toLocaleString()}
                     </td>
-                    <td className="py-2.5 px-3 text-right font-mono font-black text-slate-900 border-r border-slate-200">
+                    <td className="p-1.5 text-right font-mono">
                       {totals.totalNetWt.toFixed(1)}
                     </td>
-                    <td className="py-2.5 px-3 text-right font-mono font-black text-sky-700 border-r border-slate-200">
+                    <td className="p-1.5 text-right font-mono text-blue-700">
                       {totals.avgWeightGsm.toFixed(1)}
                     </td>
-                    <td className="py-2.5 px-3 text-right font-mono font-black text-emerald-800 border-r border-slate-200">
+                    <td className="p-1.5 text-right font-mono text-emerald-800 font-black">
                       {totals.totalPrintMtrs.toLocaleString()}
                     </td>
-                    <td className="py-2.5 px-3 text-slate-600 text-[11px]">
-                      Variance: {totals.varianceMtrs >= 0 ? "+" : ""}{totals.varianceMtrs} m ({totals.efficiencyPercent}%)
+                    <td className="p-1.5 text-slate-600 text-[9px]">
+                      {totals.efficiencyPercent.toFixed(1)}% Eff.
                     </td>
                   </tr>
-                </tfoot>
+                </tbody>
               </table>
             </div>
 
+            {/* Remarks */}
             {data.remarks && (
-              <div className="p-3 bg-slate-50 rounded border border-slate-200 mb-6 text-xs">
-                <span className="font-bold text-slate-700 uppercase block mb-1">Shift Remarks:</span>
-                <p className="text-slate-600">{data.remarks}</p>
+              <div className="p-2 bg-slate-50 border border-slate-200 rounded text-[10px] text-slate-700 mb-4">
+                <strong>Shift Remarks:</strong> {data.remarks}
               </div>
             )}
 
-            {/* Signature Blocks */}
-            <div className="grid grid-cols-4 gap-4 mt-8 pt-4 border-t border-slate-300 text-center text-[10px] font-bold text-slate-700 uppercase">
-              <div>
-                <div className="h-10 border-b border-dashed border-slate-300 mb-1"></div>
-                <span>Operator Signature</span>
+            {/* Signatures */}
+            <div className="grid grid-cols-4 gap-4 mt-8 pt-4 text-center">
+              <div className="border-t border-slate-800 pt-1 text-[10px] font-bold uppercase text-slate-700">
+                Operator Signature
               </div>
-              <div>
-                <div className="h-10 border-b border-dashed border-slate-300 mb-1"></div>
-                <span>QC Inspector</span>
+              <div className="border-t border-slate-800 pt-1 text-[10px] font-bold uppercase text-slate-700">
+                Supervisor Signature
               </div>
-              <div>
-                <div className="h-10 border-b border-dashed border-slate-300 mb-1"></div>
-                <span>Shift Supervisor</span>
+              <div className="border-t border-slate-800 pt-1 text-[10px] font-bold uppercase text-slate-700">
+                Quality In-Charge
               </div>
-              <div>
-                <div className="h-10 border-b border-dashed border-slate-300 mb-1"></div>
-                <span>Factory Manager</span>
+              <div className="border-t border-slate-800 pt-1 text-[10px] font-bold uppercase text-slate-700">
+                Plant Head / Manager
               </div>
             </div>
           </div>

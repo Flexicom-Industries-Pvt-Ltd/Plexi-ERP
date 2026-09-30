@@ -94,6 +94,7 @@ const dataCentreItems = [
   { title: "Tape Plant Recipe", url: "/dashboard/data-centre/tape-plant-recipe" },
   { title: "Loom Machine Mapping", url: "/dashboard/data-centre/loom-machine-mapping" },
   { title: "Lamination Raw Material", url: "/dashboard/data-centre/lamination-raw-materials" },
+  { title: "Party Printing Details", url: "/dashboard/data-centre/party-printing" },
 ];
 
 type AppSidebarProps = {
