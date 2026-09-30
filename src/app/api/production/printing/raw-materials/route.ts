@@ -152,9 +152,13 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    const filteredEntries = (Array.isArray(entries) ? entries : []).filter(
+      (e: any) => e && e.materialName && String(e.materialName).trim().length > 0
+    );
+
     // Calculate totals, conversions (0.82 factor), ratios, and mileage
     const { totals, calculatedEntries } = computePrintingRawMaterialTotals(
-      entries as PrintingRawMaterialEntryItem[],
+      filteredEntries as PrintingRawMaterialEntryItem[],
       printMtrs
     );
 
@@ -204,7 +208,7 @@ export async function POST(request: NextRequest) {
           data: calculatedEntries.map((e, index) => ({
             reportId: report.id,
             rawMaterialId: e.rawMaterialId || null,
-            materialName: e.materialName.trim(),
+            materialName: String(e.materialName || "").trim(),
             unit: (e.unit || "LITRE").toUpperCase(),
             consumedLitre: Number(e.consumedLitre) || 0,
             conversionFactor: Number(e.conversionFactor) || 0.82,

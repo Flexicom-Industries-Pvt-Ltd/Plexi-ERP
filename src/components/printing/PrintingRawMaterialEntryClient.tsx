@@ -21,6 +21,7 @@ import {
   Layers,
   Sparkles,
   Loader2,
+  AlertCircle,
 } from "lucide-react";
 import {
   PrintingRawMaterialReportData,
@@ -50,6 +51,7 @@ export function PrintingRawMaterialEntryClient() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [isAutoSaving, setIsAutoSaving] = useState(false);
+  const [autoSaveError, setAutoSaveError] = useState<string | null>(null);
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
   const [printModalOpen, setPrintModalOpen] = useState(false);
 
@@ -186,16 +188,23 @@ export function PrintingRawMaterialEntryClient() {
     async (targetStatus?: "DRAFT" | "SUBMITTED" | "APPROVED", silent = false) => {
       if (!date || !shiftName) return;
 
-      const validEntries = entries.filter((e) => e.materialName.trim());
-      if (validEntries.length === 0) {
-        if (!silent) {
-          toast.error("Please add at least one raw material consumption entry");
-        }
+      const validEntries = entries.filter((e) => e.materialName && e.materialName.trim());
+      const hasAnyData =
+        validEntries.length > 0 ||
+        Boolean(operatorName.trim()) ||
+        Boolean(supervisorName.trim()) ||
+        Boolean(remarks.trim());
+
+      if (!hasAnyData && (!targetStatus || targetStatus === "DRAFT")) return;
+
+      if (targetStatus === "SUBMITTED" && validEntries.length === 0) {
+        toast.error("Please add at least one raw material consumption entry before submitting");
         return;
       }
 
       if (!silent) setSaving(true);
       else setIsAutoSaving(true);
+      setAutoSaveError(null);
 
       const newStatus = targetStatus || status;
 
@@ -225,7 +234,6 @@ export function PrintingRawMaterialEntryClient() {
           throw new Error(err.error || "Failed to save raw material report");
         }
 
-        const resData = await res.json();
         setStatus(newStatus);
         setLastSavedAt(format(new Date(), "hh:mm:ss a"));
 
@@ -236,10 +244,10 @@ export function PrintingRawMaterialEntryClient() {
               : "Raw material report saved successfully"
           );
         }
-        if (resData.report && Array.isArray(resData.report.entries)) {
-          setEntries(resData.report.entries);
-        }
+        // Local entries state is intentionally preserved so user typing, empty rows, and focus are never lost
       } catch (err: any) {
+        console.error("Printing raw material auto-save error:", err);
+        setAutoSaveError(err.message || "Auto-save failed");
         if (!silent) toast.error(err.message || "Failed to save raw material report");
       } finally {
         setSaving(false);
@@ -252,8 +260,13 @@ export function PrintingRawMaterialEntryClient() {
   // Debounced Auto-Save Trigger (auto save as draft)
   useEffect(() => {
     if (isInitialLoadRef.current || loading) return;
-    const validEntries = entries.filter((e) => e.materialName.trim());
-    if (validEntries.length === 0 && !remarks && !operatorName && !supervisorName) return;
+    const hasAnyData =
+      entries.some((e) => Boolean(e.materialName?.trim() || Number(e.consumedLitre) > 0 || Number(e.consumedKg) > 0)) ||
+      Boolean(remarks.trim()) ||
+      Boolean(operatorName.trim()) ||
+      Boolean(supervisorName.trim());
+
+    if (!hasAnyData) return;
 
     if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
 
@@ -309,6 +322,14 @@ export function PrintingRawMaterialEntryClient() {
                 <span className="inline-flex items-center gap-1.5 text-xs text-amber-700 bg-amber-50/80 px-2.5 py-0.5 rounded-full border border-amber-200 font-medium">
                   <Loader2 className="h-3 w-3 animate-spin text-amber-600" />
                   Auto-saving...
+                </span>
+              ) : autoSaveError ? (
+                <span
+                  className="inline-flex items-center gap-1.5 text-xs text-rose-700 bg-rose-50/80 px-2.5 py-0.5 rounded-full border border-rose-200 font-medium cursor-help"
+                  title={autoSaveError}
+                >
+                  <AlertCircle className="h-3 w-3 text-rose-600" />
+                  Auto-save failed
                 </span>
               ) : lastSavedAt ? (
                 <span className="inline-flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50/80 px-2.5 py-0.5 rounded-full border border-emerald-200 font-medium">
