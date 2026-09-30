@@ -69,8 +69,285 @@ export interface AvailablePrintingRoll {
   shiftName?: string;
 }
 
+// ─── Raw Material Types & Calculations ──────────────────────────────────────────
+
+export interface PrintingRawMaterialMasterItem {
+  id: string;
+  name: string;
+  code?: string | null;
+  category: string; // "INK" | "SOLVENT" | "ADDITIVE"
+  unit: string; // "LITRE" | "KG"
+  conversionFactor: number; // default 0.82
+  defaultRatio?: number | null;
+  targetMileage?: number | null;
+  remarks?: string | null;
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface PrintingRawMaterialEntryItem {
+  id?: string;
+  sequence: number;
+  rawMaterialId?: string | null;
+  materialName: string;
+  unit: string; // "LITRE" or "KG"
+  consumedLitre: number | string;
+  conversionFactor: number; // default 0.82
+  consumedKg: number | string; // Litre * conversionFactor (or direct Kg)
+  ratioPercent: number | string; // % share of total consumption
+  mileage: number | string; // totalPrintMtrs / consumedKg
+  remarks?: string;
+}
+
+export interface PrintingRawMaterialTotals {
+  totalConsumedLitre: number;
+  totalConsumedKg: number;
+  totalPrintMtrs: number;
+  overallMileage: number; // totalPrintMtrs / totalConsumedKg
+}
+
+export interface PrintingRawMaterialReportData {
+  id?: string;
+  date: string;
+  shiftName: string;
+  operatorName?: string;
+  operatorId?: string;
+  supervisorName?: string;
+  totalPrintMtrs: number;
+  totalConsumedLitre: number;
+  totalConsumedKg: number;
+  overallMileage: number;
+  status: "DRAFT" | "SUBMITTED" | "APPROVED";
+  remarks?: string;
+  entries: PrintingRawMaterialEntryItem[];
+}
+
 /**
- * Calculates row-level average GSM / weight ratio:
+ * Calculates raw material row consumption in Kg, Ratio, and Mileage
+ */
+export function calculatePrintingRawMaterialRow(
+  item: PrintingRawMaterialEntryItem,
+  totalPrintMtrs: number = 0,
+  totalMixKg: number = 0
+): PrintingRawMaterialEntryItem {
+  const factor = Number(item.conversionFactor) || 0.82;
+  const isLitre = (item.unit || "LITRE").toUpperCase() === "LITRE";
+  let kg = 0;
+
+  if (isLitre) {
+    const litres = Number(item.consumedLitre) || 0;
+    kg = Math.round(litres * factor * 100) / 100;
+  } else {
+    kg = Number(item.consumedKg) || 0;
+  }
+
+  // Mileage = Total printed metres / consumed kg of this ink/solvent
+  let mileage = 0;
+  if (totalPrintMtrs > 0 && kg > 0) {
+    mileage = Math.round((totalPrintMtrs / kg) * 10) / 10;
+  }
+
+  // Ratio = (kg / totalMixKg) * 100
+  let ratio = 0;
+  if (totalMixKg > 0 && kg > 0) {
+    ratio = Math.round(((kg / totalMixKg) * 100) * 10) / 10;
+  }
+
+  return {
+    ...item,
+    conversionFactor: factor,
+    consumedKg: kg,
+    mileage,
+    ratioPercent: ratio,
+  };
+}
+
+/**
+ * Computes aggregate summary totals for printing raw material report
+ */
+export function computePrintingRawMaterialTotals(
+  entries: PrintingRawMaterialEntryItem[],
+  totalPrintMtrs: number = 0
+): {
+  totals: PrintingRawMaterialTotals;
+  calculatedEntries: PrintingRawMaterialEntryItem[];
+} {
+  let totalLitre = 0;
+  let totalKg = 0;
+
+  // First pass: compute total kg and total litres
+  const firstPass = entries.map((entry, idx) => {
+    const factor = Number(entry.conversionFactor) || 0.82;
+    const isLitre = (entry.unit || "LITRE").toUpperCase() === "LITRE";
+    let kg = 0;
+    let lit = 0;
+
+    if (isLitre) {
+      lit = Number(entry.consumedLitre) || 0;
+      kg = Math.round(lit * factor * 100) / 100;
+    } else {
+      kg = Number(entry.consumedKg) || 0;
+    }
+
+    if (lit > 0 || kg > 0 || entry.materialName) {
+      totalLitre += lit;
+      totalKg += kg;
+    }
+
+    return {
+      ...entry,
+      sequence: idx + 1,
+      conversionFactor: factor,
+      consumedKg: kg,
+    };
+  });
+
+  totalLitre = Math.round(totalLitre * 100) / 100;
+  totalKg = Math.round(totalKg * 100) / 100;
+
+  // Second pass: compute ratio and mileage for each entry
+  const calculatedEntries = firstPass.map((entry) => {
+    const kg = Number(entry.consumedKg) || 0;
+    const ratio = totalKg > 0 ? Math.round(((kg / totalKg) * 100) * 10) / 10 : 0;
+    const mileage = totalPrintMtrs > 0 && kg > 0 ? Math.round((totalPrintMtrs / kg) * 10) / 10 : 0;
+    return {
+      ...entry,
+      ratioPercent: ratio,
+      mileage,
+    };
+  });
+
+  const overallMileage =
+    totalPrintMtrs > 0 && totalKg > 0 ? Math.round((totalPrintMtrs / totalKg) * 10) / 10 : 0;
+
+  return {
+    totals: {
+      totalConsumedLitre: totalLitre,
+      totalConsumedKg: totalKg,
+      totalPrintMtrs,
+      overallMileage,
+    },
+    calculatedEntries,
+  };
+}
+
+// ─── Wastage Report Types & Calculations ────────────────────────────────────────
+
+export interface PrintingWastageReportData {
+  id?: string;
+  date: string;
+  shiftName: string;
+  operatorName?: string;
+  operatorId?: string;
+  supervisorName?: string;
+  totalProductionMtrs: number;
+  totalProductionKg: number; // Base net weight from daily production
+  laminationFabricWasteKg: number;
+  laminationFabricWastePct: number;
+  printFabricWasteKg: number;
+  printFabricWastePct: number;
+  totalWastageKg: number;
+  totalWastagePct: number;
+  status: "DRAFT" | "SUBMITTED" | "APPROVED";
+  remarks?: string;
+}
+
+/**
+ * Calculates lamination waste %, print waste %, and overall total wastage %
+ */
+export function calculatePrintingWastage(
+  baseKg: number,
+  laminationKg: number,
+  printKg: number
+): {
+  laminationFabricWastePct: number;
+  printFabricWastePct: number;
+  totalWastageKg: number;
+  totalWastagePct: number;
+} {
+  const safeBase = Number(baseKg) || 0;
+  const safeLam = Number(laminationKg) || 0;
+  const safePrint = Number(printKg) || 0;
+
+  const totalWasteKg = Math.round((safeLam + safePrint) * 100) / 100;
+
+  const laminationPct =
+    safeBase > 0 ? Math.round(((safeLam / safeBase) * 100) * 100) / 100 : 0;
+
+  const printPct =
+    safeBase > 0 ? Math.round(((safePrint / safeBase) * 100) * 100) / 100 : 0;
+
+  const totalPct =
+    safeBase > 0 ? Math.round(((totalWasteKg / safeBase) * 100) * 100) / 100 : 0;
+
+  return {
+    laminationFabricWastePct: laminationPct,
+    printFabricWastePct: printPct,
+    totalWastageKg: totalWasteKg,
+    totalWastagePct: totalPct,
+  };
+}
+
+// ─── Production Summary / Analytics Types ──────────────────────────────────────
+
+export interface CustomerPrintingSummaryItem {
+  companyName: string;
+  unitName: string;
+  totalRolls: number;
+  targetMtrs: number;
+  printMtrs: number;
+  productionMtrs: number;
+  netWeightKg: number;
+  avgGsm: number;
+  sharePercent: number;
+}
+
+export interface QualityPrintingSummaryItem {
+  quality: string;
+  totalRolls: number;
+  printMtrs: number;
+  productionMtrs: number;
+  netWeightKg: number;
+  avgGsm: number;
+  sharePercent: number;
+}
+
+export interface ShiftPrintingHistoryItem {
+  id: string;
+  date: string;
+  shiftName: string;
+  operatorName?: string;
+  supervisorName?: string;
+  totalRolls: number;
+  productionMtrs: number;
+  printMtrs: number;
+  varianceMtrs: number;
+  efficiencyPercent: number;
+  status: string;
+}
+
+export interface PrintingProductionSummaryResult {
+  startDate: string;
+  endDate: string;
+  overall: {
+    totalReports: number;
+    totalRolls: number;
+    totalTargetMtrs: number;
+    totalProductionMtrs: number;
+    totalNetWeightKg: number;
+    avgGsm: number;
+    totalPrintMtrs: number;
+    varianceMtrs: number;
+    overallEfficiency: number;
+  };
+  customers: CustomerPrintingSummaryItem[];
+  qualities: QualityPrintingSummaryItem[];
+  history: ShiftPrintingHistoryItem[];
+}
+
+/**
+ * Calculates row-level average GSM / weight ratio for daily report:
  * Avg. (g/m) = (Net Wt (kg) / Production in Metre) * 1000
  */
 export function calculatePrintingRow(item: PrintingReportItem): PrintingReportItem {
