@@ -21,6 +21,7 @@ enum Module {
   LOOM
   LAMINATION
   PRINTING
+  CONVERTEX
   QUALITY_CONTROL
   RECYCLING_PLANT
   MAINTENANCE
@@ -2430,6 +2431,78 @@ model PrintingWastageReport {
   @@index([date])
   @@index([shiftName])
   @@index([status])
+}
+
+model ConvertexDailyReport {
+  id                  String                      @id @default(cuid())
+  date                String                      // YYYY-MM-DD
+  shiftName           String                      // "Day Shift", "Night Shift", etc.
+  machineNo           String                      @default("Convertex-1") // "Convertex-1", "Convertex-2", etc.
+  companyName         String?                     @default("FLEXICOM INDUSTRIES PVT. LIMITED, KATHUA")
+  unitName            String?                     @default("Unit-1")
+  operatorName        String?
+  operatorId          String?
+  supervisorName      String?
+  status              String                      @default("DRAFT") // "DRAFT" | "SUBMITTED" | "APPROVED"
+  remarks             String?
+  totalRolls          Int                         @default(0)
+  totalRollMtr        Float                       @default(0)
+  totalNetWt          Float                       @default(0)
+  avgWeightGsm        Float?                      @default(0) // (totalNetWt / totalRollMtr) * 1000
+  totalProductionPcs  Float                       @default(0) // Total bags / sacks produced
+  totalTargetPcs      Float                       @default(0)
+  totalLoomWasteKg    Float                       @default(0)
+  totalLamWasteKg     Float                       @default(0)
+  totalPrintWasteKg   Float                       @default(0)
+  totalMachineWasteKg Float                       @default(0)
+  totalWastageKg      Float                       @default(0)
+  totalWastagePct     Float                       @default(0)
+  totalWastageMtdKg   Float                       @default(0)
+  entries             ConvertexDailyReportEntry[]
+  createdAt           DateTime                    @default(now())
+  updatedAt           DateTime                    @updatedAt
+
+  @@unique([date, shiftName, machineNo])
+  @@index([date])
+  @@index([shiftName])
+  @@index([machineNo])
+  @@index([status])
+}
+
+model ConvertexDailyReportEntry {
+  id                   String               @id @default(cuid())
+  reportId             String
+  report               ConvertexDailyReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  sequence             Int                  @default(1)
+  companyName          String?              // Company Name e.g. "Ambuja", "UltraTech"
+  unitName             String?              // Unit Name e.g. "Ropar", "Unit-1"
+  grade                String?              // Grade e.g. "PPC", "OPC"
+  targetProductionPcs  Float?               // Target Production (in pcs)
+  partyName            String?              // Party Name
+  rollNumber           String               // Roll No.
+  loomNumber           String?              // Loom No.
+  rollMtr              Float                @default(0) // Roll Mtr
+  netWeight            Float                @default(0) // Net Wt in kg
+  avgWeight            Float                @default(0) // Avg. = (netWeight / rollMtr) * 1000 in g/m
+  openingMeterReading  Float                @default(0) // Opening Meter Reading
+  closingMeterReading  Float                @default(0) // Closing Meter Reading
+  productionPcs        Float                @default(0) // Production (In Pcs)
+  loomFabricWasteKg    Float                @default(0) // Loom Fabric Wastage (In Kg)
+  lamFabricWasteKg     Float                @default(0) // Lam Fabric Wastage (In Kg)
+  printFabricWasteKg   Float                @default(0) // Print Fabric Wastage (In Kg)
+  machineWasteKg       Float                @default(0) // Machine Wastage (In Kg)
+  totalWastageKg       Float                @default(0) // Total Wastage (In Kg)
+  totalWastagePct      Float                @default(0) // Total Wastage (%)
+  totalWastageMtdKg    Float                @default(0) // Total Wastage MTD (In Kg)
+  remarks              String?
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+
+  @@index([reportId])
+  @@index([rollNumber])
+  @@index([partyName])
+  @@index([companyName])
+  @@index([loomNumber])
 }
 
 

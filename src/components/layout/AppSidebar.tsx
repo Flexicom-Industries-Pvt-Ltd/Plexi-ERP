@@ -16,6 +16,7 @@ import {
   Grid,
   Film,
   Printer,
+  Scissors,
 } from "lucide-react";
 
 import {
@@ -75,6 +76,10 @@ const printingItems = [
   { title: "Production Summary", url: "/dashboard/production/printing/summary" },
 ];
 
+const convertexItems = [
+  { title: "Daily Production Report", url: "/dashboard/production/convertex" },
+];
+
 const settingsItems = [
   { title: "General Settings", url: "/dashboard/settings/organization" },
   { title: "Users", url: "/dashboard/settings/users" },
@@ -113,6 +118,7 @@ export function AppSidebar({ user, allowedModules, ...props }: AppSidebarProps) 
   const [loomOpen, setLoomOpen] = useState(pathname.startsWith("/dashboard/production/loom"));
   const [laminationOpen, setLaminationOpen] = useState(pathname.startsWith("/dashboard/production/lamination"));
   const [printingOpen, setPrintingOpen] = useState(pathname.startsWith("/dashboard/production/printing"));
+  const [convertexOpen, setConvertexOpen] = useState(pathname.startsWith("/dashboard/production/convertex"));
   const [settingsOpen, setSettingsOpen] = useState(pathname.startsWith("/dashboard/settings"));
   const [dataCentreOpen, setDataCentreOpen] = useState(pathname.startsWith("/dashboard/data-centre"));
 
@@ -140,6 +146,7 @@ export function AppSidebar({ user, allowedModules, ...props }: AppSidebarProps) 
   const hasLoomAccess = isSuperAdmin || Boolean(allowedModules["LOOM"]);
   const hasLaminationAccess = isSuperAdmin || Boolean(allowedModules["LAMINATION"]) || Boolean(allowedModules["PRODUCTION"]);
   const hasPrintingAccess = isSuperAdmin || Boolean(allowedModules["PRINTING"]) || Boolean(allowedModules["PRODUCTION"]);
+  const hasConvertexAccess = isSuperAdmin || Boolean(allowedModules["CONVERTEX"]) || Boolean(allowedModules["PRODUCTION"]);
 
   const visibleNavItems = navItems.filter(
     (item) => (!item.module || isSuperAdmin || allowedModules[item.module]),
@@ -279,6 +286,38 @@ export function AppSidebar({ user, allowedModules, ...props }: AppSidebarProps) 
                   <SidebarMenuSub>
                     {printingItems.map((subItem) => {
                       const isBaseUrl = subItem.url === "/dashboard/production/printing";
+                      const isSubActive = isBaseUrl
+                        ? pathname === subItem.url
+                        : pathname === subItem.url || pathname.startsWith(subItem.url + "/");
+                      return (
+                        <SidebarMenuSubItem key={subItem.url}>
+                          <SidebarMenuSubButton
+                            render={<Link href={subItem.url} />}
+                            isActive={isSubActive}
+                          >
+                            <span>{subItem.title}</span>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      );
+                    })}
+                  </SidebarMenuSub>
+                </CollapsibleContent>
+              </SidebarMenuItem>
+            </Collapsible>
+          )}
+
+          {hasConvertexAccess && (
+            <Collapsible open={convertexOpen} onOpenChange={setConvertexOpen} className="group/collapsible">
+              <SidebarMenuItem>
+                <CollapsibleTrigger render={<SidebarMenuButton tooltip="Convertex" />}>
+                    <Scissors className="h-4 w-4" />
+                    <span>Convertex</span>
+                    <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180" />
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <SidebarMenuSub>
+                    {convertexItems.map((subItem) => {
+                      const isBaseUrl = subItem.url === "/dashboard/production/convertex";
                       const isSubActive = isBaseUrl
                         ? pathname === subItem.url
                         : pathname === subItem.url || pathname.startsWith(subItem.url + "/");
