@@ -70,6 +70,9 @@ const laminationItems = [
 
 const printingItems = [
   { title: "Daily Production Report", url: "/dashboard/production/printing" },
+  { title: "Raw Material Entry", url: "/dashboard/production/printing/raw-materials" },
+  { title: "Wastage Report", url: "/dashboard/production/printing/wastage" },
+  { title: "Production Summary", url: "/dashboard/production/printing/summary" },
 ];
 
 const settingsItems = [
@@ -94,6 +97,7 @@ const dataCentreItems = [
   { title: "Tape Plant Recipe", url: "/dashboard/data-centre/tape-plant-recipe" },
   { title: "Loom Machine Mapping", url: "/dashboard/data-centre/loom-machine-mapping" },
   { title: "Lamination Raw Material", url: "/dashboard/data-centre/lamination-raw-materials" },
+  { title: "Printing Raw Material", url: "/dashboard/data-centre/printing-raw-materials" },
   { title: "Party Printing Details", url: "/dashboard/data-centre/party-printing" },
 ];
 
@@ -274,7 +278,10 @@ export function AppSidebar({ user, allowedModules, ...props }: AppSidebarProps) 
                 <CollapsibleContent>
                   <SidebarMenuSub>
                     {printingItems.map((subItem) => {
-                      const isSubActive = pathname === subItem.url || pathname.startsWith(subItem.url + "/");
+                      const isBaseUrl = subItem.url === "/dashboard/production/printing";
+                      const isSubActive = isBaseUrl
+                        ? pathname === subItem.url
+                        : pathname === subItem.url || pathname.startsWith(subItem.url + "/");
                       return (
                         <SidebarMenuSubItem key={subItem.url}>
                           <SidebarMenuSubButton
