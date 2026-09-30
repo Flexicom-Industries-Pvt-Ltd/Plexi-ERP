@@ -1,12 +1,11 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { format } from "date-fns";
 import { toast } from "sonner";
 import {
   Trash2,
   Printer,
-  Save,
-  RefreshCw,
   Scale,
   Calendar,
   Clock,
@@ -16,6 +15,7 @@ import {
   Layers,
   AlertCircle,
   CheckCircle2,
+  Loader2,
 } from "lucide-react";
 import {
   PrintingWastageReportData,
@@ -43,12 +43,18 @@ export function PrintingWastageClient() {
 
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [isAutoSaving, setIsAutoSaving] = useState(false);
+  const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
   const [printModalOpen, setPrintModalOpen] = useState(false);
+
+  const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const isInitialLoadRef = useRef<boolean>(true);
 
   // Fetch Report for Date & Shift
   const loadReport = useCallback(async () => {
     if (!date || !shiftName) return;
     setLoading(true);
+    isInitialLoadRef.current = true;
     try {
       const res = await fetch(
         `/api/production/printing/wastage?date=${date}&shiftName=${encodeURIComponent(shiftName)}`
@@ -90,6 +96,9 @@ export function PrintingWastageClient() {
       toast.error(err.message || "Failed to load wastage data");
     } finally {
       setLoading(false);
+      setTimeout(() => {
+        isInitialLoadRef.current = false;
+      }, 500);
     }
   }, [date, shiftName]);
 
@@ -106,57 +115,92 @@ export function PrintingWastageClient() {
     );
   }, [totalProductionKg, laminationFabricWasteKg, printFabricWasteKg]);
 
-  // Save handler
-  const handleSave = async (targetStatus?: "DRAFT" | "SUBMITTED" | "APPROVED") => {
-    if (!date || !shiftName) {
-      toast.error("Please specify Date and Shift");
-      return;
-    }
+  // Save handler (manual submit or silent auto-save)
+  const handleSave = useCallback(
+    async (targetStatus?: "DRAFT" | "SUBMITTED" | "APPROVED", silent = false) => {
+      if (!date || !shiftName) return;
 
-    setSaving(true);
-    const newStatus = targetStatus || status;
+      if (!silent) setSaving(true);
+      else setIsAutoSaving(true);
 
-    try {
-      const payload: PrintingWastageReportData = {
-        date,
-        shiftName,
-        operatorName: operatorName.trim() || undefined,
-        supervisorName: supervisorName.trim() || undefined,
-        totalProductionMtrs,
-        totalProductionKg,
-        laminationFabricWasteKg: parseFloat(laminationFabricWasteKg) || 0,
-        laminationFabricWastePct: calc.laminationFabricWastePct,
-        printFabricWasteKg: parseFloat(printFabricWasteKg) || 0,
-        printFabricWastePct: calc.printFabricWastePct,
-        totalWastageKg: calc.totalWastageKg,
-        totalWastagePct: calc.totalWastagePct,
-        status: newStatus,
-        remarks: remarks.trim() || undefined,
-      };
+      const newStatus = targetStatus || status;
 
-      const res = await fetch("/api/production/printing/wastage", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      try {
+        const payload: PrintingWastageReportData = {
+          date,
+          shiftName,
+          operatorName: operatorName.trim() || undefined,
+          supervisorName: supervisorName.trim() || undefined,
+          totalProductionMtrs,
+          totalProductionKg,
+          laminationFabricWasteKg: parseFloat(laminationFabricWasteKg) || 0,
+          laminationFabricWastePct: calc.laminationFabricWastePct,
+          printFabricWasteKg: parseFloat(printFabricWasteKg) || 0,
+          printFabricWastePct: calc.printFabricWastePct,
+          totalWastageKg: calc.totalWastageKg,
+          totalWastagePct: calc.totalWastagePct,
+          status: newStatus,
+          remarks: remarks.trim() || undefined,
+        };
 
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || "Failed to save wastage report");
+        const res = await fetch("/api/production/printing/wastage", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.error || "Failed to save wastage report");
+        }
+
+        setStatus(newStatus);
+        setLastSavedAt(format(new Date(), "hh:mm:ss a"));
+
+        if (!silent) {
+          toast.success(
+            newStatus === "SUBMITTED"
+              ? "Printing wastage report submitted successfully!"
+              : "Printing wastage report saved successfully"
+          );
+        }
+      } catch (err: any) {
+        if (!silent) toast.error(err.message || "Failed to save wastage report");
+      } finally {
+        setSaving(false);
+        setIsAutoSaving(false);
       }
+    },
+    [
+      date,
+      shiftName,
+      operatorName,
+      supervisorName,
+      totalProductionMtrs,
+      totalProductionKg,
+      laminationFabricWasteKg,
+      printFabricWasteKg,
+      calc,
+      status,
+      remarks,
+    ]
+  );
 
-      toast.success(
-        newStatus === "SUBMITTED"
-          ? "Printing wastage report submitted successfully!"
-          : "Printing wastage report saved successfully"
-      );
-      setStatus(newStatus);
-    } catch (err: any) {
-      toast.error(err.message || "Failed to save wastage report");
-    } finally {
-      setSaving(false);
-    }
-  };
+  // Debounced Auto-Save Trigger (auto save as draft)
+  useEffect(() => {
+    if (isInitialLoadRef.current || loading) return;
+    if (!laminationFabricWasteKg && !printFabricWasteKg && !remarks && !operatorName && !supervisorName) return;
+
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+
+    autoSaveTimerRef.current = setTimeout(() => {
+      handleSave("DRAFT", true);
+    }, 1200);
+
+    return () => {
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    };
+  }, [laminationFabricWasteKg, printFabricWasteKg, remarks, operatorName, supervisorName, totalProductionKg, loading, handleSave]);
 
   const reportDataForPrint: PrintingWastageReportData = useMemo(() => {
     return {
@@ -199,8 +243,10 @@ export function PrintingWastageClient() {
               <Scale className="w-6 h-6" />
             </div>
             <div>
-              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-3">
-                Printing Wastage Report
+              <div className="flex items-center gap-3">
+                <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
+                  Printing Wastage Report
+                </h1>
                 <span
                   className={`text-xs font-semibold px-2.5 py-0.5 rounded-full border ${
                     status === "APPROVED"
@@ -212,7 +258,20 @@ export function PrintingWastageClient() {
                 >
                   {status}
                 </span>
-              </h1>
+
+                {/* Auto-Save Live Status Pill */}
+                {isAutoSaving ? (
+                  <span className="inline-flex items-center gap-1.5 text-xs text-amber-700 bg-amber-50/80 px-2.5 py-0.5 rounded-full border border-amber-200 font-medium">
+                    <Loader2 className="h-3 w-3 animate-spin text-amber-600" />
+                    Auto-saving...
+                  </span>
+                ) : lastSavedAt ? (
+                  <span className="inline-flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50/80 px-2.5 py-0.5 rounded-full border border-emerald-200 font-medium">
+                    <CheckCircle2 className="h-3 w-3 text-emerald-600" />
+                    All changes saved ({lastSavedAt})
+                  </span>
+                ) : null}
+              </div>
               <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
                 Track shift lamination and print fabric waste with live percentage calculation against production net weights.
               </p>
@@ -233,32 +292,11 @@ export function PrintingWastageClient() {
 
           <button
             type="button"
-            onClick={() => loadReport()}
-            disabled={loading}
-            className="h-9 px-3.5 text-xs font-semibold rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition-colors inline-flex items-center gap-1.5 shadow-xs"
-            title="Re-sync base production numbers"
-          >
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
-            Sync Sources
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleSave("DRAFT")}
-            disabled={saving || loading}
-            className="h-9 px-3.5 text-xs font-semibold rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 transition-colors inline-flex items-center gap-1.5 shadow-xs"
-          >
-            <Save className="h-4 w-4 text-slate-500" />
-            Save Draft
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleSave("SUBMITTED")}
+            onClick={() => handleSave("SUBMITTED", false)}
             disabled={saving || loading}
             className="h-9 px-4 text-xs font-semibold rounded-lg bg-slate-900 hover:bg-slate-800 text-white transition-colors inline-flex items-center gap-1.5 shadow-xs"
           >
-            {saving ? <RefreshCw className="h-4 w-4 animate-spin" /> : <FileCheck className="h-4 w-4" />}
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileCheck className="h-4 w-4" />}
             Submit Report
           </button>
         </div>
