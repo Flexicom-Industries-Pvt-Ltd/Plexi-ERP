@@ -2343,5 +2343,95 @@ model PartyPrintingDetail {
   @@index([isActive])
 }
 
+model PrintingRawMaterial {
+  id               String   @id @default(cuid())
+  name             String   @unique // e.g. "Solvent Ink Red", "Black Ink", "Ethyl Acetate (Solvent)"
+  code             String?  @unique // e.g. "INK-RED", "SOLV-EA"
+  category         String   @default("INK") // "INK" | "SOLVENT" | "ADDITIVE"
+  unit             String   @default("LITRE") // "LITRE" | "KG"
+  conversionFactor Float    @default(0.82) // 1 Litre = 0.82 Kg
+  defaultRatio     Float?   // Standard mix ratio or percentage
+  targetMileage    Float?   // Expected metres per kg
+  remarks          String?
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([name])
+  @@index([category])
+  @@index([isActive])
+}
+
+model PrintingRawMaterialReport {
+  id                 String                             @id @default(cuid())
+  date               String                             // YYYY-MM-DD
+  shiftName          String                             // "Day Shift", "Night Shift", etc.
+  operatorName       String?
+  operatorId         String?
+  supervisorName     String?
+  totalPrintMtrs     Float                              @default(0) // Printed meters for mileage calculation
+  totalConsumedLitre Float                              @default(0) // Total ink/solvent in Litres
+  totalConsumedKg    Float                              @default(0) // Total in Kg
+  overallMileage     Float                              @default(0) // totalPrintMtrs / totalConsumedKg
+  status             String                             @default("DRAFT") // "DRAFT" | "SUBMITTED" | "APPROVED"
+  remarks            String?
+  entries            PrintingRawMaterialReportEntry[]
+  createdAt          DateTime                           @default(now())
+  updatedAt          DateTime                           @updatedAt
+
+  @@unique([date, shiftName])
+  @@index([date])
+  @@index([shiftName])
+  @@index([status])
+}
+
+model PrintingRawMaterialReportEntry {
+  id               String                    @id @default(cuid())
+  reportId         String
+  report           PrintingRawMaterialReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  rawMaterialId    String?                   // Optional link to PrintingRawMaterial master
+  materialName     String                    // Material name e.g. "Solvent Ink Red"
+  unit             String                    @default("LITRE") // "LITRE" or "KG"
+  consumedLitre    Float                     @default(0)
+  conversionFactor Float                     @default(0.82)
+  consumedKg       Float                     @default(0) // consumedLitre * conversionFactor (or direct kg)
+  ratioPercent     Float                     @default(0) // (consumedKg / totalConsumedKg) * 100
+  mileage          Float                     @default(0) // totalPrintMtrs / consumedKg
+  sequence         Int                       @default(0)
+  remarks          String?
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @updatedAt
+
+  @@index([reportId])
+  @@index([materialName])
+}
+
+model PrintingWastageReport {
+  id                       String   @id @default(cuid())
+  date                     String   // YYYY-MM-DD
+  shiftName                String   // "Day Shift", "Night Shift", etc.
+  operatorName             String?
+  operatorId               String?
+  supervisorName           String?
+  totalProductionMtrs      Float    @default(0) // Printed meters for context
+  totalProductionKg        Float    @default(0) // Base Fabric net weight in kg from daily report
+  laminationFabricWasteKg  Float    @default(0) // Lamination fabric waste in kg
+  laminationFabricWastePct Float    @default(0) // (laminationFabricWasteKg / totalProductionKg) * 100
+  printFabricWasteKg       Float    @default(0) // Print fabric waste in kg
+  printFabricWastePct      Float    @default(0) // (printFabricWasteKg / totalProductionKg) * 100
+  totalWastageKg           Float    @default(0) // laminationFabricWasteKg + printFabricWasteKg
+  totalWastagePct          Float    @default(0) // (totalWastageKg / totalProductionKg) * 100
+  status                   String   @default("DRAFT") // "DRAFT" | "SUBMITTED" | "APPROVED"
+  remarks                  String?
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  @@unique([date, shiftName])
+  @@index([date])
+  @@index([shiftName])
+  @@index([status])
+}
+
+
 
 

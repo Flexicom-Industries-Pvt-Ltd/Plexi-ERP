@@ -4,6 +4,8 @@ import {
   computePrintingTotals,
   PrintingReportItem,
   PrintingDailyReportData,
+  computePrintingRawMaterialTotals,
+  calculatePrintingWastage,
 } from "../printing-types";
 import { generatePrintingReportHtml } from "../print-printing-report";
 
@@ -160,4 +162,89 @@ describe("Printing Production Calculations", () => {
       expect(html).toContain("Plant Head / Manager");
     });
   });
+
+  describe("Printing Raw Material Calculations & Conversions", () => {
+    it("converts litres to kg using 0.82 factor and calculates ratio & mileage", () => {
+      const { totals, calculatedEntries } = computePrintingRawMaterialTotals(
+        [
+          {
+            sequence: 1,
+            materialName: "Red Ink",
+            unit: "LITRE",
+            consumedLitre: 10,
+            conversionFactor: 0.82,
+            consumedKg: 0,
+            ratioPercent: 0,
+            mileage: 0,
+          },
+          {
+            sequence: 2,
+            materialName: "Ethyl Acetate (Solvent)",
+            unit: "LITRE",
+            consumedLitre: 20,
+            conversionFactor: 0.82,
+            consumedKg: 0,
+            ratioPercent: 0,
+            mileage: 0,
+          },
+          {
+            sequence: 3,
+            materialName: "Granules (Additive)",
+            unit: "KG",
+            consumedLitre: 0,
+            conversionFactor: 1,
+            consumedKg: 5.4,
+            ratioPercent: 0,
+            mileage: 0,
+          },
+        ],
+        30000 // 30,000 metres printed
+      );
+
+      // Entry 1: 10 * 0.82 = 8.2 kg
+      expect(calculatedEntries[0].consumedKg).toBe(8.2);
+      // Entry 2: 20 * 0.82 = 16.4 kg
+      expect(calculatedEntries[1].consumedKg).toBe(16.4);
+      // Entry 3: direct kg = 5.4 kg
+      expect(calculatedEntries[2].consumedKg).toBe(5.4);
+
+      // Total Kg = 8.2 + 16.4 + 5.4 = 30 kg
+      expect(totals.totalConsumedKg).toBe(30);
+      expect(totals.totalConsumedLitre).toBe(30);
+
+      // Overall Mileage = 30000 / 30 = 1000 m/kg
+      expect(totals.overallMileage).toBe(1000);
+
+      // Entry 1 Ratio = (8.2 / 30) * 100 = 27.33% -> 27.3%
+      expect(calculatedEntries[0].ratioPercent).toBe(27.3);
+      // Entry 1 Mileage = 30000 / 8.2 = 3658.5 m/kg
+      expect(calculatedEntries[0].mileage).toBe(3658.5);
+    });
+  });
+
+  describe("Printing Wastage Calculations", () => {
+    it("calculates lamination waste %, print waste %, and total waste % against total production", () => {
+      // 10,000 kg base production, 120 kg lamination waste, 80 kg print waste
+      const calc = calculatePrintingWastage(10000, 120, 80);
+
+      // Lamination waste % = (120 / 10000) * 100 = 1.2%
+      expect(calc.laminationFabricWastePct).toBe(1.2);
+      // Print waste % = (80 / 10000) * 100 = 0.8%
+      expect(calc.printFabricWastePct).toBe(0.8);
+      // Total waste kg = 120 + 80 = 200 kg
+      expect(calc.totalWastageKg).toBe(200);
+      // Total waste % = (200 / 10000) * 100 = 2.0%
+      expect(calc.totalWastagePct).toBe(2.0);
+    });
+
+    it("handles zero base production safely without divide by zero or NaN", () => {
+      const calc = calculatePrintingWastage(0, 50, 50);
+
+      expect(calc.laminationFabricWastePct).toBe(0);
+      expect(calc.printFabricWastePct).toBe(0);
+      expect(calc.totalWastageKg).toBe(100);
+      expect(calc.totalWastagePct).toBe(0);
+    });
+  });
 });
+

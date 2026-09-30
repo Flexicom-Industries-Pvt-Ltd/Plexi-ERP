@@ -1,7 +1,7 @@
 import { auth } from "@/auth";
 import { isSuperAdminRole } from "@/lib/api-auth";
 
-type PrintingAction = "canRead" | "canCreate" | "canUpdate" | "canDelete";
+type PrintingAction = "canRead" | "canCreate" | "canUpdate" | "canDelete" | "canWrite";
 
 export async function requirePrintingApiPermission(action: PrintingAction) {
   const session = await auth();
@@ -15,7 +15,7 @@ export async function requirePrintingApiPermission(action: PrintingAction) {
     permissions.some(
       (p: { module: string; [key: string]: unknown }) =>
         (p.module === "PRINTING" || p.module === "PRODUCTION" || p.module === "DATA_CENTRE" || p.module === "ALL") &&
-        Boolean(p[action])
+        (action === "canWrite" ? Boolean(p.canCreate || p.canUpdate) : Boolean(p[action]))
     );
 
   if (!hasAccess) {
