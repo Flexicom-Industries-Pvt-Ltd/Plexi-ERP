@@ -23,6 +23,8 @@ import {
   Sparkles,
   FileCheck,
   AlertCircle,
+  Layers,
+  Tag,
 } from "lucide-react";
 import {
   ConvertexReportItem,
@@ -30,6 +32,7 @@ import {
   calculateConvertexRow,
   computeConvertexTotals,
 } from "@/lib/convertex/convertex-types";
+import { ConvertexNavigationTabs } from "./ConvertexNavigationTabs";
 import { ConvertexReportPrintModal } from "./ConvertexReportPrintModal";
 import { exportConvertexReportExcel } from "@/lib/convertex/convertex-export";
 
@@ -40,6 +43,7 @@ function createEmptyConvertexRow(sequence: number): ConvertexReportItem {
     unitName: "",
     grade: "",
     targetProductionPcs: 0,
+    quality: "",
     partyName: "",
     rollNumber: "",
     loomNumber: "",
@@ -48,14 +52,11 @@ function createEmptyConvertexRow(sequence: number): ConvertexReportItem {
     avgWeight: 0,
     openingMeterReading: 0,
     closingMeterReading: 0,
+    coverPatchOs: 0,
+    coverPatchDs: 0,
+    valvePatch: 0,
     productionPcs: 0,
-    loomFabricWasteKg: 0,
-    lamFabricWasteKg: 0,
-    printFabricWasteKg: 0,
-    machineWasteKg: 0,
-    totalWastageKg: 0,
-    totalWastagePct: 0,
-    totalWastageMtdKg: 0,
+    productionKg: 0,
     remarks: "",
   };
 }
@@ -97,6 +98,36 @@ export function ConvertexDailyReportClient() {
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isInitialLoadRef = useRef<boolean>(true);
+  const isDirtyRef = useRef<boolean>(false);
+
+  // Keep a reference to the latest data to prevent stale closures during auto-save
+  const latestDataRef = useRef({
+    date,
+    shiftName,
+    machineNo,
+    companyName,
+    unitName,
+    operatorName,
+    supervisorName,
+    status,
+    remarks,
+    entries,
+  });
+
+  useEffect(() => {
+    latestDataRef.current = {
+      date,
+      shiftName,
+      machineNo,
+      companyName,
+      unitName,
+      operatorName,
+      supervisorName,
+      status,
+      remarks,
+      entries,
+    };
+  }, [date, shiftName, machineNo, companyName, unitName, operatorName, supervisorName, status, remarks, entries]);
 
   // Close fullscreen on Escape
   useEffect(() => {
@@ -131,6 +162,9 @@ export function ConvertexDailyReportClient() {
   const fetchReportData = useCallback(async () => {
     setLoading(true);
     isInitialLoadRef.current = true;
+    isDirtyRef.current = false;
+    setAutoSaveError(null);
+
     try {
       const res = await fetch(
         `/api/production/convertex/reports?date=${date}&shiftName=${encodeURIComponent(
@@ -152,6 +186,8 @@ export function ConvertexDailyReportClient() {
           const parsed = rep.entries.map((e: any, idx: number) =>
             calculateConvertexRow({
               ...e,
+              quality: e.quality || e.partyName || "",
+              partyName: e.quality || e.partyName || "",
               sequence: idx + 1,
             })
           );
@@ -188,7 +224,7 @@ export function ConvertexDailyReportClient() {
       setLoading(false);
       setTimeout(() => {
         isInitialLoadRef.current = false;
-      }, 500);
+      }, 400);
     }
   }, [date, shiftName, machineNo]);
 
@@ -196,8 +232,9 @@ export function ConvertexDailyReportClient() {
     fetchReportData();
   }, [fetchReportData]);
 
-  // Handle cell edits with live recalculation
+  // Handle cell edits with live recalculation and dirty flagging
   const handleCellChange = (index: number, field: keyof ConvertexReportItem, value: any) => {
+    isDirtyRef.current = true;
     setEntries((prev) => {
       const next = [...prev];
       const updatedRow = { ...next[index], [field]: value };
@@ -208,11 +245,13 @@ export function ConvertexDailyReportClient() {
 
   // Add row
   const handleAddRow = () => {
+    isDirtyRef.current = true;
     setEntries((prev) => [...prev, createEmptyConvertexRow(prev.length + 1)]);
   };
 
   // Add 5 rows
   const handleAdd5Rows = () => {
+    isDirtyRef.current = true;
     setEntries((prev) => {
       const start = prev.length + 1;
       return [
@@ -229,6 +268,7 @@ export function ConvertexDailyReportClient() {
   // Reset to blank
   const handleResetToBlank = () => {
     if (confirm("Reset sheet to 5 blank rows? Unsaved changes will be discarded.")) {
+      isDirtyRef.current = true;
       setEntries([
         createEmptyConvertexRow(1),
         createEmptyConvertexRow(2),
@@ -242,6 +282,7 @@ export function ConvertexDailyReportClient() {
 
   // Remove row
   const handleRemoveRow = (index: number) => {
+    isDirtyRef.current = true;
     setEntries((prev) => {
       if (prev.length <= 1) {
         return [createEmptyConvertexRow(1)];
@@ -254,6 +295,7 @@ export function ConvertexDailyReportClient() {
 
   // Select an available roll to populate row
   const handleSelectRoll = (rowIndex: number, roll: any) => {
+    isDirtyRef.current = true;
     setEntries((prev) => {
       const next = [...prev];
       const target = next[rowIndex];
@@ -264,7 +306,8 @@ export function ConvertexDailyReportClient() {
         unitName: roll.unitName || target.unitName,
         grade: roll.grade || target.grade,
         targetProductionPcs: roll.targetProductionPcs || target.targetProductionPcs,
-        partyName: roll.partyName || target.partyName,
+        quality: roll.quality || roll.partyName || target.quality,
+        partyName: roll.quality || roll.partyName || target.partyName,
         loomNumber: roll.loomNumber || target.loomNumber,
         rollMtr: roll.rollMtr || target.rollMtr,
         netWeight: roll.netWeight || target.netWeight,
@@ -279,38 +322,39 @@ export function ConvertexDailyReportClient() {
   const totals = useMemo(() => computeConvertexTotals(entries), [entries]);
 
   // Helper to determine if a row has any user entered data
-  const hasRowData = useCallback((e: ConvertexReportItem) => {
+  const hasRowData = (e: ConvertexReportItem) => {
     return Boolean(
       (e.rollNumber && e.rollNumber.trim()) ||
+      (e.quality && e.quality.trim()) ||
       (e.partyName && e.partyName.trim()) ||
       (e.grade && e.grade.trim()) ||
       (e.loomNumber && e.loomNumber.trim()) ||
       Number(e.productionPcs) > 0 ||
+      Number(e.productionKg) > 0 ||
+      Number(e.coverPatchOs) > 0 ||
+      Number(e.coverPatchDs) > 0 ||
+      Number(e.valvePatch) > 0 ||
       Number(e.rollMtr) > 0 ||
       Number(e.netWeight) > 0 ||
       Number(e.openingMeterReading) > 0 ||
       Number(e.closingMeterReading) > 0 ||
-      Number(e.loomFabricWasteKg) > 0 ||
-      Number(e.lamFabricWasteKg) > 0 ||
-      Number(e.printFabricWasteKg) > 0 ||
-      Number(e.machineWasteKg) > 0 ||
       (e.remarks && e.remarks.trim())
     );
-  }, []);
+  };
 
-  // Save handler (supports manual submit or silent auto-save)
-  const handleSave = useCallback(
+  // Save handler (manual submit or silent auto-save)
+  const executeSave = useCallback(
     async (targetStatus?: "DRAFT" | "SUBMITTED" | "APPROVED", silent = false) => {
-      if (!date || !shiftName) return;
+      const current = latestDataRef.current;
+      if (!current.date || !current.shiftName) return;
 
-      const filledEntries = entries.filter(hasRowData);
+      const filledEntries = current.entries.filter(hasRowData);
 
-      // Check if there is anything to save
       const hasAnyData =
         filledEntries.length > 0 ||
-        Boolean(operatorName.trim()) ||
-        Boolean(supervisorName.trim()) ||
-        Boolean(remarks.trim());
+        Boolean(current.operatorName.trim()) ||
+        Boolean(current.supervisorName.trim()) ||
+        Boolean(current.remarks.trim());
 
       if (!hasAnyData && (!targetStatus || targetStatus === "DRAFT")) return;
 
@@ -331,32 +375,30 @@ export function ConvertexDailyReportClient() {
       else setIsAutoSaving(true);
       setAutoSaveError(null);
 
-      const newStatus = targetStatus || status;
+      const newStatus = targetStatus || current.status;
+      const currentTotals = computeConvertexTotals(current.entries);
 
       try {
         const payload: ConvertexDailyReportData = {
-          date,
-          shiftName,
-          machineNo,
-          companyName,
-          unitName,
-          operatorName: operatorName.trim() || undefined,
-          supervisorName: supervisorName.trim() || undefined,
+          date: current.date,
+          shiftName: current.shiftName,
+          machineNo: current.machineNo,
+          companyName: current.companyName,
+          unitName: current.unitName,
+          operatorName: current.operatorName.trim() || undefined,
+          supervisorName: current.supervisorName.trim() || undefined,
           status: newStatus,
-          remarks: remarks.trim() || undefined,
-          totalRolls: totals.totalRolls,
-          totalRollMtr: totals.totalRollMtr,
-          totalNetWt: totals.totalNetWt,
-          avgWeightGsm: totals.avgWeightGsm,
-          totalProductionPcs: totals.totalProductionPcs,
-          totalTargetPcs: totals.totalTargetPcs,
-          totalLoomWasteKg: totals.totalLoomWasteKg,
-          totalLamWasteKg: totals.totalLamWasteKg,
-          totalPrintWasteKg: totals.totalPrintWasteKg,
-          totalMachineWasteKg: totals.totalMachineWasteKg,
-          totalWastageKg: totals.totalWastageKg,
-          totalWastagePct: totals.totalWastagePct,
-          totalWastageMtdKg: totals.totalWastageMtdKg,
+          remarks: current.remarks.trim() || undefined,
+          totalRolls: currentTotals.totalRolls,
+          totalRollMtr: currentTotals.totalRollMtr,
+          totalNetWt: currentTotals.totalNetWt,
+          avgWeightGsm: currentTotals.avgWeightGsm,
+          totalCoverPatchOs: currentTotals.totalCoverPatchOs,
+          totalCoverPatchDs: currentTotals.totalCoverPatchDs,
+          totalValvePatch: currentTotals.totalValvePatch,
+          totalProductionPcs: currentTotals.totalProductionPcs,
+          totalProductionKg: currentTotals.totalProductionKg,
+          totalTargetPcs: currentTotals.totalTargetPcs,
           entries: filledEntries.map((e, idx) => ({ ...e, sequence: idx + 1 })),
         };
 
@@ -373,6 +415,7 @@ export function ConvertexDailyReportClient() {
 
         setStatus(newStatus);
         setLastSavedAt(format(new Date(), "hh:mm:ss a"));
+        isDirtyRef.current = false;
 
         if (!silent) {
           toast.success(
@@ -381,9 +424,8 @@ export function ConvertexDailyReportClient() {
               : "Convertex report saved successfully"
           );
         }
-        // Local entries state is intentionally preserved so user typing, empty rows, and focus are never lost
       } catch (err: any) {
-        console.error("Convertex auto-save error:", err);
+        console.error("Convertex save error:", err);
         setAutoSaveError(err.message || "Auto-save failed");
         if (!silent) toast.error(err.message || "Failed to save Convertex report");
       } finally {
@@ -391,43 +433,37 @@ export function ConvertexDailyReportClient() {
         setIsAutoSaving(false);
       }
     },
-    [
-      date,
-      shiftName,
-      machineNo,
-      companyName,
-      unitName,
-      operatorName,
-      supervisorName,
-      status,
-      remarks,
-      totals,
-      entries,
-      hasRowData,
-    ]
+    []
   );
 
-  // Debounced auto-save effect (1200ms)
+  // Debounced auto-save effect: triggers 1000ms after last keystroke when dirty
   useEffect(() => {
     if (isInitialLoadRef.current || loading) return;
-    const hasAnyData =
-      entries.some(hasRowData) ||
-      Boolean(remarks.trim()) ||
-      Boolean(operatorName.trim()) ||
-      Boolean(supervisorName.trim());
-
-    if (!hasAnyData) return;
+    if (!isDirtyRef.current) return;
 
     if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
 
     autoSaveTimerRef.current = setTimeout(() => {
-      handleSave("DRAFT", true);
-    }, 1200);
+      if (isDirtyRef.current) {
+        executeSave("DRAFT", true);
+      }
+    }, 1000);
 
     return () => {
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     };
-  }, [entries, remarks, operatorName, supervisorName, loading, handleSave, hasRowData]);
+  }, [entries, remarks, operatorName, supervisorName, loading, executeSave]);
+
+  // Flush unsaved changes on tab blur or beforeunload
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (isDirtyRef.current) {
+        executeSave("DRAFT", true);
+      }
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [executeSave]);
 
   const reportDataForPrint: ConvertexDailyReportData = useMemo(() => {
     return {
@@ -444,21 +480,21 @@ export function ConvertexDailyReportClient() {
       totalRollMtr: totals.totalRollMtr,
       totalNetWt: totals.totalNetWt,
       avgWeightGsm: totals.avgWeightGsm,
+      totalCoverPatchOs: totals.totalCoverPatchOs,
+      totalCoverPatchDs: totals.totalCoverPatchDs,
+      totalValvePatch: totals.totalValvePatch,
       totalProductionPcs: totals.totalProductionPcs,
+      totalProductionKg: totals.totalProductionKg,
       totalTargetPcs: totals.totalTargetPcs,
-      totalLoomWasteKg: totals.totalLoomWasteKg,
-      totalLamWasteKg: totals.totalLamWasteKg,
-      totalPrintWasteKg: totals.totalPrintWasteKg,
-      totalMachineWasteKg: totals.totalMachineWasteKg,
-      totalWastageKg: totals.totalWastageKg,
-      totalWastagePct: totals.totalWastagePct,
-      totalWastageMtdKg: totals.totalWastageMtdKg,
       entries,
     };
   }, [date, shiftName, machineNo, companyName, unitName, operatorName, supervisorName, status, remarks, totals, entries]);
 
   return (
     <div className="space-y-5 font-sans pb-16">
+      {/* Sub-module Navigation Switcher */}
+      <ConvertexNavigationTabs currentTab="production" />
+
       {/* Header Control Card */}
       <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-100 pb-5">
@@ -479,7 +515,7 @@ export function ConvertexDailyReportClient() {
                 {status}
               </span>
 
-              {/* Auto-Save Live Status Pill */}
+              {/* Auto-Save Live Status Indicator */}
               {isAutoSaving ? (
                 <span className="inline-flex items-center gap-1.5 text-xs text-amber-700 bg-amber-50/80 px-2.5 py-0.5 rounded-full border border-amber-200 font-medium">
                   <Loader2 className="h-3 w-3 animate-spin text-amber-600" />
@@ -504,7 +540,7 @@ export function ConvertexDailyReportClient() {
               Convertex Daily Production Report
             </h1>
             <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-              Track conversion from woven rolls to finished bags with real-time meter readings, waste categorisation, and live KPIs.
+              Accurate tracking of roll conversion into sacks with real-time meter readings, cover patch counts, and production in pcs & kg.
             </p>
           </div>
 
@@ -538,7 +574,7 @@ export function ConvertexDailyReportClient() {
 
             <button
               type="button"
-              onClick={() => handleSave("SUBMITTED")}
+              onClick={() => executeSave("SUBMITTED")}
               disabled={saving}
               className="inline-flex items-center gap-1.5 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors"
             >
@@ -557,7 +593,10 @@ export function ConvertexDailyReportClient() {
             <input
               type="date"
               value={date}
-              onChange={(e) => setDate(e.target.value)}
+              onChange={(e) => {
+                isDirtyRef.current = false;
+                setDate(e.target.value);
+              }}
               className="w-full px-3 py-1.5 text-sm border border-slate-200 rounded-md focus:ring-2 focus:ring-primary/20 focus:border-primary font-medium"
             />
           </div>
@@ -568,7 +607,10 @@ export function ConvertexDailyReportClient() {
             </label>
             <select
               value={shiftName}
-              onChange={(e) => setShiftName(e.target.value)}
+              onChange={(e) => {
+                isDirtyRef.current = false;
+                setShiftName(e.target.value);
+              }}
               className="w-full px-3 py-1.5 text-sm border border-slate-200 rounded-md focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white font-medium"
             >
               <option value="Day Shift">Day Shift</option>
@@ -582,7 +624,10 @@ export function ConvertexDailyReportClient() {
             </label>
             <select
               value={machineNo}
-              onChange={(e) => setMachineNo(e.target.value)}
+              onChange={(e) => {
+                isDirtyRef.current = false;
+                setMachineNo(e.target.value);
+              }}
               className="w-full px-3 py-1.5 text-sm border border-slate-200 rounded-md focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white font-medium"
             >
               <option value="Convertex-1">Convertex-1</option>
@@ -599,7 +644,10 @@ export function ConvertexDailyReportClient() {
               type="text"
               placeholder="e.g. Rajesh Kumar"
               value={operatorName}
-              onChange={(e) => setOperatorName(e.target.value)}
+              onChange={(e) => {
+                isDirtyRef.current = true;
+                setOperatorName(e.target.value);
+              }}
               className="w-full px-3 py-1.5 text-sm border border-slate-200 rounded-md focus:ring-2 focus:ring-primary/20 focus:border-primary"
             />
           </div>
@@ -612,7 +660,10 @@ export function ConvertexDailyReportClient() {
               type="text"
               placeholder="e.g. Anil Sharma"
               value={supervisorName}
-              onChange={(e) => setSupervisorName(e.target.value)}
+              onChange={(e) => {
+                isDirtyRef.current = true;
+                setSupervisorName(e.target.value);
+              }}
               className="w-full px-3 py-1.5 text-sm border border-slate-200 rounded-md focus:ring-2 focus:ring-primary/20 focus:border-primary"
             />
           </div>
@@ -620,7 +671,7 @@ export function ConvertexDailyReportClient() {
       </div>
 
       {/* KPI Cards Strip */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
         <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-xs">
           <div className="text-[11px] font-semibold uppercase text-slate-500 tracking-wider">Total Rolls</div>
           <div className="text-xl font-bold font-mono text-slate-900 mt-1">{totals.totalRolls}</div>
@@ -651,20 +702,22 @@ export function ConvertexDailyReportClient() {
           <div className="text-[10px] text-emerald-600/80 mt-0.5">Finished Sacks</div>
         </div>
 
-        <div className="bg-white border border-red-200 bg-red-50/20 rounded-xl p-3.5 shadow-xs">
-          <div className="text-[11px] font-semibold uppercase text-red-700 tracking-wider">Total Wastage</div>
-          <div className="text-xl font-bold font-mono text-red-800 mt-1">{totals.totalWastageKg.toFixed(2)} kg</div>
-          <div className="text-[10px] text-red-600/80 mt-0.5">Loom+Lam+Print+Machine</div>
+        <div className="bg-white border border-teal-200 bg-teal-50/20 rounded-xl p-3.5 shadow-xs">
+          <div className="text-[11px] font-semibold uppercase text-teal-700 tracking-wider">Production (Kg)</div>
+          <div className="text-xl font-bold font-mono text-teal-800 mt-1">{totals.totalProductionKg.toFixed(1)} kg</div>
+          <div className="text-[10px] text-teal-600/80 mt-0.5">Total Finished Wt</div>
         </div>
 
-        <div className="bg-white border border-amber-200 bg-amber-50/20 rounded-xl p-3.5 shadow-xs">
-          <div className="text-[11px] font-semibold uppercase text-amber-700 tracking-wider">Wastage %</div>
-          <div className="text-xl font-bold font-mono text-amber-800 mt-1">{totals.totalWastagePct.toFixed(2)}%</div>
-          <div className="text-[10px] text-amber-600/80 mt-0.5">MTD: {totals.totalWastageMtdKg.toFixed(2)} kg</div>
+        <div className="bg-white border border-indigo-200 bg-indigo-50/20 rounded-xl p-3.5 shadow-xs">
+          <div className="text-[11px] font-semibold uppercase text-indigo-700 tracking-wider">Cover / Valve</div>
+          <div className="text-sm font-bold font-mono text-indigo-900 mt-1">
+            OS: {totals.totalCoverPatchOs} | DS: {totals.totalCoverPatchDs}
+          </div>
+          <div className="text-[10px] text-indigo-600/80 mt-0.5">Valve: {totals.totalValvePatch}</div>
         </div>
       </div>
 
-      {/* Spreadsheet Table Container (with the requested Expand Feature!) */}
+      {/* Spreadsheet Table Container */}
       <div
         ref={tableContainerRef}
         className={`bg-white border border-slate-200 shadow-sm transition-all duration-200 flex flex-col ${
@@ -673,7 +726,7 @@ export function ConvertexDailyReportClient() {
             : "rounded-xl overflow-hidden"
         }`}
       >
-        {/* Table Toolbar with Top-Left Fullscreen Expand/Collapse */}
+        {/* Table Toolbar */}
         <div className="p-3 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 shrink-0">
           <div className="flex items-center gap-2">
             <button
@@ -726,39 +779,42 @@ export function ConvertexDailyReportClient() {
             </span>
             <span>•</span>
             <span className="text-emerald-700 font-bold">
-              {totals.totalProductionPcs.toLocaleString()} pcs
+              {totals.totalProductionPcs.toLocaleString()} pcs ({totals.totalProductionKg.toFixed(1)} kg)
             </span>
           </div>
         </div>
 
         {/* Scrollable Spreadsheet Table */}
         <div className="overflow-x-auto flex-1 max-h-[680px]">
-          <table className="w-full text-left text-xs border-collapse min-w-[2100px]">
+          <table className="w-full text-left text-xs border-collapse min-w-[2000px]">
             <thead className="bg-slate-900 text-white font-semibold text-[11px] sticky top-0 z-10 uppercase tracking-wider">
+              {/* Row 1 Header with Grouping */}
               <tr>
-                <th className="py-2.5 px-2 text-center w-12 border-r border-slate-800">Sl. No.</th>
-                <th className="py-2.5 px-2 text-left w-36 border-r border-slate-800">Company Name</th>
-                <th className="py-2.5 px-2 text-left w-28 border-r border-slate-800">Unit Name</th>
-                <th className="py-2.5 px-2 text-center w-24 border-r border-slate-800">Grade</th>
-                <th className="py-2.5 px-2 text-right w-32 border-r border-slate-800">Target (Pcs)</th>
-                <th className="py-2.5 px-2 text-left w-36 border-r border-slate-800">Party Name</th>
-                <th className="py-2.5 px-2 text-center w-32 border-r border-slate-800">Roll No.</th>
-                <th className="py-2.5 px-2 text-center w-24 border-r border-slate-800">Loom No.</th>
-                <th className="py-2.5 px-2 text-right w-28 border-r border-slate-800">Roll Mtr</th>
-                <th className="py-2.5 px-2 text-right w-24 border-r border-slate-800">Net Wt</th>
-                <th className="py-2.5 px-2 text-right w-24 border-r border-slate-800">Avg. (g/m)</th>
-                <th className="py-2.5 px-2 text-right w-32 border-r border-slate-800">Opening Reading</th>
-                <th className="py-2.5 px-2 text-right w-32 border-r border-slate-800">Closing Reading</th>
-                <th className="py-2.5 px-2 text-right w-32 border-r border-slate-800 bg-emerald-950">Prod (In Pcs)</th>
-                <th className="py-2.5 px-2 text-right w-28 border-r border-slate-800">Loom Wst (Kg)</th>
-                <th className="py-2.5 px-2 text-right w-28 border-r border-slate-800">Lam Wst (Kg)</th>
-                <th className="py-2.5 px-2 text-right w-28 border-r border-slate-800">Print Wst (Kg)</th>
-                <th className="py-2.5 px-2 text-right w-28 border-r border-slate-800">Mach Wst (Kg)</th>
-                <th className="py-2.5 px-2 text-right w-28 border-r border-slate-800 bg-red-950">Total Wst (Kg)</th>
-                <th className="py-2.5 px-2 text-right w-24 border-r border-slate-800 bg-amber-950">Total Wst (%)</th>
-                <th className="py-2.5 px-2 text-right w-28 border-r border-slate-800">MTD Wst (Kg)</th>
-                <th className="py-2.5 px-2 text-left min-w-[140px] border-r border-slate-800">Remarks</th>
-                <th className="py-2.5 px-2 text-center w-12">Act</th>
+                <th rowSpan={2} className="py-2 px-2 text-center w-12 border-r border-slate-800">Sl. No.</th>
+                <th rowSpan={2} className="py-2 px-2 text-left w-36 border-r border-slate-800">Company Name</th>
+                <th rowSpan={2} className="py-2 px-2 text-left w-24 border-r border-slate-800">Unit Name</th>
+                <th rowSpan={2} className="py-2 px-2 text-center w-20 border-r border-slate-800">Grade</th>
+                <th rowSpan={2} className="py-2 px-2 text-right w-28 border-r border-slate-800">Target (Pcs)</th>
+                <th rowSpan={2} className="py-2 px-2 text-left w-36 border-r border-slate-800 bg-slate-800 text-amber-300">Quality</th>
+                <th rowSpan={2} className="py-2 px-2 text-center w-32 border-r border-slate-800">Roll No.</th>
+                <th rowSpan={2} className="py-2 px-2 text-center w-20 border-r border-slate-800">Loom No.</th>
+                <th rowSpan={2} className="py-2 px-2 text-right w-24 border-r border-slate-800">Roll Mtr</th>
+                <th rowSpan={2} className="py-2 px-2 text-right w-24 border-r border-slate-800">Net Wt (Kg)</th>
+                <th rowSpan={2} className="py-2 px-2 text-right w-24 border-r border-slate-800">Avg. (g/m)</th>
+                <th rowSpan={2} className="py-2 px-2 text-right w-28 border-r border-slate-800">Opening Reading</th>
+                <th rowSpan={2} className="py-2 px-2 text-right w-28 border-r border-slate-800">Closing Reading</th>
+                {/* Grouped Header: Cover Patch */}
+                <th colSpan={2} className="py-1 px-2 text-center border-r border-slate-800 bg-indigo-900/80">Cover Patch</th>
+                <th rowSpan={2} className="py-2 px-2 text-right w-24 border-r border-slate-800 bg-indigo-950">Valve Patch</th>
+                <th rowSpan={2} className="py-2 px-2 text-right w-32 border-r border-slate-800 bg-emerald-950 text-emerald-300">Prod (In Pcs)</th>
+                <th rowSpan={2} className="py-2 px-2 text-right w-32 border-r border-slate-800 bg-teal-950 text-teal-300">Prod (In Kg)</th>
+                <th rowSpan={2} className="py-2 px-2 text-left min-w-[140px] border-r border-slate-800">Remarks</th>
+                <th rowSpan={2} className="py-2 px-2 text-center w-12">Act</th>
+              </tr>
+              {/* Row 2 Sub-Headers for Cover Patch */}
+              <tr>
+                <th className="py-1 px-2 text-right w-20 border-r border-slate-800 bg-indigo-900/90 text-[10px]">OS</th>
+                <th className="py-1 px-2 text-right w-20 border-r border-slate-800 bg-indigo-900/90 text-[10px]">DS</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 font-medium">
@@ -818,14 +874,17 @@ export function ConvertexDailyReportClient() {
                     />
                   </td>
 
-                  {/* Party Name */}
-                  <td className="py-1 px-1 border-r border-slate-200">
+                  {/* Quality (Replaced Party Name!) */}
+                  <td className="py-1 px-1 border-r border-slate-200 bg-amber-50/20">
                     <input
                       type="text"
-                      value={entry.partyName || ""}
-                      onChange={(e) => handleCellChange(index, "partyName", e.target.value)}
-                      placeholder="Party / Customer"
-                      className="w-full px-2 py-1 text-xs border border-transparent hover:border-slate-300 focus:border-primary focus:bg-white rounded transition-colors"
+                      value={entry.quality || entry.partyName || ""}
+                      onChange={(e) => {
+                        handleCellChange(index, "quality", e.target.value);
+                        handleCellChange(index, "partyName", e.target.value);
+                      }}
+                      placeholder="e.g. 50kg Cement Bag"
+                      className="w-full px-2 py-1 text-xs font-semibold text-slate-800 border border-transparent hover:border-slate-300 focus:border-primary focus:bg-white rounded transition-colors"
                     />
                   </td>
 
@@ -943,7 +1002,7 @@ export function ConvertexDailyReportClient() {
                     />
                   </td>
 
-                  {/* Avg. (g/m) (Computed Automatically) */}
+                  {/* Avg. (g/m) */}
                   <td className="py-1.5 px-2 border-r border-slate-200 text-right font-mono font-bold text-sky-800 bg-sky-50/30">
                     {entry.avgWeight ? entry.avgWeight.toFixed(1) : "—"}
                   </td>
@@ -972,8 +1031,44 @@ export function ConvertexDailyReportClient() {
                     />
                   </td>
 
+                  {/* Cover Patch OS */}
+                  <td className="py-1 px-1 border-r border-slate-200 bg-indigo-50/15">
+                    <input
+                      type="number"
+                      step="any"
+                      value={entry.coverPatchOs || ""}
+                      onChange={(e) => handleCellChange(index, "coverPatchOs", e.target.value)}
+                      placeholder="0"
+                      className="w-full px-2 py-1 text-xs text-right font-mono text-indigo-700 border border-transparent hover:border-indigo-300 focus:border-indigo-500 rounded transition-colors"
+                    />
+                  </td>
+
+                  {/* Cover Patch DS */}
+                  <td className="py-1 px-1 border-r border-slate-200 bg-indigo-50/15">
+                    <input
+                      type="number"
+                      step="any"
+                      value={entry.coverPatchDs || ""}
+                      onChange={(e) => handleCellChange(index, "coverPatchDs", e.target.value)}
+                      placeholder="0"
+                      className="w-full px-2 py-1 text-xs text-right font-mono text-indigo-700 border border-transparent hover:border-indigo-300 focus:border-indigo-500 rounded transition-colors"
+                    />
+                  </td>
+
+                  {/* Valve Patch */}
+                  <td className="py-1 px-1 border-r border-slate-200 bg-indigo-50/20">
+                    <input
+                      type="number"
+                      step="any"
+                      value={entry.valvePatch || ""}
+                      onChange={(e) => handleCellChange(index, "valvePatch", e.target.value)}
+                      placeholder="0"
+                      className="w-full px-2 py-1 text-xs text-right font-mono text-indigo-800 border border-transparent hover:border-indigo-300 focus:border-indigo-500 rounded transition-colors"
+                    />
+                  </td>
+
                   {/* Production (In Pcs) */}
-                  <td className="py-1 px-1 border-r border-slate-200 bg-emerald-50/20">
+                  <td className="py-1 px-1 border-r border-slate-200 bg-emerald-50/25">
                     <input
                       type="number"
                       value={entry.productionPcs || ""}
@@ -983,73 +1078,15 @@ export function ConvertexDailyReportClient() {
                     />
                   </td>
 
-                  {/* Loom Fabric Wastage (In Kg) */}
-                  <td className="py-1 px-1 border-r border-slate-200">
+                  {/* Production (In Kg) */}
+                  <td className="py-1 px-1 border-r border-slate-200 bg-teal-50/25">
                     <input
                       type="number"
                       step="any"
-                      value={entry.loomFabricWasteKg || ""}
-                      onChange={(e) => handleCellChange(index, "loomFabricWasteKg", e.target.value)}
+                      value={entry.productionKg || ""}
+                      onChange={(e) => handleCellChange(index, "productionKg", e.target.value)}
                       placeholder="0.00"
-                      className="w-full px-2 py-1 text-xs text-right font-mono text-slate-700 border border-transparent hover:border-slate-300 focus:border-primary focus:bg-white rounded transition-colors"
-                    />
-                  </td>
-
-                  {/* Lam Fabric Wastage (In Kg) */}
-                  <td className="py-1 px-1 border-r border-slate-200">
-                    <input
-                      type="number"
-                      step="any"
-                      value={entry.lamFabricWasteKg || ""}
-                      onChange={(e) => handleCellChange(index, "lamFabricWasteKg", e.target.value)}
-                      placeholder="0.00"
-                      className="w-full px-2 py-1 text-xs text-right font-mono text-slate-700 border border-transparent hover:border-slate-300 focus:border-primary focus:bg-white rounded transition-colors"
-                    />
-                  </td>
-
-                  {/* Print Fabric Wastage (In Kg) */}
-                  <td className="py-1 px-1 border-r border-slate-200">
-                    <input
-                      type="number"
-                      step="any"
-                      value={entry.printFabricWasteKg || ""}
-                      onChange={(e) => handleCellChange(index, "printFabricWasteKg", e.target.value)}
-                      placeholder="0.00"
-                      className="w-full px-2 py-1 text-xs text-right font-mono text-slate-700 border border-transparent hover:border-slate-300 focus:border-primary focus:bg-white rounded transition-colors"
-                    />
-                  </td>
-
-                  {/* Machine Wastage (In Kg) */}
-                  <td className="py-1 px-1 border-r border-slate-200">
-                    <input
-                      type="number"
-                      step="any"
-                      value={entry.machineWasteKg || ""}
-                      onChange={(e) => handleCellChange(index, "machineWasteKg", e.target.value)}
-                      placeholder="0.00"
-                      className="w-full px-2 py-1 text-xs text-right font-mono text-slate-700 border border-transparent hover:border-slate-300 focus:border-primary focus:bg-white rounded transition-colors"
-                    />
-                  </td>
-
-                  {/* Total Wastage (In Kg) (Auto-Computed) */}
-                  <td className="py-1.5 px-2 border-r border-slate-200 text-right font-mono font-bold text-red-700 bg-red-50/20">
-                    {entry.totalWastageKg ? entry.totalWastageKg.toFixed(2) : "0.00"}
-                  </td>
-
-                  {/* Total Wastage (%) (Auto-Computed) */}
-                  <td className="py-1.5 px-2 border-r border-slate-200 text-right font-mono font-bold text-amber-700 bg-amber-50/20">
-                    {entry.totalWastagePct ? `${entry.totalWastagePct.toFixed(2)}%` : "0.00%"}
-                  </td>
-
-                  {/* Total Wastage MTD (In Kg) */}
-                  <td className="py-1 px-1 border-r border-slate-200">
-                    <input
-                      type="number"
-                      step="any"
-                      value={entry.totalWastageMtdKg || ""}
-                      onChange={(e) => handleCellChange(index, "totalWastageMtdKg", e.target.value)}
-                      placeholder="0.00"
-                      className="w-full px-2 py-1 text-xs text-right font-mono text-purple-700 border border-transparent hover:border-slate-300 focus:border-primary focus:bg-white rounded transition-colors"
+                      className="w-full px-2 py-1 text-xs text-right font-mono font-bold text-teal-800 bg-transparent border border-transparent hover:border-teal-300 focus:border-teal-500 rounded transition-colors"
                     />
                   </td>
 
@@ -1103,29 +1140,20 @@ export function ConvertexDailyReportClient() {
                 <td colSpan={2} className="py-2.5 px-2 text-center text-slate-400">
                   —
                 </td>
+                <td className="py-2.5 px-2 text-right font-mono text-indigo-800 bg-indigo-100/50 font-bold">
+                  {totals.totalCoverPatchOs > 0 ? totals.totalCoverPatchOs.toLocaleString() : "—"}
+                </td>
+                <td className="py-2.5 px-2 text-right font-mono text-indigo-800 bg-indigo-100/50 font-bold">
+                  {totals.totalCoverPatchDs > 0 ? totals.totalCoverPatchDs.toLocaleString() : "—"}
+                </td>
+                <td className="py-2.5 px-2 text-right font-mono text-indigo-900 bg-indigo-100/60 font-bold">
+                  {totals.totalValvePatch > 0 ? totals.totalValvePatch.toLocaleString() : "—"}
+                </td>
                 <td className="py-2.5 px-2 text-right font-mono text-emerald-800 bg-emerald-100/60 font-black text-sm">
                   {totals.totalProductionPcs > 0 ? totals.totalProductionPcs.toLocaleString() : "—"}
                 </td>
-                <td className="py-2.5 px-2 text-right font-mono text-slate-700">
-                  {totals.totalLoomWasteKg > 0 ? totals.totalLoomWasteKg.toFixed(2) : "—"}
-                </td>
-                <td className="py-2.5 px-2 text-right font-mono text-slate-700">
-                  {totals.totalLamWasteKg > 0 ? totals.totalLamWasteKg.toFixed(2) : "—"}
-                </td>
-                <td className="py-2.5 px-2 text-right font-mono text-slate-700">
-                  {totals.totalPrintWasteKg > 0 ? totals.totalPrintWasteKg.toFixed(2) : "—"}
-                </td>
-                <td className="py-2.5 px-2 text-right font-mono text-slate-700">
-                  {totals.totalMachineWasteKg > 0 ? totals.totalMachineWasteKg.toFixed(2) : "—"}
-                </td>
-                <td className="py-2.5 px-2 text-right font-mono text-red-800 bg-red-100/50 font-black text-sm">
-                  {totals.totalWastageKg > 0 ? totals.totalWastageKg.toFixed(2) : "0.00"}
-                </td>
-                <td className="py-2.5 px-2 text-right font-mono text-amber-800 bg-amber-100/50 font-black text-sm">
-                  {totals.totalWastagePct > 0 ? `${totals.totalWastagePct.toFixed(2)}%` : "0.00%"}
-                </td>
-                <td className="py-2.5 px-2 text-right font-mono text-purple-800 bg-purple-100/50 font-bold">
-                  {totals.totalWastageMtdKg > 0 ? totals.totalWastageMtdKg.toFixed(2) : "—"}
+                <td className="py-2.5 px-2 text-right font-mono text-teal-800 bg-teal-100/60 font-black text-sm">
+                  {totals.totalProductionKg > 0 ? totals.totalProductionKg.toFixed(1) : "—"}
                 </td>
                 <td colSpan={2}></td>
               </tr>
@@ -1142,7 +1170,10 @@ export function ConvertexDailyReportClient() {
         <textarea
           rows={2}
           value={remarks}
-          onChange={(e) => setRemarks(e.target.value)}
+          onChange={(e) => {
+            isDirtyRef.current = true;
+            setRemarks(e.target.value);
+          }}
           placeholder="Record downtime reasons, machine maintenance, quality checks, roll defects..."
           className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none"
         />

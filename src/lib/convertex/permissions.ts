@@ -9,9 +9,16 @@ export async function requireConvertexApiPermission(action: ConvertexAction) {
     return { ok: false as const, status: 401, error: "Unauthorized" };
   }
 
+  const role = session.user.role || (session.user as any).roleName || "";
+  const normalizedRole = role.trim().toUpperCase().replace(/[\s_-]/g, "");
+  const isAdminOrSuper =
+    normalizedRole === "SUPERADMIN" ||
+    normalizedRole === "ADMIN" ||
+    isSuperAdminRole(session.user.role);
+
   const permissions = session.user.permissions || [];
   const hasAccess =
-    isSuperAdminRole(session.user.role) ||
+    isAdminOrSuper ||
     permissions.some(
       (p: { module: string; [key: string]: unknown }) =>
         (p.module === "CONVERTEX" ||
