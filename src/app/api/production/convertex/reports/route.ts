@@ -156,38 +156,35 @@ export async function POST(request: NextRequest) {
     const hasRowContent = (e: any) =>
       Boolean(
         (e.rollNumber && String(e.rollNumber).trim()) ||
+        (e.quality && String(e.quality).trim()) ||
         (e.partyName && String(e.partyName).trim()) ||
         (e.grade && String(e.grade).trim()) ||
         (e.loomNumber && String(e.loomNumber).trim()) ||
         Number(e.productionPcs) > 0 ||
+        Number(e.productionKg) > 0 ||
+        Number(e.coverPatchOs) > 0 ||
+        Number(e.coverPatchDs) > 0 ||
+        Number(e.valvePatch) > 0 ||
         Number(e.rollMtr) > 0 ||
         Number(e.netWeight) > 0 ||
         Number(e.openingMeterReading) > 0 ||
         Number(e.closingMeterReading) > 0 ||
-        Number(e.loomFabricWasteKg) > 0 ||
-        Number(e.lamFabricWasteKg) > 0 ||
-        Number(e.printFabricWasteKg) > 0 ||
-        Number(e.machineWasteKg) > 0 ||
         (e.remarks && String(e.remarks).trim())
       );
 
     const validEntries = Array.isArray(entries) ? entries.filter(hasRowContent) : [];
 
     // Recalculate row metrics
-    let runningShiftWaste = 0;
     const calculatedEntries: ConvertexReportItem[] = validEntries.map((entry: any, index: number) => {
       const row = calculateConvertexRow({
         ...entry,
         rollNumber: String(entry.rollNumber || "").trim(),
         sequence: index + 1,
       });
-      runningShiftWaste += row.totalWastageKg;
-      row.totalWastageMtdKg = Math.round((priorMtdKg + runningShiftWaste) * 100) / 100;
       return row;
     });
 
     const totals = computeConvertexTotals(calculatedEntries);
-    const finalMtdKg = Math.round((priorMtdKg + totals.totalWastageKg) * 100) / 100;
 
     const savedReport = await db.$transaction(async (tx) => {
       // Upsert report header
@@ -214,15 +211,12 @@ export async function POST(request: NextRequest) {
           totalRollMtr: totals.totalRollMtr,
           totalNetWt: totals.totalNetWt,
           avgWeightGsm: totals.avgWeightGsm,
+          totalCoverPatchOs: totals.totalCoverPatchOs,
+          totalCoverPatchDs: totals.totalCoverPatchDs,
+          totalValvePatch: totals.totalValvePatch,
           totalProductionPcs: totals.totalProductionPcs,
+          totalProductionKg: totals.totalProductionKg,
           totalTargetPcs: totals.totalTargetPcs,
-          totalLoomWasteKg: totals.totalLoomWasteKg,
-          totalLamWasteKg: totals.totalLamWasteKg,
-          totalPrintWasteKg: totals.totalPrintWasteKg,
-          totalMachineWasteKg: totals.totalMachineWasteKg,
-          totalWastageKg: totals.totalWastageKg,
-          totalWastagePct: totals.totalWastagePct,
-          totalWastageMtdKg: finalMtdKg,
         },
         update: {
           companyName: companyName?.trim() || "FLEXICOM INDUSTRIES PVT. LIMITED, KATHUA",
@@ -236,15 +230,12 @@ export async function POST(request: NextRequest) {
           totalRollMtr: totals.totalRollMtr,
           totalNetWt: totals.totalNetWt,
           avgWeightGsm: totals.avgWeightGsm,
+          totalCoverPatchOs: totals.totalCoverPatchOs,
+          totalCoverPatchDs: totals.totalCoverPatchDs,
+          totalValvePatch: totals.totalValvePatch,
           totalProductionPcs: totals.totalProductionPcs,
+          totalProductionKg: totals.totalProductionKg,
           totalTargetPcs: totals.totalTargetPcs,
-          totalLoomWasteKg: totals.totalLoomWasteKg,
-          totalLamWasteKg: totals.totalLamWasteKg,
-          totalPrintWasteKg: totals.totalPrintWasteKg,
-          totalMachineWasteKg: totals.totalMachineWasteKg,
-          totalWastageKg: totals.totalWastageKg,
-          totalWastagePct: totals.totalWastagePct,
-          totalWastageMtdKg: finalMtdKg,
         },
       });
 
@@ -262,7 +253,8 @@ export async function POST(request: NextRequest) {
             unitName: e.unitName?.trim() || null,
             grade: e.grade?.trim() || null,
             targetProductionPcs: e.targetProductionPcs ? Number(e.targetProductionPcs) : null,
-            partyName: e.partyName?.trim() || null,
+            quality: e.quality?.trim() || e.partyName?.trim() || null,
+            partyName: e.quality?.trim() || e.partyName?.trim() || null,
             rollNumber: String(e.rollNumber || "").trim(),
             loomNumber: e.loomNumber?.trim() || null,
             rollMtr: Number(e.rollMtr) || 0,
@@ -270,14 +262,11 @@ export async function POST(request: NextRequest) {
             avgWeight: Number(e.avgWeight) || 0,
             openingMeterReading: Number(e.openingMeterReading) || 0,
             closingMeterReading: Number(e.closingMeterReading) || 0,
+            coverPatchOs: Number(e.coverPatchOs) || 0,
+            coverPatchDs: Number(e.coverPatchDs) || 0,
+            valvePatch: Number(e.valvePatch) || 0,
             productionPcs: Number(e.productionPcs) || 0,
-            loomFabricWasteKg: Number(e.loomFabricWasteKg) || 0,
-            lamFabricWasteKg: Number(e.lamFabricWasteKg) || 0,
-            printFabricWasteKg: Number(e.printFabricWasteKg) || 0,
-            machineWasteKg: Number(e.machineWasteKg) || 0,
-            totalWastageKg: Number(e.totalWastageKg) || 0,
-            totalWastagePct: Number(e.totalWastagePct) || 0,
-            totalWastageMtdKg: Number(e.totalWastageMtdKg) || finalMtdKg,
+            productionKg: Number(e.productionKg) || 0,
             remarks: e.remarks?.trim() || null,
           })),
         });
@@ -307,7 +296,7 @@ export async function POST(request: NextRequest) {
         status,
         totalRolls: totals.totalRolls,
         totalProductionPcs: totals.totalProductionPcs,
-        totalWastageKg: totals.totalWastageKg,
+        totalProductionKg: totals.totalProductionKg,
       },
       httpMethod: "POST",
       url: "/api/production/convertex/reports",

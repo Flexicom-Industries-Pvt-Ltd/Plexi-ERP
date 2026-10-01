@@ -4,7 +4,7 @@ import React, { useMemo } from "react";
 import { ConvertexDailyReportData, computeConvertexTotals } from "@/lib/convertex/convertex-types";
 import { printConvertexReport } from "@/lib/convertex/print-convertex-production";
 import { exportConvertexReportExcel } from "@/lib/convertex/convertex-export";
-import { FileText, Printer, FileSpreadsheet, X, CheckCircle2 } from "lucide-react";
+import { FileText, Printer, FileSpreadsheet, X } from "lucide-react";
 
 interface ConvertexReportPrintModalProps {
   open: boolean;
@@ -23,14 +23,6 @@ export function ConvertexReportPrintModal({
 
   const docDate = (data.date || new Date().toISOString().slice(0, 10)).replace(/[^a-zA-Z0-9]/g, "");
   const docRef = `CVX-${docDate}-${(data.shiftName || "SHIFT").toUpperCase().replace(/\s+/g, "")}-${(data.machineNo || "M1").replace(/[^a-zA-Z0-9]/g, "")}`;
-  const genTimestamp = new Date().toLocaleString("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: true,
-  });
 
   const handlePrint = () => {
     printConvertexReport(data);
@@ -163,21 +155,23 @@ export function ConvertexReportPrintModal({
                   <div className="text-[8px] font-bold text-purple-700 uppercase">Net Weight</div>
                   <div className="text-xs sm:text-sm font-mono font-bold text-purple-800 mt-0.5">{totals.totalNetWt.toFixed(1)} kg</div>
                 </div>
+                <div className="border border-indigo-200 rounded p-2 bg-indigo-50 text-center">
+                  <div className="text-[8px] font-bold text-indigo-700 uppercase">Cover Patch (OS/DS)</div>
+                  <div className="text-xs sm:text-sm font-mono font-bold text-indigo-800 mt-0.5">
+                    {totals.totalCoverPatchOs} / {totals.totalCoverPatchDs}
+                  </div>
+                </div>
                 <div className="border border-emerald-200 rounded p-2 bg-emerald-50 text-center">
                   <div className="text-[8px] font-bold text-emerald-700 uppercase">Production (Pcs)</div>
                   <div className="text-xs sm:text-sm font-mono font-bold text-emerald-800 mt-0.5">{totals.totalProductionPcs.toLocaleString()}</div>
                 </div>
-                <div className="border border-red-200 rounded p-2 bg-red-50 text-center">
-                  <div className="text-[8px] font-bold text-red-700 uppercase">Total Wastage</div>
-                  <div className="text-xs sm:text-sm font-mono font-bold text-red-800 mt-0.5">{totals.totalWastageKg.toFixed(2)} kg</div>
-                </div>
-                <div className="border border-amber-200 rounded p-2 bg-amber-50 text-center">
-                  <div className="text-[8px] font-bold text-amber-700 uppercase">Overall Wastage %</div>
-                  <div className="text-xs sm:text-sm font-mono font-bold text-amber-800 mt-0.5">{totals.totalWastagePct.toFixed(2)}%</div>
+                <div className="border border-teal-200 rounded p-2 bg-teal-50 text-center">
+                  <div className="text-[8px] font-bold text-teal-700 uppercase">Production (Kg)</div>
+                  <div className="text-xs sm:text-sm font-mono font-bold text-teal-800 mt-0.5">{totals.totalProductionKg.toFixed(1)} kg</div>
                 </div>
               </div>
 
-              {/* 22 Column Data Table */}
+              {/* Data Table */}
               <div className="border border-slate-300 rounded overflow-x-auto mb-4">
                 <table className="w-full border-collapse text-[9px]">
                   <thead>
@@ -187,7 +181,7 @@ export function ConvertexReportPrintModal({
                       <th className="p-1 border border-slate-700 text-left">Unit</th>
                       <th className="p-1 border border-slate-700 text-center">Grade</th>
                       <th className="p-1 border border-slate-700 text-right">Target</th>
-                      <th className="p-1 border border-slate-700 text-left">Party</th>
+                      <th className="p-1 border border-slate-700 text-left bg-slate-800 text-amber-300">Quality</th>
                       <th className="p-1 border border-slate-700 text-center">Roll No</th>
                       <th className="p-1 border border-slate-700 text-center">Loom</th>
                       <th className="p-1 border border-slate-700 text-right">Roll Mtr</th>
@@ -195,14 +189,11 @@ export function ConvertexReportPrintModal({
                       <th className="p-1 border border-slate-700 text-right">Avg</th>
                       <th className="p-1 border border-slate-700 text-right">Open</th>
                       <th className="p-1 border border-slate-700 text-right">Close</th>
-                      <th className="p-1 border border-slate-700 text-right bg-emerald-950">Prod Pcs</th>
-                      <th className="p-1 border border-slate-700 text-right">Loom Wst</th>
-                      <th className="p-1 border border-slate-700 text-right">Lam Wst</th>
-                      <th className="p-1 border border-slate-700 text-right">Prn Wst</th>
-                      <th className="p-1 border border-slate-700 text-right">Mch Wst</th>
-                      <th className="p-1 border border-slate-700 text-right bg-red-950">Tot Wst</th>
-                      <th className="p-1 border border-slate-700 text-right bg-amber-950">Wst %</th>
-                      <th className="p-1 border border-slate-700 text-right">MTD Wst</th>
+                      <th className="p-1 border border-slate-700 text-right bg-indigo-950">Cover OS</th>
+                      <th className="p-1 border border-slate-700 text-right bg-indigo-950">Cover DS</th>
+                      <th className="p-1 border border-slate-700 text-right bg-indigo-950">Valve</th>
+                      <th className="p-1 border border-slate-700 text-right bg-emerald-950 text-emerald-300">Prod Pcs</th>
+                      <th className="p-1 border border-slate-700 text-right bg-teal-950 text-teal-300">Prod Kg</th>
                       <th className="p-1 border border-slate-700 text-left">Remarks</th>
                     </tr>
                   </thead>
@@ -230,8 +221,8 @@ export function ConvertexReportPrintModal({
                           <td className="p-1 border-r border-slate-200 text-right font-mono text-blue-700">
                             {entry.targetProductionPcs ? Number(entry.targetProductionPcs).toLocaleString() : "—"}
                           </td>
-                          <td className="p-1 border-r border-slate-200 font-medium text-slate-800 truncate max-w-[80px]">
-                            {entry.partyName || "—"}
+                          <td className="p-1 border-r border-slate-200 font-bold text-slate-900 bg-amber-50/20 truncate max-w-[90px]">
+                            {entry.quality || entry.partyName || "—"}
                           </td>
                           <td className="p-1 border-r border-slate-200 text-center font-mono font-bold text-slate-900 bg-slate-50/50">
                             {entry.rollNumber || "—"}
@@ -248,58 +239,49 @@ export function ConvertexReportPrintModal({
                           <td className="p-1 border-r border-slate-200 text-right font-mono text-sky-700 bg-sky-50/40">
                             {entry.avgWeight ? Number(entry.avgWeight).toFixed(1) : "—"}
                           </td>
-                          <td className="p-1 border-r border-slate-200 text-right font-mono text-slate-500">
+                          <td className="p-1 border-r border-slate-200 text-right font-mono text-slate-600">
                             {entry.openingMeterReading ? Number(entry.openingMeterReading).toLocaleString() : "—"}
                           </td>
-                          <td className="p-1 border-r border-slate-200 text-right font-mono text-slate-500">
+                          <td className="p-1 border-r border-slate-200 text-right font-mono text-slate-600">
                             {entry.closingMeterReading ? Number(entry.closingMeterReading).toLocaleString() : "—"}
                           </td>
-                          <td className="p-1 border-r border-slate-200 text-right font-mono font-bold text-emerald-700 bg-emerald-50/50">
+                          <td className="p-1 border-r border-slate-200 text-right font-mono text-indigo-700 bg-indigo-50/20">
+                            {entry.coverPatchOs ? Number(entry.coverPatchOs).toLocaleString() : "—"}
+                          </td>
+                          <td className="p-1 border-r border-slate-200 text-right font-mono text-indigo-700 bg-indigo-50/20">
+                            {entry.coverPatchDs ? Number(entry.coverPatchDs).toLocaleString() : "—"}
+                          </td>
+                          <td className="p-1 border-r border-slate-200 text-right font-mono text-indigo-900 bg-indigo-50/30">
+                            {entry.valvePatch ? Number(entry.valvePatch).toLocaleString() : "—"}
+                          </td>
+                          <td className="p-1 border-r border-slate-200 text-right font-mono font-bold text-emerald-700 bg-emerald-50/40">
                             {entry.productionPcs ? Number(entry.productionPcs).toLocaleString() : "—"}
                           </td>
-                          <td className="p-1 border-r border-slate-200 text-right font-mono text-slate-600">
-                            {entry.loomFabricWasteKg ? Number(entry.loomFabricWasteKg).toFixed(2) : "—"}
+                          <td className="p-1 border-r border-slate-200 text-right font-mono font-bold text-teal-800 bg-teal-50/40">
+                            {entry.productionKg ? Number(entry.productionKg).toFixed(1) : "—"}
                           </td>
-                          <td className="p-1 border-r border-slate-200 text-right font-mono text-slate-600">
-                            {entry.lamFabricWasteKg ? Number(entry.lamFabricWasteKg).toFixed(2) : "—"}
-                          </td>
-                          <td className="p-1 border-r border-slate-200 text-right font-mono text-slate-600">
-                            {entry.printFabricWasteKg ? Number(entry.printFabricWasteKg).toFixed(2) : "—"}
-                          </td>
-                          <td className="p-1 border-r border-slate-200 text-right font-mono text-slate-600">
-                            {entry.machineWasteKg ? Number(entry.machineWasteKg).toFixed(2) : "—"}
-                          </td>
-                          <td className="p-1 border-r border-slate-200 text-right font-mono font-bold text-red-700 bg-red-50/40">
-                            {entry.totalWastageKg ? Number(entry.totalWastageKg).toFixed(2) : "—"}
-                          </td>
-                          <td className="p-1 border-r border-slate-200 text-right font-mono font-bold text-amber-700 bg-amber-50/40">
-                            {entry.totalWastagePct ? `${Number(entry.totalWastagePct).toFixed(2)}%` : "—"}
-                          </td>
-                          <td className="p-1 border-r border-slate-200 text-right font-mono text-purple-700 bg-purple-50/30">
-                            {entry.totalWastageMtdKg ? Number(entry.totalWastageMtdKg).toFixed(2) : "—"}
-                          </td>
-                          <td className="p-1 text-slate-500 text-[8px] truncate max-w-[80px]">
+                          <td className="p-1 text-slate-500 truncate max-w-[80px]">
                             {entry.remarks || ""}
                           </td>
                         </tr>
                       ))
                     ) : (
                       <tr>
-                        <td colSpan={22} className="p-6 text-center text-slate-500 italic">
-                          No production entries logged for this shift.
+                        <td colSpan={19} className="p-4 text-center text-slate-400 italic">
+                          No rolls entered yet
                         </td>
                       </tr>
                     )}
-
-                    {/* Totals Summary Row */}
-                    <tr className="bg-slate-100 font-bold border-t-2 border-slate-900 text-slate-900">
-                      <td colSpan={4} className="p-1.5 text-right uppercase text-[8px]">
-                        SHIFT TOTALS:
+                  </tbody>
+                  <tfoot>
+                    <tr className="bg-slate-100 font-bold border-t-2 border-slate-900 text-slate-900 text-[9px]">
+                      <td colSpan={4} className="p-1 text-right uppercase">
+                        SHIFT TOTAL:
                       </td>
                       <td className="p-1 text-right font-mono text-blue-700">
                         {totals.totalTargetPcs > 0 ? totals.totalTargetPcs.toLocaleString() : "—"}
                       </td>
-                      <td colSpan={3} className="p-1 text-center font-medium text-slate-600">
+                      <td colSpan={3} className="p-1 text-center text-slate-600">
                         {totals.totalRolls} ROLLS
                       </td>
                       <td className="p-1 text-right font-mono">
@@ -308,75 +290,60 @@ export function ConvertexReportPrintModal({
                       <td className="p-1 text-right font-mono">
                         {totals.totalNetWt > 0 ? totals.totalNetWt.toFixed(1) : "—"}
                       </td>
-                      <td className="p-1 text-right font-mono text-sky-700 bg-sky-100/50">
+                      <td className="p-1 text-right font-mono text-sky-800 bg-sky-100/50">
                         {totals.avgWeightGsm > 0 ? totals.avgWeightGsm.toFixed(1) : "—"}
                       </td>
-                      <td colSpan={2} className="p-1 text-center text-slate-400">
-                        —
+                      <td colSpan={2} className="p-1 text-center text-slate-400">—</td>
+                      <td className="p-1 text-right font-mono text-indigo-800 bg-indigo-100/40">
+                        {totals.totalCoverPatchOs > 0 ? totals.totalCoverPatchOs.toLocaleString() : "—"}
                       </td>
-                      <td className="p-1 text-right font-mono text-emerald-800 bg-emerald-100/60 font-bold">
+                      <td className="p-1 text-right font-mono text-indigo-800 bg-indigo-100/40">
+                        {totals.totalCoverPatchDs > 0 ? totals.totalCoverPatchDs.toLocaleString() : "—"}
+                      </td>
+                      <td className="p-1 text-right font-mono text-indigo-900 bg-indigo-100/50">
+                        {totals.totalValvePatch > 0 ? totals.totalValvePatch.toLocaleString() : "—"}
+                      </td>
+                      <td className="p-1 text-right font-mono text-emerald-800 bg-emerald-100/60 font-black">
                         {totals.totalProductionPcs > 0 ? totals.totalProductionPcs.toLocaleString() : "—"}
                       </td>
-                      <td className="p-1 text-right font-mono text-slate-700">
-                        {totals.totalLoomWasteKg > 0 ? totals.totalLoomWasteKg.toFixed(2) : "—"}
-                      </td>
-                      <td className="p-1 text-right font-mono text-slate-700">
-                        {totals.totalLamWasteKg > 0 ? totals.totalLamWasteKg.toFixed(2) : "—"}
-                      </td>
-                      <td className="p-1 text-right font-mono text-slate-700">
-                        {totals.totalPrintWasteKg > 0 ? totals.totalPrintWasteKg.toFixed(2) : "—"}
-                      </td>
-                      <td className="p-1 text-right font-mono text-slate-700">
-                        {totals.totalMachineWasteKg > 0 ? totals.totalMachineWasteKg.toFixed(2) : "—"}
-                      </td>
-                      <td className="p-1 text-right font-mono text-red-800 bg-red-100/50 font-bold">
-                        {totals.totalWastageKg > 0 ? totals.totalWastageKg.toFixed(2) : "—"}
-                      </td>
-                      <td className="p-1 text-right font-mono text-amber-800 bg-amber-100/50 font-bold">
-                        {totals.totalWastagePct > 0 ? `${totals.totalWastagePct.toFixed(2)}%` : "—"}
-                      </td>
-                      <td className="p-1 text-right font-mono text-purple-800 bg-purple-100/50">
-                        {totals.totalWastageMtdKg > 0 ? totals.totalWastageMtdKg.toFixed(2) : "—"}
+                      <td className="p-1 text-right font-mono text-teal-800 bg-teal-100/60 font-black">
+                        {totals.totalProductionKg > 0 ? totals.totalProductionKg.toFixed(1) : "—"}
                       </td>
                       <td></td>
                     </tr>
-                  </tbody>
+                  </tfoot>
                 </table>
               </div>
 
               {/* Remarks */}
               {data.remarks && (
-                <div className="bg-slate-50 border border-slate-200 rounded p-2 text-[9px] text-slate-600 mb-3">
-                  <span className="font-bold text-slate-700">Shift Remarks: </span>
-                  {data.remarks}
+                <div className="p-2 border border-slate-200 rounded bg-slate-50 text-[9px] mb-4">
+                  <span className="font-bold text-slate-700">Remarks:</span> {data.remarks}
                 </div>
               )}
             </div>
 
-            {/* Signature Grid */}
-            <div className="pt-4 border-t border-slate-200 mt-2">
-              <div className="grid grid-cols-4 gap-4 text-center">
-                <div className="border-t border-dashed border-slate-400 pt-1">
-                  <div className="font-bold text-slate-900">{data.operatorName || "_______________"}</div>
-                  <div className="text-[8px] text-slate-500 uppercase">Operator Signature</div>
-                </div>
-                <div className="border-t border-dashed border-slate-400 pt-1">
-                  <div className="font-bold text-slate-900">{data.supervisorName || "_______________"}</div>
-                  <div className="text-[8px] text-slate-500 uppercase">Supervisor Signature</div>
-                </div>
-                <div className="border-t border-dashed border-slate-400 pt-1">
-                  <div className="font-bold text-slate-900">Quality In-Charge</div>
-                  <div className="text-[8px] text-slate-500 uppercase">QC Verification</div>
-                </div>
-                <div className="border-t border-dashed border-slate-400 pt-1">
-                  <div className="font-bold text-slate-900">Plant Manager / HOD</div>
-                  <div className="text-[8px] text-slate-500 uppercase">Authorized Signatory</div>
-                </div>
+            {/* Footer Signatures */}
+            <div className="grid grid-cols-4 gap-4 pt-4 border-t border-slate-200 text-center text-[9px]">
+              <div>
+                <div className="h-8 border-b border-slate-300"></div>
+                <div className="font-bold text-slate-700 mt-1">Operator Signature</div>
+                <div className="text-[8px] text-slate-400">{data.operatorName || "_______________"}</div>
               </div>
-
-              <div className="flex justify-between items-center text-[8px] text-slate-400 mt-3 pt-1 border-t border-slate-100">
-                <span>Flexicom ERP • Convertex Production Report</span>
-                <span>Generated on {genTimestamp}</span>
+              <div>
+                <div className="h-8 border-b border-slate-300"></div>
+                <div className="font-bold text-slate-700 mt-1">Supervisor Signature</div>
+                <div className="text-[8px] text-slate-400">{data.supervisorName || "_______________"}</div>
+              </div>
+              <div>
+                <div className="h-8 border-b border-slate-300"></div>
+                <div className="font-bold text-slate-700 mt-1">Quality Inspector</div>
+                <div className="text-[8px] text-slate-400">_______________</div>
+              </div>
+              <div>
+                <div className="h-8 border-b border-slate-300"></div>
+                <div className="font-bold text-slate-700 mt-1">Factory Manager</div>
+                <div className="text-[8px] text-slate-400">_______________</div>
               </div>
             </div>
           </div>
