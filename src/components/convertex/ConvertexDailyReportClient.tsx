@@ -32,7 +32,6 @@ import {
   calculateConvertexRow,
   computeConvertexTotals,
 } from "@/lib/convertex/convertex-types";
-import { ConvertexNavigationTabs } from "./ConvertexNavigationTabs";
 import { ConvertexReportPrintModal } from "./ConvertexReportPrintModal";
 import { exportConvertexReportExcel } from "@/lib/convertex/convertex-export";
 
@@ -324,6 +323,8 @@ export function ConvertexDailyReportClient() {
   // Helper to determine if a row has any user entered data
   const hasRowData = (e: ConvertexReportItem) => {
     return Boolean(
+      (e.companyName && e.companyName.trim()) ||
+      (e.unitName && e.unitName.trim()) ||
       (e.rollNumber && e.rollNumber.trim()) ||
       (e.quality && e.quality.trim()) ||
       (e.partyName && e.partyName.trim()) ||
@@ -492,9 +493,6 @@ export function ConvertexDailyReportClient() {
 
   return (
     <div className="space-y-5 font-sans pb-16">
-      {/* Sub-module Navigation Switcher */}
-      <ConvertexNavigationTabs currentTab="production" />
-
       {/* Header Control Card */}
       <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-100 pb-5">

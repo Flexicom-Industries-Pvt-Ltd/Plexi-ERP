@@ -31,7 +31,6 @@ import {
   calculateConvertexWastageRow,
   computeConvertexWastageTotals,
 } from "@/lib/convertex/convertex-types";
-import { ConvertexNavigationTabs } from "./ConvertexNavigationTabs";
 import { ConvertexWastagePrintModal } from "./ConvertexWastagePrintModal";
 import { exportConvertexWastageReportExcel } from "@/lib/convertex/convertex-export";
 
@@ -443,9 +442,6 @@ export function ConvertexWastageClient() {
 
   return (
     <div className="space-y-5 font-sans pb-16">
-      {/* Sub-module Navigation Switcher */}
-      <ConvertexNavigationTabs currentTab="wastage" />
-
       {/* Control Card */}
       <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-100 pb-5">
