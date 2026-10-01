@@ -24,326 +24,363 @@ export function generateConvertexSummaryHtml(
     hour12: true,
   });
 
+  const periodText = dateRange || "All Active Records";
+
   const qualityRows =
     data.qualities.length > 0
       ? data.qualities
           .map((q, idx) => {
             return `
             <tr style="${idx % 2 === 1 ? "background-color: #f8fafc;" : "background-color: #ffffff;"}">
-              <td style="text-align: center; font-weight: 700; color: #475569;">${idx + 1}</td>
-              <td style="font-weight: 700; color: #0f172a; background-color: #fffbeb;">${escapeHtml(q.quality)}</td>
-              <td style="text-align: center; font-family: monospace; font-weight: 700; color: #0284c7;">${q.rollsCount}</td>
-              <td style="text-align: right; font-family: monospace;">${q.totalRollMtr.toLocaleString()}</td>
-              <td style="text-align: right; font-family: monospace;">${q.totalNetWt.toFixed(1)}</td>
-              <td style="text-align: right; font-family: monospace; color: #0369a1; background-color: #f0f9ff;">${q.avgGsm.toFixed(1)}</td>
-              <td style="text-align: right; font-family: monospace; font-weight: 800; color: #15803d; background-color: #f0fdf4;">${q.productionPcs.toLocaleString()}</td>
-              <td style="text-align: right; font-family: monospace; font-weight: 800; color: #0f766e; background-color: #f0fdfa;">${q.productionKg.toFixed(1)}</td>
-              <td style="text-align: right; font-family: monospace; color: #4338ca;">${q.coverPatchOs}</td>
-              <td style="text-align: right; font-family: monospace; color: #4338ca;">${q.coverPatchDs}</td>
-              <td style="text-align: right; font-family: monospace; color: #3730a3; font-weight: 600;">${q.valvePatch}</td>
-              <td style="text-align: right; font-family: monospace; font-weight: 700; color: #b91c1c; background-color: #fef2f2;">${q.totalWasteKg.toFixed(2)}</td>
-              <td style="text-align: right; font-family: monospace; font-weight: 700; color: #c2410c; background-color: #fff7ed;">${q.totalWastePct.toFixed(2)}%</td>
-              <td style="text-align: right; font-family: monospace; font-weight: 800; color: #166534; background-color: #f0fdf4;">${q.netProductionKg.toFixed(1)}</td>
+              <td style="text-align: center; font-weight: 700; font-size: 7.5pt; color: #475569;">${idx + 1}</td>
+              <td style="font-weight: 700; font-size: 7.5pt; color: #0f172a; background-color: #fffbeb;">${escapeHtml(q.quality)}</td>
+              <td style="text-align: center; font-family: monospace; font-size: 7.5pt; font-weight: 700; color: #0284c7;">${q.rollsCount}</td>
+              <td style="text-align: right; font-family: monospace; font-size: 8pt; font-weight: 800; color: #15803d; background-color: #f0fdf4;">${q.productionPcs.toLocaleString()}</td>
+              <td style="text-align: right; font-family: monospace; font-size: 8pt; font-weight: 800; color: #0f766e; background-color: #f0fdfa;">${q.productionKg.toFixed(1)}</td>
+              <td style="text-align: right; font-family: monospace; font-size: 7.5pt; color: #334155;">${q.totalRollMtr.toLocaleString()}</td>
+              <td style="text-align: right; font-family: monospace; font-size: 7.5pt; color: #334155;">${q.totalNetWt.toFixed(1)}</td>
+              <td style="text-align: right; font-family: monospace; font-size: 7.5pt; color: #0369a1; background-color: #f0f9ff;">${q.avgGsm.toFixed(1)}</td>
+              <td style="text-align: right; font-family: monospace; font-size: 7.5pt; color: #4338ca;">${q.coverPatchOs}</td>
+              <td style="text-align: right; font-family: monospace; font-size: 7.5pt; color: #4338ca;">${q.coverPatchDs}</td>
+              <td style="text-align: right; font-family: monospace; font-size: 7.5pt; color: #3730a3; font-weight: 600;">${q.valvePatch}</td>
+              <td style="text-align: right; font-family: monospace; font-size: 7.5pt; font-weight: 700; color: #b91c1c; background-color: #fef2f2;">${q.totalWasteKg.toFixed(2)}</td>
+              <td style="text-align: right; font-family: monospace; font-size: 7.5pt; font-weight: 700; color: #c2410c; background-color: #fff7ed;">${q.totalWastePct.toFixed(2)}%</td>
+              <td style="text-align: right; font-family: monospace; font-size: 8pt; font-weight: 800; color: #166534; background-color: #f0fdf4;">${q.netProductionKg.toFixed(1)}</td>
             </tr>
           `;
           })
           .join("")
-      : `<tr><td colspan="14" style="text-align: center; padding: 14px; color: #64748b;">No quality production data found for this selection.</td></tr>`;
+      : `<tr><td colspan="14" style="text-align: center; padding: 24px; color: #64748b; font-style: italic;">No quality production data found for this selection.</td></tr>`;
 
-  return `
-<!DOCTYPE html>
+  const totalWaste = data.wastage.totalWasteKg || 1;
+  const wasteStreams = [
+    { label: "Loom Wastage", kg: data.wastage.loomWasteKg, share: totalWaste > 0 ? (data.wastage.loomWasteKg / totalWaste) * 100 : 0 },
+    { label: "Lamination Wastage", kg: data.wastage.lamWasteKg, share: totalWaste > 0 ? (data.wastage.lamWasteKg / totalWaste) * 100 : 0 },
+    { label: "Printing Wastage", kg: data.wastage.printWasteKg, share: totalWaste > 0 ? (data.wastage.printWasteKg / totalWaste) * 100 : 0 },
+    { label: "Machine Wastage", kg: data.wastage.machineWasteKg, share: totalWaste > 0 ? (data.wastage.machineWasteKg / totalWaste) * 100 : 0 },
+    { label: "Cover Patch Wastage", kg: data.wastage.coverPatchWasteKg, share: totalWaste > 0 ? (data.wastage.coverPatchWasteKg / totalWaste) * 100 : 0 },
+  ];
+
+  const wasteRows = wasteStreams
+    .map((w, idx) => {
+      const pctOfGross = data.overall.totalProductionKg > 0 ? (w.kg / data.overall.totalProductionKg) * 100 : 0;
+      return `
+      <tr style="${idx % 2 === 1 ? "background-color: #f8fafc;" : "background-color: #ffffff;"}">
+        <td style="text-align: center; font-weight: 700; font-size: 7.5pt; color: #475569;">${idx + 1}</td>
+        <td style="font-weight: 700; font-size: 7.5pt; color: #0f172a; text-align: left; padding-left: 8px;">${w.label}</td>
+        <td style="text-align: right; font-family: monospace; font-size: 7.5pt; font-weight: 700; color: #b91c1c;">${w.kg.toFixed(2)} kg</td>
+        <td style="text-align: right; font-family: monospace; font-size: 7.5pt; font-weight: 700; color: #7c3aed; background-color: #faf5ff;">${w.share.toFixed(1)}%</td>
+        <td style="text-align: right; font-family: monospace; font-size: 7.5pt; color: #64748b;">${pctOfGross.toFixed(2)}%</td>
+      </tr>
+    `;
+    })
+    .join("");
+
+  return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Convertex Production & Wastage Executive Summary</title>
+  <title>Flexicom - Convertex Production & Wastage Summary (${escapeHtml(periodText)})</title>
   <style>
     @page {
       size: A4 landscape;
-      margin: 8mm 7mm 8mm 7mm;
+      margin: 8mm 8mm 8mm 8mm;
     }
     * {
       box-sizing: border-box;
+      margin: 0;
+      padding: 0;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
     }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
       font-size: 7.5pt;
-      line-height: 1.25;
       color: #0f172a;
       background: #ffffff;
-      margin: 0;
-      padding: 0;
+      padding: 4px;
+      line-height: 1.25;
     }
-    .header-table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-bottom: 5px;
+
+    /* Enterprise Standard Company Letterhead */
+    .company-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
       border-bottom: 2px solid #0f172a;
       padding-bottom: 4px;
+      margin-bottom: 5px;
     }
-    .meta-strip {
+    .company-title {
+      font-size: 13pt;
+      font-weight: 900;
+      letter-spacing: 0.5px;
+      color: #000000;
+      text-transform: uppercase;
+    }
+    .company-sub {
+      font-size: 6.5pt;
+      color: #475569;
+      margin-top: 1px;
+    }
+    .doc-main-heading {
+      display: inline-block;
+      border: 1.5px solid #0f172a;
+      background: #f8fafc;
+      padding: 2px 14px;
+      font-size: 8.5pt;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-top: 3px;
+      margin-bottom: 2px;
+    }
+    .doc-meta-strip {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-items: center;
+      gap: 12px;
+      font-size: 6.5pt;
+      color: #334155;
+      margin-top: 2px;
+    }
+    .doc-meta-strip strong {
+      color: #000000;
+    }
+
+    /* KPI Summary Row */
+    .kpi-table {
       width: 100%;
       border-collapse: collapse;
       margin-bottom: 6px;
-      background: #f8fafc;
-      border: 1px solid #cbd5e1;
-      border-radius: 4px;
+      background-color: #f8fafc;
+      border: 1px solid #94a3b8;
     }
-    .meta-strip td {
+    .kpi-table td {
       padding: 4px 6px;
-      font-size: 7pt;
+      border: 1px solid #cbd5e1;
       vertical-align: middle;
-    }
-    .kpi-table {
-      width: 100%;
-      border-collapse: separate;
-      border-spacing: 4px;
-      margin-bottom: 6px;
-    }
-    .kpi-cell {
-      padding: 4px 6px;
-      border-radius: 4px;
       text-align: center;
-      border: 1px solid #cbd5e1;
-      background: #ffffff;
     }
     .kpi-label {
-      font-size: 5.5pt;
+      font-size: 6pt;
       font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: 0.5px;
-      color: #64748b;
-      margin-bottom: 1px;
+      color: #475569;
     }
-    .kpi-value {
-      font-size: 9.5pt;
+    .kpi-val {
+      font-size: 8.5pt;
       font-weight: 800;
       font-family: monospace;
+      color: #0f172a;
+      margin-top: 1px;
     }
+
+    /* Section Subheadings */
+    .section-title {
+      font-size: 7.5pt;
+      font-weight: 800;
+      color: #0f172a;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-top: 4px;
+      margin-bottom: 3px;
+      border-left: 3px solid #0284c7;
+      padding-left: 6px;
+    }
+
+    /* Fixed-Layout Main Table */
     .data-table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 6.8pt;
+      margin-bottom: 6px;
+      font-size: 7pt;
       table-layout: fixed;
-      margin-bottom: 8px;
-    }
-    .data-table th, .data-table td {
-      border: 0.5pt solid #cbd5e1;
-      padding: 2.5px 3px;
     }
     .data-table th {
-      background-color: #0f172a;
-      color: #ffffff;
-      font-weight: 700;
+      background-color: #e2e8f0 !important;
+      border: 1px solid #64748b !important;
+      padding: 3px 2px;
+      font-weight: 900;
+      font-size: 6.5pt;
       text-transform: uppercase;
-      letter-spacing: 0.2px;
-      font-size: 6pt;
+      text-align: center;
+      color: #0f172a;
     }
-    .section-title {
-      font-size: 8pt;
-      font-weight: 800;
+    .data-table td {
+      border: 1px solid #cbd5e1 !important;
+      padding: 3px 3px;
+      vertical-align: middle;
+    }
+    tr.totals-row td {
+      font-weight: 900 !important;
+      font-size: 7.5pt !important;
+      background-color: #f1f5f9 !important;
+      border-top: 2px solid #0f172a !important;
+      border-bottom: 2px solid #0f172a !important;
+      padding: 4px 3px;
+    }
+
+    /* Signatures Strip */
+    .signatures-container {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 14px;
+      padding: 0 16px;
+      page-break-inside: avoid;
+    }
+    .sig-box {
+      text-align: center;
+      width: 160px;
+    }
+    .sig-line {
+      border-top: 1.5px solid #0f172a;
+      margin-top: 24px;
+      padding-top: 3px;
+      font-weight: 700;
+      font-size: 7pt;
       text-transform: uppercase;
       color: #0f172a;
-      margin: 6px 0 3px 0;
-      border-left: 3px solid #0284c7;
-      padding-left: 5px;
-    }
-    .sign-table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 8px;
-    }
-    .sign-box {
-      border: 0.5pt solid #cbd5e1;
-      height: 38px;
-      vertical-align: bottom;
-      padding: 3px 6px;
-      font-size: 6.5pt;
-      color: #475569;
-      background: #fafafa;
-    }
-    @media print {
-      body { margin: 0; }
-      .no-print { display: none !important; }
     }
   </style>
 </head>
 <body>
-  <!-- HEADER -->
-  <table class="header-table">
-    <tr>
-      <td style="width: 20%; vertical-align: middle;">
-        <img src="${origin}/flexicom-logo.png" alt="Flexicom" style="height: 32px; object-fit: contain;" onerror="this.style.display='none'" />
-        <div style="font-size: 6.5pt; color: #64748b; font-weight: 600; margin-top: 2px;">Doc Ref: CVX-SUM-REPORT</div>
-      </td>
-      <td style="text-align: center; vertical-align: middle;">
-        <div style="font-size: 13pt; font-weight: 900; letter-spacing: 0.5px; color: #0f172a;">
-          FLEXICOM INDUSTRIES PVT. LIMITED, KATHUA
-        </div>
-        <div style="font-size: 9pt; font-weight: 800; color: #0284c7; text-transform: uppercase; letter-spacing: 0.8px; margin-top: 1px;">
-          CONVERTEX PRODUCTION & WASTAGE EXECUTIVE SUMMARY
-        </div>
-        <div style="font-size: 6.5pt; color: #475569; margin-top: 1px;">
-          Comprehensive Quality Performance, Scrap Breakdown, and Net Conversion
-        </div>
-      </td>
-      <td style="width: 22%; text-align: right; vertical-align: middle; font-size: 6.5pt; color: #475569;">
-        <div><strong>Period:</strong> ${escapeHtml(dateRange || "All Recorded Shifts")}</div>
-        <div><strong>Printed:</strong> ${escapeHtml(genTimestamp)}</div>
-      </td>
-    </tr>
-  </table>
+  <!-- Standardized Letterhead Strip -->
+  <div class="company-header">
+    <div style="width: 70px;">
+      <img src="${origin}/logo.png" style="height: 38px; width: auto;" onerror="this.style.display='none'" />
+    </div>
+    <div style="flex: 1; text-align: center;">
+      <div class="company-title">FLEXICOM INDUSTRIES PVT. LIMITED</div>
+      <div class="company-sub">SIDCO INDUSTRIAL ESTATE, PHASE-II, KATHUA (J&K) 184143 • CONVERTEX DIVISION</div>
+      <div class="doc-main-heading">CONVERTEX PRODUCTION & WASTAGE EXECUTIVE SUMMARY</div>
+      <div class="doc-meta-strip">
+        <span>Period: <strong>${escapeHtml(periodText)}</strong></span>
+        <span>Division: <strong>Convertex Bag Making</strong></span>
+        <span>Generated: <strong>${genTimestamp}</strong></span>
+      </div>
+    </div>
+    <div style="width: 70px; text-align: right;">
+      <span style="font-size: 6.5pt; font-weight: 800; border: 1px solid #94a3b8; padding: 2px 4px; background: #f8fafc; border-radius: 2px;">
+        A4 LANDSCAPE
+      </span>
+    </div>
+  </div>
 
-  <!-- KPI SUMMARY CARDS -->
+  <!-- Standard KPI Table Strip -->
   <table class="kpi-table">
     <tr>
-      <td class="kpi-cell" style="border-left: 2.5px solid #0284c7;">
-        <div class="kpi-label">Total Rolls</div>
-        <div class="kpi-value" style="color: #0284c7;">${data.overall.totalRolls}</div>
+      <td>
+        <div class="kpi-label">Active Rolls</div>
+        <div class="kpi-val">${data.overall.totalRolls}</div>
       </td>
-      <td class="kpi-cell" style="border-left: 2.5px solid #0369a1;">
-        <div class="kpi-label">Roll Metres</div>
-        <div class="kpi-value" style="color: #0369a1;">${data.overall.totalRollMtr.toLocaleString()} m</div>
+      <td style="background-color: #f0fdf4;">
+        <div class="kpi-label" style="color: #166534;">Total Bags (Pcs)</div>
+        <div class="kpi-val" style="color: #15803d;">${data.overall.totalProductionPcs.toLocaleString()}</div>
       </td>
-      <td class="kpi-cell" style="border-left: 2.5px solid #0891b2;">
-        <div class="kpi-label">Avg Weight</div>
-        <div class="kpi-value" style="color: #0891b2;">${data.overall.avgGsm.toFixed(1)} g/m</div>
+      <td style="background-color: #f0fdfa;">
+        <div class="kpi-label" style="color: #115e59;">Gross Prod (Kg)</div>
+        <div class="kpi-val" style="color: #0f766e;">${data.overall.totalProductionKg.toFixed(1)} kg</div>
       </td>
-      <td class="kpi-cell" style="border-left: 2.5px solid #16a34a; background-color: #f0fdf4;">
-        <div class="kpi-label" style="color: #166534;">Production (Pcs)</div>
-        <div class="kpi-value" style="color: #166534;">${data.overall.totalProductionPcs.toLocaleString()}</div>
+      <td style="background-color: #fef2f2;">
+        <div class="kpi-label" style="color: #991b1b;">Total Waste (Kg)</div>
+        <div class="kpi-val" style="color: #b91c1c;">${data.overall.totalWastageKg.toFixed(1)} kg</div>
       </td>
-      <td class="kpi-cell" style="border-left: 2.5px solid #0f766e; background-color: #f0fdfa;">
-        <div class="kpi-label" style="color: #115e59;">Production (Kg)</div>
-        <div class="kpi-value" style="color: #115e59;">${data.overall.totalProductionKg.toFixed(1)} kg</div>
+      <td style="background-color: #fff7ed;">
+        <div class="kpi-label" style="color: #9a3412;">Scrap Rate %</div>
+        <div class="kpi-val" style="color: #c2410c;">${data.overall.totalWastagePct.toFixed(2)}%</div>
       </td>
-      <td class="kpi-cell" style="border-left: 2.5px solid #e11d48; background-color: #fff1f2;">
-        <div class="kpi-label" style="color: #9f1239;">Total Waste</div>
-        <div class="kpi-value" style="color: #9f1239;">
-          ${data.overall.totalWastageKg.toFixed(1)} kg (${data.overall.totalWastagePct.toFixed(2)}%)
-        </div>
-      </td>
-      <td class="kpi-cell" style="border-left: 2.5px solid #16a34a; background-color: #f0fdf4;">
-        <div class="kpi-label" style="color: #166534;">Net Production</div>
-        <div class="kpi-value" style="color: #166534;">${data.overall.totalNetProductionKg.toFixed(1)} kg</div>
+      <td style="background-color: #f0fdf4;">
+        <div class="kpi-label" style="color: #166534;">Net Good Prod (Kg)</div>
+        <div class="kpi-val" style="color: #16a34a;">${data.overall.totalNetProductionKg.toFixed(1)} kg</div>
       </td>
     </tr>
   </table>
 
-  <!-- SECTION 1: QUALITY-WISE SUMMARY -->
-  <div class="section-title">1. Quality-Wise Production & Output Conversion</div>
+  <!-- Section 1: Quality Breakdown -->
+  <div class="section-title">1. Quality-Wise Production & Wastage Breakdown</div>
   <table class="data-table">
     <thead>
       <tr>
-        <th style="width: 20px; text-align: center;">Sl.</th>
-        <th style="width: 140px; text-align: left; background-color: #1e293b; color: #fde047;">Quality Name</th>
-        <th style="width: 45px; text-align: center;">Rolls</th>
-        <th style="width: 60px; text-align: right;">Total Mtr</th>
-        <th style="width: 55px; text-align: right;">Net Wt (Kg)</th>
-        <th style="width: 45px; text-align: right;">Avg (g/m)</th>
-        <th style="width: 65px; text-align: right; background-color: #14532d; color: #86efac;">Prod (Pcs)</th>
-        <th style="width: 60px; text-align: right; background-color: #134e4a; color: #5eead4;">Prod (Kg)</th>
-        <th style="width: 40px; text-align: right; background-color: #312e81;">Patch OS</th>
-        <th style="width: 40px; text-align: right; background-color: #312e81;">Patch DS</th>
-        <th style="width: 40px; text-align: right; background-color: #1e1b4b;">Valve</th>
-        <th style="width: 55px; text-align: right; background-color: #7f1d1d; color: #fca5a5;">Waste (Kg)</th>
-        <th style="width: 45px; text-align: right; background-color: #7f1d1d; color: #fca5a5;">Waste %</th>
-        <th style="width: 65px; text-align: right; background-color: #14532d; color: #86efac;">Net Prod (Kg)</th>
+        <th style="width: 2.5%;">#</th>
+        <th style="width: 14%; text-align: left; padding-left: 6px;">Quality Name</th>
+        <th style="width: 6%;">Rolls</th>
+        <th style="width: 10%; background-color: #dcfce7 !important; color: #166534;">Bags (Pcs)</th>
+        <th style="width: 9%; background-color: #ccfbf1 !important; color: #115e59;">Gross (Kg)</th>
+        <th style="width: 8%;">Roll Mtr</th>
+        <th style="width: 8%;">Net Wt (Kg)</th>
+        <th style="width: 6%;">Avg GSM</th>
+        <th style="width: 5%;">Cover OS</th>
+        <th style="width: 5%;">Cover DS</th>
+        <th style="width: 5%;">Valve</th>
+        <th style="width: 8%; background-color: #fee2e2 !important; color: #991b1b;">Waste (Kg)</th>
+        <th style="width: 6.5%; background-color: #ffedd5 !important; color: #9a3412;">Waste %</th>
+        <th style="width: 9%; background-color: #dcfce7 !important; color: #166534;">Net Good (Kg)</th>
       </tr>
     </thead>
     <tbody>
       ${qualityRows}
-    </tbody>
-    <tfoot>
-      <tr style="background-color: #f1f5f9; font-weight: 800; border-top: 1.5pt solid #0f172a;">
-        <td colspan="2" style="text-align: right; text-transform: uppercase;">GRAND TOTALS:</td>
+      <tr class="totals-row">
+        <td style="text-align: center;">Σ</td>
+        <td style="font-weight: 800; text-transform: uppercase;">Totals:</td>
         <td style="text-align: center; font-family: monospace; color: #0284c7;">${data.overall.totalRolls}</td>
-        <td style="text-align: right; font-family: monospace;">${data.overall.totalRollMtr.toLocaleString()}</td>
+        <td style="text-align: right; font-family: monospace; color: #15803d;">${data.overall.totalProductionPcs.toLocaleString()}</td>
+        <td style="text-align: right; font-family: monospace; color: #0f766e;">${data.overall.totalProductionKg.toFixed(1)} kg</td>
+        <td style="text-align: right; font-family: monospace; color: #0284c7;">${data.overall.totalRollMtr.toLocaleString()}</td>
         <td style="text-align: right; font-family: monospace;">${data.overall.totalNetWt.toFixed(1)}</td>
-        <td style="text-align: right; font-family: monospace; color: #0369a1; background-color: #e0f2fe;">${data.overall.avgGsm.toFixed(1)}</td>
-        <td style="text-align: right; font-family: monospace; font-weight: 900; color: #14532d; background-color: #dcfce7;">${data.overall.totalProductionPcs.toLocaleString()}</td>
-        <td style="text-align: right; font-family: monospace; font-weight: 900; color: #115e59; background-color: #ccfbf1;">${data.overall.totalProductionKg.toFixed(1)}</td>
-        <td style="text-align: right; font-family: monospace; color: #3730a3; background-color: #eef2ff;">${data.overall.totalCoverPatchOs}</td>
-        <td style="text-align: right; font-family: monospace; color: #3730a3; background-color: #eef2ff;">${data.overall.totalCoverPatchDs}</td>
-        <td style="text-align: right; font-family: monospace; color: #312e81; background-color: #e0e7ff;">${data.overall.totalValvePatch}</td>
-        <td style="text-align: right; font-family: monospace; font-weight: 800; color: #991b1b; background-color: #fee2e2;">${data.overall.totalWastageKg.toFixed(2)}</td>
-        <td style="text-align: right; font-family: monospace; font-weight: 800; color: #c2410c; background-color: #ffedd5;">${data.overall.totalWastagePct.toFixed(2)}%</td>
-        <td style="text-align: right; font-family: monospace; font-weight: 900; color: #14532d; background-color: #dcfce7;">${data.overall.totalNetProductionKg.toFixed(1)}</td>
+        <td style="text-align: right; font-family: monospace; color: #0369a1;">${data.overall.avgGsm.toFixed(1)}</td>
+        <td style="text-align: right; font-family: monospace; color: #4338ca;">${data.overall.totalCoverPatchOs}</td>
+        <td style="text-align: right; font-family: monospace; color: #4338ca;">${data.overall.totalCoverPatchDs}</td>
+        <td style="text-align: right; font-family: monospace; color: #3730a3;">${data.overall.totalValvePatch}</td>
+        <td style="text-align: right; font-family: monospace; color: #b91c1c;">${data.overall.totalWastageKg.toFixed(2)} kg</td>
+        <td style="text-align: right; font-family: monospace; color: #c2410c;">${data.overall.totalWastagePct.toFixed(2)}%</td>
+        <td style="text-align: right; font-family: monospace; color: #166534;">${data.overall.totalNetProductionKg.toFixed(1)} kg</td>
       </tr>
-    </tfoot>
+    </tbody>
   </table>
 
-  <!-- SECTION 2: WASTAGE CATEGORISATION BREAKDOWN -->
-  <div class="section-title">2. Wastage Stream Categorisation Breakdown</div>
-  <table class="data-table" style="max-width: 600px;">
+  <!-- Section 2: Scrap Streams -->
+  <div class="section-title">2. Granular Scrap Stream Breakdown</div>
+  <table class="data-table" style="width: 70%;">
     <thead>
       <tr>
-        <th style="text-align: left;">Wastage Category</th>
-        <th style="width: 110px; text-align: right;">Quantity (Kg)</th>
-        <th style="width: 90px; text-align: right;">Share (% of Prod)</th>
+        <th style="width: 4%;">#</th>
+        <th style="width: 38%; text-align: left; padding-left: 8px;">Scrap Stream / Category</th>
+        <th style="width: 20%; text-align: right; padding-right: 8px;">Waste (Kg)</th>
+        <th style="width: 18%; text-align: right; padding-right: 8px;">Share of Scrap (%)</th>
+        <th style="width: 20%; text-align: right; padding-right: 8px;">% of Gross Output</th>
       </tr>
     </thead>
     <tbody>
-      <tr>
-        <td>Loom Fabric Wastage</td>
-        <td style="text-align: right; font-family: monospace;">${data.wastage.loomWasteKg.toFixed(2)} kg</td>
-        <td style="text-align: right; font-family: monospace;">${data.wastage.loomWastePct.toFixed(2)}%</td>
-      </tr>
-      <tr style="background-color: #f8fafc;">
-        <td>Lamination Fabric Wastage</td>
-        <td style="text-align: right; font-family: monospace;">${data.wastage.lamWasteKg.toFixed(2)} kg</td>
-        <td style="text-align: right; font-family: monospace;">${data.wastage.lamWastePct.toFixed(2)}%</td>
-      </tr>
-      <tr>
-        <td>Print Fabric Wastage</td>
-        <td style="text-align: right; font-family: monospace;">${data.wastage.printWasteKg.toFixed(2)} kg</td>
-        <td style="text-align: right; font-family: monospace;">${data.wastage.printWastePct.toFixed(2)}%</td>
-      </tr>
-      <tr style="background-color: #f8fafc;">
-        <td>Machine Operational Wastage</td>
-        <td style="text-align: right; font-family: monospace;">${data.wastage.machineWasteKg.toFixed(2)} kg</td>
-        <td style="text-align: right; font-family: monospace;">${data.wastage.machineWastePct.toFixed(2)}%</td>
-      </tr>
-      <tr>
-        <td>Cover Patch Wastage</td>
-        <td style="text-align: right; font-family: monospace;">${data.wastage.coverPatchWasteKg.toFixed(2)} kg</td>
-        <td style="text-align: right; font-family: monospace;">${data.wastage.coverPatchWastePct.toFixed(2)}%</td>
+      ${wasteRows}
+      <tr class="totals-row">
+        <td style="text-align: center;">Σ</td>
+        <td style="font-weight: 800; text-transform: uppercase;">Total Scrap Recorded:</td>
+        <td style="text-align: right; padding-right: 8px; font-family: monospace; color: #b91c1c;">${data.overall.totalWastageKg.toFixed(2)} kg</td>
+        <td style="text-align: right; padding-right: 8px; font-family: monospace; color: #7c3aed;">100.0%</td>
+        <td style="text-align: right; padding-right: 8px; font-family: monospace; color: #c2410c;">${data.overall.totalWastagePct.toFixed(2)}%</td>
       </tr>
     </tbody>
-    <tfoot>
-      <tr style="background-color: #fee2e2; font-weight: 800; border-top: 1.5pt solid #0f172a;">
-        <td style="text-transform: uppercase; color: #991b1b;">TOTAL ACCUMULATED WASTAGE:</td>
-        <td style="text-align: right; font-family: monospace; font-size: 7.5pt; color: #991b1b;">${data.wastage.totalWasteKg.toFixed(2)} kg</td>
-        <td style="text-align: right; font-family: monospace; font-size: 7.5pt; color: #991b1b;">${data.wastage.totalWastePct.toFixed(2)}%</td>
-      </tr>
-    </tfoot>
   </table>
 
-  <!-- SIGNATURES -->
-  <table class="sign-table">
-    <tr>
-      <td class="sign-box" style="width: 25%;">
-        Prepared By (Data Entry)<br>
-        <strong style="color: #0f172a;">_______________</strong>
-      </td>
-      <td class="sign-box" style="width: 25%;">
-        Shift In-charge / Supervisor<br>
-        <strong style="color: #0f172a;">_______________</strong>
-      </td>
-      <td class="sign-box" style="width: 25%;">
-        Quality Control Head<br>
-        <strong style="color: #0f172a;">_______________</strong>
-      </td>
-      <td class="sign-box" style="width: 25%;">
-        Plant General Manager / Operations<br>
-        <strong style="color: #0f172a;">_______________</strong>
-      </td>
-    </tr>
-  </table>
+  <!-- Standard 4-Block Signatures Strip -->
+  <div class="signatures-container">
+    <div class="sig-box">
+      <div class="sig-line">Prepared By</div>
+    </div>
+    <div class="sig-box">
+      <div class="sig-line">Production In-Charge</div>
+    </div>
+    <div class="sig-box">
+      <div class="sig-line">Quality Head</div>
+    </div>
+    <div class="sig-box">
+      <div class="sig-line">Plant Head / GM</div>
+    </div>
+  </div>
 </body>
-</html>
-  `;
+</html>`;
 }
 
 export function printConvertexSummaryReport(
@@ -351,16 +388,50 @@ export function printConvertexSummaryReport(
   dateRange: string
 ): void {
   const html = generateConvertexSummaryHtml(data, dateRange);
-  const printWindow = window.open("", "_blank");
-  if (!printWindow) {
-    alert("Please allow pop-ups to print the report.");
-    return;
+  let iframe = document.getElementById("convertex-summary-print-iframe") as HTMLIFrameElement | null;
+  if (!iframe) {
+    iframe = document.createElement("iframe");
+    iframe.id = "convertex-summary-print-iframe";
+    iframe.style.position = "fixed";
+    iframe.style.right = "0";
+    iframe.style.bottom = "0";
+    iframe.style.width = "0";
+    iframe.style.height = "0";
+    iframe.style.border = "0";
+    document.body.appendChild(iframe);
   }
-  printWindow.document.open();
-  printWindow.document.write(html);
-  printWindow.document.close();
-  printWindow.onload = () => {
-    printWindow.focus();
-    printWindow.print();
-  };
+
+  const doc = iframe.contentWindow?.document || iframe.contentDocument;
+  if (doc && iframe.contentWindow) {
+    doc.open();
+    doc.write(html);
+    doc.close();
+
+    const triggerPrint = () => {
+      try {
+        iframe?.contentWindow?.focus();
+        iframe?.contentWindow?.print();
+      } catch (err) {
+        console.error("Iframe print failed, falling back to window print", err);
+        fallbackWindowPrint(html);
+      }
+    };
+
+    setTimeout(triggerPrint, 250);
+  } else {
+    fallbackWindowPrint(html);
+  }
+}
+
+function fallbackWindowPrint(html: string): void {
+  const win = window.open("", "_blank", "width=1200,height=800");
+  if (win) {
+    win.document.open();
+    win.document.write(html);
+    win.document.close();
+    win.onload = () => {
+      win.focus();
+      win.print();
+    };
+  }
 }
