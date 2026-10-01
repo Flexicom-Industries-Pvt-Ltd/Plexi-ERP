@@ -324,6 +324,8 @@ export function ConvertexDailyReportClient() {
   // Helper to determine if a row has any user entered data
   const hasRowData = (e: ConvertexReportItem) => {
     return Boolean(
+      (e.companyName && e.companyName.trim()) ||
+      (e.unitName && e.unitName.trim()) ||
       (e.rollNumber && e.rollNumber.trim()) ||
       (e.quality && e.quality.trim()) ||
       (e.partyName && e.partyName.trim()) ||
