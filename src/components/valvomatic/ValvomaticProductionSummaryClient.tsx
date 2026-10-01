@@ -21,7 +21,6 @@ import {
   ShieldAlert,
 } from "lucide-react";
 import { ValvomaticSummaryResult } from "@/lib/valvomatic/valvomatic-types";
-import { ValvomaticNavigationTabs } from "./ValvomaticNavigationTabs";
 import { ValvomaticSummaryPrintModal } from "./ValvomaticSummaryPrintModal";
 import { exportValvomaticSummaryExcel } from "@/lib/valvomatic/valvomatic-export";
 
@@ -38,6 +37,7 @@ export function ValvomaticProductionSummaryClient() {
 
   const [activeTab, setActiveTab] = useState<"qualities" | "wastage">("qualities");
   const [loading, setLoading] = useState<boolean>(true);
+  const [lastRefreshedAt, setLastRefreshedAt] = useState<string | null>(null);
   const [isPrintModalOpen, setIsPrintModalOpen] = useState<boolean>(false);
   const [summaryData, setSummaryData] = useState<ValvomaticSummaryResult | null>(null);
 
@@ -60,6 +60,7 @@ export function ValvomaticProductionSummaryClient() {
       const json = await res.json();
       if (json.summary) {
         setSummaryData(json.summary);
+        setLastRefreshedAt(format(new Date(), "hh:mm a"));
       }
     } catch (err: any) {
       toast.error(err.message || "Failed to load Valvomatic summary");
@@ -144,9 +145,6 @@ export function ValvomaticProductionSummaryClient() {
 
   return (
     <div className="space-y-5 pb-16 max-w-[100vw] overflow-x-hidden">
-      {/* Navigation Sub-module Tabs */}
-      <ValvomaticNavigationTabs currentTab="summary" />
-
       {/* Main Filter and Controls Header Card */}
       <div className="bg-white border border-slate-200 rounded-xl p-4 sm:p-5 shadow-xs">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
@@ -156,7 +154,23 @@ export function ValvomaticProductionSummaryClient() {
                 <BarChart3 className="h-6 w-6" />
               </div>
               <div>
-                <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-sky-700">
+                    Analytics & Reporting
+                  </span>
+                  {loading ? (
+                    <span className="inline-flex items-center gap-1.5 text-xs text-sky-700 bg-sky-50/80 px-2.5 py-0.5 rounded-full border border-sky-200 font-medium">
+                      <RefreshCw className="h-3 w-3 animate-spin text-sky-600" />
+                      Refreshing...
+                    </span>
+                  ) : lastRefreshedAt ? (
+                    <span className="inline-flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50/80 px-2.5 py-0.5 rounded-full border border-emerald-200 font-medium">
+                      <CheckCircle2 className="h-3 w-3 text-emerald-600" />
+                      Live Summary ({lastRefreshedAt})
+                    </span>
+                  ) : null}
+                </div>
+                <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight mt-1">
                   Valvomatic Production & Wastage Summary
                 </h1>
                 <p className="text-xs sm:text-sm text-slate-500">

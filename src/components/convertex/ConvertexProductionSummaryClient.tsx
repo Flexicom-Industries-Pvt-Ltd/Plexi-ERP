@@ -22,7 +22,6 @@ import {
   ShieldAlert,
 } from "lucide-react";
 import { ConvertexSummaryResult } from "@/lib/convertex/convertex-types";
-import { ConvertexNavigationTabs } from "./ConvertexNavigationTabs";
 import { ConvertexSummaryPrintModal } from "./ConvertexSummaryPrintModal";
 import { exportConvertexSummaryExcel } from "@/lib/convertex/convertex-export";
 
@@ -39,6 +38,7 @@ export function ConvertexProductionSummaryClient() {
 
   const [activeTab, setActiveTab] = useState<"qualities" | "wastage">("qualities");
   const [loading, setLoading] = useState<boolean>(true);
+  const [lastRefreshedAt, setLastRefreshedAt] = useState<string | null>(null);
   const [isPrintModalOpen, setIsPrintModalOpen] = useState<boolean>(false);
   const [summaryData, setSummaryData] = useState<ConvertexSummaryResult | null>(null);
 
@@ -61,6 +61,7 @@ export function ConvertexProductionSummaryClient() {
       const json = await res.json();
       if (json.summary) {
         setSummaryData(json.summary);
+        setLastRefreshedAt(format(new Date(), "hh:mm a"));
       }
     } catch (err: any) {
       toast.error(err.message || "Failed to load Convertex summary");
@@ -136,9 +137,6 @@ export function ConvertexProductionSummaryClient() {
 
   return (
     <div className="space-y-5 font-sans pb-16">
-      {/* Sub-module Navigation */}
-      <ConvertexNavigationTabs currentTab="summary" />
-
       {/* Control Card */}
       <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-100 pb-5">
@@ -150,6 +148,17 @@ export function ConvertexProductionSummaryClient() {
               <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 border border-sky-200">
                 {overall.totalReports} Shifts Compiled
               </span>
+              {loading ? (
+                <span className="inline-flex items-center gap-1.5 text-xs text-sky-700 bg-sky-50/80 px-2.5 py-0.5 rounded-full border border-sky-200 font-medium">
+                  <RefreshCw className="h-3 w-3 animate-spin text-sky-600" />
+                  Refreshing...
+                </span>
+              ) : lastRefreshedAt ? (
+                <span className="inline-flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50/80 px-2.5 py-0.5 rounded-full border border-emerald-200 font-medium">
+                  <CheckCircle2 className="h-3 w-3 text-emerald-600" />
+                  Live Aggregated ({lastRefreshedAt})
+                </span>
+              ) : null}
             </div>
             <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 mt-1">
               Convertex Production & Wastage Summary
