@@ -1,0 +1,356 @@
+import { NextRequest, NextResponse } from "next/server";
+import { db } from "@/lib/db";
+import { requireValvomaticApiPermission } from "@/lib/valvomatic/permissions";
+import {
+  calculateValvomaticRow,
+  computeValvomaticTotals,
+  ValvomaticReportItem,
+} from "@/lib/valvomatic/valvomatic-types";
+import { logEvent } from "@/lib/logging";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
+export async function GET(request: NextRequest) {
+  const authResult = await requireValvomaticApiPermission("canRead");
+  if (!authResult.ok) {
+    return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+  }
+
+  const { searchParams } = new URL(request.url);
+  const id = searchParams.get("id");
+  const date = searchParams.get("date");
+  const shiftName = searchParams.get("shiftName");
+  const machineNo = searchParams.get("machineNo") || "Valvomatic-1";
+  const dateFrom = searchParams.get("dateFrom");
+  const dateTo = searchParams.get("dateTo");
+
+  try {
+    // 1. Single report fetch by ID
+    if (id) {
+      const report = await db.valvomaticDailyReport.findUnique({
+        where: { id },
+        include: {
+          entries: {
+            orderBy: { sequence: "asc" },
+          },
+        },
+      });
+      if (!report) {
+        return NextResponse.json({ error: "Report not found" }, { status: 404 });
+      }
+      return NextResponse.json({ success: true, report });
+    }
+
+    // 2. Single report fetch by Date, Shift, and Machine
+    if (date && shiftName) {
+      const report = await db.valvomaticDailyReport.findUnique({
+        where: {
+          date_shiftName_machineNo: {
+            date,
+            shiftName,
+            machineNo,
+          },
+        },
+        include: {
+          entries: {
+            orderBy: { sequence: "asc" },
+          },
+        },
+      });
+
+      // Calculate MTD wastage up to this date
+      const monthStart = date.slice(0, 7) + "-01";
+      const mtdRecords = await db.valvomaticDailyReport.findMany({
+        where: {
+          date: { gte: monthStart, lte: date },
+          machineNo,
+        },
+        select: { totalWastageKg: true },
+      });
+      const calculatedMtdWastageKg = mtdRecords.reduce((acc, r) => acc + (r.totalWastageKg || 0), 0);
+
+      return NextResponse.json({
+        success: true,
+        report: report || null,
+        calculatedMtdWastageKg,
+      });
+    }
+
+    // 3. List reports with filters
+    const where: any = {};
+    if (date) {
+      where.date = date;
+    } else if (dateFrom || dateTo) {
+      where.date = {
+        ...(dateFrom ? { gte: dateFrom } : {}),
+        ...(dateTo ? { lte: dateTo } : {}),
+      };
+    }
+    if (shiftName && shiftName !== "ALL") {
+      where.shiftName = shiftName;
+    }
+    if (machineNo && machineNo !== "ALL") {
+      where.machineNo = machineNo;
+    }
+
+    const reports = await db.valvomaticDailyReport.findMany({
+      where,
+      include: {
+        _count: {
+          select: { entries: true },
+        },
+      },
+      orderBy: [{ date: "desc" }, { createdAt: "desc" }],
+      take: 200,
+    });
+
+    return NextResponse.json({ success: true, reports });
+  } catch (error: any) {
+    console.error("GET /api/production/valvomatic/reports error:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch Valvomatic production reports" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(request: NextRequest) {
+  const authResult = await requireValvomaticApiPermission("canWrite");
+  if (!authResult.ok) {
+    return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+  }
+
+  try {
+    const body = await request.json();
+    const {
+      date,
+      shiftName,
+      machineNo = "Valvomatic-1",
+      companyName = "FLEXICOM INDUSTRIES PVT. LIMITED, KATHUA",
+      unitName = "Unit-1",
+      operatorName,
+      operatorId,
+      supervisorName,
+      status = "DRAFT",
+      remarks,
+      entries = [],
+    } = body;
+
+    if (!date || !shiftName) {
+      return NextResponse.json({ error: "Date and Shift are required" }, { status: 400 });
+    }
+
+    // Calculate month-to-date wastage
+    const monthStart = date.slice(0, 7) + "-01";
+    const priorMtdRecords = await db.valvomaticDailyReport.findMany({
+      where: {
+        date: { gte: monthStart, lt: date },
+        machineNo,
+      },
+      select: { totalWastageKg: true },
+    });
+    const priorMtdKg = priorMtdRecords.reduce((acc, r) => acc + (r.totalWastageKg || 0), 0);
+
+    // Safely filter rows that have content
+    const hasRowContent = (e: any) =>
+      Boolean(
+        (e.rollNumber && String(e.rollNumber).trim()) ||
+        (e.quality && String(e.quality).trim()) ||
+        (e.partyName && String(e.partyName).trim()) ||
+        (e.grade && String(e.grade).trim()) ||
+        (e.loomNumber && String(e.loomNumber).trim()) ||
+        Number(e.productionPcs) > 0 ||
+        Number(e.productionKg) > 0 ||
+        Number(e.coverPatchOs) > 0 ||
+        Number(e.coverPatchDs) > 0 ||
+        Number(e.valvePatch) > 0 ||
+        Number(e.rollMtr) > 0 ||
+        Number(e.netWeight) > 0 ||
+        Number(e.openingMeterReading) > 0 ||
+        Number(e.closingMeterReading) > 0 ||
+        (e.remarks && String(e.remarks).trim())
+      );
+
+    const validEntries = Array.isArray(entries) ? entries.filter(hasRowContent) : [];
+
+    // Recalculate row metrics
+    const calculatedEntries: ValvomaticReportItem[] = validEntries.map((entry: any, index: number) => {
+      const row = calculateValvomaticRow({
+        ...entry,
+        rollNumber: String(entry.rollNumber || "").trim(),
+        sequence: index + 1,
+      });
+      return row;
+    });
+
+    const totals = computeValvomaticTotals(calculatedEntries);
+
+    const savedReport = await db.$transaction(async (tx) => {
+      // Upsert report header
+      const report = await tx.valvomaticDailyReport.upsert({
+        where: {
+          date_shiftName_machineNo: {
+            date,
+            shiftName,
+            machineNo,
+          },
+        },
+        create: {
+          date,
+          shiftName,
+          machineNo,
+          companyName: companyName?.trim() || "FLEXICOM INDUSTRIES PVT. LIMITED, KATHUA",
+          unitName: unitName?.trim() || "Unit-1",
+          operatorName: operatorName?.trim() || null,
+          operatorId: operatorId || null,
+          supervisorName: supervisorName?.trim() || null,
+          status,
+          remarks: remarks?.trim() || null,
+          totalRolls: totals.totalRolls,
+          totalRollMtr: totals.totalRollMtr,
+          totalNetWt: totals.totalNetWt,
+          avgWeightGsm: totals.avgWeightGsm,
+          totalCoverPatchOs: totals.totalCoverPatchOs,
+          totalCoverPatchDs: totals.totalCoverPatchDs,
+          totalValvePatch: totals.totalValvePatch,
+          totalProductionPcs: totals.totalProductionPcs,
+          totalProductionKg: totals.totalProductionKg,
+          totalTargetPcs: totals.totalTargetPcs,
+        },
+        update: {
+          companyName: companyName?.trim() || "FLEXICOM INDUSTRIES PVT. LIMITED, KATHUA",
+          unitName: unitName?.trim() || "Unit-1",
+          operatorName: operatorName?.trim() || null,
+          operatorId: operatorId || null,
+          supervisorName: supervisorName?.trim() || null,
+          status,
+          remarks: remarks?.trim() || null,
+          totalRolls: totals.totalRolls,
+          totalRollMtr: totals.totalRollMtr,
+          totalNetWt: totals.totalNetWt,
+          avgWeightGsm: totals.avgWeightGsm,
+          totalCoverPatchOs: totals.totalCoverPatchOs,
+          totalCoverPatchDs: totals.totalCoverPatchDs,
+          totalValvePatch: totals.totalValvePatch,
+          totalProductionPcs: totals.totalProductionPcs,
+          totalProductionKg: totals.totalProductionKg,
+          totalTargetPcs: totals.totalTargetPcs,
+        },
+      });
+
+      // Clear existing entries and recreate atomically
+      await tx.valvomaticDailyReportEntry.deleteMany({
+        where: { reportId: report.id },
+      });
+
+      if (calculatedEntries.length > 0) {
+        await tx.valvomaticDailyReportEntry.createMany({
+          data: calculatedEntries.map((e) => ({
+            reportId: report.id,
+            sequence: e.sequence,
+            companyName: e.companyName?.trim() || null,
+            unitName: e.unitName?.trim() || null,
+            grade: e.grade?.trim() || null,
+            targetProductionPcs: e.targetProductionPcs ? Number(e.targetProductionPcs) : null,
+            quality: e.quality?.trim() || e.partyName?.trim() || null,
+            partyName: e.quality?.trim() || e.partyName?.trim() || null,
+            rollNumber: String(e.rollNumber || "").trim(),
+            loomNumber: e.loomNumber?.trim() || null,
+            rollMtr: Number(e.rollMtr) || 0,
+            netWeight: Number(e.netWeight) || 0,
+            avgWeight: Number(e.avgWeight) || 0,
+            openingMeterReading: Number(e.openingMeterReading) || 0,
+            closingMeterReading: Number(e.closingMeterReading) || 0,
+            coverPatchOs: Number(e.coverPatchOs) || 0,
+            coverPatchDs: Number(e.coverPatchDs) || 0,
+            valvePatch: Number(e.valvePatch) || 0,
+            productionPcs: Number(e.productionPcs) || 0,
+            productionKg: Number(e.productionKg) || 0,
+            remarks: e.remarks?.trim() || null,
+          })),
+        });
+      }
+
+      return tx.valvomaticDailyReport.findUnique({
+        where: { id: report.id },
+        include: {
+          entries: {
+            orderBy: { sequence: "asc" },
+          },
+        },
+      });
+    });
+
+    // Comprehensive logging
+    logEvent({
+      userId: authResult.session.user.id,
+      module: "PRODUCTION",
+      severity: "INFO",
+      action: `${status === "SUBMITTED" ? "Submitted" : "Saved"} Valvomatic daily production report for ${date} (${shiftName}, ${machineNo}) with ${calculatedEntries.length} rolls`,
+      payload: {
+        reportId: savedReport?.id,
+        date,
+        shiftName,
+        machineNo,
+        status,
+        totalRolls: totals.totalRolls,
+        totalProductionPcs: totals.totalProductionPcs,
+        totalProductionKg: totals.totalProductionKg,
+      },
+      httpMethod: "POST",
+      url: "/api/production/valvomatic/reports",
+      statusCode: 200,
+    }).catch(() => {});
+
+    return NextResponse.json({
+      success: true,
+      report: savedReport,
+    });
+  } catch (error: any) {
+    console.error("POST /api/production/valvomatic/reports error:", error);
+    return NextResponse.json(
+      { error: error.message || "Failed to save Valvomatic daily production report" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  const authResult = await requireValvomaticApiPermission("canDelete");
+  if (!authResult.ok) {
+    return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+  }
+
+  const { searchParams } = new URL(request.url);
+  const id = searchParams.get("id");
+
+  if (!id) {
+    return NextResponse.json({ error: "Report ID is required" }, { status: 400 });
+  }
+
+  try {
+    const deleted = await db.valvomaticDailyReport.delete({
+      where: { id },
+    });
+
+    logEvent({
+      userId: authResult.session.user.id,
+      module: "PRODUCTION",
+      severity: "WARN",
+      action: `Deleted Valvomatic daily production report for ${deleted.date} (${deleted.shiftName}, ${deleted.machineNo})`,
+      payload: { reportId: id, date: deleted.date, shiftName: deleted.shiftName },
+      httpMethod: "DELETE",
+      url: `/api/production/valvomatic/reports?id=${id}`,
+      statusCode: 200,
+    }).catch(() => {});
+
+    return NextResponse.json({ success: true, message: "Report deleted successfully" });
+  } catch (error: any) {
+    console.error("DELETE /api/production/valvomatic/reports error:", error);
+    return NextResponse.json(
+      { error: "Failed to delete Valvomatic production report" },
+      { status: 500 }
+    );
+  }
+}
