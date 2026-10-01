@@ -82,6 +82,12 @@ const convertexItems = [
   { title: "Production Summary", url: "/dashboard/production/convertex/summary" },
 ];
 
+const valvomaticItems = [
+  { title: "Daily Production Report", url: "/dashboard/production/valvomatic" },
+  { title: "Wastage Report", url: "/dashboard/production/valvomatic/wastage" },
+  { title: "Production Summary", url: "/dashboard/production/valvomatic/summary" },
+];
+
 const settingsItems = [
   { title: "General Settings", url: "/dashboard/settings/organization" },
   { title: "Users", url: "/dashboard/settings/users" },
@@ -121,6 +127,7 @@ export function AppSidebar({ user, allowedModules, ...props }: AppSidebarProps) 
   const [laminationOpen, setLaminationOpen] = useState(pathname.startsWith("/dashboard/production/lamination"));
   const [printingOpen, setPrintingOpen] = useState(pathname.startsWith("/dashboard/production/printing"));
   const [convertexOpen, setConvertexOpen] = useState(pathname.startsWith("/dashboard/production/convertex"));
+  const [valvomaticOpen, setValvomaticOpen] = useState(pathname.startsWith("/dashboard/production/valvomatic"));
   const [settingsOpen, setSettingsOpen] = useState(pathname.startsWith("/dashboard/settings"));
   const [dataCentreOpen, setDataCentreOpen] = useState(pathname.startsWith("/dashboard/data-centre"));
 
@@ -149,6 +156,7 @@ export function AppSidebar({ user, allowedModules, ...props }: AppSidebarProps) 
   const hasLaminationAccess = isSuperAdmin || Boolean(allowedModules["LAMINATION"]) || Boolean(allowedModules["PRODUCTION"]);
   const hasPrintingAccess = isSuperAdmin || Boolean(allowedModules["PRINTING"]) || Boolean(allowedModules["PRODUCTION"]);
   const hasConvertexAccess = isSuperAdmin || Boolean(allowedModules["CONVERTEX"]) || Boolean(allowedModules["PRODUCTION"]);
+  const hasValvomaticAccess = isSuperAdmin || Boolean(allowedModules["VALVOMATIC"]) || Boolean(allowedModules["CONVERTEX"]) || Boolean(allowedModules["PRODUCTION"]);
 
   const visibleNavItems = navItems.filter(
     (item) => (!item.module || isSuperAdmin || allowedModules[item.module]),
@@ -320,6 +328,38 @@ export function AppSidebar({ user, allowedModules, ...props }: AppSidebarProps) 
                   <SidebarMenuSub>
                     {convertexItems.map((subItem) => {
                       const isBaseUrl = subItem.url === "/dashboard/production/convertex";
+                      const isSubActive = isBaseUrl
+                        ? pathname === subItem.url
+                        : pathname === subItem.url || pathname.startsWith(subItem.url + "/");
+                      return (
+                        <SidebarMenuSubItem key={subItem.url}>
+                          <SidebarMenuSubButton
+                            render={<Link href={subItem.url} />}
+                            isActive={isSubActive}
+                          >
+                            <span>{subItem.title}</span>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      );
+                    })}
+                  </SidebarMenuSub>
+                </CollapsibleContent>
+              </SidebarMenuItem>
+            </Collapsible>
+          )}
+
+          {hasValvomaticAccess && (
+            <Collapsible open={valvomaticOpen} onOpenChange={setValvomaticOpen} className="group/collapsible">
+              <SidebarMenuItem>
+                <CollapsibleTrigger render={<SidebarMenuButton tooltip="Valvomatic" />}>
+                    <Layers className="h-4 w-4" />
+                    <span>Valvomatic</span>
+                    <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180" />
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <SidebarMenuSub>
+                    {valvomaticItems.map((subItem) => {
+                      const isBaseUrl = subItem.url === "/dashboard/production/valvomatic";
                       const isSubActive = isBaseUrl
                         ? pathname === subItem.url
                         : pathname === subItem.url || pathname.startsWith(subItem.url + "/");
