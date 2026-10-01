@@ -31,7 +31,6 @@ import {
   calculateValvomaticRow,
   computeValvomaticTotals,
 } from "@/lib/valvomatic/valvomatic-types";
-import { ValvomaticNavigationTabs } from "./ValvomaticNavigationTabs";
 import { ValvomaticReportPrintModal } from "./ValvomaticReportPrintModal";
 import { exportValvomaticReportExcel } from "@/lib/valvomatic/valvomatic-export";
 
@@ -326,6 +325,7 @@ export function ValvomaticDailyReportClient() {
     setAutoSaveError(null);
 
     try {
+      const currentTotals = computeValvomaticTotals(currentData.entries);
       const payload: ValvomaticDailyReportData = {
         date: currentData.date,
         shiftName: currentData.shiftName,
@@ -336,16 +336,16 @@ export function ValvomaticDailyReportClient() {
         supervisorName: currentData.supervisorName,
         status: finalStatus,
         remarks: currentData.remarks,
-        totalRolls: 0,
-        totalRollMtr: 0,
-        totalNetWt: 0,
-        avgWeightGsm: 0,
-        totalCoverPatchOs: 0,
-        totalCoverPatchDs: 0,
-        totalValvePatch: 0,
-        totalProductionPcs: 0,
-        totalProductionKg: 0,
-        totalTargetPcs: 0,
+        totalRolls: currentTotals.totalRolls,
+        totalRollMtr: currentTotals.totalRollMtr,
+        totalNetWt: currentTotals.totalNetWt,
+        avgWeightGsm: currentTotals.avgWeightGsm,
+        totalCoverPatchOs: currentTotals.totalCoverPatchOs,
+        totalCoverPatchDs: currentTotals.totalCoverPatchDs,
+        totalValvePatch: currentTotals.totalValvePatch,
+        totalProductionPcs: currentTotals.totalProductionPcs,
+        totalProductionKg: currentTotals.totalProductionKg,
+        totalTargetPcs: currentTotals.totalTargetPcs,
         entries: currentData.entries,
       };
 
@@ -395,7 +395,7 @@ export function ValvomaticDailyReportClient() {
       if (isDirtyRef.current) {
         saveReport(undefined, true);
       }
-    }, 2500);
+    }, 1000);
 
     return () => {
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
@@ -459,15 +459,12 @@ export function ValvomaticDailyReportClient() {
 
   return (
     <div
-      className={`space-y-4 pb-16 ${
+      className={`space-y-5 pb-16 ${
         isFullscreen
           ? "fixed inset-0 z-50 bg-slate-100 p-4 overflow-y-auto"
           : "max-w-[100vw] overflow-x-hidden"
       }`}
     >
-      {/* Navigation Sub-module Tabs */}
-      <ValvomaticNavigationTabs currentTab="production" />
-
       {/* Main Header Card */}
       <div className="bg-white border border-slate-200 rounded-xl p-4 sm:p-5 shadow-xs">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
@@ -477,7 +474,44 @@ export function ValvomaticDailyReportClient() {
                 <Layers className="h-6 w-6" />
               </div>
               <div>
-                <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-primary">
+                    Cutting & Bag Making
+                  </span>
+                  <span
+                    className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
+                      status === "APPROVED"
+                        ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                        : status === "SUBMITTED"
+                        ? "bg-blue-50 text-blue-700 border border-blue-200"
+                        : "bg-amber-50 text-amber-700 border border-amber-200"
+                    }`}
+                  >
+                    {status}
+                  </span>
+
+                  {/* Auto-Save Live Status Indicator */}
+                  {isAutoSaving ? (
+                    <span className="inline-flex items-center gap-1.5 text-xs text-amber-700 bg-amber-50/80 px-2.5 py-0.5 rounded-full border border-amber-200 font-medium">
+                      <Loader2 className="h-3 w-3 animate-spin text-amber-600" />
+                      Auto-saving...
+                    </span>
+                  ) : autoSaveError ? (
+                    <span
+                      className="inline-flex items-center gap-1.5 text-xs text-rose-700 bg-rose-50/80 px-2.5 py-0.5 rounded-full border border-rose-200 font-medium cursor-help"
+                      title={autoSaveError}
+                    >
+                      <AlertCircle className="h-3 w-3 text-rose-600" />
+                      Auto-save failed
+                    </span>
+                  ) : lastSavedAt ? (
+                    <span className="inline-flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50/80 px-2.5 py-0.5 rounded-full border border-emerald-200 font-medium">
+                      <CheckCircle2 className="h-3 w-3 text-emerald-600" />
+                      All changes saved ({lastSavedAt})
+                    </span>
+                  ) : null}
+                </div>
+                <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight mt-1">
                   Valvomatic Machine Daily Production
                 </h1>
                 <p className="text-xs sm:text-sm text-slate-500">
@@ -489,25 +523,6 @@ export function ValvomaticDailyReportClient() {
 
           {/* Action Buttons Strip */}
           <div className="flex flex-wrap items-center gap-2">
-            {/* Auto-save status feedback */}
-            <div className="text-[11px] text-slate-500 flex items-center gap-1.5 mr-2">
-              {isAutoSaving ? (
-                <>
-                  <Loader2 className="h-3 w-3 animate-spin text-primary" />
-                  <span className="text-primary font-medium">Auto-saving...</span>
-                </>
-              ) : autoSaveError ? (
-                <>
-                  <AlertCircle className="h-3.5 w-3.5 text-rose-500" />
-                  <span className="text-rose-600 font-medium">Save failed</span>
-                </>
-              ) : lastSavedAt ? (
-                <>
-                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
-                  <span className="text-slate-600">Saved at {lastSavedAt}</span>
-                </>
-              ) : null}
-            </div>
 
             <button
               onClick={() => saveReport("DRAFT")}
