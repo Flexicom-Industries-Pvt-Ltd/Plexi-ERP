@@ -78,6 +78,8 @@ const printingItems = [
 
 const convertexItems = [
   { title: "Daily Production Report", url: "/dashboard/production/convertex" },
+  { title: "Wastage Report", url: "/dashboard/production/convertex/wastage" },
+  { title: "Production Summary", url: "/dashboard/production/convertex/summary" },
 ];
 
 const settingsItems = [
