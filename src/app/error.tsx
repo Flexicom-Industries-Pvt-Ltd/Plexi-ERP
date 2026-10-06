@@ -38,22 +38,34 @@ export default function ErrorBoundary({
         
         <h1 className="text-3xl font-bold tracking-tight">Something went wrong</h1>
         
-        <p className="text-muted-foreground">
-          We encountered an unexpected error while processing your request. Our engineering team has been notified.
+        <p className="text-muted-foreground text-sm">
+          {error?.message && !error.message.includes("digest")
+            ? error.message
+            : "We encountered an unexpected error while processing your request. Our engineering team has been notified."}
         </p>
+        {error?.digest && (
+          <p className="text-xs text-muted-foreground/60 font-mono">
+            Digest: {error.digest}
+          </p>
+        )}
         
         <div className="flex flex-col space-y-2 sm:flex-row sm:justify-center sm:space-x-4 sm:space-y-0">
           <button
-            onClick={() => reset()}
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            onClick={() => {
+              reset();
+              if (typeof window !== "undefined") {
+                window.location.reload();
+              }
+            }}
+            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
           >
             Try again
           </button>
           <button
-            onClick={() => window.location.href = "/"}
-            className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            onClick={() => window.location.href = "/dashboard"}
+            className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
           >
-            Return Home
+            Dashboard
           </button>
         </div>
       </div>
