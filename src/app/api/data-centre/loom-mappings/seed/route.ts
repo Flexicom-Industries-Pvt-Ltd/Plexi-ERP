@@ -6,7 +6,7 @@ import { logEvent } from "@/lib/logging";
 
 export const dynamic = "force-dynamic";
 
-export const MASTER_LOOM_MAPPINGS = [
+const MASTER_LOOM_MAPPINGS = [
   {
     qualityCode: 'GRADE "B"',
     colorGroup: "Grey",

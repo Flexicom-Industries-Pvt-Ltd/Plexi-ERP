@@ -118,21 +118,23 @@ export class GateService {
   /**
    * Generates next unique gate entry number (e.g. GE-YYYYMMDD-001).
    */
-  static async generateEntryNumber(): Promise<string> {
+  static async generateEntryNumber(tx?: any): Promise<string> {
+    const client = tx || db;
     const today = new Date();
     const datePrefix = `GE-${today.getFullYear()}${(today.getMonth() + 1)
       .toString()
       .padStart(2, "0")}${today.getDate().toString().padStart(2, "0")}`;
 
-    const lastEntry = await db.gateEntry.findFirst({
+    const lastEntry = await client.gateEntry.findFirst({
       where: { entryNumber: { startsWith: datePrefix } },
       orderBy: { entryNumber: "desc" },
     });
 
     let sequence = 1;
     if (lastEntry) {
-      const lastSeq = parseInt(lastEntry.entryNumber.split("-").pop() || "0", 10);
-      sequence = lastSeq + 1;
+      const parts = lastEntry.entryNumber.split("-");
+      const lastSeq = parseInt(parts[parts.length - 1] || "0", 10);
+      sequence = isNaN(lastSeq) ? 1 : lastSeq + 1;
     }
 
     return `${datePrefix}-${sequence.toString().padStart(3, "0")}`;
@@ -381,22 +383,37 @@ export class GateService {
           }
         }
 
-        const entry = await tx.gateEntry.create({
-          data: {
-            entryNumber,
-            truckNumber: data.truckNumber ? String(data.truckNumber).toUpperCase() : "",
-            driverName: data.driverName,
-            driverContact: data.driverContact || null,
-            driverLicenseNumber: data.driverLicenseNumber || data.driverLicense || null,
-            transporter: data.transporter || null,
-            supplierCustomer: data.supplierCustomer || null,
-            purpose: (data.purpose as GatePurpose) || GatePurpose.UNLOADING,
-            status: GateEntryStatus.ARRIVED,
-            expectedMaterial: summaryMaterial,
-            expectedQuantity: summaryQuantity,
-            createdBy: userId || null,
-          },
-        });
+        let currentEntryNumber = entryNumber;
+        let entry: any = null;
+        for (let attempt = 0; attempt < 3; attempt++) {
+          try {
+            if (attempt > 0) {
+              currentEntryNumber = await GateService.generateEntryNumber(tx);
+            }
+            entry = await tx.gateEntry.create({
+              data: {
+                entryNumber: currentEntryNumber,
+                truckNumber: data.truckNumber ? String(data.truckNumber).toUpperCase() : "",
+                driverName: data.driverName,
+                driverContact: data.driverContact || null,
+                driverLicenseNumber: data.driverLicenseNumber || data.driverLicense || null,
+                transporter: data.transporter || null,
+                supplierCustomer: data.supplierCustomer || null,
+                purpose: (data.purpose as GatePurpose) || GatePurpose.UNLOADING,
+                status: GateEntryStatus.ARRIVED,
+                expectedMaterial: summaryMaterial,
+                expectedQuantity: summaryQuantity,
+                createdBy: userId || null,
+              },
+            });
+            break;
+          } catch (createErr: any) {
+            if (createErr?.code === "P2002" && attempt < 2) {
+              continue;
+            }
+            throw createErr;
+          }
+        }
 
         // Record initial status log for Arrival
         await tx.gateStatusLog.create({

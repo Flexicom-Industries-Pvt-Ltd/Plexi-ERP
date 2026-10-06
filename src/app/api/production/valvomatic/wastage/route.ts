@@ -7,6 +7,7 @@ import {
   ValvomaticWastageEntryItem,
 } from "@/lib/valvomatic/valvomatic-types";
 import { logEvent } from "@/lib/logging";
+import { withResourceLock } from "@/lib/concurrency-lock";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -178,7 +179,9 @@ export async function POST(request: NextRequest) {
 
     const totals = computeValvomaticWastageTotals(calculatedEntries);
 
-    const savedReport = await db.$transaction(async (tx) => {
+    const lockKey = `valvomatic_wastage:${date}:${shiftName}:${machineNo}`;
+    const savedReport = await withResourceLock(lockKey, async () => {
+      return await db.$transaction(async (tx) => {
       const report = await tx.valvomaticWastageReport.upsert({
         where: {
           date_shiftName_machineNo: {
@@ -272,6 +275,7 @@ export async function POST(request: NextRequest) {
         },
       });
     });
+  });
 
     logEvent({
       userId: authResult.session.user.id,
