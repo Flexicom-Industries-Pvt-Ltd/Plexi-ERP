@@ -45,9 +45,17 @@ export async function POST(request: NextRequest) {
     const diffs: any[] = [];
     const itemCache = new Map<string, any>();
 
+    // Deterministically order commits by stockId and stockDetailId to prevent PostgreSQL deadlocks (40P01)
+    // when concurrent receipts or adjustments acquire row-level locks on overlapping inventory items.
+    const sortedCommits = [...commits].sort((a, b) => {
+      const stockCompare = String(a.stockId || "").localeCompare(String(b.stockId || ""));
+      if (stockCompare !== 0) return stockCompare;
+      return String(a.stockDetailId || "").localeCompare(String(b.stockDetailId || ""));
+    });
+
     await db.$transaction(
       async (tx) => {
-        for (const commit of commits) {
+        for (const commit of sortedCommits) {
           const { stockDetailId, stockId, actualQuantity } = commit;
 
           // 1. Update TruckStockDetail

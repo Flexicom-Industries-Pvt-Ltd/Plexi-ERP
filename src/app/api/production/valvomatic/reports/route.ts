@@ -7,6 +7,7 @@ import {
   ValvomaticReportItem,
 } from "@/lib/valvomatic/valvomatic-types";
 import { logEvent } from "@/lib/logging";
+import { withResourceLock } from "@/lib/concurrency-lock";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -186,7 +187,9 @@ export async function POST(request: NextRequest) {
 
     const totals = computeValvomaticTotals(calculatedEntries);
 
-    const savedReport = await db.$transaction(async (tx) => {
+    const lockKey = `valvomatic_report:${date}:${shiftName}:${machineNo}`;
+    const savedReport = await withResourceLock(lockKey, async () => {
+      return await db.$transaction(async (tx) => {
       // Upsert report header
       const report = await tx.valvomaticDailyReport.upsert({
         where: {
@@ -281,6 +284,7 @@ export async function POST(request: NextRequest) {
         },
       });
     });
+  });
 
     // Comprehensive logging
     logEvent({
