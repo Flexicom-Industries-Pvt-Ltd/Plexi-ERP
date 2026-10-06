@@ -5,7 +5,7 @@ import { requireLaminationApiPermission } from "@/lib/lamination/permissions";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-export const DEFAULT_LAMINATION_QUALITIES: string[] = [
+const DEFAULT_LAMINATION_QUALITIES: string[] = [
   "NUVOCO SI",
   "UTCL YL SI",
   "White VIP",

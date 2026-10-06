@@ -20,6 +20,10 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    const { searchParams } = new URL(request.url);
+    const limitParam = searchParams.get("limit");
+    const take = limitParam ? Math.min(200, Math.max(1, parseInt(limitParam, 10))) : 100;
+
     // Fetch Gate Entries that are either UNLOADING or COMPLETED, have purpose LOADING/UNLOADING, 
     // and have stock details that have NOT been synced to inventory yet (actualQuantity is null).
     const entries = await db.gateEntry.findMany({
@@ -28,9 +32,10 @@ export async function GET(request: NextRequest) {
         stockDetails: {
           some: {
             actualQuantity: null,
-          }
-        }
+          },
+        },
       },
+      take,
       orderBy: { arrivalTime: "desc" },
       include: {
         stockDetails: {
