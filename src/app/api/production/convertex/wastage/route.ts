@@ -7,6 +7,7 @@ import {
   ConvertexWastageEntryItem,
 } from "@/lib/convertex/convertex-types";
 import { logEvent } from "@/lib/logging";
+import { withResourceLock } from "@/lib/concurrency-lock";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -178,7 +179,9 @@ export async function POST(request: NextRequest) {
 
     const totals = computeConvertexWastageTotals(calculatedEntries);
 
-    const savedReport = await db.$transaction(async (tx) => {
+    const lockKey = `convertex_wastage:${date}:${shiftName}:${machineNo}`;
+    const savedReport = await withResourceLock(lockKey, async () => {
+      return await db.$transaction(async (tx) => {
       const report = await tx.convertexWastageReport.upsert({
         where: {
           date_shiftName_machineNo: {
@@ -272,6 +275,7 @@ export async function POST(request: NextRequest) {
         },
       });
     });
+  });
 
     logEvent({
       userId: authResult.session.user.id,
