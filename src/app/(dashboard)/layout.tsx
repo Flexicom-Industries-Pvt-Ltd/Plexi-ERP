@@ -19,7 +19,7 @@ export default async function DashboardLayout({
 
   const allowedModules: Record<string, boolean> = {};
   if (user.role?.permissions) {
-    user.role.permissions.forEach((p) => {
+    (user.role.permissions as any[]).forEach((p: any) => {
       allowedModules[p.module] = p.canRead;
     });
   }

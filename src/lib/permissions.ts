@@ -15,21 +15,38 @@ export const getAuthenticatedUserWithRole = cache(async () => {
     return null;
   }
 
-  return db.user.findFirst({
-    where: {
-      OR: [
-        ...(session.user.id ? [{ id: session.user.id }] : []),
-        ...(session.user.email ? [{ email: session.user.email }] : []),
-      ],
-    },
-    include: {
-      role: {
-        include: {
-          permissions: true,
+  try {
+    return await db.user.findFirst({
+      where: {
+        OR: [
+          ...(session.user.id ? [{ id: session.user.id }] : []),
+          ...(session.user.email ? [{ email: session.user.email }] : []),
+        ],
+      },
+      include: {
+        role: {
+          include: {
+            permissions: true,
+          },
         },
       },
-    },
-  });
+    });
+  } catch (err) {
+    console.error("Failed to query authenticated user from database:", err);
+    // Graceful fallback to verified session JWT to prevent DashboardLayout crash during cold-starts/pool reconnects
+    const roleName = (session.user as any).role || (session.user as any).roleName || "User";
+    const sessionPerms = (session.user as any).permissions || [];
+    return {
+      id: session.user.id || "session-user",
+      name: session.user.name || "User",
+      email: session.user.email || "",
+      isActive: true,
+      role: {
+        name: roleName,
+        permissions: sessionPerms,
+      },
+    } as any;
+  }
 });
 
 /**
@@ -86,7 +103,7 @@ export async function requirePermission(
     redirect("/dashboard/unauthorized");
   }
 
-  const modulePerms = user.role.permissions.find((p) => p.module === module || p.module === ("ALL" as any));
+  const modulePerms = (user.role.permissions as any[]).find((p: any) => p.module === module || p.module === ("ALL" as any));
   if (!modulePerms || !modulePerms[action]) {
     redirect("/dashboard/unauthorized");
   }
