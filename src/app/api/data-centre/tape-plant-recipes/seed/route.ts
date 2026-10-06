@@ -6,7 +6,7 @@ import { logEvent } from "@/lib/logging";
 
 export const dynamic = "force-dynamic";
 
-export interface MasterRecipeSeedItem {
+interface MasterRecipeSeedItem {
   code: string;
   tapeType: string;
   denier: number | null;
@@ -35,7 +35,7 @@ export interface MasterRecipeSeedItem {
   remarks: string | null;
 }
 
-export const DEFAULT_MASTER_RECIPES: MasterRecipeSeedItem[] = [
+const DEFAULT_MASTER_RECIPES: MasterRecipeSeedItem[] = [
   // =========================================================================
   // 1. 🟡 YELLOW GROUP (High-Volume / Priority / Plant Key Indicators)
   // =========================================================================

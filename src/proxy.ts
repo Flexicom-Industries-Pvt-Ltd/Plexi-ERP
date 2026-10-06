@@ -5,7 +5,10 @@ import { NextResponse } from "next/server";
 export default auth((req) => {
   const isLoggedIn = !!req.auth;
   const isAuthRoute = req.nextUrl.pathname.startsWith("/auth");
-  const isPublicRoute = req.nextUrl.pathname === "/";
+  const isPublicRoute =
+    req.nextUrl.pathname === "/" ||
+    req.nextUrl.pathname.startsWith("/api/health") ||
+    req.nextUrl.pathname.startsWith("/api/cron");
 
   // If the user is trying to access an auth route (like login)
   if (isAuthRoute) {
@@ -38,7 +41,9 @@ export default auth((req) => {
   return response;
 });
 
-// Optionally, don't invoke Middleware on some paths
+// Exclude static Next.js assets, public images, icons, fonts, and favicon
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff2?|ttf|eot)$).*)",
+  ],
 };
