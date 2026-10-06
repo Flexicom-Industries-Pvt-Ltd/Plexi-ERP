@@ -262,12 +262,21 @@ export function LoomReadingSheetSection() {
     fetchSheetData(selectedDate, selectedShift);
   }, [selectedDate, selectedShift, fetchSheetData]);
 
-  // Immediate or debounced auto-save function
+  // Immediate or debounced auto-save function with in-flight queuing
+  const isSavingRef = useRef(false);
+  const pendingSaveRef = useRef<string | null>(null);
+
   const triggerAutoSave = useCallback(async (isImmediate: boolean = false, keepalive: boolean = false) => {
     if (!latestPayloadRef.current || isInitialMountRef.current) return;
     const serialized = JSON.stringify(latestPayloadRef.current);
     if (serialized === lastSavedPayloadRef.current) return;
 
+    if (isSavingRef.current) {
+      pendingSaveRef.current = serialized;
+      return;
+    }
+
+    isSavingRef.current = true;
     if (!isImmediate) {
       setAutoSaving(true);
     }
@@ -287,8 +296,13 @@ export function LoomReadingSheetSection() {
     } catch (err) {
       console.error("Auto-save error:", err);
     } finally {
+      isSavingRef.current = false;
       if (!isImmediate) {
         setAutoSaving(false);
+      }
+      if (pendingSaveRef.current && pendingSaveRef.current !== lastSavedPayloadRef.current) {
+        pendingSaveRef.current = null;
+        triggerAutoSave(false);
       }
     }
   }, []);

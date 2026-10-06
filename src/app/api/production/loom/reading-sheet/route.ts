@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireLoomApiPermission } from "@/lib/loom/permissions";
 import { logAudit } from "@/lib/audit-logger";
+import { withResourceLock } from "@/lib/concurrency-lock";
 import {
   LoomReadingEntryItem,
   IntervalKpiSummary,
@@ -12,9 +13,6 @@ import {
   DEFAULT_INITIAL_SLOT,
   ESTIMATED_KG_PER_METER,
 } from "@/lib/loom/loom-reading-types";
-
-export type { LoomReadingEntryItem, IntervalKpiSummary };
-export { computeIntervalDeltas, computeLoomEfficiency };
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -499,18 +497,20 @@ export async function POST(request: NextRequest) {
 
       const totalShiftKg = Math.round(sheetTotalMeters * ESTIMATED_KG_PER_METER * 100) / 100;
 
-      const candidateShiftNames = getNormalizedShiftCandidates(shiftName);
-      const existingSheet = await db.loomReadingSheet.findFirst({
-        where: {
-          date,
-          shiftName: { in: candidateShiftNames, mode: "insensitive" },
-        },
-      });
+      const lockKey = `loom_reading_sheet:${date}:${shiftName}`;
+      const savedSheet = await withResourceLock(lockKey, async () => {
+        const candidateShiftNames = getNormalizedShiftCandidates(shiftName);
+        const existingSheet = await db.loomReadingSheet.findFirst({
+          where: {
+            date,
+            shiftName: { in: candidateShiftNames, mode: "insensitive" },
+          },
+        });
 
-      const targetShiftName = existingSheet?.shiftName || shiftName;
+        const targetShiftName = existingSheet?.shiftName || shiftName;
 
-      // Upsert sheet record directly
-      const savedSheet = await db.loomReadingSheet.upsert({
+        // Upsert sheet record directly
+        const sheet = await db.loomReadingSheet.upsert({
         where: {
           date_shiftName: {
             date,
@@ -710,6 +710,9 @@ export async function POST(request: NextRequest) {
           }
         }
       }
+
+      return sheet;
+    });
 
       await logAudit({
         action: "UPDATE",
