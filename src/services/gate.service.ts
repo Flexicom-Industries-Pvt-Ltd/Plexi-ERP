@@ -210,34 +210,248 @@ export class GateService {
    * Creates a new gate entry and synchronizes Driver / Stock master data.
    * Optimized with batch queries and parallel operations to minimize latency.
    */
-  static async createGateEntry(data: any, userId?: string) {
-    const entryNumber = await this.generateEntryNumber();
+  /**
+   * Internal helper to execute gate entry, status log, and consignment stock creations.
+   * Can be executed inside an ACID transaction (tx) or directly via db in case of pool timeout.
+   */
+  private static async executeGateEntryCreation(
+    client: any,
+    data: any,
+    userId: string | undefined,
+    rawStockItems: any[],
+    summaryMaterial: string | null,
+    summaryQuantity: number | null,
+    initialEntryNumber?: string
+  ) {
+    // Collect item identifiers to pre-fetch catalogs in parallel
+    const stockIds = rawStockItems.map((item) => item.stockId).filter(Boolean);
+    const materialNames = rawStockItems
+      .map((item) => (item.materialName ? String(item.materialName).trim() : null))
+      .filter((n): n is string => Boolean(n));
 
-    // Async sync Driver to Data Centre without blocking transaction
-    if (data.driverContact && db.driver?.upsert) {
-      try {
-        const p = db.driver.upsert({
-          where: { phone: data.driverContact },
-          update: {
-            name: data.driverName,
-            ...(data.driverLicenseNumber || data.driverLicense
-              ? { licenseNumber: data.driverLicenseNumber || data.driverLicense }
-              : {}),
-            isActive: true,
+    let prefetchedStocks: any[] = [];
+    let activeUoms: any[] = [];
+
+    try {
+      if (client.stock?.findMany && (stockIds.length > 0 || materialNames.length > 0)) {
+        const res = await client.stock.findMany({
+          where: {
+            OR: [
+              ...(stockIds.length > 0 ? [{ id: { in: stockIds } }] : []),
+              ...(materialNames.length > 0
+                ? [{ name: { in: materialNames, mode: "insensitive" as const } }]
+                : []),
+            ],
           },
-          create: {
-            phone: data.driverContact,
-            name: data.driverName,
-            licenseNumber: data.driverLicenseNumber || data.driverLicense || null,
+          include: {
+            uom: true,
+            inventoryItems: {
+              select: { currentStock: true, reservedStock: true },
+            },
           },
         });
-        if (p && typeof p.catch === "function") {
-          p.catch((err) => console.error("Failed to sync driver record:", err));
+        if (Array.isArray(res)) prefetchedStocks = res;
+      }
+    } catch {
+      prefetchedStocks = [];
+    }
+
+    try {
+      if (client.unitOfMeasurement?.findMany) {
+        const res = await client.unitOfMeasurement.findMany({ where: { isActive: true } });
+        if (Array.isArray(res)) activeUoms = res;
+      }
+    } catch {
+      activeUoms = [];
+    }
+
+    const findStockCatalog = async (item: any) => {
+      let catalog = prefetchedStocks.find(
+        (s: any) =>
+          (item.stockId && s.id === item.stockId) ||
+          (item.materialName && s.name?.toLowerCase() === String(item.materialName).trim().toLowerCase())
+      );
+      if (!catalog && item.stockId && client.stock?.findUnique) {
+        catalog = await client.stock.findUnique({
+          where: { id: item.stockId },
+          include: {
+            uom: true,
+            inventoryItems: {
+              select: { currentStock: true, reservedStock: true },
+            },
+          },
+        }).catch(() => null);
+      }
+      if (!catalog && item.materialName && client.stock?.findFirst) {
+        catalog = await client.stock.findFirst({
+          where: { name: { equals: String(item.materialName).trim(), mode: "insensitive" } },
+          include: {
+            uom: true,
+            inventoryItems: {
+              select: { currentStock: true, reservedStock: true },
+            },
+          },
+        }).catch(() => null);
+      }
+      return catalog;
+    };
+
+    // Enforce stock availability check for LOADING purpose
+    if (data.purpose === GatePurpose.LOADING) {
+      for (const item of rawStockItems) {
+        if (!item.materialName || item.quantity === undefined || item.quantity === "") continue;
+        const requestedQty = parseFloat(item.quantity) || 0;
+        if (requestedQty <= 0) continue;
+
+        const catalog = await findStockCatalog(item);
+
+        let availableStock = 0;
+        if (catalog && catalog.inventoryItems && catalog.inventoryItems.length > 0) {
+          const current = catalog.inventoryItems.reduce((acc: number, inv: any) => acc + (inv.currentStock || 0), 0);
+          const reserved = catalog.inventoryItems.reduce((acc: number, inv: any) => acc + (inv.reservedStock || 0), 0);
+          availableStock = Math.max(0, current - reserved);
+        } else {
+          const standalone = await client.inventoryItem.findFirst({
+            where: {
+              isActive: true,
+              OR: [
+                { name: { equals: String(item.materialName).trim(), mode: "insensitive" } },
+                { code: { equals: String(item.materialName).trim(), mode: "insensitive" } },
+              ],
+            },
+          });
+          if (standalone) {
+            availableStock = Math.max(0, (standalone.currentStock || 0) - (standalone.reservedStock || 0));
+          }
         }
-      } catch (err) {
-        console.error("Failed to sync driver record:", err);
+
+        if (requestedQty > availableStock) {
+          const unitStr = catalog?.uom?.abbreviation || item.unit || "units";
+          throw new Error(
+            `Cannot create loading gate entry: Requested quantity for "${item.materialName}" (${requestedQty} ${unitStr}) exceeds available stock in factory (${availableStock} ${unitStr}).`
+          );
+        }
       }
     }
+
+    let currentEntryNumber = initialEntryNumber || (await GateService.generateEntryNumber(client));
+    let entry: any = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        if (attempt > 0) {
+          currentEntryNumber = await GateService.generateEntryNumber(client);
+        }
+        entry = await client.gateEntry.create({
+          data: {
+            entryNumber: currentEntryNumber,
+            truckNumber: data.truckNumber ? String(data.truckNumber).toUpperCase().trim() : "",
+            driverName: (data.driverName || "").trim(),
+            driverContact: data.driverContact?.trim() || null,
+            driverLicenseNumber: data.driverLicenseNumber || data.driverLicense || null,
+            transporter: data.transporter || null,
+            supplierCustomer: data.supplierCustomer || null,
+            purpose: (data.purpose as GatePurpose) || GatePurpose.UNLOADING,
+            status: GateEntryStatus.ARRIVED,
+            expectedMaterial: summaryMaterial,
+            expectedQuantity: summaryQuantity,
+            createdBy: userId || null,
+          },
+        });
+        break;
+      } catch (createErr: any) {
+        if (createErr?.code === "P2002" && attempt < 2) {
+          continue;
+        }
+        throw createErr;
+      }
+    }
+
+    // Record initial status log for Arrival
+    await client.gateStatusLog.create({
+      data: {
+        gateEntryId: entry.id,
+        status: GateEntryStatus.ARRIVED,
+        timestamp: entry.arrivalTime,
+        updatedBy: userId || null,
+        remarks: "Initial truck arrival registered at gate",
+      },
+    });
+
+    // Process consignment stock items
+    for (const item of rawStockItems) {
+      if (!item.materialName || item.quantity === undefined || item.quantity === "") continue;
+
+      let catalog = await findStockCatalog(item);
+
+      if (!catalog) {
+        const unitAbbrev = (item.unit as string) || "kg";
+        let uom = (activeUoms as any[]).find((u: any) => u.abbreviation?.toLowerCase() === unitAbbrev.toLowerCase()) ||
+          (activeUoms as any[])[0];
+        if (!uom) {
+          uom = await client.unitOfMeasurement.findFirst({
+            where: { abbreviation: { equals: unitAbbrev, mode: "insensitive" }, isActive: true },
+          }).catch(() => null) || await client.unitOfMeasurement.findFirst({ where: { isActive: true } }).catch(() => null);
+        }
+
+        if (uom) {
+          const rawType = item.materialType || "RAW_MATERIALS";
+          const materialType = MATERIAL_TYPES.has(rawType)
+            ? (rawType as StockMaterialType)
+            : StockMaterialType.RAW_MATERIALS;
+
+          let code = codeFromName(item.materialName);
+          const existingCode = await client.stock.findUnique({ where: { code } });
+          if (existingCode) {
+            code = `${code}-${Date.now().toString(36).slice(-4).toUpperCase()}`;
+          }
+
+          catalog = await client.stock.create({
+            data: {
+              code,
+              name: String(item.materialName).trim(),
+              materialType,
+              uomId: uom.id,
+              isActive: true,
+            },
+            include: { uom: true },
+          });
+          (prefetchedStocks as any[]).push(catalog);
+        }
+      }
+
+      const unit = catalog?.uom?.abbreviation || item.unit || "kg";
+      const materialType = catalog?.materialType || item.materialType || "RAW_MATERIALS";
+      const qtyNum = parseFloat(item.quantity) || 0;
+
+      await client.truckStockDetail.create({
+        data: {
+          gateEntryId: entry.id,
+          stockId: catalog?.id || null,
+          materialName: catalog?.name || String(item.materialName).trim(),
+          materialType,
+          quantity: qtyNum,
+          expectedQuantity: qtyNum,
+          unit,
+          batchLot: item.batchLot || item.batchNumber || null,
+          supplierCustomer: data.supplierCustomer || null,
+        },
+      });
+    }
+
+    return client.gateEntry.findUnique({
+      where: { id: entry.id },
+      include: {
+        stockDetails: true,
+        statusLogs: {
+          include: { user: { select: { name: true, email: true } } },
+          orderBy: { timestamp: "asc" },
+        },
+      },
+    });
+  }
+
+  static async createGateEntry(data: any, userId?: string) {
+    const entryNumber = await this.generateEntryNumber();
 
     // Support both stockItems and stockDetails arrays
     const rawStockItems: any[] = Array.isArray(data.stockItems)
@@ -270,241 +484,69 @@ export class GateService {
         ? parseFloat(data.expectedQuantity)
         : null;
 
-    const createdEntry = await db.$transaction(
-      async (tx) => {
-        // Collect item identifiers to pre-fetch catalogs in parallel
-        const stockIds = rawStockItems.map((item) => item.stockId).filter(Boolean);
-        const materialNames = rawStockItems
-          .map((item) => (item.materialName ? String(item.materialName).trim() : null))
-          .filter((n): n is string => Boolean(n));
+    let createdEntry: any = null;
 
-        let prefetchedStocks: any[] = [];
-        let activeUoms: any[] = [];
-
-        try {
-          if (tx.stock?.findMany && (stockIds.length > 0 || materialNames.length > 0)) {
-            const res = await tx.stock.findMany({
-              where: {
-                OR: [
-                  ...(stockIds.length > 0 ? [{ id: { in: stockIds } }] : []),
-                  ...(materialNames.length > 0
-                    ? [{ name: { in: materialNames, mode: "insensitive" as const } }]
-                    : []),
-                ],
-              },
-              include: {
-                uom: true,
-                inventoryItems: {
-                  select: { currentStock: true, reservedStock: true },
-                },
-              },
-            });
-            if (Array.isArray(res)) prefetchedStocks = res;
-          }
-        } catch {
-          prefetchedStocks = [];
-        }
-
-        try {
-          if (tx.unitOfMeasurement?.findMany) {
-            const res = await tx.unitOfMeasurement.findMany({ where: { isActive: true } });
-            if (Array.isArray(res)) activeUoms = res;
-          }
-        } catch {
-          activeUoms = [];
-        }
-
-        const findStockCatalog = async (item: any) => {
-          let catalog = prefetchedStocks.find(
-            (s: any) =>
-              (item.stockId && s.id === item.stockId) ||
-              (item.materialName && s.name?.toLowerCase() === String(item.materialName).trim().toLowerCase())
+    try {
+      createdEntry = await db.$transaction(
+        async (tx) => {
+          return await GateService.executeGateEntryCreation(
+            tx,
+            data,
+            userId,
+            rawStockItems,
+            summaryMaterial,
+            summaryQuantity,
+            entryNumber
           );
-          if (!catalog && item.stockId && tx.stock?.findUnique) {
-            catalog = await tx.stock.findUnique({
-              where: { id: item.stockId },
-              include: {
-                uom: true,
-                inventoryItems: {
-                  select: { currentStock: true, reservedStock: true },
-                },
-              },
-            }).catch(() => null);
-          }
-          if (!catalog && item.materialName && tx.stock?.findFirst) {
-            catalog = await tx.stock.findFirst({
-              where: { name: { equals: String(item.materialName).trim(), mode: "insensitive" } },
-              include: {
-                uom: true,
-                inventoryItems: {
-                  select: { currentStock: true, reservedStock: true },
-                },
-              },
-            }).catch(() => null);
-          }
-          return catalog;
-        };
+        },
+        { maxWait: 15000, timeout: 30000 }
+      );
+    } catch (txError: any) {
+      const errMsg = txError?.message || "";
+      const isTxStartupTimeout =
+        txError?.code === "P2028" ||
+        errMsg.includes("Unable to start a transaction") ||
+        errMsg.includes("Transaction API error") ||
+        errMsg.includes("Timed out fetching a new connection") ||
+        errMsg.includes("Transaction timed out");
 
-        // Enforce stock availability check for LOADING purpose
-        if (data.purpose === GatePurpose.LOADING) {
-          for (const item of rawStockItems) {
-            if (!item.materialName || item.quantity === undefined || item.quantity === "") continue;
-            const requestedQty = parseFloat(item.quantity) || 0;
-            if (requestedQty <= 0) continue;
+      if (isTxStartupTimeout) {
+        console.warn("[GateService] Transaction timed out starting. Falling back to direct execution...", errMsg);
+        createdEntry = await GateService.executeGateEntryCreation(
+          db,
+          data,
+          userId,
+          rawStockItems,
+          summaryMaterial,
+          summaryQuantity
+        );
+      } else {
+        throw txError;
+      }
+    }
 
-            const catalog = await findStockCatalog(item);
-
-            let availableStock = 0;
-            if (catalog && catalog.inventoryItems && catalog.inventoryItems.length > 0) {
-              const current = catalog.inventoryItems.reduce((acc: number, inv: any) => acc + (inv.currentStock || 0), 0);
-              const reserved = catalog.inventoryItems.reduce((acc: number, inv: any) => acc + (inv.reservedStock || 0), 0);
-              availableStock = Math.max(0, current - reserved);
-            } else {
-              const standalone = await tx.inventoryItem.findFirst({
-                where: {
-                  isActive: true,
-                  OR: [
-                    { name: { equals: String(item.materialName).trim(), mode: "insensitive" } },
-                    { code: { equals: String(item.materialName).trim(), mode: "insensitive" } },
-                  ],
-                },
-              });
-              if (standalone) {
-                availableStock = Math.max(0, (standalone.currentStock || 0) - (standalone.reservedStock || 0));
-              }
-            }
-
-            if (requestedQty > availableStock) {
-              const unitStr = catalog?.uom?.abbreviation || item.unit || "units";
-              throw new Error(
-                `Cannot create loading gate entry: Requested quantity for "${item.materialName}" (${requestedQty} ${unitStr}) exceeds available stock in factory (${availableStock} ${unitStr}).`
-              );
-            }
-          }
-        }
-
-        let currentEntryNumber = entryNumber;
-        let entry: any = null;
-        for (let attempt = 0; attempt < 3; attempt++) {
-          try {
-            if (attempt > 0) {
-              currentEntryNumber = await GateService.generateEntryNumber(tx);
-            }
-            entry = await tx.gateEntry.create({
-              data: {
-                entryNumber: currentEntryNumber,
-                truckNumber: data.truckNumber ? String(data.truckNumber).toUpperCase() : "",
-                driverName: data.driverName,
-                driverContact: data.driverContact || null,
-                driverLicenseNumber: data.driverLicenseNumber || data.driverLicense || null,
-                transporter: data.transporter || null,
-                supplierCustomer: data.supplierCustomer || null,
-                purpose: (data.purpose as GatePurpose) || GatePurpose.UNLOADING,
-                status: GateEntryStatus.ARRIVED,
-                expectedMaterial: summaryMaterial,
-                expectedQuantity: summaryQuantity,
-                createdBy: userId || null,
-              },
-            });
-            break;
-          } catch (createErr: any) {
-            if (createErr?.code === "P2002" && attempt < 2) {
-              continue;
-            }
-            throw createErr;
-          }
-        }
-
-        // Record initial status log for Arrival
-        await tx.gateStatusLog.create({
-          data: {
-            gateEntryId: entry.id,
-            status: GateEntryStatus.ARRIVED,
-            timestamp: entry.arrivalTime,
-            updatedBy: userId || null,
-            remarks: "Initial truck arrival registered at gate",
+    // Await driver synchronization cleanly
+    if (data.driverContact && db.driver?.upsert) {
+      try {
+        await db.driver.upsert({
+          where: { phone: data.driverContact },
+          update: {
+            name: data.driverName,
+            ...(data.driverLicenseNumber || data.driverLicense
+              ? { licenseNumber: data.driverLicenseNumber || data.driverLicense }
+              : {}),
+            isActive: true,
+          },
+          create: {
+            phone: data.driverContact,
+            name: data.driverName,
+            licenseNumber: data.driverLicenseNumber || data.driverLicense || null,
           },
         });
-
-        // Process consignment stock items
-        const truckStockDetailsToCreate: any[] = [];
-        for (const item of rawStockItems) {
-          if (!item.materialName || item.quantity === undefined || item.quantity === "") continue;
-
-          let catalog = await findStockCatalog(item);
-
-          if (!catalog) {
-            const unitAbbrev = (item.unit as string) || "kg";
-            let uom = (activeUoms as any[]).find((u: any) => u.abbreviation?.toLowerCase() === unitAbbrev.toLowerCase()) ||
-              (activeUoms as any[])[0];
-            if (!uom) {
-              uom = await tx.unitOfMeasurement.findFirst({
-                where: { abbreviation: { equals: unitAbbrev, mode: "insensitive" }, isActive: true },
-              }).catch(() => null) || await tx.unitOfMeasurement.findFirst({ where: { isActive: true } }).catch(() => null);
-            }
-
-            if (uom) {
-              const rawType = item.materialType || "RAW_MATERIALS";
-              const materialType = MATERIAL_TYPES.has(rawType)
-                ? (rawType as StockMaterialType)
-                : StockMaterialType.RAW_MATERIALS;
-
-              let code = codeFromName(item.materialName);
-              const existingCode = await tx.stock.findUnique({ where: { code } });
-              if (existingCode) {
-                code = `${code}-${Date.now().toString(36).slice(-4).toUpperCase()}`;
-              }
-
-              catalog = await tx.stock.create({
-                data: {
-                  code,
-                  name: String(item.materialName).trim(),
-                  materialType,
-                  uomId: uom.id,
-                  isActive: true,
-                },
-                include: { uom: true },
-              });
-              (prefetchedStocks as any[]).push(catalog);
-            }
-          }
-
-          const unit = catalog?.uom?.abbreviation || item.unit || "kg";
-          const materialType = catalog?.materialType || item.materialType || "RAW_MATERIALS";
-          const qtyNum = parseFloat(item.quantity) || 0;
-
-          truckStockDetailsToCreate.push({
-            gateEntryId: entry.id,
-            stockId: catalog?.id || null,
-            materialName: catalog?.name || String(item.materialName).trim(),
-            materialType,
-            quantity: qtyNum,
-            expectedQuantity: qtyNum,
-            unit,
-            batchLot: item.batchLot || item.batchNumber || null,
-            supplierCustomer: data.supplierCustomer || null,
-          });
-        }
-
-        if (truckStockDetailsToCreate.length > 0) {
-          await Promise.all(
-            truckStockDetailsToCreate.map((detail) => tx.truckStockDetail.create({ data: detail }))
-          );
-        }
-
-        return tx.gateEntry.findUnique({
-          where: { id: entry.id },
-          include: {
-            stockDetails: true,
-            statusLogs: {
-              include: { user: { select: { name: true, email: true } } },
-              orderBy: { timestamp: "asc" },
-            },
-          },
-        });
-      },
-      { maxWait: 15000, timeout: 30000 }
-    );
+      } catch (err) {
+        console.error("Failed to sync driver record:", err);
+      }
+    }
 
     try {
       const p = logEvent({
