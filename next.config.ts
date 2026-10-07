@@ -9,6 +9,7 @@ const withPWA = withPWAInit({
 
 const nextConfig: NextConfig = {
   /* config options here */
+  serverExternalPackages: ['ws'],
   turbopack: {},
   experimental: {
     workerThreads: false,

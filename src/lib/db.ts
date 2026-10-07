@@ -6,6 +6,8 @@ import { env } from '../env';
 
 // Required for Neon to use WebSockets in Node.js and support interactive transactions
 neonConfig.webSocketConstructor = ws;
+// Enable HTTP fetch querying for pool queries to prevent WebSocket termination/timeouts on serverless (Vercel)
+neonConfig.poolQueryViaFetch = true;
 
 // Clean connection string to remove channel_binding which is unsupported over WebSocket/fetch proxies
 let cleanConnectionString = env.DATABASE_URL
