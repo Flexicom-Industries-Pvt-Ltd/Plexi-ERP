@@ -32,9 +32,15 @@ import {
   calculateConvertexRow,
   computeConvertexTotals,
 } from "@/lib/convertex/convertex-types";
-import { ConvertexReportPrintModal } from "./ConvertexReportPrintModal";
+import dynamic from "next/dynamic";
 import { exportConvertexReportExcel } from "@/lib/convertex/convertex-export";
 import { UniversalQualityInput } from "@/components/ui/UniversalQualityInput";
+import { UniversalPersonnelInput } from "@/components/ui/UniversalPersonnelInput";
+
+const ConvertexReportPrintModal = dynamic(
+  () => import("./ConvertexReportPrintModal").then((m) => m.ConvertexReportPrintModal),
+  { ssr: false }
+);
 
 function createEmptyConvertexRow(sequence: number): ConvertexReportItem {
   return {
@@ -639,15 +645,15 @@ export function ConvertexDailyReportClient() {
             <label className="block text-xs font-semibold uppercase text-slate-600 mb-1 flex items-center gap-1">
               <User className="w-3.5 h-3.5 text-slate-400" /> Operator Name
             </label>
-            <input
-              type="text"
-              placeholder="e.g. Rajesh Kumar"
+            <UniversalPersonnelInput
+              type="operator"
+              section="CONVERTEX"
               value={operatorName}
-              onChange={(e) => {
+              onChange={(name) => {
                 isDirtyRef.current = true;
-                setOperatorName(e.target.value);
+                setOperatorName(name);
               }}
-              className="w-full px-3 py-1.5 text-sm border border-slate-200 rounded-md focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              placeholder="e.g. Rajesh Kumar"
             />
           </div>
 
@@ -655,15 +661,14 @@ export function ConvertexDailyReportClient() {
             <label className="block text-xs font-semibold uppercase text-slate-600 mb-1 flex items-center gap-1">
               <User className="w-3.5 h-3.5 text-slate-400" /> Supervisor Name
             </label>
-            <input
-              type="text"
-              placeholder="e.g. Anil Sharma"
+            <UniversalPersonnelInput
+              type="supervisor"
               value={supervisorName}
-              onChange={(e) => {
+              onChange={(name) => {
                 isDirtyRef.current = true;
-                setSupervisorName(e.target.value);
+                setSupervisorName(name);
               }}
-              className="w-full px-3 py-1.5 text-sm border border-slate-200 rounded-md focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              placeholder="e.g. Anil Sharma"
             />
           </div>
         </div>
