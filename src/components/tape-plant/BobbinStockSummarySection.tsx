@@ -23,7 +23,12 @@ import {
   Minimize2,
 } from "lucide-react";
 import { RecipeQualityBadge } from "./RecipeQualityBadge";
-import { BobbinStockPrintPreviewModal } from "./BobbinStockPrintPreviewModal";
+import dynamic from "next/dynamic";
+
+const BobbinStockPrintPreviewModal = dynamic(
+  () => import("./BobbinStockPrintPreviewModal").then((m) => m.BobbinStockPrintPreviewModal),
+  { ssr: false }
+);
 import { BobbinIssueModal } from "./BobbinIssueModal";
 import { BobbinIssueSlipModal } from "./BobbinIssueSlipModal";
 import { BobbinIssueSlipData } from "@/lib/tape-plant/print-bobbin-issue-slip";

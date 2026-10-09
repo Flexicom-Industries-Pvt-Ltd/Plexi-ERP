@@ -17,10 +17,15 @@ import {
   Maximize2,
   Minimize2,
 } from "lucide-react";
-import { PlanningPrintPreviewModal } from "./PlanningPrintPreviewModal";
+import dynamic from "next/dynamic";
 import { generateTapePlantPlanningExcel } from "@/lib/tape-plant/planning-export";
 import { parseRecipeQuality } from "@/lib/tape-plant/recipe-format";
 import { QualityCombobox } from "./QualityCombobox";
+
+const PlanningPrintPreviewModal = dynamic(
+  () => import("./PlanningPrintPreviewModal").then((m) => m.PlanningPrintPreviewModal),
+  { ssr: false }
+);
 
 export interface MaterialRow {
   material: string;

@@ -35,8 +35,14 @@ import {
   calculateWastage,
   LaminationWastageReportData,
 } from "@/lib/lamination/lamination-wastage-types";
-import { WastagePrintModal } from "./WastagePrintModal";
+import dynamic from "next/dynamic";
 import { exportWastageReportExcel } from "@/lib/lamination/wastage-export";
+import { UniversalPersonnelInput } from "@/components/ui/UniversalPersonnelInput";
+
+const WastagePrintModal = dynamic(
+  () => import("./WastagePrintModal").then((m) => m.WastagePrintModal),
+  { ssr: false }
+);
 
 const SHIFTS = ["Day Shift", "Night Shift"];
 
@@ -336,11 +342,13 @@ export function LaminationWastageClient() {
               <User className="h-3.5 w-3.5 text-slate-400" />
               Operator / Technician
             </label>
-            <Input
-              placeholder="e.g. Ramesh Kumar"
+            <UniversalPersonnelInput
+              type="operator"
+              section="LAMINATION"
               value={operatorName}
-              onChange={(e) => setOperatorName(e.target.value)}
-              className="h-9 text-xs"
+              onChange={(name) => setOperatorName(name)}
+              placeholder="e.g. Ramesh Kumar"
+              inputClassName="h-9"
             />
           </div>
 
@@ -350,31 +358,19 @@ export function LaminationWastageClient() {
               <Building className="h-3.5 w-3.5 text-slate-400" />
               Contractor
             </label>
-            {contractorsList.length > 0 ? (
-              <Select
-                value={contractorName || "NONE"}
-                onValueChange={(val) => setContractorName(val === "NONE" || !val ? "" : val)}
-              >
-                <SelectTrigger className="h-9 text-xs">
-                  <SelectValue placeholder="Select Contractor" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="NONE" className="text-xs">In-House / None</SelectItem>
-                  {contractorsList.map((c) => (
-                    <SelectItem key={c.id} value={c.name} className="text-xs">
-                      {c.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            ) : (
-              <Input
-                placeholder="Contractor Name"
-                value={contractorName}
-                onChange={(e) => setContractorName(e.target.value)}
-                className="h-9 text-xs"
-              />
-            )}
+            <UniversalPersonnelInput
+              type="contractor"
+              value={contractorName}
+              onChange={(name) => setContractorName(name)}
+              options={contractorsList.map((c) => ({
+                id: c.id,
+                name: c.name,
+                code: c.code,
+                type: "contractor",
+              }))}
+              placeholder="In-House / None"
+              inputClassName="h-9"
+            />
           </div>
 
           {/* Status */}
