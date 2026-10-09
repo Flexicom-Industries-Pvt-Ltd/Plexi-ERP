@@ -32,10 +32,15 @@ import {
   calculateConvertexRow,
   computeConvertexTotals,
 } from "@/lib/convertex/convertex-types";
-import { ConvertexNavigationTabs } from "./ConvertexNavigationTabs";
-import { ConvertexReportPrintModal } from "./ConvertexReportPrintModal";
+import dynamic from "next/dynamic";
 import { exportConvertexReportExcel } from "@/lib/convertex/convertex-export";
 import { UniversalQualityInput } from "@/components/ui/UniversalQualityInput";
+import { UniversalPersonnelInput } from "@/components/ui/UniversalPersonnelInput";
+
+const ConvertexReportPrintModal = dynamic(
+  () => import("./ConvertexReportPrintModal").then((m) => m.ConvertexReportPrintModal),
+  { ssr: false }
+);
 
 function createEmptyConvertexRow(sequence: number): ConvertexReportItem {
   return {
@@ -495,9 +500,6 @@ export function ConvertexDailyReportClient() {
 
   return (
     <div className="space-y-5 font-sans pb-16">
-      {/* Sub-module Navigation Switcher */}
-      <ConvertexNavigationTabs currentTab="production" />
-
       {/* Header Control Card */}
       <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-100 pb-5">
@@ -643,15 +645,15 @@ export function ConvertexDailyReportClient() {
             <label className="block text-xs font-semibold uppercase text-slate-600 mb-1 flex items-center gap-1">
               <User className="w-3.5 h-3.5 text-slate-400" /> Operator Name
             </label>
-            <input
-              type="text"
-              placeholder="e.g. Rajesh Kumar"
+            <UniversalPersonnelInput
+              type="operator"
+              section="CONVERTEX"
               value={operatorName}
-              onChange={(e) => {
+              onChange={(name) => {
                 isDirtyRef.current = true;
-                setOperatorName(e.target.value);
+                setOperatorName(name);
               }}
-              className="w-full px-3 py-1.5 text-sm border border-slate-200 rounded-md focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              placeholder="e.g. Rajesh Kumar"
             />
           </div>
 
@@ -659,15 +661,14 @@ export function ConvertexDailyReportClient() {
             <label className="block text-xs font-semibold uppercase text-slate-600 mb-1 flex items-center gap-1">
               <User className="w-3.5 h-3.5 text-slate-400" /> Supervisor Name
             </label>
-            <input
-              type="text"
-              placeholder="e.g. Anil Sharma"
+            <UniversalPersonnelInput
+              type="supervisor"
               value={supervisorName}
-              onChange={(e) => {
+              onChange={(name) => {
                 isDirtyRef.current = true;
-                setSupervisorName(e.target.value);
+                setSupervisorName(name);
               }}
-              className="w-full px-3 py-1.5 text-sm border border-slate-200 rounded-md focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              placeholder="e.g. Anil Sharma"
             />
           </div>
         </div>

@@ -140,12 +140,23 @@ export function UniversalQualityInput({
   id,
 }: UniversalQualityInputProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [openUpward, setOpenUpward] = useState(false);
   const [searchQuery, setSearchQuery] = useState(value || "");
   const [highlightedIndex, setHighlightedIndex] = useState(0);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+
+  // Auto-flip upward if viewport space below is tight
+  useEffect(() => {
+    if (isOpen && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const spaceAbove = rect.top;
+      setOpenUpward(spaceBelow < 260 && spaceAbove > spaceBelow);
+    }
+  }, [isOpen]);
 
   // Load qualities from options or Data Centre API
   const { qualities: masterQualities, loading: masterLoading } = useDataCentreQualities(options);
@@ -414,7 +425,9 @@ export function UniversalQualityInput({
       {isOpen && (
         <div
           ref={listRef}
-          className={`absolute left-0 top-full mt-1 z-50 w-full min-w-[280px] max-w-[420px] max-h-72 overflow-y-auto bg-white rounded-lg border border-slate-300 shadow-2xl p-1 text-xs animate-in fade-in zoom-in-95 duration-100 ${dropdownClassName}`}
+          className={`absolute left-0 z-50 w-full min-w-[280px] max-w-[420px] max-h-72 overflow-y-auto bg-white rounded-lg border border-slate-300 shadow-2xl p-1 text-xs animate-in fade-in zoom-in-95 duration-100 ${
+            openUpward ? "bottom-full mb-1" : "top-full mt-1"
+          } ${dropdownClassName}`}
         >
           <div className="px-2.5 py-1 text-[10px] font-bold text-slate-500 uppercase tracking-wider bg-slate-50 rounded-t flex items-center justify-between mb-1 border-b pb-1">
             <span>
