@@ -18,7 +18,12 @@ import {
 } from "lucide-react";
 import { RecipeQualityBadge } from "./RecipeQualityBadge";
 import { OperatorSelect } from "./OperatorSelect";
-import { PostProductionPrintPreviewModal } from "./PostProductionPrintPreviewModal";
+import dynamic from "next/dynamic";
+
+const PostProductionPrintPreviewModal = dynamic(
+  () => import("./PostProductionPrintPreviewModal").then((m) => m.PostProductionPrintPreviewModal),
+  { ssr: false }
+);
 
 export interface RecipePostProductionEntry {
   id: string;
