@@ -10,7 +10,7 @@ import {
 } from "@/lib/lamination/lamination-types";
 import { RollStockPickerModal } from "./RollStockPickerModal";
 import { LaminationReportPrintModal } from "./LaminationReportPrintModal";
-import { QualityAutocomplete } from "./QualityAutocomplete";
+import { UniversalQualityInput } from "@/components/ui/UniversalQualityInput";
 import { exportLaminationReportExcel } from "@/lib/lamination/lamination-report-export";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -647,12 +647,14 @@ export function LaminationReportClient() {
                       </td>
 
                       {/* Quality */}
-                      <td className="py-2 px-2.5 min-w-[170px]">
-                        <QualityAutocomplete
+                      <td className="py-2 px-2.5 min-w-[200px]">
+                        <UniversalQualityInput
                           value={entry.quality}
                           onChange={(val) => handleUpdateEntry(index, "quality", val)}
-                          qualities={allQualities}
-                          placeholder="Type Quality..."
+                          options={allQualities}
+                          placeholder="— Select / Type Quality —"
+                          compact={true}
+                          inputClassName="h-8 font-semibold"
                         />
                       </td>
 

@@ -21,6 +21,7 @@ import {
   BOBBINS_PER_CRATE,
 } from "@/lib/tape-plant/bobbin-stock";
 import { BobbinIssueSlipData, LoomAllocationItem } from "@/lib/tape-plant/print-bobbin-issue-slip";
+import { UniversalQualityInput } from "@/components/ui/UniversalQualityInput";
 
 interface StockQualityOption {
   recipeQuality: string;
@@ -350,30 +351,16 @@ export function BobbinIssueModal({
               )}
             </div>
 
-            {availableStock.length > 0 ? (
-              <select
-                value={recipeQuality}
-                onChange={(e) => setRecipeQuality(e.target.value)}
-                required
-                className="w-full text-xs font-medium text-slate-900 bg-slate-50/70 border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-slate-800 focus:bg-white transition-colors cursor-pointer"
-              >
-                <option value="">-- Select Available Recipe Quality --</option>
-                {availableStock.map((s) => (
-                  <option key={s.recipeQuality} value={s.recipeQuality}>
-                    {s.recipeQuality} (Available: {s.availableCrates.toFixed(1)} crates / {s.availableKg.toFixed(0)} kg)
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <input
-                type="text"
-                value={recipeQuality}
-                onChange={(e) => setRecipeQuality(e.target.value)}
-                placeholder="e.g. AMB/PP/WH/500/76/S1"
-                required
-                className="w-full text-xs font-medium text-slate-900 bg-slate-50/70 border border-slate-200 rounded-lg px-3 py-2 outline-none focus:border-slate-800 focus:bg-white transition-colors"
-              />
-            )}
+            <UniversalQualityInput
+              value={recipeQuality}
+              onChange={(val) => setRecipeQuality(val)}
+              options={availableStock.map((s) => ({
+                code: s.recipeQuality,
+                label: `Stock: ${s.availableCrates.toFixed(1)} crates (${s.availableKg.toFixed(0)} kg)`,
+              }))}
+              placeholder="— Select / Type Recipe Quality —"
+              inputClassName="h-9 font-semibold"
+            />
           </div>
 
           {/* Multi-Loom Allocation Schedule */}

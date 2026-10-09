@@ -5,18 +5,6 @@ import { requireLaminationApiPermission } from "@/lib/lamination/permissions";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-const DEFAULT_LAMINATION_QUALITIES: string[] = [
-  "NUVOCO SI",
-  "UTCL YL SI",
-  "White VIP",
-  "Mahal/LPP/W",
-  "STAR CEMENT",
-  "DALMIA",
-  "ULTRATECH",
-  "AMBUJA",
-  "STANDARD",
-];
-
 export async function GET(_request: NextRequest) {
   const authResult = await requireLaminationApiPermission("canRead");
   if (!authResult.ok) {
@@ -24,7 +12,7 @@ export async function GET(_request: NextRequest) {
   }
 
   try {
-    const [loomRolls, recipes, mappings, pastLamination] = await Promise.all([
+    const [loomRolls, recipes, mappings, pastLamination, partyDetails] = await Promise.all([
       db.loomRollCuttingEntry.findMany({
         select: { qualityType: true },
         distinct: ["qualityType"],
@@ -32,7 +20,7 @@ export async function GET(_request: NextRequest) {
       }),
       db.tapePlantRecipe.findMany({
         select: { code: true },
-        where: { code: { not: "" } },
+        where: { code: { not: "" }, isActive: true },
       }),
       db.loomMachineMapping.findMany({
         select: { qualityCode: true },
@@ -43,6 +31,11 @@ export async function GET(_request: NextRequest) {
         select: { quality: true },
         distinct: ["quality"],
         where: { quality: { not: "" } },
+      }),
+      db.partyPrintingDetail.findMany({
+        select: { quality: true },
+        distinct: ["quality"],
+        where: { quality: { not: "" }, isActive: true },
       }),
     ]);
 
@@ -55,10 +48,10 @@ export async function GET(_request: NextRequest) {
       }
     };
 
-    DEFAULT_LAMINATION_QUALITIES.forEach(addQuality);
-    loomRolls.forEach((r: { qualityType: string | null }) => addQuality(r.qualityType));
     recipes.forEach((r: { code: string }) => addQuality(r.code));
     mappings.forEach((m: { qualityCode: string | null }) => addQuality(m.qualityCode));
+    partyDetails.forEach((p: { quality: string | null }) => addQuality(p.quality));
+    loomRolls.forEach((r: { qualityType: string | null }) => addQuality(r.qualityType));
     pastLamination.forEach((p: { quality: string }) => addQuality(p.quality));
 
     const qualities = Array.from(set).sort((a, b) => a.localeCompare(b));
@@ -71,7 +64,7 @@ export async function GET(_request: NextRequest) {
     console.error("GET /api/production/lamination/qualities error:", error);
     return NextResponse.json({
       success: true,
-      qualities: DEFAULT_LAMINATION_QUALITIES,
+      qualities: [],
     });
   }
 }

@@ -33,6 +33,7 @@ import {
 import { printLoomSummary } from "@/lib/loom/print-loom-summary";
 import { RecipeQualityBadge } from "../tape-plant/RecipeQualityBadge";
 import { RecipeLoomSummaryItem, LoomMachineSummaryItem } from "@/lib/loom/loom-summary-types";
+import { UniversalQualityInput } from "@/components/ui/UniversalQualityInput";
 
 // Color group styling helper for changeover and matrix cards
 export const COLOR_GROUP_STYLES: Record<string, { bg: string; text: string; border: string; dot: string }> = {
@@ -1104,25 +1105,20 @@ export function LoomSummarySection() {
                 <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                   Select Recipe Quality:
                 </label>
-                <select
+                <UniversalQualityInput
                   value={assigningQualityCode}
-                  onChange={(e) => setAssigningQualityCode(e.target.value)}
-                  className="w-full px-3 py-2 text-xs font-medium bg-white border border-slate-200 rounded-lg outline-none focus:border-slate-800"
-                >
-                  <option value="">-- Choose Quality --</option>
-                  {availableRecipes.map((r) => (
-                    <option key={r.id} value={r.code}>
-                      {r.code} {r.denier ? `(${r.denier}D / ${r.colour || "White"})` : ""}
-                    </option>
-                  ))}
-                  {recipeList
-                    .filter((r) => !availableRecipes.some((ar) => ar.code.toLowerCase() === r.recipeQuality.toLowerCase()))
-                    .map((r) => (
-                      <option key={r.recipeQuality} value={r.recipeQuality}>
-                        {r.recipeQuality}
-                      </option>
-                    ))}
-                </select>
+                  onChange={(code) => setAssigningQualityCode(code)}
+                  options={availableRecipes.map((r) => ({
+                    code: r.code,
+                    colour: r.colour || undefined,
+                    denier: r.denier,
+                    tapeType: r.tapeType || undefined,
+                    colorGroup: r.colorGroup || undefined,
+                    size: r.size ? `${r.size}mm` : r.reedSpaceCm ? `${r.reedSpaceCm * 10}mm` : undefined,
+                  }))}
+                  placeholder="— Search / Select / Type Quality —"
+                  inputClassName="h-9 font-semibold"
+                />
               </div>
 
               {/* Dynamic Auto-Fetched Quality Specs */}
@@ -1282,24 +1278,20 @@ export function LoomSummarySection() {
                 <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                   Recipe Quality Formulation:
                 </label>
-                <select
+                <UniversalQualityInput
                   value={bulkSelectedRecipe}
-                  onChange={(e) => handleSelectRecipeInBulkModal(e.target.value)}
-                  className="w-full px-3 py-2 text-xs font-medium bg-white border border-slate-200 rounded-lg outline-none focus:border-slate-800"
-                >
-                  {availableRecipes.map((r) => (
-                    <option key={r.id} value={r.code}>
-                      {r.code} {r.denier ? `(${r.denier}D / ${r.colour || "White"})` : ""}
-                    </option>
-                  ))}
-                  {recipeList
-                    .filter((r) => !availableRecipes.some((ar) => ar.code.toLowerCase() === r.recipeQuality.toLowerCase()))
-                    .map((r) => (
-                      <option key={r.recipeQuality} value={r.recipeQuality}>
-                        {r.recipeQuality}
-                      </option>
-                    ))}
-                </select>
+                  onChange={(code) => handleSelectRecipeInBulkModal(code)}
+                  options={availableRecipes.map((r) => ({
+                    code: r.code,
+                    colour: r.colour || undefined,
+                    denier: r.denier,
+                    tapeType: r.tapeType || undefined,
+                    colorGroup: r.colorGroup || undefined,
+                    size: r.size ? `${r.size}mm` : r.reedSpaceCm ? `${r.reedSpaceCm * 10}mm` : undefined,
+                  }))}
+                  placeholder="— Search / Select / Type Quality —"
+                  inputClassName="h-9 font-semibold"
+                />
               </div>
 
               {/* Dynamic Auto-Fetched Specs for Bulk Selected Recipe */}

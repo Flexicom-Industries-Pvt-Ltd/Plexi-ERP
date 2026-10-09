@@ -35,6 +35,7 @@ import {
 import { ConvertexNavigationTabs } from "./ConvertexNavigationTabs";
 import { ConvertexReportPrintModal } from "./ConvertexReportPrintModal";
 import { exportConvertexReportExcel } from "@/lib/convertex/convertex-export";
+import { UniversalQualityInput } from "@/components/ui/UniversalQualityInput";
 
 function createEmptyConvertexRow(sequence: number): ConvertexReportItem {
   return {
@@ -877,16 +878,16 @@ export function ConvertexDailyReportClient() {
                   </td>
 
                   {/* Quality (Replaced Party Name!) */}
-                  <td className="py-1 px-1 border-r border-slate-200 bg-amber-50/20">
-                    <input
-                      type="text"
+                  <td className="py-1 px-1 border-r border-slate-200 bg-amber-50/20 min-w-[200px]">
+                    <UniversalQualityInput
                       value={entry.quality || entry.partyName || ""}
-                      onChange={(e) => {
-                        handleCellChange(index, "quality", e.target.value);
-                        handleCellChange(index, "partyName", e.target.value);
+                      onChange={(newVal) => {
+                        handleCellChange(index, "quality", newVal);
+                        handleCellChange(index, "partyName", newVal);
                       }}
-                      placeholder="e.g. 50kg Cement Bag"
-                      className="w-full px-2 py-1 text-xs font-semibold text-slate-800 border border-transparent hover:border-slate-300 focus:border-primary focus:bg-white rounded transition-colors"
+                      placeholder="— Quality —"
+                      compact={true}
+                      inputClassName="h-7 text-xs font-semibold text-slate-800"
                     />
                   </td>
 
