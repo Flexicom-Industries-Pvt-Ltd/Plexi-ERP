@@ -36,6 +36,7 @@ import {
 } from "@/lib/printing/printing-types";
 import { exportPrintingReportExcel } from "@/lib/printing/printing-export";
 import { PrintingReportPrintModal } from "./PrintingReportPrintModal";
+import { UniversalQualityInput } from "@/components/ui/UniversalQualityInput";
 
 const SHIFTS = ["Day Shift", "Night Shift", "Shift 1", "Shift 2"];
 
@@ -828,13 +829,13 @@ export function PrintingDailyReportClient() {
                   </td>
 
                   {/* Quality */}
-                  <td className="py-1 px-2 border-r border-slate-200">
-                    <input
-                      type="text"
-                      placeholder="Quality name..."
+                  <td className="py-1 px-2 border-r border-slate-200 min-w-[200px]">
+                    <UniversalQualityInput
                       value={row.quality || ""}
-                      onChange={(e) => handleFieldChange(idx, "quality", e.target.value)}
-                      className="w-full px-2 py-1 border border-slate-300 rounded font-medium text-slate-800 focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-xs"
+                      onChange={(val) => handleFieldChange(idx, "quality", val)}
+                      placeholder="— Quality —"
+                      compact={true}
+                      inputClassName="h-7 text-xs font-medium"
                     />
                   </td>
 

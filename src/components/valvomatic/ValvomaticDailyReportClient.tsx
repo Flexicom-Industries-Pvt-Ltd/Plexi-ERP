@@ -33,6 +33,7 @@ import {
 } from "@/lib/valvomatic/valvomatic-types";
 import { ValvomaticReportPrintModal } from "./ValvomaticReportPrintModal";
 import { exportValvomaticReportExcel } from "@/lib/valvomatic/valvomatic-export";
+import { UniversalQualityInput } from "@/components/ui/UniversalQualityInput";
 
 function createEmptyValvomaticRow(sequence: number): ValvomaticReportItem {
   return {
@@ -839,16 +840,16 @@ export function ValvomaticDailyReportClient() {
                     </td>
 
                     {/* Quality Name */}
-                    <td className="p-1 border-r border-slate-200 bg-amber-50/40">
-                      <input
-                        type="text"
+                    <td className="p-1 border-r border-slate-200 bg-amber-50/40 min-w-[200px]">
+                      <UniversalQualityInput
                         value={entry.quality || entry.partyName || ""}
-                        onChange={(e) => {
-                          handleCellChange(index, "quality", e.target.value);
-                          handleCellChange(index, "partyName", e.target.value);
+                        onChange={(newVal) => {
+                          handleCellChange(index, "quality", newVal);
+                          handleCellChange(index, "partyName", newVal);
                         }}
-                        placeholder="Quality name..."
-                        className="w-full px-2 py-1 text-xs font-bold text-slate-900 border border-transparent hover:border-amber-300 focus:border-amber-500 rounded focus:outline-hidden bg-transparent"
+                        placeholder="— Quality —"
+                        compact={true}
+                        inputClassName="h-7 text-xs font-bold text-slate-900 border-amber-300"
                       />
                     </td>
 

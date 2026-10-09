@@ -33,6 +33,7 @@ import {
 } from "@/lib/convertex/convertex-types";
 import { ConvertexWastagePrintModal } from "./ConvertexWastagePrintModal";
 import { exportConvertexWastageReportExcel } from "@/lib/convertex/convertex-export";
+import { UniversalQualityInput } from "@/components/ui/UniversalQualityInput";
 
 function createEmptyWastageRow(sequence: number): ConvertexWastageEntryItem {
   return {
@@ -795,13 +796,13 @@ export function ConvertexWastageClient() {
                   </td>
 
                   {/* Quality */}
-                  <td className="py-1 px-1 border-r border-slate-200 bg-amber-50/20">
-                    <input
-                      type="text"
+                  <td className="py-1 px-1 border-r border-slate-200 bg-amber-50/20 min-w-[200px]">
+                    <UniversalQualityInput
                       value={entry.quality}
-                      onChange={(e) => handleCellChange(index, "quality", e.target.value)}
-                      placeholder="e.g. 50kg Cement Bag"
-                      className="w-full px-2 py-1 text-xs font-semibold text-slate-800 border border-transparent hover:border-slate-300 focus:border-primary focus:bg-white rounded transition-colors"
+                      onChange={(newVal) => handleCellChange(index, "quality", newVal)}
+                      placeholder="— Quality —"
+                      compact={true}
+                      inputClassName="h-7 text-xs font-semibold text-slate-800"
                     />
                   </td>
 
