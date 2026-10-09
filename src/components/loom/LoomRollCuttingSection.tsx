@@ -36,6 +36,7 @@ import {
 } from "@/lib/loom/loom-roll-cutting-types";
 import { exportLoomRollCuttingExcel } from "@/lib/loom/loom-roll-cutting-export";
 import { LoomRollCuttingPrintModal } from "./LoomRollCuttingPrintModal";
+import { UniversalQualityInput } from "@/components/ui/UniversalQualityInput";
 
 interface AvailableQuality {
   code: string;
@@ -962,22 +963,21 @@ export function LoomRollCuttingSection() {
                     </td>
 
                     {/* Quality */}
-                    <td className="p-2 border-r">
-                      <select
+                    <td className="p-2 border-r min-w-[220px]">
+                      <UniversalQualityInput
                         value={entry.qualityType}
                         title={entry.qualityType}
-                        onChange={(e) => handleUpdateEntry(idx, "qualityType", e.target.value)}
-                        className="w-full text-xs font-semibold px-3 py-2 rounded-lg border bg-background text-foreground focus:ring-2 focus:ring-primary/20 outline-hidden cursor-pointer shadow-2xs"
-                      >
-                        {availableQualities.map((q) => (
-                          <option key={q.code} value={q.code}>
-                            {q.code}
-                          </option>
-                        ))}
-                        {!availableQualities.some((q) => q.code === entry.qualityType) && entry.qualityType && (
-                          <option value={entry.qualityType}>{entry.qualityType}</option>
-                        )}
-                      </select>
+                        onChange={(newCode, option) => {
+                          handleUpdateEntry(idx, "qualityType", newCode);
+                          if (option?.size && !entry.size) {
+                            handleUpdateEntry(idx, "size", option.size.replace("mm", ""));
+                          }
+                        }}
+                        options={availableQualities}
+                        placeholder="— Select / Type Quality —"
+                        compact={true}
+                        inputClassName="h-8 text-xs font-semibold"
+                      />
                     </td>
 
                     {/* Contractor */}

@@ -36,6 +36,7 @@ import {
 import { exportLoomReadingSheetExcel } from "@/lib/loom/loom-reading-export";
 import { printLoomReadingSheet } from "@/lib/loom/print-loom-reading";
 import { LoomReadingPrintPreviewModal } from "./LoomReadingPrintPreviewModal";
+import { UniversalQualityInput } from "@/components/ui/UniversalQualityInput";
 
 interface AvailableShift {
   id: string;
@@ -1347,24 +1348,18 @@ export function LoomReadingSheetSection() {
                       </td>
 
                       {/* Quality Type (Dropdown synced with Quality Master) */}
-                      <td className="py-1.5 px-2.5 border-r border-slate-100">
-                        <select
+                      <td className="py-1 px-1.5 border-r border-slate-100 min-w-[170px]">
+                        <UniversalQualityInput
                           value={e.qualityType || ""}
-                          onChange={(ev) => handleEntryChange(e.loomNumber, rowSeq, "qualityType", ev.target.value)}
-                          onBlur={() => triggerAutoSave(true)}
-                          className="w-full px-2.5 py-1.5 text-xs font-bold text-slate-900 bg-slate-50/60 group-hover:bg-white focus:bg-white border border-slate-200 focus:border-slate-800 rounded-lg outline-none cursor-pointer transition-all truncate"
-                        >
-                          <option value="">-- Select Quality --</option>
-                          {(data?.availableQualities || []).map((q) => (
-                            <option key={q.code} value={q.code}>
-                              {q.code} {q.denier ? `(${q.denier}D${q.size ? ` / ${q.size}mm` : ""})` : ""}
-                            </option>
-                          ))}
-                          {e.qualityType &&
-                            !(data?.availableQualities || []).some(
-                              (q) => q.code.toLowerCase() === e.qualityType?.toLowerCase()
-                            ) && <option value={e.qualityType}>{e.qualityType}</option>}
-                        </select>
+                          onChange={(newCode) => {
+                            handleEntryChange(e.loomNumber, rowSeq, "qualityType", newCode);
+                            triggerAutoSave(true);
+                          }}
+                          options={data?.availableQualities || []}
+                          placeholder="— Quality —"
+                          compact={true}
+                          inputClassName="h-7 text-xs font-bold"
+                        />
                       </td>
 
                       {/* Initial Reading */}
@@ -1561,27 +1556,19 @@ export function LoomReadingSheetSection() {
                       </td>
 
                       {/* C/O Target Quality Column */}
-                      <td className="py-1.5 px-2.5 border-r border-slate-100 bg-amber-50/20">
+                      <td className="py-1 px-1.5 border-r border-slate-100 min-w-[170px] bg-amber-50/20">
                         {e.breakdownReason === "Change Over" || e.changeoverTargetQuality ? (
-                          <select
+                          <UniversalQualityInput
                             value={e.changeoverTargetQuality || ""}
-                            onChange={(ev) =>
-                              handleEntryChange(e.loomNumber, rowSeq, "changeoverTargetQuality", ev.target.value || null)
-                            }
-                            onBlur={() => triggerAutoSave(true)}
-                            className="w-full text-xs font-extrabold px-2.5 py-1.5 bg-white border-2 border-amber-400 text-amber-950 rounded-lg outline-none focus:border-amber-600 shadow-2xs cursor-pointer"
-                          >
-                            <option value="">Select Target Quality...</option>
-                            {(data?.availableQualities || []).map((q) => (
-                              <option key={q.code} value={q.code}>
-                                {q.code} {q.colorGroup ? `(${q.colorGroup})` : ""}
-                              </option>
-                            ))}
-                            {e.changeoverTargetQuality &&
-                              !data?.availableQualities?.some((q) => q.code === e.changeoverTargetQuality) && (
-                                <option value={e.changeoverTargetQuality}>{e.changeoverTargetQuality}</option>
-                              )}
-                          </select>
+                            onChange={(newCode) => {
+                              handleEntryChange(e.loomNumber, rowSeq, "changeoverTargetQuality", newCode || null);
+                              triggerAutoSave(true);
+                            }}
+                            options={data?.availableQualities || []}
+                            placeholder="Target Quality..."
+                            compact={true}
+                            inputClassName="h-7 text-xs font-bold text-amber-950 border-amber-300"
+                          />
                         ) : (
                           <div className="text-center text-slate-300 text-xs font-mono select-none">—</div>
                         )}
@@ -1821,26 +1808,20 @@ export function LoomReadingSheetSection() {
 
             <div>
               <label className="block text-[11px] font-semibold text-slate-600 mb-1">Quality / Recipe (Optional):</label>
-              <select
+              <UniversalQualityInput
                 value={bulkQuality}
-                onChange={(e) => {
-                  const val = e.target.value;
+                onChange={(val, opt) => {
                   setBulkQuality(val);
-                  const found = (data?.availableQualities || []).find((q) => q.code === val);
+                  const found = opt || (data?.availableQualities || []).find((q) => q.code === val);
                   if (found) {
-                    setBulkSize(found.size || (found.reedSpaceCm ? String(found.reedSpaceCm * 10) : ""));
+                    setBulkSize(found.size ? String(found.size).replace("mm", "") : (found.reedSpaceCm ? String(found.reedSpaceCm * 10) : ""));
                     setBulkDenier(found.denier ? String(found.denier) : "");
                   }
                 }}
-                className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-slate-800 font-medium cursor-pointer"
-              >
-                <option value="">-- Leave Unchanged / Select Quality --</option>
-                {(data?.availableQualities || []).map((q) => (
-                  <option key={q.code} value={q.code}>
-                    {q.code} {q.denier ? `(${q.denier}D${q.size ? ` / ${q.size}mm` : ""})` : ""}
-                  </option>
-                ))}
-              </select>
+                options={data?.availableQualities || []}
+                placeholder="— Leave Unchanged / Select Quality —"
+                inputClassName="h-9 font-medium"
+              />
             </div>
 
             <div className="grid grid-cols-2 gap-3">
