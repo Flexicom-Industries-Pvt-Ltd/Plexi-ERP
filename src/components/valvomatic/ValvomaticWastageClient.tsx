@@ -31,9 +31,15 @@ import {
   calculateValvomaticWastageRow,
   computeValvomaticWastageTotals,
 } from "@/lib/valvomatic/valvomatic-types";
-import { ValvomaticWastagePrintModal } from "./ValvomaticWastagePrintModal";
+import dynamic from "next/dynamic";
 import { exportValvomaticWastageReportExcel } from "@/lib/valvomatic/valvomatic-export";
 import { UniversalQualityInput } from "@/components/ui/UniversalQualityInput";
+import { UniversalPersonnelInput } from "@/components/ui/UniversalPersonnelInput";
+
+const ValvomaticWastagePrintModal = dynamic(
+  () => import("./ValvomaticWastagePrintModal").then((m) => m.ValvomaticWastagePrintModal),
+  { ssr: false }
+);
 
 function createEmptyWastageRow(sequence: number): ValvomaticWastageEntryItem {
   return {
@@ -582,29 +588,28 @@ export function ValvomaticWastageClient() {
 
           <div>
             <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">Operator</label>
-            <input
-              type="text"
-              placeholder="Operator name"
+            <UniversalPersonnelInput
+              type="operator"
+              section="VALVOMATIC"
               value={operatorName}
-              onChange={(e) => {
+              onChange={(name) => {
                 isDirtyRef.current = true;
-                setOperatorName(e.target.value);
+                setOperatorName(name);
               }}
-              className="w-full text-xs px-2.5 py-1.5 border border-slate-300 rounded-lg focus:outline-hidden focus:ring-1 focus:ring-primary"
+              placeholder="Operator name"
             />
           </div>
 
           <div>
             <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">Supervisor</label>
-            <input
-              type="text"
-              placeholder="Supervisor name"
+            <UniversalPersonnelInput
+              type="supervisor"
               value={supervisorName}
-              onChange={(e) => {
+              onChange={(name) => {
                 isDirtyRef.current = true;
-                setSupervisorName(e.target.value);
+                setSupervisorName(name);
               }}
-              className="w-full text-xs px-2.5 py-1.5 border border-slate-300 rounded-lg focus:outline-hidden focus:ring-1 focus:ring-primary"
+              placeholder="Supervisor name"
             />
           </div>
 

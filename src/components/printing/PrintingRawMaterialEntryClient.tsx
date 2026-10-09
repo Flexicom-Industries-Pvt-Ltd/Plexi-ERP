@@ -29,7 +29,13 @@ import {
   PrintingRawMaterialMasterItem,
   computePrintingRawMaterialTotals,
 } from "@/lib/printing/printing-types";
-import { PrintingRawMaterialPrintModal } from "./PrintingRawMaterialPrintModal";
+import dynamic from "next/dynamic";
+import { UniversalPersonnelInput } from "@/components/ui/UniversalPersonnelInput";
+
+const PrintingRawMaterialPrintModal = dynamic(
+  () => import("./PrintingRawMaterialPrintModal").then((m) => m.PrintingRawMaterialPrintModal),
+  { ssr: false }
+);
 
 export function PrintingRawMaterialEntryClient() {
   const [date, setDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
@@ -410,12 +416,12 @@ export function PrintingRawMaterialEntryClient() {
             <label className="block text-xs font-semibold uppercase text-slate-600 mb-1 flex items-center gap-1">
               <User className="w-3.5 h-3.5 text-slate-400" /> Machine Operator
             </label>
-            <input
-              type="text"
-              placeholder="e.g. Ramesh Kumar"
+            <UniversalPersonnelInput
+              type="operator"
+              section="PRINTING"
               value={operatorName}
-              onChange={(e) => setOperatorName(e.target.value)}
-              className="w-full px-3 py-1.5 text-sm border border-slate-200 rounded-md focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              onChange={(name) => setOperatorName(name)}
+              placeholder="e.g. Ramesh Kumar"
             />
           </div>
 
@@ -423,12 +429,11 @@ export function PrintingRawMaterialEntryClient() {
             <label className="block text-xs font-semibold uppercase text-slate-600 mb-1 flex items-center gap-1">
               <User className="w-3.5 h-3.5 text-slate-400" /> Shift Supervisor
             </label>
-            <input
-              type="text"
-              placeholder="e.g. Anil Verma"
+            <UniversalPersonnelInput
+              type="supervisor"
               value={supervisorName}
-              onChange={(e) => setSupervisorName(e.target.value)}
-              className="w-full px-3 py-1.5 text-sm border border-slate-200 rounded-md focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              onChange={(name) => setSupervisorName(name)}
+              placeholder="e.g. Anil Verma"
             />
           </div>
 
