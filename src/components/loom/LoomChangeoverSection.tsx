@@ -26,6 +26,7 @@ import {
 } from "@/app/api/production/loom/changeover/route";
 import { exportLoomChangeoverExcel } from "@/lib/loom/loom-changeover-export";
 import { printLoomChangeover } from "@/lib/loom/print-loom-changeover";
+import { UniversalQualityInput } from "@/components/ui/UniversalQualityInput";
 
 interface AvailableQuality {
   code: string;
@@ -595,22 +596,18 @@ export function LoomChangeoverSection() {
                 <label className="block text-[11px] font-semibold text-slate-600 mb-1">
                   Target / Next Quality:
                 </label>
-                <input
-                  type="text"
-                  list="target-qualities-list"
+                <UniversalQualityInput
                   value={newScheduleTo}
-                  onChange={(e) => setNewScheduleTo(e.target.value)}
+                  onChange={(code) => setNewScheduleTo(code)}
+                  options={availableQualities.map((q) => ({
+                    code: q.code,
+                    colour: q.colour || undefined,
+                    colorGroup: q.colorGroup || undefined,
+                    denier: q.denier,
+                  }))}
                   placeholder="e.g. UTCL/LPP/Y/67 or 1000D/LPP/W"
-                  required
-                  className="w-full px-2.5 py-1.5 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-slate-800"
+                  inputClassName="h-9 font-semibold"
                 />
-                <datalist id="target-qualities-list">
-                  {availableQualities.map((q) => (
-                    <option key={q.code} value={q.code}>
-                      {q.code} {q.colorGroup ? `(${q.colorGroup})` : ""}
-                    </option>
-                  ))}
-                </datalist>
               </div>
 
               <div>
