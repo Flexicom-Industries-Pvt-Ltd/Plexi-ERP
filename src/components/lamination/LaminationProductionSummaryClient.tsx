@@ -35,7 +35,12 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { exportProductionSummaryExcel } from "@/lib/lamination/production-summary-export";
-import { ProductionSummaryPrintModal } from "./ProductionSummaryPrintModal";
+import dynamic from "next/dynamic";
+
+const ProductionSummaryPrintModal = dynamic(
+  () => import("./ProductionSummaryPrintModal").then((m) => m.ProductionSummaryPrintModal),
+  { ssr: false }
+);
 
 const SHIFTS = ["ALL", "Day Shift", "Night Shift"];
 
