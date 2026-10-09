@@ -35,8 +35,14 @@ import {
   computeQualityRollSummary,
 } from "@/lib/loom/loom-roll-cutting-types";
 import { exportLoomRollCuttingExcel } from "@/lib/loom/loom-roll-cutting-export";
-import { LoomRollCuttingPrintModal } from "./LoomRollCuttingPrintModal";
+import dynamic from "next/dynamic";
 import { UniversalQualityInput } from "@/components/ui/UniversalQualityInput";
+import { UniversalPersonnelInput } from "@/components/ui/UniversalPersonnelInput";
+
+const LoomRollCuttingPrintModal = dynamic(
+  () => import("./LoomRollCuttingPrintModal").then((m) => m.LoomRollCuttingPrintModal),
+  { ssr: false }
+);
 
 interface AvailableQuality {
   code: string;
@@ -981,34 +987,27 @@ export function LoomRollCuttingSection() {
                     </td>
 
                     {/* Contractor */}
-                    <td className="p-2 border-r">
-                      <select
+                    <td className="p-2 border-r min-w-[210px]">
+                      <UniversalPersonnelInput
+                        type="contractor"
                         value={entry.contractor || ""}
                         title={entry.contractor || "In-House / Direct"}
-                        onChange={(e) => {
-                          if (e.target.value === "__NEW__") {
-                            setTargetEntryIndexForNewContractor(idx);
-                            setQuickContractorModalOpen(true);
-                          } else {
-                            handleUpdateEntry(idx, "contractor", e.target.value);
-                          }
+                        onChange={(name) => handleUpdateEntry(idx, "contractor", name)}
+                        options={availableContractors.map((c) => ({
+                          id: c.id,
+                          name: c.name,
+                          code: c.code,
+                          type: "contractor",
+                        }))}
+                        placeholder="In-House / Direct"
+                        compact={true}
+                        inputClassName="h-8 text-xs font-semibold"
+                        onAddNew={() => {
+                          setTargetEntryIndexForNewContractor(idx);
+                          setQuickContractorModalOpen(true);
                         }}
-                        className="w-full text-xs font-medium px-3 py-2 rounded-lg border bg-background text-foreground focus:ring-2 focus:ring-primary/20 outline-hidden cursor-pointer shadow-2xs"
-                      >
-                        <option value="">In-House / Direct</option>
-                        {availableContractors.map((c) => (
-                          <option key={c.id} value={c.name}>
-                            {c.name} {c.code ? `(${c.code})` : ""}
-                          </option>
-                        ))}
-                        {entry.contractor &&
-                          !availableContractors.some((c) => c.name === entry.contractor) && (
-                            <option value={entry.contractor}>{entry.contractor}</option>
-                          )}
-                        <option value="__NEW__" className="text-primary font-bold">
-                          + Register New Contractor...
-                        </option>
-                      </select>
+                        addNewLabel="+ Register New Contractor..."
+                      />
                     </td>
 
                     {/* Initial Reading */}

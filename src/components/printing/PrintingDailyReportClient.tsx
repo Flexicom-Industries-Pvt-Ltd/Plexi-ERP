@@ -35,8 +35,14 @@ import {
   PrintingReportItem,
 } from "@/lib/printing/printing-types";
 import { exportPrintingReportExcel } from "@/lib/printing/printing-export";
-import { PrintingReportPrintModal } from "./PrintingReportPrintModal";
+import dynamic from "next/dynamic";
 import { UniversalQualityInput } from "@/components/ui/UniversalQualityInput";
+import { UniversalPersonnelInput } from "@/components/ui/UniversalPersonnelInput";
+
+const PrintingReportPrintModal = dynamic(
+  () => import("./PrintingReportPrintModal").then((m) => m.PrintingReportPrintModal),
+  { ssr: false }
+);
 
 const SHIFTS = ["Day Shift", "Night Shift", "Shift 1", "Shift 2"];
 
@@ -534,12 +540,12 @@ export function PrintingDailyReportClient() {
             <label className="flex items-center gap-1 text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">
               <User className="h-3 w-3" /> Operator
             </label>
-            <input
-              type="text"
-              placeholder="e.g. Ramesh Kumar"
+            <UniversalPersonnelInput
+              type="operator"
+              section="PRINTING"
               value={operatorName}
-              onChange={(e) => setOperatorName(e.target.value)}
-              className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary"
+              onChange={(name) => setOperatorName(name)}
+              placeholder="Select / Type Operator"
             />
           </div>
 
@@ -547,12 +553,11 @@ export function PrintingDailyReportClient() {
             <label className="flex items-center gap-1 text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">
               <Shield className="h-3 w-3" /> Supervisor
             </label>
-            <input
-              type="text"
-              placeholder="e.g. Rajesh Sharma"
+            <UniversalPersonnelInput
+              type="supervisor"
               value={supervisorName}
-              onChange={(e) => setSupervisorName(e.target.value)}
-              className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary"
+              onChange={(name) => setSupervisorName(name)}
+              placeholder="Select / Type Supervisor"
             />
           </div>
         </div>
