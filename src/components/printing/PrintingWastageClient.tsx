@@ -21,7 +21,13 @@ import {
   PrintingWastageReportData,
   calculatePrintingWastage,
 } from "@/lib/printing/printing-types";
-import { PrintingWastagePrintModal } from "./PrintingWastagePrintModal";
+import dynamic from "next/dynamic";
+import { UniversalPersonnelInput } from "@/components/ui/UniversalPersonnelInput";
+
+const PrintingWastagePrintModal = dynamic(
+  () => import("./PrintingWastagePrintModal").then((m) => m.PrintingWastagePrintModal),
+  { ssr: false }
+);
 
 const SHIFTS = ["Day Shift", "Night Shift", "General Shift"];
 
@@ -372,12 +378,13 @@ export function PrintingWastageClient() {
               <User className="h-3.5 w-3.5 text-slate-400" />
               Operator / Technician
             </label>
-            <input
-              type="text"
-              placeholder="e.g. Ramesh Kumar"
+            <UniversalPersonnelInput
+              type="operator"
+              section="PRINTING"
               value={operatorName}
-              onChange={(e) => setOperatorName(e.target.value)}
-              className="w-full h-9 px-3 py-1.5 text-xs border border-slate-200 rounded-md focus:ring-1 focus:ring-primary"
+              onChange={(name) => setOperatorName(name)}
+              placeholder="e.g. Ramesh Kumar"
+              inputClassName="h-9"
             />
           </div>
 
@@ -387,12 +394,12 @@ export function PrintingWastageClient() {
               <User className="h-3.5 w-3.5 text-slate-400" />
               Supervisor
             </label>
-            <input
-              type="text"
-              placeholder="e.g. Anil Verma"
+            <UniversalPersonnelInput
+              type="supervisor"
               value={supervisorName}
-              onChange={(e) => setSupervisorName(e.target.value)}
-              className="w-full h-9 px-3 py-1.5 text-xs border border-slate-200 rounded-md focus:ring-1 focus:ring-primary"
+              onChange={(name) => setSupervisorName(name)}
+              placeholder="e.g. Anil Verma"
+              inputClassName="h-9"
             />
           </div>
 
