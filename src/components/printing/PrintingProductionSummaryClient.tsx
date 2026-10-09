@@ -21,7 +21,12 @@ import {
   Sparkles,
 } from "lucide-react";
 import { PrintingProductionSummaryResult } from "@/lib/printing/printing-types";
-import { PrintingSummaryPrintModal } from "./PrintingSummaryPrintModal";
+import dynamic from "next/dynamic";
+
+const PrintingSummaryPrintModal = dynamic(
+  () => import("./PrintingSummaryPrintModal").then((m) => m.PrintingSummaryPrintModal),
+  { ssr: false }
+);
 
 export function PrintingProductionSummaryClient() {
   const [dateFrom, setDateFrom] = useState<string>("");

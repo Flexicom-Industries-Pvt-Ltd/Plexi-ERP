@@ -39,8 +39,14 @@ import {
   LaminationRawMaterialReportData,
   RawMaterialEntryItem,
 } from "@/lib/lamination/lamination-raw-material-types";
-import { RawMaterialPrintModal } from "./RawMaterialPrintModal";
+import dynamic from "next/dynamic";
 import { exportRawMaterialReportExcel } from "@/lib/lamination/raw-material-export";
+import { UniversalPersonnelInput } from "@/components/ui/UniversalPersonnelInput";
+
+const RawMaterialPrintModal = dynamic(
+  () => import("./RawMaterialPrintModal").then((m) => m.RawMaterialPrintModal),
+  { ssr: false }
+);
 
 const SHIFTS = ["Day Shift", "Night Shift"];
 
@@ -471,11 +477,13 @@ export function LaminationRawMaterialEntryClient() {
               <User className="h-3.5 w-3.5 text-slate-400" />
               Operator / Technician
             </label>
-            <Input
-              placeholder="e.g. Ramesh Kumar"
+            <UniversalPersonnelInput
+              type="operator"
+              section="LAMINATION"
               value={operatorName}
-              onChange={(e) => setOperatorName(e.target.value)}
-              className="h-9 text-xs"
+              onChange={(name) => setOperatorName(name)}
+              placeholder="e.g. Ramesh Kumar"
+              inputClassName="h-9"
             />
           </div>
 
