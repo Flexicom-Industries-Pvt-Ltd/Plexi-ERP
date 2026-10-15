@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
     });
 
     // Compute Overall Totals
-    let totalShifts = reports.length;
+    const totalShifts = reports.length;
     let totalRolls = 0;
     let totalProductionMtrs = 0;
     let totalNetWtAfter = 0;

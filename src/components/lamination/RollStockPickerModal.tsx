@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   AvailableLaminationRoll,
   GroupedQualityRolls,
@@ -45,14 +45,7 @@ export function RollStockPickerModal({
   const [selectedQuality, setSelectedQuality] = useState<string>("ALL");
   const [selectedRollIds, setSelectedRollIds] = useState<Set<string>>(new Set());
 
-  useEffect(() => {
-    if (open) {
-      fetchAvailableRolls();
-      setSelectedRollIds(new Set());
-    }
-  }, [open]);
-
-  const fetchAvailableRolls = async () => {
+  const fetchAvailableRolls = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch("/api/production/lamination/available-rolls");
@@ -66,7 +59,14 @@ export function RollStockPickerModal({
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (open) {
+      fetchAvailableRolls();
+      setSelectedRollIds(new Set());
+    }
+  }, [open, fetchAvailableRolls]);
 
   const filteredRolls = rolls.filter((r) => {
     const matchesQuality =

@@ -110,7 +110,7 @@ export async function GET(request: NextRequest) {
     }
 
     // 2. Build 1..91 entries list (supporting multi-row changeovers per loom)
-    let entries: LoomReadingEntryItem[] = [];
+    const entries: LoomReadingEntryItem[] = [];
 
     if (existingSheet && existingSheet.entries.length > 0) {
       const entryGroupMap = new Map<number, typeof existingSheet.entries>();
@@ -618,7 +618,7 @@ export async function POST(request: NextRequest) {
               });
             }
 
-            let targetMapping = await db.loomMachineMapping.findUnique({
+            const targetMapping = await db.loomMachineMapping.findUnique({
               where: { qualityCode: targetQuality },
             });
 

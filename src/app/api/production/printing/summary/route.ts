@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
       orderBy: [{ date: "desc" }, { createdAt: "desc" }],
     });
 
-    let overallTotalReports = reports.length;
+    const overallTotalReports = reports.length;
     let overallTotalRolls = 0;
     let overallTargetMtrs = 0;
     let overallProductionMtrs = 0;

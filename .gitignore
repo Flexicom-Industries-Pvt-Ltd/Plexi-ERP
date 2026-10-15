@@ -46,3 +46,6 @@ next-env.d.ts
 # PWA generated build assets
 /public/sw*
 /public/workbox*
+
+# scratch & temporary files
+/scratch/
