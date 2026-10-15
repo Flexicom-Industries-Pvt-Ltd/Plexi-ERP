@@ -266,6 +266,7 @@ export function LoomReadingSheetSection() {
   // Immediate or debounced auto-save function with in-flight queuing
   const isSavingRef = useRef(false);
   const pendingSaveRef = useRef<string | null>(null);
+  const triggerAutoSaveRef = useRef<((isImmediate?: boolean, keepalive?: boolean) => Promise<void>) | null>(null);
 
   const triggerAutoSave = useCallback(async (isImmediate: boolean = false, keepalive: boolean = false) => {
     if (!latestPayloadRef.current || isInitialMountRef.current) return;
@@ -303,10 +304,13 @@ export function LoomReadingSheetSection() {
       }
       if (pendingSaveRef.current && pendingSaveRef.current !== lastSavedPayloadRef.current) {
         pendingSaveRef.current = null;
-        triggerAutoSave(false);
+        triggerAutoSaveRef.current?.(false);
       }
     }
   }, []);
+  useEffect(() => {
+    triggerAutoSaveRef.current = triggerAutoSave;
+  }, [triggerAutoSave]);
 
   // Sync latestPayloadRef and debounce auto-save (400ms)
   useEffect(() => {
@@ -773,7 +777,7 @@ export function LoomReadingSheetSection() {
     }
 
     return result;
-  }, [data?.availableShifts]);
+  }, [data]);
 
   return (
     <div className="space-y-4">
