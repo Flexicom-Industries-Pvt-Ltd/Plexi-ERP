@@ -134,7 +134,7 @@ export async function GET(request: NextRequest) {
       }
     >();
 
-    let overallTotalReports = dailyReports.length;
+    const overallTotalReports = dailyReports.length;
     let overallTotalRolls = 0;
     let overallTotalRollMtr = 0;
     let overallTotalNetWt = 0;

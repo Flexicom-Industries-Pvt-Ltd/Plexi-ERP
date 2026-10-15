@@ -518,7 +518,7 @@ export function ApiDocsClient() {
               <Search className="h-10 w-10 text-slate-300 mx-auto" />
               <h3 className="text-base font-bold text-slate-800">No matching endpoints found</h3>
               <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto">
-                Try searching for a different keyword like "gate", "inventory", "stock", "runs", or select "All APIs".
+                Try searching for a different keyword like &ldquo;gate&rdquo;, &ldquo;inventory&rdquo;, &ldquo;stock&rdquo;, &ldquo;runs&rdquo;, or select &ldquo;All APIs&rdquo;.
               </p>
             </div>
           ) : (

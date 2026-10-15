@@ -291,7 +291,7 @@ export function LaminationRawMaterialsClient() {
               ) : filteredItems.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="py-8 text-center text-slate-500 text-xs">
-                    No raw materials found. Click "Add Raw Material" to get started.
+                    No raw materials found. Click &ldquo;Add Raw Material&rdquo; to get started.
                   </td>
                 </tr>
               ) : (
