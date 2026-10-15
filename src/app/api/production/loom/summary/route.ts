@@ -204,7 +204,7 @@ export async function GET(request: NextRequest) {
     // Next aggregate bobbin issue allocations into the recipeMap (only for active assigned looms/recipes)
     for (const alloc of normalizedAllocations) {
       const q = alloc.recipeQuality;
-      let entry = recipeMap.get(q);
+      const entry = recipeMap.get(q);
       if (!entry) continue; // Only aggregate into active manual recipe allocations
 
       if (alloc.loomNumber && alloc.loomNumber >= 1 && alloc.loomNumber <= TOTAL_LOOMS) {

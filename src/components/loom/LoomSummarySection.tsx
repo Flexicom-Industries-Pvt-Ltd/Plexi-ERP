@@ -127,11 +127,10 @@ export function LoomSummarySection() {
     fetchSummary();
   }, [fetchSummary]);
 
-  const selectedShiftName = useMemo(() => {
-    if (!data?.availableShifts || selectedShiftId === "ALL") return "All Shifts";
-    const found = data.availableShifts.find((s) => s.id === selectedShiftId);
-    return found ? found.name : "All Shifts";
-  }, [data?.availableShifts, selectedShiftId]);
+  const selectedShiftName =
+    selectedShiftId !== "ALL" && data?.availableShifts
+      ? data.availableShifts.find((s) => s.id === selectedShiftId)?.name || "All Shifts"
+      : "All Shifts";
 
   const recipeList: RecipeLoomSummaryItem[] = data?.recipeSummaries || [];
   const rawLoomList: LoomMachineSummaryItem[] = data?.loomSummaries || [];
