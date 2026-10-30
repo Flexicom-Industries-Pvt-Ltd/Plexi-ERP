@@ -20,6 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -330,7 +331,8 @@ export function HRAttendanceClient() {
                 </Button>
               } />
               <DropdownMenuContent align="end" className="w-56 text-xs">
-                <DropdownMenuLabel>Attendance Downloads</DropdownMenuLabel>
+                <DropdownMenuGroup>
+                  <DropdownMenuLabel>Attendance Downloads</DropdownMenuLabel>
                 <DropdownMenuItem onClick={() => handleExport("attendance", "xlsx")} className="gap-2 cursor-pointer">
                   <FileSpreadsheet className="h-4 w-4 text-emerald-600" />
                   Daily Register (.xlsx)
@@ -348,6 +350,7 @@ export function HRAttendanceClient() {
                   <Download className="h-4 w-4 text-slate-500" />
                   Sample Import Template (.xlsx)
                 </DropdownMenuItem>
+                </DropdownMenuGroup>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
