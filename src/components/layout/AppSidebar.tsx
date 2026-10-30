@@ -17,6 +17,7 @@ import {
   Film,
   Printer,
   Scissors,
+  UserCheck,
 } from "lucide-react";
 
 import {
@@ -40,6 +41,7 @@ const navItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, module: null },
   { title: "Security & Gate", url: "/dashboard/gate", icon: ShieldCheck, module: "SECURITY_GATE" },
   { title: "Inventory", url: "/dashboard/inventory", icon: PackageSearch, module: "INVENTORY" },
+  { title: "HR & Attendance", url: "/dashboard/hr", icon: UserCheck, module: "HR" },
 ];
 
 const tapePlantItems = [

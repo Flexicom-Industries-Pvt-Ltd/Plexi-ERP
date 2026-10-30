@@ -27,6 +27,7 @@ enum Module {
   MAINTENANCE
   DISPATCH
   DATA_CENTRE
+  HR
 }
 
 
@@ -181,6 +182,12 @@ model Shift {
   tapePlantRawMaterials       TapePlantRawMaterial[]
   tapePlantPostProductions    TapePlantPostProduction[]
   tapePlantBobbinIssues       TapePlantBobbinIssue[]
+
+  gracePeriodMinutes          Int      @default(15)
+  halfDayHours                Float    @default(4.0)
+  fullDayHours                Float    @default(8.0)
+  isNightShift                Boolean  @default(false)
+  dailyAttendances            DailyAttendance[]
 }
 
 enum StockMaterialType {
@@ -2727,4 +2734,120 @@ model ValvomaticWastageReportEntry {
   @@index([reportId])
   @@index([quality])
   @@index([rollNumber])
+}
+
+
+// ==========================================
+// Phase 3: HR & Time Office (Biometric Attendance)
+// ==========================================
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  HALF_DAY
+  LATE
+  ON_DUTY
+  WEEKLY_OFF
+  HOLIDAY
+}
+
+enum PunchDirection {
+  IN
+  OUT
+  AUTO
+}
+
+enum PunchSource {
+  API_REALTIME
+  API_POLL
+  EXCEL_IMPORT
+  MANUAL_ENTRY
+}
+
+model BiometricDevice {
+  id             String    @id @default(cuid())
+  serialNumber   String    @unique
+  name           String    // e.g. "IKOLAHA FACTORY"
+  ipAddress      String?
+  location       String?   // "Main Gate", "Loom Shed", "Admin"
+  status         String    @default("OFFLINE") // ONLINE, OFFLINE
+  userCount      Int       @default(0)
+  faceCount      Int       @default(0)
+  fingerCount    Int       @default(0)
+  lastConnected  DateTime?
+  lastLogAt      DateTime?
+  isActive       Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  punches        AttendancePunch[]
+}
+
+model AttendancePunch {
+  id             String         @id @default(cuid())
+  employeeCode   String
+  employeeName   String?
+  punchTime      DateTime
+  direction      PunchDirection @default(AUTO)
+  verifyMode     String?        // Face, Finger, Card, Password
+  source         PunchSource    @default(API_REALTIME)
+  rawPayload     Json?          // Verbatim device JSON for audit trail
+  
+  deviceId       String?
+  device         BiometricDevice? @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+  deviceName     String?
+
+  createdAt      DateTime       @default(now())
+
+  @@index([employeeCode, punchTime])
+  @@index([punchTime])
+  @@index([deviceId])
+}
+
+model DailyAttendance {
+  id             String           @id @default(cuid())
+  date           DateTime         @db.Date
+  employeeCode   String
+  employeeName   String
+  department     String           // "LOOM", "TAPE_PLANT", "LAMINATION", "PRINTING", "SECURITY", "ADMIN", etc.
+  
+  shiftId        String?
+  shift          Shift?           @relation(fields: [shiftId], references: [id], onDelete: SetNull)
+  shiftName      String?          // Dynamic from Shift master
+  
+  firstIn        DateTime?
+  lastOut        DateTime?
+  workHours      Float            @default(0.0)
+  overtimeHours  Float            @default(0.0)
+  status         AttendanceStatus @default(ABSENT)
+  isLate         Boolean          @default(false)
+  isRegularized  Boolean          @default(false)
+  regularizedBy  String?
+  regularizeNote String?
+
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  @@unique([date, employeeCode])
+  @@index([date, department])
+  @@index([status])
+}
+
+model ShiftHeadcount {
+  id             String   @id @default(cuid())
+  date           DateTime @db.Date
+  shiftName      String   // Dynamic shift name from Shift master (e.g. "Shift A")
+  department     String   // "LOOM", "TAPE_PLANT", "LAMINATION", "PRINTING", "CONVERTEX", "VALVOMATIC"
+  totalReported  Int      @default(0)
+  operatorsCount Int      @default(0)
+  helpersCount   Int      @default(0)
+  fittersCount   Int      @default(0)
+  supervisorCode String?
+  isVerified     Boolean  @default(false)
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([date, shiftName, department])
+  @@index([date, department])
 }
