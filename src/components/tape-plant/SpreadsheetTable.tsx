@@ -16,6 +16,7 @@ export type ColumnDef<T> = {
   align?: "left" | "center" | "right";
   minWidth?: number;
   sticky?: boolean;
+  render?: (value: any, row: T, rowIndex: number) => React.ReactNode;
 };
 
 interface SpreadsheetTableProps<T extends Record<string, any>> {
@@ -33,6 +34,9 @@ interface SpreadsheetTableProps<T extends Record<string, any>> {
   title?: string;
   subtitle?: string;
   actions?: React.ReactNode;
+  isRowDisabled?: (row: T, index: number) => boolean;
+  renderRowBadge?: (row: T, index: number) => React.ReactNode;
+  rowActions?: (row: T, index: number) => React.ReactNode;
 }
 
 export function SpreadsheetTable<T extends Record<string, any>>({
@@ -50,6 +54,9 @@ export function SpreadsheetTable<T extends Record<string, any>>({
   title,
   subtitle,
   actions,
+  isRowDisabled,
+  renderRowBadge,
+  rowActions,
 }: SpreadsheetTableProps<T>) {
   const tableRef = useRef<HTMLTableElement>(null);
   const [activeCell, setActiveCell] = useState<{ row: number; col: number } | null>(null);
@@ -379,10 +386,10 @@ export function SpreadsheetTable<T extends Record<string, any>>({
                     });
                   })}
 
-                  {(allowDeleteRow || allowCopyRow || allowClearRow) && (
+                  {(allowDeleteRow || allowCopyRow || allowClearRow || rowActions) && (
                     <th
                       rowSpan={2}
-                      className="w-20 px-2 py-2 text-center text-slate-500 font-bold text-[10px] bg-slate-100 border-b border-slate-300"
+                      className="w-24 px-2 py-2 text-center text-slate-500 font-bold text-[10px] bg-slate-100 border-b border-slate-300"
                     >
                       Actions
                     </th>
@@ -423,8 +430,8 @@ export function SpreadsheetTable<T extends Record<string, any>>({
                     {col.label}
                   </th>
                 ))}
-                {(allowDeleteRow || allowCopyRow || allowClearRow) && (
-                  <th className="w-20 px-2 py-2.5 text-center text-slate-500 font-bold text-[10px] bg-slate-100">
+                {(allowDeleteRow || allowCopyRow || allowClearRow || rowActions) && (
+                  <th className="w-24 px-2 py-2.5 text-center text-slate-500 font-bold text-[10px] bg-slate-100">
                     Actions
                   </th>
                 )}
@@ -442,31 +449,84 @@ export function SpreadsheetTable<T extends Record<string, any>>({
                 </td>
               </tr>
             ) : (
-              data.map((row, rIdx) => (
-                <tr key={rIdx} className="hover:bg-blue-50/40 transition-colors group">
-                  <td className="px-2 py-1.5 text-center font-semibold text-slate-400 border-r border-slate-200 bg-slate-50/50 text-[11px]">
-                    {rIdx + 1}
-                  </td>
-                  {columns.map((col, cIdx) => {
-                    const cellId = `cell-${rIdx}-${cIdx}`;
-                    const rawValue = col.calculate ? col.calculate(row, rIdx, data) : row[col.key];
-                    const displayValue = rawValue !== undefined && rawValue !== null ? rawValue : "";
-                    const isReadOnly = col.type === "readonly" || Boolean(col.calculate);
+              data.map((row, rIdx) => {
+                const rowDisabled = Boolean(isRowDisabled && isRowDisabled(row, rIdx));
 
-                    if (isReadOnly) {
-                      return (
-                        <td
-                          key={col.key}
-                          className={`px-3 py-1.5 border-r border-slate-200 font-semibold bg-slate-50/70 text-slate-800 ${
-                            col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"
-                          } ${cIdx === 0 && col.sticky ? "sticky left-0 z-10 bg-slate-100 font-bold" : ""}`}
-                        >
-                          <span className="block truncate">{displayValue !== "" ? String(displayValue) : "—"}</span>
-                        </td>
-                      );
-                    }
+                return (
+                  <tr
+                    key={rIdx}
+                    className={`transition-colors group ${
+                      rowDisabled ? "bg-slate-50/70 hover:bg-slate-100/60" : "hover:bg-blue-50/40"
+                    }`}
+                  >
+                    <td
+                      className={`px-2 py-1.5 text-center font-semibold border-r border-slate-200 text-[11px] ${
+                        rowDisabled ? "bg-slate-100/80 text-slate-500 font-bold" : "bg-slate-50/50 text-slate-400"
+                      }`}
+                    >
+                      {renderRowBadge ? renderRowBadge(row, rIdx) : rIdx + 1}
+                    </td>
+                    {columns.map((col, cIdx) => {
+                      const cellId = `cell-${rIdx}-${cIdx}`;
+                      const rawValue = col.calculate ? col.calculate(row, rIdx, data) : row[col.key];
+                      const displayValue = rawValue !== undefined && rawValue !== null ? rawValue : "";
+                      const isReadOnly = col.type === "readonly" || Boolean(col.calculate);
 
-                    if (col.type === "select" && col.options) {
+                      if (col.render) {
+                        return (
+                          <td
+                            key={col.key}
+                            className={`px-2 py-1 border-r border-slate-200 ${
+                              col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"
+                            } ${cIdx === 0 && col.sticky ? "sticky left-0 z-10 bg-white" : ""}`}
+                          >
+                            {col.render(displayValue, row, rIdx)}
+                          </td>
+                        );
+                      }
+
+                      if (isReadOnly) {
+                        return (
+                          <td
+                            key={col.key}
+                            className={`px-3 py-1.5 border-r border-slate-200 font-semibold bg-slate-50/70 text-slate-800 ${
+                              col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"
+                            } ${cIdx === 0 && col.sticky ? "sticky left-0 z-10 bg-slate-100 font-bold" : ""}`}
+                          >
+                            <span className="block truncate">{displayValue !== "" ? String(displayValue) : "—"}</span>
+                          </td>
+                        );
+                      }
+
+                      if (col.type === "select" && col.options) {
+                        return (
+                          <td
+                            key={col.key}
+                            className={`p-0 border-r border-slate-200 ${
+                              cIdx === 0 && col.sticky ? "sticky left-0 z-10 bg-white" : ""
+                            }`}
+                          >
+                            <select
+                              id={cellId}
+                              disabled={rowDisabled}
+                              value={String(displayValue)}
+                              onChange={(e) => handleCellChange(rIdx, col.key, e.target.value)}
+                              onKeyDown={(e) => handleKeyDown(e, rIdx, cIdx)}
+                              className={`w-full h-8 px-2.5 text-xs bg-transparent border-0 focus:ring-2 focus:ring-primary focus:bg-white text-slate-800 outline-none transition-all cursor-pointer ${
+                                rowDisabled ? "opacity-60 cursor-not-allowed bg-slate-100/60 text-slate-500" : ""
+                              }`}
+                            >
+                              <option value="">Select...</option>
+                              {col.options.map((opt) => (
+                                <option key={opt} value={opt}>
+                                  {opt}
+                                </option>
+                              ))}
+                            </select>
+                          </td>
+                        );
+                      }
+
                       return (
                         <td
                           key={col.key}
@@ -474,91 +534,69 @@ export function SpreadsheetTable<T extends Record<string, any>>({
                             cIdx === 0 && col.sticky ? "sticky left-0 z-10 bg-white" : ""
                           }`}
                         >
-                          <select
+                          <input
                             id={cellId}
-                            value={String(displayValue)}
-                            onChange={(e) => handleCellChange(rIdx, col.key, e.target.value)}
+                            disabled={rowDisabled}
+                            type={col.type === "number" ? "number" : "text"}
+                            step="any"
+                            value={displayValue}
+                            placeholder={col.placeholder || "—"}
+                            onChange={(e) =>
+                              handleCellChange(
+                                rIdx,
+                                col.key,
+                                col.type === "number" ? (e.target.value === "" ? "" : Number(e.target.value)) : e.target.value
+                              )
+                            }
+                            onFocus={() => setActiveCell({ row: rIdx, col: cIdx })}
                             onKeyDown={(e) => handleKeyDown(e, rIdx, cIdx)}
-                            className="w-full h-8 px-2.5 text-xs bg-transparent border-0 focus:ring-2 focus:ring-primary focus:bg-white text-slate-800 outline-none transition-all cursor-pointer"
-                          >
-                            <option value="">Select...</option>
-                            {col.options.map((opt) => (
-                              <option key={opt} value={opt}>
-                                {opt}
-                              </option>
-                            ))}
-                          </select>
+                            className={`w-full h-8 px-2.5 text-xs bg-transparent border-0 focus:ring-2 focus:ring-primary focus:bg-blue-50/20 text-slate-800 outline-none transition-all ${
+                              col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"
+                            } ${rowDisabled ? "opacity-60 cursor-not-allowed bg-slate-100/60 text-slate-500 font-semibold" : ""}`}
+                          />
                         </td>
                       );
-                    }
-
-                    return (
-                      <td
-                        key={col.key}
-                        className={`p-0 border-r border-slate-200 ${
-                          cIdx === 0 && col.sticky ? "sticky left-0 z-10 bg-white" : ""
-                        }`}
-                      >
-                        <input
-                          id={cellId}
-                          type={col.type === "number" ? "number" : "text"}
-                          step="any"
-                          value={displayValue}
-                          placeholder={col.placeholder || "—"}
-                          onChange={(e) =>
-                            handleCellChange(
-                              rIdx,
-                              col.key,
-                              col.type === "number" ? (e.target.value === "" ? "" : Number(e.target.value)) : e.target.value
-                            )
-                          }
-                          onFocus={() => setActiveCell({ row: rIdx, col: cIdx })}
-                          onKeyDown={(e) => handleKeyDown(e, rIdx, cIdx)}
-                          className={`w-full h-8 px-2.5 text-xs bg-transparent border-0 focus:ring-2 focus:ring-primary focus:bg-blue-50/20 text-slate-800 outline-none transition-all ${
-                            col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"
-                          }`}
-                        />
+                    })}
+                    {(allowDeleteRow || allowCopyRow || allowClearRow || rowActions) && (
+                      <td className="px-2 py-1 text-center whitespace-nowrap">
+                        <div className="flex items-center justify-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
+                          {rowActions && rowActions(row, rIdx)}
+                          {allowCopyRow && onCopyPrevious && !rowDisabled && (
+                            <button
+                              type="button"
+                              title="Copy Previous Reading"
+                              onClick={() => onCopyPrevious(rIdx)}
+                              className="p-1 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded"
+                            >
+                              <Copy className="h-3 w-3" />
+                            </button>
+                          )}
+                          {allowClearRow && !rowDisabled && (
+                            <button
+                              type="button"
+                              title="Clear Row"
+                              onClick={() => handleClearRow(rIdx)}
+                              className="p-1 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded"
+                            >
+                              <Eraser className="h-3 w-3" />
+                            </button>
+                          )}
+                          {allowDeleteRow && onDeleteRow && !rowDisabled && (
+                            <button
+                              type="button"
+                              title="Delete Row"
+                              onClick={() => onDeleteRow(rIdx)}
+                              className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </button>
+                          )}
+                        </div>
                       </td>
-                    );
-                  })}
-                  {(allowDeleteRow || allowCopyRow || allowClearRow) && (
-                    <td className="px-2 py-1 text-center whitespace-nowrap">
-                      <div className="flex items-center justify-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
-                        {allowCopyRow && onCopyPrevious && (
-                          <button
-                            type="button"
-                            title="Copy Previous Reading"
-                            onClick={() => onCopyPrevious(rIdx)}
-                            className="p-1 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded"
-                          >
-                            <Copy className="h-3 w-3" />
-                          </button>
-                        )}
-                        {allowClearRow && (
-                          <button
-                            type="button"
-                            title="Clear Row"
-                            onClick={() => handleClearRow(rIdx)}
-                            className="p-1 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded"
-                          >
-                            <Eraser className="h-3 w-3" />
-                          </button>
-                        )}
-                        {allowDeleteRow && onDeleteRow && (
-                          <button
-                            type="button"
-                            title="Delete Row"
-                            onClick={() => onDeleteRow(rIdx)}
-                            className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded"
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  )}
-                </tr>
-              ))
+                    )}
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>
