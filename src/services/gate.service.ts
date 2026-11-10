@@ -334,6 +334,29 @@ export class GateService {
       }
     }
 
+    // Enforce single active entry per vehicle inside premises
+    const normalizedTruck = data.truckNumber ? String(data.truckNumber).toUpperCase().trim() : "";
+    if (normalizedTruck) {
+      const activeEntry = await client.gateEntry.findFirst({
+        where: {
+          truckNumber: normalizedTruck,
+          status: {
+            notIn: [
+              GateEntryStatus.GATE_OUT,
+              GateEntryStatus.REJECTED,
+              GateEntryStatus.CANCELLED,
+            ],
+          },
+        },
+        select: { id: true, entryNumber: true, status: true },
+      });
+      if (activeEntry) {
+        throw new Error(
+          `Truck ${normalizedTruck} is already recorded inside the facility under active entry ${activeEntry.entryNumber} (Status: ${String(activeEntry.status).replace(/_/g, " ")}). Please complete Gate Out clearance before logging a new entry.`
+        );
+      }
+    }
+
     let currentEntryNumber = initialEntryNumber || (await GateService.generateEntryNumber(client));
     let entry: any = null;
     for (let attempt = 0; attempt < 3; attempt++) {
