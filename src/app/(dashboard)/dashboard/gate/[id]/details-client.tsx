@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import {
   ArrowLeft,
@@ -77,10 +77,18 @@ function formatStatus(status: string | null | undefined): string {
 
 export function GateDetailsClient({ entryId }: { entryId: string }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [entry, setEntry] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTab] = useState(searchParams?.get("tab") || "overview");
+
+  useEffect(() => {
+    const tabParam = searchParams?.get("tab");
+    if (tabParam && ["overview", "stock", "documents", "statuses"].includes(tabParam)) {
+      setActiveTab(tabParam);
+    }
+  }, [searchParams]);
 
   // Modals & Menus state
   const [showStockModal, setShowStockModal] = useState(false);
@@ -165,6 +173,8 @@ export function GateDetailsClient({ entryId }: { entryId: string }) {
         const err = await res.json().catch(() => ({}));
         if (err.blockers) {
           setBlockerModalData({
+            title: err.blockers.title,
+            description: err.blockers.description,
             entryNumber: entry.entryNumber,
             truckNumber: entry.truckNumber,
             purpose: entry.purpose,

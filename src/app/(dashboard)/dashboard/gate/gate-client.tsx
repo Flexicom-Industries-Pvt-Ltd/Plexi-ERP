@@ -281,6 +281,8 @@ export function GateClient({
         const err = await res.json().catch(() => ({}));
         if (err.blockers) {
           setBlockerModalData({
+            title: err.blockers.title,
+            description: err.blockers.description,
             entryNumber: target.entryNumber,
             truckNumber: target.truckNumber,
             purpose: target.purpose,
@@ -327,9 +329,11 @@ export function GateClient({
         if (err.blockers) {
           const match = prevEntries.find((e) => e.entryNumber === entryNumber);
           setBlockerModalData({
+            title: err.blockers.title,
+            description: err.blockers.description,
             entryNumber,
-            truckNumber: match?.truckNumber || entryNumber,
-            purpose: match?.purpose,
+            truckNumber: match?.truckNumber || err.blockers.truckNumber || entryNumber,
+            purpose: match?.purpose || err.blockers.purpose,
             message: err.error,
             unverifiedDocuments: err.blockers.unverifiedDocuments,
             uncommittedStock: err.blockers.uncommittedStock,

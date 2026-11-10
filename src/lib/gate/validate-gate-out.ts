@@ -2,6 +2,8 @@ import { db } from "@/lib/db";
 import { DocumentStatus, GateEntryStatus } from "@/generated/prisma";
 
 export interface GateOutBlockerDetails {
+  title?: string;
+  description?: string;
   entryNumber: string;
   truckNumber: string;
   purpose: string;
@@ -56,6 +58,9 @@ export async function validateGateOut(gateEntryId: string): Promise<GateOutValid
 
   if (unverified.length > 0 || uncommitted.length > 0) {
     const blockers: GateOutBlockerDetails = {
+      title: "Gate Out Clearance Blocked",
+      description:
+        "This vehicle cannot depart the factory premises. All required documents must be verified and consignment stock must be reconciled before final exit clearance.",
       entryNumber: entry.entryNumber,
       truckNumber: entry.truckNumber,
       purpose: entry.purpose,

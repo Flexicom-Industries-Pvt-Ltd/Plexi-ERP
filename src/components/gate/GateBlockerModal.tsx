@@ -12,6 +12,8 @@ import {
 } from "lucide-react";
 
 export interface GateBlockerModalData {
+  title?: string;
+  description?: string;
   entryNumber: string;
   truckNumber: string;
   purpose?: string;
@@ -58,7 +60,7 @@ export function GateBlockerModal({ isOpen, onClose, data }: GateBlockerModalProp
             </div>
             <div>
               <h3 className="font-bold text-slate-900 text-base sm:text-lg">
-                Gate Out Clearance Blocked
+                {data.title || (stock.length > 0 ? "Gate Out Clearance Blocked" : "Document Verification Incomplete")}
               </h3>
               <p className="text-xs text-slate-500 font-mono mt-0.5">
                 Truck: <span className="font-bold text-slate-800">{data.truckNumber}</span> • Entry:{" "}
@@ -81,8 +83,10 @@ export function GateBlockerModal({ isOpen, onClose, data }: GateBlockerModalProp
           <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200/80 text-xs text-slate-600 flex items-start gap-2.5">
             <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
             <p className="leading-relaxed">
-              This vehicle cannot depart the factory premises. All required documents must be
-              verified and consignment stock must be reconciled before final exit clearance.
+              {data.description ||
+                (stock.length > 0
+                  ? "This vehicle cannot depart the factory premises. All required documents must be verified and consignment stock must be reconciled before final exit clearance."
+                  : "This gate entry cannot proceed. All required driver and consignment documents must be verified before status can be advanced.")}
             </p>
           </div>
 
@@ -99,7 +103,7 @@ export function GateBlockerModal({ isOpen, onClose, data }: GateBlockerModalProp
                   onClick={onClose}
                   className="text-xs font-semibold text-primary hover:underline inline-flex items-center gap-1"
                 >
-                  <span>Review in Entry</span>
+                  <span>Review in Documents Tab</span>
                   <ExternalLink className="h-3 w-3" />
                 </Link>
               </div>
@@ -166,20 +170,38 @@ export function GateBlockerModal({ isOpen, onClose, data }: GateBlockerModalProp
           )}
 
           {docs.length === 0 && stock.length === 0 && (
-            <p className="text-xs text-slate-600 font-medium">
-              {data.message || "Entry status cannot be advanced until operational prerequisites are met."}
-            </p>
+            <div className="p-4 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-900 space-y-2">
+              <div className="flex items-center gap-2 font-bold text-amber-800">
+                <FileText className="h-4 w-4" />
+                <span>Document Verification Required</span>
+              </div>
+              <p className="text-slate-600 leading-relaxed">
+                {data.message ||
+                  "No documents have been uploaded for this gate entry. At least one driver or consignment document must be uploaded and verified before advancing."}
+              </p>
+              <div className="pt-1">
+                <Link
+                  href={`/dashboard/gate/${data.entryNumber}?tab=documents`}
+                  onClick={onClose}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-semibold text-xs transition-colors shadow-2xs"
+                >
+                  <span>Upload Documents Now</span>
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </Link>
+              </div>
+            </div>
           )}
         </div>
 
         {/* Modal Footer */}
         <div className="px-5 py-3.5 border-t border-slate-100 bg-slate-50 flex items-center justify-between gap-2 shrink-0">
           <Link
-            href={`/dashboard/gate/${data.entryNumber}`}
+            href={`/dashboard/gate/${data.entryNumber}?tab=documents`}
             onClick={onClose}
-            className="text-xs sm:text-sm font-semibold text-slate-700 hover:text-slate-900 px-3 py-2 rounded-lg hover:bg-slate-200/60 transition-colors inline-flex items-center gap-1"
+            className="text-xs sm:text-sm font-semibold text-primary hover:text-primary/80 px-3 py-2 rounded-lg hover:bg-primary/5 transition-colors inline-flex items-center gap-1.5"
           >
-            <span>Open Gate Entry</span>
+            <FileText className="h-4 w-4" />
+            <span>Review Documents</span>
             <ArrowRight className="h-3.5 w-3.5" />
           </Link>
           <button
