@@ -21,6 +21,7 @@ import dynamic from "next/dynamic";
 import { generateTapePlantPlanningExcel } from "@/lib/tape-plant/planning-export";
 import { parseRecipeQuality } from "@/lib/tape-plant/recipe-format";
 import { QualityCombobox } from "./QualityCombobox";
+import { useProductionShifts } from "@/hooks/useProductionShifts";
 
 const PlanningPrintPreviewModal = dynamic(
   () => import("./PlanningPrintPreviewModal").then((m) => m.PlanningPrintPreviewModal),
@@ -124,28 +125,9 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName, shifts }: T
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isFullscreen]);
 
-  // Available shifts
-  const [availableShifts, setAvailableShifts] = useState<{ id: string; name: string }[]>(shifts || []);
-
-  useEffect(() => {
-    if (shifts && shifts.length > 0) {
-      setAvailableShifts(shifts);
-    } else {
-      fetch("/api/settings/master-data/shift")
-        .then((r) => (r.ok ? r.json() : []))
-        .then((data) => {
-          if (Array.isArray(data) && data.length > 0) {
-            setAvailableShifts(data);
-          } else {
-            setAvailableShifts([
-              { id: "shift_day", name: "Day Shift" },
-              { id: "shift_night", name: "Night Shift" },
-            ]);
-          }
-        })
-        .catch(() => {});
-    }
-  }, [shifts]);
+  // Sourced strictly from Shift Master via useProductionShifts
+  const { shifts: masterShifts, allowDayNight } = useProductionShifts();
+  const availableShifts = shifts && shifts.length > 0 ? shifts : masterShifts;
 
   // Multi-recipe state
   const [recipePlans, setRecipePlans] = useState<RecipePlanItem[]>([createEmptyRecipePlan(1)]);
@@ -1093,7 +1075,7 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName, shifts }: T
                               </option>
                             );
                           })}
-                          <option value="BOTH">Both (D+N)</option>
+                          {allowDayNight && <option value="BOTH">Both (D+N)</option>}
                         </select>
                       </td>
 
