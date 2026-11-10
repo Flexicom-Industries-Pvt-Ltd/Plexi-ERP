@@ -13,12 +13,16 @@ export interface RolePermissionInput {
 export interface CreateRoleInput {
   name: string;
   description?: string;
+  canUploadPhoto?: boolean;
+  canCapturePhoto?: boolean;
   permissions: RolePermissionInput[];
 }
 
 export interface UpdateRoleInput {
   name: string;
   description?: string;
+  canUploadPhoto?: boolean;
+  canCapturePhoto?: boolean;
   permissions: RolePermissionInput[];
 }
 
@@ -73,6 +77,8 @@ export class RoleService {
           data: {
             name: data.name,
             description: data.description,
+            canUploadPhoto: data.canUploadPhoto ?? false,
+            canCapturePhoto: data.canCapturePhoto ?? true,
             permissions: {
               create: data.permissions,
             },
@@ -119,6 +125,8 @@ export class RoleService {
           data: {
             name: data.name,
             description: data.description,
+            canUploadPhoto: data.canUploadPhoto ?? false,
+            canCapturePhoto: data.canCapturePhoto ?? true,
             permissions: {
               create: data.permissions,
             },

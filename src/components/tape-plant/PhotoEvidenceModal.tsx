@@ -40,8 +40,16 @@ export function PhotoEvidenceModal({
   allowUpload = true,
   allowCapture = true,
 }: PhotoEvidenceModalProps) {
-  const defaultTab = currentPhotoUrl ? "view" : allowUpload ? "upload" : "camera";
-  const [activeTab, setActiveTab] = useState<"view" | "upload" | "camera">(defaultTab);
+  const resolveDefaultTab = (hasPhoto: boolean, uploadAllowed: boolean, captureAllowed: boolean): "view" | "upload" | "camera" => {
+    if (hasPhoto) return "view";
+    if (uploadAllowed) return "upload";
+    if (captureAllowed) return "camera";
+    return "view";
+  };
+
+  const [activeTab, setActiveTab] = useState<"view" | "upload" | "camera">(() =>
+    resolveDefaultTab(Boolean(currentPhotoUrl), allowUpload, allowCapture)
+  );
   const [previewUrl, setPreviewUrl] = useState<string | null>(currentPhotoUrl || null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
@@ -58,11 +66,11 @@ export function PhotoEvidenceModal({
       setPreviewUrl(currentPhotoUrl || null);
       setSelectedFile(null);
       setCameraError(null);
-      setActiveTab(currentPhotoUrl ? "view" : allowUpload ? "upload" : "camera");
+      setActiveTab(resolveDefaultTab(Boolean(currentPhotoUrl), allowUpload, allowCapture));
     } else {
       stopCamera();
     }
-  }, [isOpen, currentPhotoUrl, allowUpload]);
+  }, [isOpen, currentPhotoUrl, allowUpload, allowCapture]);
 
   // Clean up camera on unmount or tab switch
   const stopCamera = useCallback(() => {
@@ -273,6 +281,18 @@ export function PhotoEvidenceModal({
               </span>
             </div>
           )}
+          {!allowUpload && !allowCapture && !previewUrl && (
+            <div className="w-full py-10 flex flex-col items-center justify-center text-center px-4">
+              <div className="p-3 bg-red-50 text-red-600 rounded-full mb-3">
+                <AlertCircle className="h-6 w-6" />
+              </div>
+              <h4 className="text-sm font-bold text-slate-800">Photo Attachment Restricted</h4>
+              <p className="text-xs text-slate-500 max-w-sm mt-1">
+                Your user role does not have permission to upload files or capture live photos. Please contact your system administrator to request access in Settings → Roles.
+              </p>
+            </div>
+          )}
+
           {/* 1. View Tab */}
           {activeTab === "view" && previewUrl && (
             <div className="w-full flex flex-col items-center">

@@ -65,6 +65,8 @@ export function RawMaterialSection({ date, shiftId, shiftName }: RawMaterialSect
   // Auth & RBAC State
   const [userRole, setUserRole] = useState<string>("");
   const [userPermissions, setUserPermissions] = useState<any[]>([]);
+  const [canUploadPhoto, setCanUploadPhoto] = useState<boolean>(false);
+  const [canCapturePhoto, setCanCapturePhoto] = useState<boolean>(true);
   const isSupervisor = useMemo(() => {
     return canUserOverrideLock(userRole, userPermissions);
   }, [userRole, userPermissions]);
@@ -81,6 +83,12 @@ export function RawMaterialSection({ date, shiftId, shiftName }: RawMaterialSect
         if (!isMounted || !session?.user) return;
         setUserRole(session.user.role || "");
         setUserPermissions(session.user.permissions || []);
+        const isSuperAdmin =
+          session.user.role === "SUPERADMIN" ||
+          session.user.role === "Super Admin" ||
+          session.user.role === "SUPER_ADMIN";
+        setCanUploadPhoto(isSuperAdmin ? true : Boolean(session.user.canUploadPhoto));
+        setCanCapturePhoto(isSuperAdmin ? true : session.user.canCapturePhoto ?? true);
       })
       .catch((err) => {
         console.warn("Could not determine user session for RBAC:", err);
@@ -454,8 +462,8 @@ export function RawMaterialSection({ date, shiftId, shiftName }: RawMaterialSect
           title={`Raw Material Evidence — ${activePhotoRow.material} (${date})`}
           timeSlot={activePhotoRow.material}
           currentPhotoUrl={activePhotoRow.photoUrl}
-          allowUpload={isSupervisor} // Operators restricted to live camera capture
-          allowCapture={true}
+          allowUpload={canUploadPhoto}
+          allowCapture={canCapturePhoto}
           onSavePhoto={(url) => {
             handleUpdateRowPhoto(photoModalRowIdx, url);
             setPhotoModalRowIdx(null);

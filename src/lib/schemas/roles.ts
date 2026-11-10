@@ -12,6 +12,8 @@ export const RolePermissionSchema = z.object({
 export const CreateRoleSchema = z.object({
   name: z.string().min(1, "Role name is required"),
   description: z.string().optional(),
+  canUploadPhoto: z.boolean().default(false),
+  canCapturePhoto: z.boolean().default(true),
   permissions: z.array(RolePermissionSchema),
 });
 
