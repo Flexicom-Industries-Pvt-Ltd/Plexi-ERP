@@ -68,18 +68,20 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         }
 
         // Return user object without the password
+        const roleName = user.role?.name || "USER";
+        const normalizedRole = roleName.toUpperCase().replace(/[\s_-]+/g, "");
         const isSuperAdmin =
-          user.role?.name === "SUPERADMIN" ||
-          user.role?.name === "Super Admin" ||
-          user.role?.name === "SUPER_ADMIN";
+          roleName === "SUPER ADMIN" ||
+          normalizedRole === "SUPERADMIN" ||
+          normalizedRole.includes("ADMIN");
 
         return {
           id: user.id,
           email: user.email,
           name: user.name,
-          role: user.role?.name || "USER",
+          role: roleName,
           permissions: user.role?.permissions || [],
-          canUploadPhoto: isSuperAdmin ? true : (user.role?.canUploadPhoto ?? false),
+          canUploadPhoto: isSuperAdmin ? true : Boolean(user.role?.canUploadPhoto),
           canCapturePhoto: isSuperAdmin ? true : (user.role?.canCapturePhoto ?? true),
         };
       }
@@ -98,15 +100,51 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
     async session({ session, token }) {
       if (session.user) {
-        session.user.role = token.role as string;
+        session.user.role = (token.role as string) || "USER";
         session.user.id = token.id as string;
-        session.user.permissions = token.permissions as any[];
+        session.user.permissions = (token.permissions as any[]) || [];
+
+        let canUpload = Boolean(token.canUploadPhoto);
+        let canCapture = token.canCapturePhoto !== undefined ? Boolean(token.canCapturePhoto) : true;
+
+        // Query live role and photo permissions directly from DB on every session query
+        if (token.id) {
+          try {
+            const userWithRole = await db.user.findUnique({
+              where: { id: token.id as string },
+              select: {
+                role: {
+                  select: {
+                    name: true,
+                    canUploadPhoto: true,
+                    canCapturePhoto: true,
+                    permissions: true,
+                  },
+                },
+              },
+            });
+
+            if (userWithRole?.role) {
+              session.user.role = userWithRole.role.name;
+              canUpload = Boolean(userWithRole.role.canUploadPhoto);
+              canCapture = Boolean(userWithRole.role.canCapturePhoto);
+              if (userWithRole.role.permissions) {
+                session.user.permissions = userWithRole.role.permissions as any[];
+              }
+            }
+          } catch (e) {
+            console.warn("Could not query live role in session callback:", e);
+          }
+        }
+
+        const roleStr = (session.user.role || "").toUpperCase().replace(/[\s_-]+/g, "");
         const isSuperAdmin =
-          session.user.role === "SUPERADMIN" ||
-          session.user.role === "Super Admin" ||
-          session.user.role === "SUPER_ADMIN";
-        (session.user as any).canUploadPhoto = isSuperAdmin ? true : Boolean(token.canUploadPhoto);
-        (session.user as any).canCapturePhoto = isSuperAdmin ? true : Boolean(token.canCapturePhoto);
+          session.user.role === "SUPER ADMIN" ||
+          roleStr === "SUPERADMIN" ||
+          roleStr.includes("ADMIN");
+
+        (session.user as any).canUploadPhoto = isSuperAdmin ? true : canUpload;
+        (session.user as any).canCapturePhoto = isSuperAdmin ? true : canCapture;
       }
       return session;
     }
