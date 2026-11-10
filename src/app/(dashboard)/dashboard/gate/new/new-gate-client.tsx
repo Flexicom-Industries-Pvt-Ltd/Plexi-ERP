@@ -14,6 +14,7 @@ import {
   X,
   AlertTriangle,
   Info,
+  Loader2,
 } from "lucide-react";
 import Link from "next/link";
 import { GatePurpose } from "@/generated/prisma";
@@ -22,6 +23,10 @@ import { cn } from "@/lib/utils";
 export function NewGateClient() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [redirecting, setRedirecting] = useState(false);
+  const isSubmittingRef = useRef(false);
+  const navigationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   const [formData, setFormData] = useState<{
     truckNumber: string;
     driverName: string;
@@ -45,6 +50,14 @@ export function NewGateClient() {
   const [showDriverSuggestions, setShowDriverSuggestions] = useState(false);
   const [isDriverLocked, setIsDriverLocked] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    return () => {
+      if (navigationTimeoutRef.current) {
+        clearTimeout(navigationTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const fetchDrivers = async () => {
@@ -97,32 +110,81 @@ export function NewGateClient() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.truckNumber || !formData.driverName) {
-      toast.error("Truck number and driver name are required");
+    if (isSubmittingRef.current || loading || redirecting) {
       return;
     }
 
+    const trimmedTruck = (formData.truckNumber || "").trim().toUpperCase();
+    const trimmedDriverName = (formData.driverName || "").trim();
+    const trimmedDriverContact = (formData.driverContact || driverSearchTerm || "").trim();
+
+    if (!trimmedTruck) {
+      toast.error("Truck number is required");
+      return;
+    }
+
+    if (!trimmedDriverName) {
+      toast.error("Driver name is required");
+      return;
+    }
+
+    isSubmittingRef.current = true;
     setLoading(true);
+
+    const submissionPayload = {
+      ...formData,
+      truckNumber: trimmedTruck,
+      driverName: trimmedDriverName,
+      driverContact: trimmedDriverContact,
+    };
+
+    const idempotencyKey = `gate-entry-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+
     try {
       const res = await fetch("/api/gate", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": idempotencyKey,
+        },
+        body: JSON.stringify(submissionPayload),
       });
-      
+
+      const responseJson = await res.json().catch(() => null);
+
       if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.error || "Failed to create entry");
+        const message =
+          responseJson?.error?.message ||
+          (typeof responseJson?.error === "string" ? responseJson.error : null) ||
+          responseJson?.message ||
+          "Failed to create gate entry";
+        throw new Error(message);
       }
-      const data = await res.json();
-      toast.success("Gate entry created successfully");
-      const entryNum = data.data?.entryNumber || data.entryNumber;
+
+      const entryNum = responseJson?.data?.entryNumber || responseJson?.entryNumber;
+      if (!entryNum) {
+        throw new Error("Gate entry was registered, but did not return a valid entry number.");
+      }
+
+      toast.success(`Gate entry ${entryNum} created successfully`);
+      setRedirecting(true);
+
+      // Trigger router navigation to the gate entry details view
+      router.refresh();
       router.push(`/dashboard/gate/${entryNum}`);
+
+      // Fallback timer to guarantee redirection even if client RSC transition stalls
+      navigationTimeoutRef.current = setTimeout(() => {
+        if (typeof window !== "undefined" && window.location.pathname !== `/dashboard/gate/${entryNum}`) {
+          window.location.href = `/dashboard/gate/${entryNum}`;
+        }
+      }, 2500);
     } catch (err: any) {
-      console.error(err);
+      console.error("[NewGateEntry] Submission error:", err);
       toast.error(err.message || "An error occurred while creating the entry");
-    } finally {
       setLoading(false);
+      setRedirecting(false);
+      isSubmittingRef.current = false;
     }
   };
 
@@ -334,15 +396,25 @@ export function NewGateClient() {
             </Link>
             <button
               type="submit"
-              disabled={loading}
-              className="min-h-[44px] inline-flex items-center justify-center gap-2 px-6 py-2.5 text-xs sm:text-sm font-bold rounded-lg bg-primary text-white hover:bg-primary/90 transition-all shadow-sm disabled:opacity-50 touch-manipulation"
+              disabled={loading || redirecting}
+              className="min-h-[44px] inline-flex items-center justify-center gap-2 px-6 py-2.5 text-xs sm:text-sm font-bold rounded-lg bg-primary text-white hover:bg-primary/90 transition-all shadow-sm disabled:opacity-50 touch-manipulation cursor-pointer disabled:cursor-not-allowed"
             >
-              {loading ? (
-                <span className="animate-spin text-lg block h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
+              {redirecting ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin text-white" />
+                  <span>Opening Gate Entry...</span>
+                </>
+              ) : loading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin text-white" />
+                  <span>Registering Entry...</span>
+                </>
               ) : (
-                <PlusCircle className="h-4 w-4" />
+                <>
+                  <PlusCircle className="h-4 w-4" />
+                  <span>Create Gate Entry</span>
+                </>
               )}
-              <span>Create Gate Entry</span>
             </button>
           </div>
         </div>
