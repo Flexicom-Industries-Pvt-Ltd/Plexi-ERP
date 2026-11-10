@@ -690,8 +690,6 @@ export function GateDetailsClient({ entryId }: { entryId: string }) {
                 </h3>
                 <div className="bg-slate-50 rounded-xl p-3.5 sm:p-4 space-y-3 border border-slate-100">
                   <DetailRow icon={<FileText />} label="Purpose" value={entry.purpose} />
-                  <DetailRow icon={<Package />} label="Expected Material" value={entry.expectedMaterial || "—"} />
-                  <DetailRow icon={<RefreshCw />} label="Expected Quantity" value={entry.expectedQuantity ? `${entry.expectedQuantity}` : "—"} />
                   <DetailRow icon={<User />} label="Logged By" value={entry.user?.name || entry.createdBy || "System"} />
                 </div>
               </div>
