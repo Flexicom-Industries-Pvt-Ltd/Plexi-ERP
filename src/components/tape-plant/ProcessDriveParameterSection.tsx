@@ -94,6 +94,8 @@ export function ProcessDriveParameterSection({
   // Auth & RBAC State
   const [userRole, setUserRole] = useState<string>("");
   const [userPermissions, setUserPermissions] = useState<any[]>([]);
+  const [canUploadPhoto, setCanUploadPhoto] = useState<boolean>(false);
+  const [canCapturePhoto, setCanCapturePhoto] = useState<boolean>(true);
   const isSupervisor = useMemo(() => {
     return canUserOverrideLock(userRole, userPermissions);
   }, [userRole, userPermissions]);
@@ -113,6 +115,12 @@ export function ProcessDriveParameterSection({
         if (!isMounted || !session?.user) return;
         setUserRole(session.user.role || "");
         setUserPermissions(session.user.permissions || []);
+        const isSuperAdmin =
+          session.user.role === "SUPERADMIN" ||
+          session.user.role === "Super Admin" ||
+          session.user.role === "SUPER_ADMIN";
+        setCanUploadPhoto(isSuperAdmin ? true : Boolean(session.user.canUploadPhoto));
+        setCanCapturePhoto(isSuperAdmin ? true : session.user.canCapturePhoto ?? true);
       })
       .catch((err) => {
         console.warn("Could not determine user session for RBAC:", err);
@@ -793,6 +801,8 @@ export function ProcessDriveParameterSection({
           title={`Evidence Photo — ${activePhotoRecord.time || `Row #${photoModalRowIdx + 1}`} (${date})`}
           timeSlot={activePhotoRecord.time}
           currentPhotoUrl={activePhotoRecord.photoUrl}
+          allowUpload={canUploadPhoto}
+          allowCapture={canCapturePhoto}
           disabled={isRowLocked(activePhotoRecord, photoModalRowIdx)}
           onSavePhoto={(url) => {
             handleUpdateRowPhoto(photoModalRowIdx, url);

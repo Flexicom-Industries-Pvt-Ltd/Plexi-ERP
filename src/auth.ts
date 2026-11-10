@@ -68,12 +68,19 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         }
 
         // Return user object without the password
+        const isSuperAdmin =
+          user.role?.name === "SUPERADMIN" ||
+          user.role?.name === "Super Admin" ||
+          user.role?.name === "SUPER_ADMIN";
+
         return {
           id: user.id,
           email: user.email,
           name: user.name,
           role: user.role?.name || "USER",
           permissions: user.role?.permissions || [],
+          canUploadPhoto: isSuperAdmin ? true : (user.role?.canUploadPhoto ?? false),
+          canCapturePhoto: isSuperAdmin ? true : (user.role?.canCapturePhoto ?? true),
         };
       }
     })
@@ -84,6 +91,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.role = user.role;
         token.id = user.id;
         token.permissions = user.permissions;
+        token.canUploadPhoto = (user as any).canUploadPhoto;
+        token.canCapturePhoto = (user as any).canCapturePhoto;
       }
       return token;
     },
@@ -92,6 +101,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         session.user.role = token.role as string;
         session.user.id = token.id as string;
         session.user.permissions = token.permissions as any[];
+        const isSuperAdmin =
+          session.user.role === "SUPERADMIN" ||
+          session.user.role === "Super Admin" ||
+          session.user.role === "SUPER_ADMIN";
+        (session.user as any).canUploadPhoto = isSuperAdmin ? true : Boolean(token.canUploadPhoto);
+        (session.user as any).canCapturePhoto = isSuperAdmin ? true : Boolean(token.canCapturePhoto);
       }
       return session;
     }
