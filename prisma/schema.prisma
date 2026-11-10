@@ -1778,6 +1778,7 @@ model TapePlantRawMaterial {
   shiftId        String
   operatorName   String?
   operatorId     String?
+  photoUrl       String?
   material       String   // PP, CC, MB, RP1, RP2, HD RP, TPT, etc.
   grade          String?
   openingStock   Float    @default(0)
