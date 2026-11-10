@@ -497,12 +497,26 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName, shifts }: T
           lastSavedPayloadRef.current = serialized;
           setLastAutoSavedAt(new Date());
           if (Array.isArray(resData.plans)) {
-            setRecipePlans((prev) =>
-              prev.map((p, i) => {
+            // Only update recipePlans state if IDs actually changed (e.g. newly minted DB IDs)
+            // This prevents disruptive input re-renders, focus loss, and keystroke drops while typing
+            setRecipePlans((prev) => {
+              let hasIdMismatch = false;
+              for (let i = 0; i < prev.length; i++) {
                 const match = resData.plans[i];
-                return match && match.id ? { ...p, id: match.id } : p;
-              })
-            );
+                if (match && match.id && prev[i].id !== match.id) {
+                  hasIdMismatch = true;
+                  break;
+                }
+              }
+              if (!hasIdMismatch) return prev; // Identity preserved, zero re-renders
+              return prev.map((p, i) => {
+                const match = resData.plans[i];
+                if (match && match.id && p.id !== match.id) {
+                  return { ...p, id: match.id };
+                }
+                return p;
+              });
+            });
           }
         }
       } catch (err) {

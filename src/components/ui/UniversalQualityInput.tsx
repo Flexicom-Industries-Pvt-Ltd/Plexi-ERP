@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { ChevronDown, X, Check, Sparkles, Loader2 } from "lucide-react";
 
 export interface UniversalQualityOption {
@@ -139,24 +140,77 @@ export function UniversalQualityInput({
   title,
   id,
 }: UniversalQualityInputProps) {
+  const [mounted, setMounted] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
-  const [openUpward, setOpenUpward] = useState(false);
   const [searchQuery, setSearchQuery] = useState(value || "");
   const [highlightedIndex, setHighlightedIndex] = useState(0);
+  const [dropdownCoords, setDropdownCoords] = useState<{
+    top: number;
+    left: number;
+    width: number;
+    maxHeight: number;
+    placement: "bottom" | "top";
+  }>({ top: 0, left: 0, width: 280, maxHeight: 280, placement: "bottom" });
 
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
-  // Auto-flip upward if viewport space below is tight
   useEffect(() => {
-    if (isOpen && containerRef.current) {
-      const rect = containerRef.current.getBoundingClientRect();
-      const spaceBelow = window.innerHeight - rect.bottom;
-      const spaceAbove = rect.top;
-      setOpenUpward(spaceBelow < 260 && spaceAbove > spaceBelow);
+    setMounted(true);
+  }, []);
+
+  // Compute fixed viewport coordinates to prevent clipping by table overflow / sticky headers
+  const updateDropdownPosition = useCallback(() => {
+    if (!containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const spaceAbove = rect.top;
+    const preferredHeight = 280;
+
+    const placement: "bottom" | "top" =
+      spaceBelow < preferredHeight && spaceAbove > spaceBelow ? "top" : "bottom";
+
+    const maxAvailableHeight =
+      placement === "top"
+        ? Math.max(120, Math.min(288, spaceAbove - 16))
+        : Math.max(120, Math.min(288, spaceBelow - 16));
+
+    const width = Math.min(Math.max(rect.width, 280), 420);
+
+    let left = rect.left;
+    if (left + width > window.innerWidth - 12) {
+      left = Math.max(12, window.innerWidth - width - 12);
     }
-  }, [isOpen]);
+    if (left < 12) left = 12;
+
+    const top = placement === "bottom" ? rect.bottom + 4 : rect.top - 4;
+
+    setDropdownCoords({
+      top,
+      left,
+      width,
+      maxHeight: maxAvailableHeight,
+      placement,
+    });
+  }, []);
+
+  // Recalculate position on open, scroll (all nested containers), and resize
+  useEffect(() => {
+    if (!isOpen) return;
+    updateDropdownPosition();
+
+    const handleReposition = () => {
+      updateDropdownPosition();
+    };
+
+    window.addEventListener("scroll", handleReposition, { capture: true, passive: true });
+    window.addEventListener("resize", handleReposition, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", handleReposition, { capture: true });
+      window.removeEventListener("resize", handleReposition);
+    };
+  }, [isOpen, updateDropdownPosition]);
 
   // Load qualities from options or Data Centre API
   const { qualities: masterQualities, loading: masterLoading } = useDataCentreQualities(options);
@@ -168,17 +222,24 @@ export function UniversalQualityInput({
     }
   }, [value, isOpen]);
 
-  // Click outside listener
+  // Click outside listener (verifies both containerRef and portaled listRef)
   useEffect(() => {
+    if (!isOpen) return;
     const handleClickOutside = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(target) &&
+        listRef.current &&
+        !listRef.current.contains(target)
+      ) {
         setIsOpen(false);
         setSearchQuery(value || "");
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [value]);
+  }, [isOpen, value]);
 
   // Filter master qualities based on search query
   const filteredOptions = useMemo(() => {
@@ -421,13 +482,23 @@ export function UniversalQualityInput({
         </div>
       </div>
 
-      {/* Floating Suggestions Dropdown */}
-      {isOpen && (
+      {/* Floating Suggestions Dropdown (Portaled to document.body to avoid table cell clipping & overflow traps) */}
+      {mounted && isOpen && createPortal(
         <div
           ref={listRef}
-          className={`absolute left-0 z-50 w-full min-w-[280px] max-w-[420px] max-h-72 overflow-y-auto bg-white rounded-lg border border-slate-300 shadow-2xl p-1 text-xs animate-in fade-in zoom-in-95 duration-100 ${
-            openUpward ? "bottom-full mb-1" : "top-full mt-1"
-          } ${dropdownClassName}`}
+          style={{
+            position: "fixed",
+            top: dropdownCoords.placement === "bottom" ? `${dropdownCoords.top}px` : undefined,
+            bottom:
+              dropdownCoords.placement === "top"
+                ? `${window.innerHeight - dropdownCoords.top}px`
+                : undefined,
+            left: `${dropdownCoords.left}px`,
+            width: `${dropdownCoords.width}px`,
+            maxHeight: `${dropdownCoords.maxHeight}px`,
+            zIndex: 99999,
+          }}
+          className={`overflow-y-auto bg-white rounded-lg border border-slate-300 shadow-2xl p-1 text-xs animate-in fade-in zoom-in-95 duration-100 ${dropdownClassName}`}
         >
           <div className="px-2.5 py-1 text-[10px] font-bold text-slate-500 uppercase tracking-wider bg-slate-50 rounded-t flex items-center justify-between mb-1 border-b pb-1">
             <span>
@@ -535,7 +606,8 @@ export function UniversalQualityInput({
               )}
             </>
           )}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
