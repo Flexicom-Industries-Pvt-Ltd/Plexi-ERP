@@ -24,6 +24,7 @@ import {
 import { toast } from "sonner";
 import { GateEntryStatus, GatePurpose } from "@/generated/prisma";
 import { cn } from "@/lib/utils";
+import { GateBlockerModal, GateBlockerModalData } from "@/components/gate/GateBlockerModal";
 
 type GateClientProps = {
   initialEntries?: any[];
@@ -91,6 +92,8 @@ export function GateClient({
   const [isDeleting, setIsDeleting] = useState(false);
   const [editEntry, setEditEntry] = useState<any | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [blockerModalData, setBlockerModalData] = useState<GateBlockerModalData | null>(null);
+  const [showBlockerModal, setShowBlockerModal] = useState(false);
 
   const fetchEntries = useCallback(async (targetPage: number = 1, customLimit?: number) => {
     setLoading(true);
@@ -274,15 +277,31 @@ export function GateClient({
           status: target.status,
         }),
       });
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        if (err.blockers) {
+          setBlockerModalData({
+            entryNumber: target.entryNumber,
+            truckNumber: target.truckNumber,
+            purpose: target.purpose,
+            message: err.error,
+            unverifiedDocuments: err.blockers.unverifiedDocuments,
+            uncommittedStock: err.blockers.uncommittedStock,
+          });
+          setShowBlockerModal(true);
+          setEntries(prevEntries);
+          return;
+        }
+        throw new Error(err.error || "Failed to update gate entry");
+      }
       toast.success("Gate entry updated successfully");
       fetch("/api/gate/stats")
         .then((r) => (r.ok ? r.json() : null))
         .then((s) => s && setStats(s))
         .catch(() => {});
-    } catch {
+    } catch (err: unknown) {
       setEntries(prevEntries);
-      toast.error("Failed to update gate entry");
+      toast.error(err instanceof Error ? err.message : "Failed to update gate entry");
     } finally {
       setIsEditing(false);
     }
@@ -305,6 +324,20 @@ export function GateClient({
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
+        if (err.blockers) {
+          const match = prevEntries.find((e) => e.entryNumber === entryNumber);
+          setBlockerModalData({
+            entryNumber,
+            truckNumber: match?.truckNumber || entryNumber,
+            purpose: match?.purpose,
+            message: err.error,
+            unverifiedDocuments: err.blockers.unverifiedDocuments,
+            uncommittedStock: err.blockers.uncommittedStock,
+          });
+          setShowBlockerModal(true);
+          setEntries(prevEntries);
+          return;
+        }
         throw new Error(err.error || "Failed to advance status");
       }
       toast.success("Status advanced successfully");
@@ -1070,6 +1103,12 @@ export function GateClient({
         <Plus className="h-5 w-5" />
         <span>New Truck</span>
       </Link>
+
+      <GateBlockerModal
+        isOpen={showBlockerModal}
+        onClose={() => setShowBlockerModal(false)}
+        data={blockerModalData}
+      />
     </div>
   );
 }

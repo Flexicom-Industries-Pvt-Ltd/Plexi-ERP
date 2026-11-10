@@ -34,6 +34,7 @@ import {
 import { GateEntryStatus } from "@/generated/prisma";
 import { TransportSlipModal } from "@/components/gate/TransportSlipModal";
 import { printTransportSlip } from "@/lib/gate/print-transport-slip";
+import { GateBlockerModal, GateBlockerModalData } from "@/components/gate/GateBlockerModal";
 
 const LIFECYCLE_STEPS = [
   { id: "ARRIVED", label: "Arrived" },
@@ -87,6 +88,8 @@ export function GateDetailsClient({ entryId }: { entryId: string }) {
   const [showSlipModal, setShowSlipModal] = useState(false);
   const [showStatusMenu, setShowStatusMenu] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [blockerModalData, setBlockerModalData] = useState<GateBlockerModalData | null>(null);
+  const [showBlockerModal, setShowBlockerModal] = useState(false);
 
   // Forms state
   const [stockForm, setStockForm] = useState({ ...EMPTY_STOCK_FORM });
@@ -160,6 +163,18 @@ export function GateDetailsClient({ entryId }: { entryId: string }) {
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
+        if (err.blockers) {
+          setBlockerModalData({
+            entryNumber: entry.entryNumber,
+            truckNumber: entry.truckNumber,
+            purpose: entry.purpose,
+            message: err.error,
+            unverifiedDocuments: err.blockers.unverifiedDocuments,
+            uncommittedStock: err.blockers.uncommittedStock,
+          });
+          setShowBlockerModal(true);
+          return;
+        }
         throw new Error(err.error || "Failed to update status");
       }
       await fetchEntry();
@@ -1450,6 +1465,11 @@ export function GateDetailsClient({ entryId }: { entryId: string }) {
         entry={entry}
       />
 
+      <GateBlockerModal
+        isOpen={showBlockerModal}
+        onClose={() => setShowBlockerModal(false)}
+        data={blockerModalData}
+      />
     </div>
   );
 }

@@ -1,9 +1,33 @@
 import { db } from "@/lib/db";
 import { DocumentStatus, GateEntryStatus } from "@/generated/prisma";
 
+export interface GateOutBlockerDetails {
+  entryNumber: string;
+  truckNumber: string;
+  purpose: string;
+  unverifiedDocuments: Array<{
+    id: string;
+    documentType: string;
+    status: string;
+    remarks?: string | null;
+  }>;
+  uncommittedStock: Array<{
+    id: string;
+    materialName: string;
+    quantity: number;
+    unit: string;
+    batchLot?: string | null;
+  }>;
+}
+
 export type GateOutValidationResult =
   | { ok: true }
-  | { ok: false; error: string };
+  | {
+      ok: false;
+      error: string;
+      code: "DOCUMENTS_PENDING" | "STOCK_PENDING" | "STATUS_INVALID" | "NOT_FOUND";
+      blockers?: GateOutBlockerDetails;
+    };
 
 export async function validateGateOut(gateEntryId: string): Promise<GateOutValidationResult> {
   const entry = await db.gateEntry.findUnique({
@@ -12,46 +36,72 @@ export async function validateGateOut(gateEntryId: string): Promise<GateOutValid
   });
 
   if (!entry) {
-    return { ok: false, error: "Gate entry not found" };
+    return { ok: false, error: "Gate entry not found", code: "NOT_FOUND" };
   }
 
   if (entry.status === GateEntryStatus.GATE_OUT) {
-    return { ok: false, error: "Entry has already exited the gate" };
+    return { ok: false, error: "Entry has already exited the gate", code: "STATUS_INVALID" };
   }
 
   if (entry.status !== GateEntryStatus.COMPLETED) {
     return {
       ok: false,
       error: "Entry must be COMPLETED before gate-out. Advance through loading/unloading first.",
+      code: "STATUS_INVALID",
     };
   }
 
-  if (entry.documents.length > 0) {
-    const unverified = entry.documents.filter((d) => d.status !== DocumentStatus.VERIFIED);
+  const unverified = entry.documents.filter((d) => d.status !== DocumentStatus.VERIFIED);
+  const uncommitted = entry.stockDetails.filter((s) => s.actualQuantity == null);
+
+  if (unverified.length > 0 || uncommitted.length > 0) {
+    const blockers: GateOutBlockerDetails = {
+      entryNumber: entry.entryNumber,
+      truckNumber: entry.truckNumber,
+      purpose: entry.purpose,
+      unverifiedDocuments: unverified.map((d) => ({
+        id: d.id,
+        documentType: d.documentType,
+        status: d.status,
+        remarks: d.remarks,
+      })),
+      uncommittedStock: uncommitted.map((s) => ({
+        id: s.id,
+        materialName: s.materialName,
+        quantity: s.quantity,
+        unit: s.unit,
+        batchLot: s.batchLot,
+      })),
+    };
+
+    if (unverified.length > 0 && uncommitted.length > 0) {
+      return {
+        ok: false,
+        error: `Gate Out blocked: ${unverified.length} document(s) pending verification and ${uncommitted.length} stock line(s) pending inventory confirmation.`,
+        code: "DOCUMENTS_PENDING",
+        blockers,
+      };
+    }
+
     if (unverified.length > 0) {
       return {
         ok: false,
         error: `All documents must be verified before gate-out (${unverified.length} pending/rejected)`,
+        code: "DOCUMENTS_PENDING",
+        blockers,
       };
     }
-  }
 
-  if (entry.purpose === "UNLOADING" && entry.stockDetails.length > 0) {
-    const uncommitted = entry.stockDetails.filter((s) => s.actualQuantity == null);
     if (uncommitted.length > 0) {
+      const msg =
+        entry.purpose === "UNLOADING"
+          ? `All stock lines must be received into inventory before gate-out (${uncommitted.length} line(s) pending)`
+          : `All loading quantities must be confirmed before gate-out (${uncommitted.length} line(s) pending)`;
       return {
         ok: false,
-        error: "All stock lines must be received into inventory before gate-out",
-      };
-    }
-  }
-
-  if (entry.purpose === "LOADING" && entry.stockDetails.length > 0) {
-    const uncommitted = entry.stockDetails.filter((s) => s.actualQuantity == null);
-    if (uncommitted.length > 0) {
-      return {
-        ok: false,
-        error: "All loading quantities must be confirmed before gate-out",
+        error: msg,
+        code: "STOCK_PENDING",
+        blockers,
       };
     }
   }
