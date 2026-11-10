@@ -1704,6 +1704,7 @@ model TapePlantTemperatureReading {
   time           String   // e.g. "12:00", "14:00"
   operatorName   String?
   operatorId     String?
+  photoUrl       String?
   b1             Float?
   b2             Float?
   b3             Float?
@@ -1742,6 +1743,7 @@ model TapePlantDriveParameter {
   time            String   // e.g. "12:00", "14:00"
   operatorName    String?
   operatorId      String?
+  photoUrl        String?
   extruderRpm     Float?
   meltPumpRpm     Float?
   takeUpMpm       Float?
