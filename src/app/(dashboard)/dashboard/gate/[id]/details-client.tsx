@@ -90,6 +90,9 @@ export function GateDetailsClient({ entryId }: { entryId: string }) {
   // Forms state
   const [stockForm, setStockForm] = useState({ ...EMPTY_STOCK_FORM });
   const [docForm, setDocForm] = useState({ documentType: "", remarks: "" });
+  const [docFile, setDocFile] = useState<File | null>(null);
+  const [fileDragActive, setFileDragActive] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [stockSearchTerm, setStockSearchTerm] = useState("");
   const [suggestedStocks, setSuggestedStocks] = useState<any[]>([]);
   const [showStockSuggestions, setShowStockSuggestions] = useState(false);
@@ -268,20 +271,38 @@ export function GateDetailsClient({ entryId }: { entryId: string }) {
 
   const handleAddDoc = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!docForm.documentType) {
+      toast.error("Please select a document type");
+      return;
+    }
     setSubmitting(true);
     try {
+      const formData = new FormData();
+      formData.append("documentType", docForm.documentType);
+      if (docForm.remarks) {
+        formData.append("remarks", docForm.remarks);
+      }
+      if (docFile) {
+        formData.append("file", docFile);
+      }
+
       const res = await fetch(`/api/gate/${entryId}/documents`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...docForm, fileUrl: "local-check" }),
+        body: formData,
       });
-      if (!res.ok) throw new Error();
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Failed to add document");
+      }
+
       await fetchEntry();
       setShowDocModal(false);
       setDocForm({ documentType: "", remarks: "" });
-      toast.success("Document added");
-    } catch (err) {
-      toast.error("Failed to add document");
+      setDocFile(null);
+      toast.success("Document attached successfully");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to add document");
     } finally {
       setSubmitting(false);
     }
@@ -884,10 +905,18 @@ export function GateDetailsClient({ entryId }: { entryId: string }) {
                              {doc.verifiedAt ? ` • ${new Date(doc.verifiedAt).toLocaleString()}` : ""}
                            </p>
                          )}
-                         {doc.fileUrl && doc.fileUrl !== "local-check" && (
-                           <a href={doc.fileUrl} target="_blank" rel="noreferrer" className="text-xs text-primary font-semibold hover:underline block mb-2">
-                             View File
+                         {doc.fileUrl && doc.fileUrl !== "local-check" ? (
+                           <a
+                             href={doc.fileUrl}
+                             target="_blank"
+                             rel="noreferrer"
+                             className="inline-flex items-center gap-1.5 text-xs text-primary font-semibold hover:underline mb-2 bg-primary/5 hover:bg-primary/10 px-2.5 py-1 rounded-md border border-primary/20 transition-colors"
+                           >
+                             <FileText className="h-3.5 w-3.5" />
+                             <span>View Attached Document</span>
                            </a>
+                         ) : (
+                           <span className="text-[11px] text-slate-400 italic block mb-2">No file attached</span>
                          )}
                          {doc.status !== "VERIFIED" && doc.status !== "REJECTED" && entry.status !== "GATE_OUT" && (
                            <div className="flex flex-wrap gap-1.5 mt-2">
@@ -1237,7 +1266,7 @@ export function GateDetailsClient({ entryId }: { entryId: string }) {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
             <div className="px-5 py-4 border-b border-slate-100 flex justify-between items-center sticky top-0 bg-white z-10">
               <h3 className="font-bold text-slate-800 text-base">Add Document</h3>
-              <button onClick={() => setShowDocModal(false)} className="text-slate-400 hover:text-slate-600 p-1">
+              <button onClick={() => { setShowDocModal(false); setDocFile(null); }} className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer">
                 <XCircle className="h-5 w-5" />
               </button>
             </div>
@@ -1258,6 +1287,83 @@ export function GateDetailsClient({ entryId }: { entryId: string }) {
                   <option value="Other">Other</option>
                 </select>
               </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Document File Attachment
+                </label>
+                <div
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setFileDragActive(true);
+                  }}
+                  onDragLeave={() => setFileDragActive(false)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setFileDragActive(false);
+                    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                      setDocFile(e.dataTransfer.files[0]);
+                    }
+                  }}
+                  onClick={() => fileInputRef.current?.click()}
+                  className={`border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-all ${
+                    fileDragActive
+                      ? "border-primary bg-primary/5"
+                      : docFile
+                      ? "border-emerald-300 bg-emerald-50/50"
+                      : "border-slate-200 hover:border-slate-300 hover:bg-slate-50/50"
+                  }`}
+                >
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".pdf,.png,.jpg,.jpeg,.webp"
+                    className="hidden"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        setDocFile(e.target.files[0]);
+                      }
+                    }}
+                  />
+                  {docFile ? (
+                    <div className="flex items-center justify-between gap-2 text-left">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="p-2 bg-emerald-100 text-emerald-700 rounded-lg shrink-0">
+                          <FileText className="h-5 w-5" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-slate-800 truncate">{docFile.name}</p>
+                          <p className="text-[11px] text-slate-500">{(docFile.size / 1024).toFixed(1)} KB</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDocFile(null);
+                        }}
+                        className="text-slate-400 hover:text-red-500 p-1 shrink-0"
+                        title="Remove file"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center gap-1.5 py-1">
+                      <div className="p-2 rounded-full bg-slate-100 text-slate-500">
+                        <Upload className="h-5 w-5" />
+                      </div>
+                      <p className="text-xs font-bold text-slate-700">
+                        Click to browse or drag file here
+                      </p>
+                      <p className="text-[11px] text-slate-400">
+                        PDF, JPG, PNG or WEBP (up to 10MB)
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Remarks / Reference No.</label>
                 <textarea 
@@ -1268,20 +1374,21 @@ export function GateDetailsClient({ entryId }: { entryId: string }) {
                   rows={3}
                 />
               </div>
+
               <div className="pt-3 flex justify-end gap-2 border-t border-slate-100">
                 <button 
                   type="button" 
-                  onClick={() => setShowDocModal(false)} 
-                  className="px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 rounded-lg border border-slate-200"
+                  onClick={() => { setShowDocModal(false); setDocFile(null); }} 
+                  className="px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 rounded-lg border border-slate-200 cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button 
                   type="submit" 
                   disabled={submitting} 
-                  className="px-4 py-2.5 text-sm font-bold bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 shadow-sm"
+                  className="px-4 py-2.5 text-sm font-bold bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 shadow-sm cursor-pointer"
                 >
-                  {submitting ? "Saving..." : "Add Document"}
+                  {submitting ? "Attaching..." : "Add Document"}
                 </button>
               </div>
             </form>
