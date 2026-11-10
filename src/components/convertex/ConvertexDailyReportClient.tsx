@@ -36,6 +36,7 @@ import dynamic from "next/dynamic";
 import { exportConvertexReportExcel } from "@/lib/convertex/convertex-export";
 import { UniversalQualityInput } from "@/components/ui/UniversalQualityInput";
 import { UniversalPersonnelInput } from "@/components/ui/UniversalPersonnelInput";
+import { UniversalShiftSelector } from "@/components/production/UniversalShiftSelector";
 
 const ConvertexReportPrintModal = dynamic(
   () => import("./ConvertexReportPrintModal").then((m) => m.ConvertexReportPrintModal),
@@ -610,17 +611,16 @@ export function ConvertexDailyReportClient() {
             <label className="block text-xs font-semibold uppercase text-slate-600 mb-1 flex items-center gap-1">
               <Clock className="w-3.5 h-3.5 text-slate-400" /> Shift
             </label>
-            <select
+            <UniversalShiftSelector
               value={shiftName}
-              onChange={(e) => {
+              onChange={(val) => {
                 isDirtyRef.current = false;
-                setShiftName(e.target.value);
+                setShiftName(val);
               }}
-              className="w-full px-3 py-1.5 text-sm border border-slate-200 rounded-md focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white font-medium"
-            >
-              <option value="Day Shift">Day Shift</option>
-              <option value="Night Shift">Night Shift</option>
-            </select>
+              mode="byName"
+              showIcon={false}
+              selectClassName="px-3 py-1.5 border-slate-200"
+            />
           </div>
 
           <div>

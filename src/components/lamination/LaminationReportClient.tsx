@@ -47,14 +47,7 @@ import {
   Minimize2,
 } from "lucide-react";
 import { toast } from "sonner";
-
-const SHIFTS = [
-  "Night Shift",
-  "Day Shift",
-  "Shift A",
-  "Shift B",
-  "Shift C",
-];
+import { UniversalShiftSelector } from "@/components/production/UniversalShiftSelector";
 
 export function LaminationReportClient() {
   const todayStr = useMemo(() => {
@@ -421,22 +414,12 @@ export function LaminationReportClient() {
 
           {/* Shift */}
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
-              <Clock className="h-3.5 w-3.5 text-slate-400" />
-              Shift
-            </label>
-            <Select value={shiftName} onValueChange={(val) => { if (val) setShiftName(val); }}>
-              <SelectTrigger className="h-9 text-xs">
-                <SelectValue placeholder="Select Shift" />
-              </SelectTrigger>
-              <SelectContent>
-                {SHIFTS.map((s) => (
-                  <SelectItem key={s} value={s} className="text-xs">
-                    {s}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <UniversalShiftSelector
+              value={shiftName}
+              onChange={(val) => setShiftName(val)}
+              mode="byName"
+              label="Shift"
+            />
           </div>
 
           {/* Operator Name */}

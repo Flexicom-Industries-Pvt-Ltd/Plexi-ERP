@@ -38,13 +38,12 @@ import { exportPrintingReportExcel } from "@/lib/printing/printing-export";
 import dynamic from "next/dynamic";
 import { UniversalQualityInput } from "@/components/ui/UniversalQualityInput";
 import { UniversalPersonnelInput } from "@/components/ui/UniversalPersonnelInput";
+import { UniversalShiftSelector } from "@/components/production/UniversalShiftSelector";
 
 const PrintingReportPrintModal = dynamic(
   () => import("./PrintingReportPrintModal").then((m) => m.PrintingReportPrintModal),
   { ssr: false }
 );
-
-const SHIFTS = ["Day Shift", "Night Shift", "Shift 1", "Shift 2"];
 
 function createEmptyRow(seq: number): PrintingReportItem {
   return {
@@ -525,15 +524,13 @@ export function PrintingDailyReportClient() {
             <label className="flex items-center gap-1 text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1">
               <Clock className="h-3 w-3" /> Shift
             </label>
-            <select
+            <UniversalShiftSelector
               value={shiftName}
-              onChange={(e) => setShiftName(e.target.value)}
-              className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary"
-            >
-              {SHIFTS.map((s) => (
-                <option key={s} value={s}>{s}</option>
-              ))}
-            </select>
+              onChange={(val) => setShiftName(val)}
+              mode="byName"
+              showIcon={false}
+              selectClassName="px-3 py-1.5 bg-slate-50 border-slate-200 font-semibold"
+            />
           </div>
 
           <div>

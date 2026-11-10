@@ -35,6 +35,7 @@ import dynamic from "next/dynamic";
 import { exportValvomaticReportExcel } from "@/lib/valvomatic/valvomatic-export";
 import { UniversalQualityInput } from "@/components/ui/UniversalQualityInput";
 import { UniversalPersonnelInput } from "@/components/ui/UniversalPersonnelInput";
+import { UniversalShiftSelector } from "@/components/production/UniversalShiftSelector";
 
 const ValvomaticReportPrintModal = dynamic(
   () => import("./ValvomaticReportPrintModal").then((m) => m.ValvomaticReportPrintModal),
@@ -591,15 +592,13 @@ export function ValvomaticDailyReportClient() {
 
           <div>
             <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">Shift</label>
-            <select
+            <UniversalShiftSelector
               value={shiftName}
-              onChange={(e) => setShiftName(e.target.value)}
-              className="w-full text-xs px-2.5 py-1.5 border border-slate-300 rounded-lg focus:outline-hidden focus:ring-1 focus:ring-primary bg-white"
-            >
-              <option value="Day Shift">Day Shift</option>
-              <option value="Night Shift">Night Shift</option>
-              <option value="General Shift">General Shift</option>
-            </select>
+              onChange={(val) => setShiftName(val)}
+              mode="byName"
+              showIcon={false}
+              selectClassName="px-2.5 py-1.5 border-slate-300"
+            />
           </div>
 
           <div>

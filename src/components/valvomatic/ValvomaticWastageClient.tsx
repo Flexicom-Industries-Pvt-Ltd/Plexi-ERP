@@ -35,6 +35,7 @@ import dynamic from "next/dynamic";
 import { exportValvomaticWastageReportExcel } from "@/lib/valvomatic/valvomatic-export";
 import { UniversalQualityInput } from "@/components/ui/UniversalQualityInput";
 import { UniversalPersonnelInput } from "@/components/ui/UniversalPersonnelInput";
+import { UniversalShiftSelector } from "@/components/production/UniversalShiftSelector";
 
 const ValvomaticWastagePrintModal = dynamic(
   () => import("./ValvomaticWastagePrintModal").then((m) => m.ValvomaticWastagePrintModal),
@@ -429,11 +430,10 @@ export function ValvomaticWastageClient() {
 
   return (
     <div
-      className={`space-y-4 pb-16 ${
-        isFullscreen
+      className={`space-y-4 pb-16 ${isFullscreen
           ? "fixed inset-0 z-50 bg-slate-100 p-4 overflow-y-auto"
           : "max-w-[100vw] overflow-x-hidden"
-      }`}
+        }`}
     >
       {/* Main Header Card */}
       <div className="bg-white border border-slate-200 rounded-xl p-4 sm:p-5 shadow-xs">
@@ -449,13 +449,12 @@ export function ValvomaticWastageClient() {
                     Wastage Accounting
                   </span>
                   <span
-                    className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
-                      status === "APPROVED"
+                    className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${status === "APPROVED"
                         ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                         : status === "SUBMITTED"
-                        ? "bg-blue-50 text-blue-700 border border-blue-200"
-                        : "bg-amber-50 text-amber-700 border border-amber-200"
-                    }`}
+                          ? "bg-blue-50 text-blue-700 border border-blue-200"
+                          : "bg-amber-50 text-amber-700 border border-amber-200"
+                      }`}
                   >
                     {status}
                   </span>
@@ -562,15 +561,13 @@ export function ValvomaticWastageClient() {
 
           <div>
             <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">Shift</label>
-            <select
+            <UniversalShiftSelector
               value={shiftName}
-              onChange={(e) => setShiftName(e.target.value)}
-              className="w-full text-xs px-2.5 py-1.5 border border-slate-300 rounded-lg focus:outline-hidden focus:ring-1 focus:ring-primary bg-white"
-            >
-              <option value="Day Shift">Day Shift</option>
-              <option value="Night Shift">Night Shift</option>
-              <option value="General Shift">General Shift</option>
-            </select>
+              onChange={(val) => setShiftName(val)}
+              mode="byName"
+              showIcon={false}
+              selectClassName="px-2.5 py-1.5 border-slate-300"
+            />
           </div>
 
           <div>
@@ -621,13 +618,12 @@ export function ValvomaticWastageClient() {
                 isDirtyRef.current = true;
                 setStatus(e.target.value as any);
               }}
-              className={`w-full text-xs px-2.5 py-1.5 font-bold rounded-lg border focus:outline-hidden ${
-                status === "APPROVED"
+              className={`w-full text-xs px-2.5 py-1.5 font-bold rounded-lg border focus:outline-hidden ${status === "APPROVED"
                   ? "bg-emerald-50 text-emerald-800 border-emerald-300"
                   : status === "SUBMITTED"
-                  ? "bg-blue-50 text-blue-800 border-blue-300"
-                  : "bg-amber-50 text-amber-800 border-amber-300"
-              }`}
+                    ? "bg-blue-50 text-blue-800 border-blue-300"
+                    : "bg-amber-50 text-amber-800 border-amber-300"
+                }`}
             >
               <option value="DRAFT">DRAFT</option>
               <option value="SUBMITTED">SUBMITTED</option>

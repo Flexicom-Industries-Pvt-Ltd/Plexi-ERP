@@ -26,6 +26,7 @@ import { PostProductionSection } from "@/components/tape-plant/PostProductionSec
 import { BobbinStockSummarySection } from "@/components/tape-plant/BobbinStockSummarySection";
 import { BobbinIssueSection } from "@/components/tape-plant/BobbinIssueSection";
 import { TapePlantReportSection } from "@/components/tape-plant/TapePlantReportSection";
+import { useProductionShifts } from "@/hooks/useProductionShifts";
 
 export type TapePlantTab =
   | "planning"
@@ -129,31 +130,16 @@ export function TapePlantClient() {
   };
 
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [shifts, setShifts] = useState<{ id: string; name: string; startTime?: string; endTime?: string }[]>([]);
-  const [selectedShiftId, setSelectedShiftId] = useState("");
+  const { shifts, allowDayNight } = useProductionShifts();
+  const [selectedShiftId, setSelectedShiftId] = useState("ALL");
 
   useEffect(() => {
-    fetch("/api/settings/master-data/shift")
-      .then((r) => (r.ok ? r.json() : []))
-      .then((data) => {
-        if (Array.isArray(data) && data.length > 0) {
-          setShifts(data);
-          setSelectedShiftId(data[0].id);
-        } else {
-          // Fallback if master data empty
-          const fallback = [
-            { id: "shift_day", name: "Day Shift (08:00 - 20:00)" },
-            { id: "shift_night", name: "Night Shift (20:00 - 08:00)" },
-            { id: "shift-a", name: "Shift A (06:00 - 14:00)" },
-            { id: "shift-b", name: "Shift B (14:00 - 22:00)" },
-            { id: "shift-c", name: "Shift C (22:00 - 06:00)" },
-          ];
-          setShifts(fallback);
-          setSelectedShiftId(fallback[0].id);
-        }
-      })
-      .catch(() => {});
-  }, []);
+    if (shifts.length > 0 && (!selectedShiftId || selectedShiftId === "ALL")) {
+      if (!allowDayNight) {
+        setSelectedShiftId(shifts[0].id);
+      }
+    }
+  }, [shifts, allowDayNight, selectedShiftId]);
 
   const handlePrevDay = () => {
     const current = new Date(selectedDate);
@@ -247,7 +233,7 @@ export function TapePlantClient() {
                     onChange={(e) => setSelectedShiftId(e.target.value)}
                     className="text-xs font-bold text-slate-800 bg-transparent outline-none cursor-pointer pr-1"
                   >
-                    <option value="ALL">ALL (All Shifts)</option>
+                    {allowDayNight && <option value="ALL">ALL (Day + Night 24h)</option>}
                     {shifts.map((s) => (
                       <option key={s.id} value={s.id}>
                         {s.name}
