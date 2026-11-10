@@ -24,6 +24,8 @@ interface PhotoEvidenceModalProps {
   onSavePhoto: (photoUrl: string) => void;
   onRemovePhoto?: () => void;
   disabled?: boolean;
+  allowUpload?: boolean;
+  allowCapture?: boolean;
 }
 
 export function PhotoEvidenceModal({
@@ -35,10 +37,11 @@ export function PhotoEvidenceModal({
   onSavePhoto,
   onRemovePhoto,
   disabled = false,
+  allowUpload = true,
+  allowCapture = true,
 }: PhotoEvidenceModalProps) {
-  const [activeTab, setActiveTab] = useState<"view" | "upload" | "camera">(
-    currentPhotoUrl ? "view" : "upload"
-  );
+  const defaultTab = currentPhotoUrl ? "view" : allowUpload ? "upload" : "camera";
+  const [activeTab, setActiveTab] = useState<"view" | "upload" | "camera">(defaultTab);
   const [previewUrl, setPreviewUrl] = useState<string | null>(currentPhotoUrl || null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
@@ -55,11 +58,11 @@ export function PhotoEvidenceModal({
       setPreviewUrl(currentPhotoUrl || null);
       setSelectedFile(null);
       setCameraError(null);
-      setActiveTab(currentPhotoUrl ? "view" : "upload");
+      setActiveTab(currentPhotoUrl ? "view" : allowUpload ? "upload" : "camera");
     } else {
       stopCamera();
     }
-  }, [isOpen, currentPhotoUrl]);
+  }, [isOpen, currentPhotoUrl, allowUpload]);
 
   // Clean up camera on unmount or tab switch
   const stopCamera = useCallback(() => {
@@ -228,36 +231,48 @@ export function PhotoEvidenceModal({
           )}
           {!disabled && (
             <>
-              <button
-                type="button"
-                onClick={() => setActiveTab("upload")}
-                className={`pb-2.5 px-3 text-xs font-semibold border-b-2 transition-all cursor-pointer flex items-center gap-1.5 ${
-                  activeTab === "upload"
-                    ? "border-primary text-primary"
-                    : "border-transparent text-slate-500 hover:text-slate-700"
-                }`}
-              >
-                <Upload className="h-3.5 w-3.5" />
-                <span>Upload File</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab("camera")}
-                className={`pb-2.5 px-3 text-xs font-semibold border-b-2 transition-all cursor-pointer flex items-center gap-1.5 ${
-                  activeTab === "camera"
-                    ? "border-primary text-primary"
-                    : "border-transparent text-slate-500 hover:text-slate-700"
-                }`}
-              >
-                <Camera className="h-3.5 w-3.5" />
-                <span>Live Camera</span>
-              </button>
+              {allowUpload && (
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("upload")}
+                  className={`pb-2.5 px-3 text-xs font-semibold border-b-2 transition-all cursor-pointer flex items-center gap-1.5 ${
+                    activeTab === "upload"
+                      ? "border-primary text-primary"
+                      : "border-transparent text-slate-500 hover:text-slate-700"
+                  }`}
+                >
+                  <Upload className="h-3.5 w-3.5" />
+                  <span>Upload File</span>
+                </button>
+              )}
+              {allowCapture && (
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("camera")}
+                  className={`pb-2.5 px-3 text-xs font-semibold border-b-2 transition-all cursor-pointer flex items-center gap-1.5 ${
+                    activeTab === "camera"
+                      ? "border-primary text-primary"
+                      : "border-transparent text-slate-500 hover:text-slate-700"
+                  }`}
+                >
+                  <Camera className="h-3.5 w-3.5" />
+                  <span>Live Camera</span>
+                </button>
+              )}
             </>
           )}
         </div>
 
         {/* Modal Body */}
         <div className="p-5 overflow-y-auto flex-1 flex flex-col items-center justify-center min-h-[260px] bg-slate-50/50">
+          {!allowUpload && allowCapture && activeTab === "camera" && (
+            <div className="w-full mb-3 p-2.5 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-2 text-xs text-blue-800">
+              <Camera className="h-4 w-4 text-blue-600 shrink-0" />
+              <span>
+                <strong>Live Capture Policy:</strong> Operator physical presence is required. Take a direct snapshot at the station scale/panel.
+              </span>
+            </div>
+          )}
           {/* 1. View Tab */}
           {activeTab === "view" && previewUrl && (
             <div className="w-full flex flex-col items-center">
