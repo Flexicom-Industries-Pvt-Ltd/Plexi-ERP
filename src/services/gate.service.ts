@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { logEvent, logDiff } from "@/lib/logging";
-import { GateEntryStatus, StockMaterialType, GatePurpose } from "@/generated/prisma";
+import { GateEntryStatus, StockMaterialType, GatePurpose, DocumentStatus } from "@/generated/prisma";
 import { findGateEntryByIdOrNumber } from "@/lib/gate/resolve-gate-entry";
 import { validateGateOut } from "@/lib/gate/validate-gate-out";
 import { parsePaginationParams, createPaginationMeta, PaginationMeta } from "@/lib/pagination";
@@ -609,6 +609,58 @@ export class GateService {
         throw err;
       }
       updatedData.exitTime = new Date();
+    }
+
+    const allowedUncheckedStatuses: GateEntryStatus[] = [
+      GateEntryStatus.ARRIVED,
+      GateEntryStatus.DOCUMENT_VERIFICATION,
+      GateEntryStatus.REJECTED,
+      GateEntryStatus.CANCELLED,
+      GateEntryStatus.ON_HOLD,
+    ];
+
+    const isAdvancingToVerified =
+      (data.status === GateEntryStatus.VERIFIED && existing.status !== GateEntryStatus.VERIFIED) ||
+      (existing.status === GateEntryStatus.DOCUMENT_VERIFICATION &&
+        data.status &&
+        !allowedUncheckedStatuses.includes(data.status as GateEntryStatus));
+
+    if (isAdvancingToVerified) {
+      const fullEntry = await db.gateEntry.findUnique({
+        where: { id: existing.id },
+        include: { documents: true },
+      });
+
+      if (fullEntry) {
+        const unverified = fullEntry.documents.filter((d) => d.status !== DocumentStatus.VERIFIED);
+        if (fullEntry.documents.length === 0 || unverified.length > 0) {
+          const errMsg =
+            fullEntry.documents.length === 0
+              ? "Driver and shipment documents have not been uploaded. At least one verified document is required before proceeding past document verification."
+              : `All documents must be verified before advancing (${unverified.length} pending/rejected)`;
+
+          const err: any = new Error(errMsg);
+          err.code = "DOCUMENTS_PENDING";
+          err.blockers = {
+            title: "Document Verification Incomplete",
+            description:
+              fullEntry.documents.length === 0
+                ? "This gate entry cannot proceed because no driver or consignment documents have been uploaded for verification."
+                : `This gate entry cannot proceed. There are ${unverified.length} document(s) that require review and approval before advancing.`,
+            entryNumber: fullEntry.entryNumber,
+            truckNumber: fullEntry.truckNumber,
+            purpose: fullEntry.purpose,
+            unverifiedDocuments: unverified.map((d) => ({
+              id: d.id,
+              documentType: d.documentType,
+              status: d.status,
+              remarks: d.remarks,
+            })),
+            uncommittedStock: [],
+          };
+          throw err;
+        }
+      }
     }
 
     const updated = await db.gateEntry.update({
