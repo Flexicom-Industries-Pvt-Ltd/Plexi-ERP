@@ -29,6 +29,7 @@ import {
   Printer,
   History,
   Calendar,
+  Trash2,
 } from "lucide-react";
 import { GateEntryStatus } from "@/generated/prisma";
 import { TransportSlipModal } from "@/components/gate/TransportSlipModal";
@@ -202,6 +203,23 @@ export function GateDetailsClient({ entryId }: { entryId: string }) {
       toast.success(`Document ${status.toLowerCase()}`);
     } catch {
       toast.error("Failed to update document");
+    }
+  };
+
+  const handleDeleteDocument = async (docId: string, docType: string) => {
+    if (!confirm(`Are you sure you want to delete "${docType}"?`)) return;
+    try {
+      const res = await fetch(`/api/gate/${entryId}/documents/${docId}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Failed to delete document");
+      }
+      await fetchEntry();
+      toast.success(`Document "${docType}" deleted successfully`);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to delete document");
     }
   };
 
@@ -890,13 +908,25 @@ export function GateDetailsClient({ entryId }: { entryId: string }) {
                        <div className="flex-1 min-w-0">
                          <div className="flex items-center justify-between gap-2 mb-1">
                            <h4 className="font-bold text-slate-800 text-sm truncate">{doc.documentType}</h4>
-                           <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full ${
-                             doc.status === 'VERIFIED' ? 'bg-emerald-100 text-emerald-700' :
-                             doc.status === 'REJECTED' ? 'bg-red-100 text-red-700' :
-                             'bg-amber-100 text-amber-700'
-                           }`}>
-                             {doc.status}
-                           </span>
+                           <div className="flex items-center gap-1.5 shrink-0">
+                             <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full ${
+                               doc.status === 'VERIFIED' ? 'bg-emerald-100 text-emerald-700' :
+                               doc.status === 'REJECTED' ? 'bg-red-100 text-red-700' :
+                               'bg-amber-100 text-amber-700'
+                             }`}>
+                               {doc.status}
+                             </span>
+                             {entry.status !== "GATE_OUT" && (
+                               <button
+                                 type="button"
+                                 onClick={() => handleDeleteDocument(doc.id, doc.documentType)}
+                                 className="text-slate-400 hover:text-red-600 p-1 rounded-md hover:bg-red-50 transition-colors cursor-pointer"
+                                 title="Delete Document"
+                               >
+                                 <Trash2 className="h-3.5 w-3.5" />
+                               </button>
+                             )}
+                           </div>
                          </div>
                          <p className="text-xs text-slate-500 truncate mb-1">{doc.remarks || "No remarks"}</p>
                          {doc.verifier && (
@@ -918,25 +948,40 @@ export function GateDetailsClient({ entryId }: { entryId: string }) {
                          ) : (
                            <span className="text-[11px] text-slate-400 italic block mb-2">No file attached</span>
                          )}
-                         {doc.status !== "VERIFIED" && doc.status !== "REJECTED" && entry.status !== "GATE_OUT" && (
-                           <div className="flex flex-wrap gap-1.5 mt-2">
+                         {entry.status !== "GATE_OUT" && (
+                           <div className="flex items-center justify-between gap-1.5 mt-2 pt-2 border-t border-slate-100">
+                             {doc.status !== "VERIFIED" && doc.status !== "REJECTED" ? (
+                               <div className="flex flex-wrap gap-1.5">
+                                 <button
+                                   onClick={() => updateDocumentStatus(doc.id, "VERIFIED")}
+                                   className="text-xs px-3 py-1.5 bg-emerald-100 text-emerald-800 rounded-lg font-bold hover:bg-emerald-200 active:scale-95 transition-all cursor-pointer"
+                                 >
+                                   Verify
+                                 </button>
+                                 <button
+                                   onClick={() => updateDocumentStatus(doc.id, "REJECTED")}
+                                   className="text-xs px-3 py-1.5 bg-red-100 text-red-800 rounded-lg font-bold hover:bg-red-200 active:scale-95 transition-all cursor-pointer"
+                                 >
+                                   Reject
+                                 </button>
+                                 <button
+                                   onClick={() => updateDocumentStatus(doc.id, "UNDER_VERIFICATION")}
+                                   className="text-xs px-3 py-1.5 bg-amber-100 text-amber-800 rounded-lg font-bold hover:bg-amber-200 active:scale-95 transition-all cursor-pointer"
+                                 >
+                                   Reviewing
+                                 </button>
+                                </div>
+                              ) : (
+                                <span className="text-[11px] text-slate-400 font-medium">Status finalized</span>
+                              )}
                              <button
-                               onClick={() => updateDocumentStatus(doc.id, "VERIFIED")}
-                               className="text-xs px-3 py-1.5 bg-emerald-100 text-emerald-800 rounded-lg font-bold hover:bg-emerald-200 active:scale-95 transition-all"
+                               type="button"
+                               onClick={() => handleDeleteDocument(doc.id, doc.documentType)}
+                               className="text-xs px-2.5 py-1.5 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg font-semibold inline-flex items-center gap-1 transition-all cursor-pointer ml-auto"
+                               title="Delete Document"
                              >
-                               Verify
-                             </button>
-                             <button
-                               onClick={() => updateDocumentStatus(doc.id, "REJECTED")}
-                               className="text-xs px-3 py-1.5 bg-red-100 text-red-800 rounded-lg font-bold hover:bg-red-200 active:scale-95 transition-all"
-                             >
-                               Reject
-                             </button>
-                             <button
-                               onClick={() => updateDocumentStatus(doc.id, "UNDER_VERIFICATION")}
-                               className="text-xs px-3 py-1.5 bg-amber-100 text-amber-800 rounded-lg font-bold hover:bg-amber-200 active:scale-95 transition-all"
-                             >
-                               Reviewing
+                               <Trash2 className="h-3.5 w-3.5" />
+                               <span>Delete</span>
                              </button>
                            </div>
                          )}
