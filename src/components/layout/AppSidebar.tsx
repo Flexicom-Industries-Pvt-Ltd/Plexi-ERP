@@ -40,9 +40,15 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem,
 const navItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, module: null },
   { title: "Security & Gate", url: "/dashboard/gate", icon: ShieldCheck, module: "SECURITY_GATE" },
-  { title: "Inventory", url: "/dashboard/inventory", icon: PackageSearch, module: "INVENTORY" },
-  { title: "HR & Attendance", url: "/dashboard/hr", icon: UserCheck, module: "HR" },
 ];
+
+const inventoryItems = [
+  { title: "All Items", url: "/dashboard/inventory/items" },
+  { title: "Pending Gate Receipts", url: "/dashboard/inventory/gate-receipts" },
+  { title: "Stock Ledger", url: "/dashboard/inventory/transactions" },
+];
+
+const hrNavItem = { title: "HR & Attendance", url: "/dashboard/hr", icon: UserCheck, module: "HR" };
 
 const tapePlantItems = [
   { title: "Planning", url: "/dashboard/production/tape-plant?tab=planning" },
@@ -124,6 +130,7 @@ type AppSidebarProps = {
 export function AppSidebar({ user, allowedModules, ...props }: AppSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const [inventoryOpen, setInventoryOpen] = useState(pathname.startsWith("/dashboard/inventory"));
   const [tapePlantOpen, setTapePlantOpen] = useState(pathname.startsWith("/dashboard/production/tape-plant"));
   const [loomOpen, setLoomOpen] = useState(pathname.startsWith("/dashboard/production/loom"));
   const [laminationOpen, setLaminationOpen] = useState(pathname.startsWith("/dashboard/production/lamination"));
@@ -151,6 +158,8 @@ export function AppSidebar({ user, allowedModules, ...props }: AppSidebarProps) 
       roleName === "SUPER_ADMIN" ||
       roleName === "SUPERADMIN")
   );
+  const hasInventoryAccess = isSuperAdmin || Boolean(allowedModules["INVENTORY"]);
+  const hasHrAccess = isSuperAdmin || Boolean(allowedModules["HR"]);
   const hasSettingsAccess = isSuperAdmin || Boolean(allowedModules["SETTINGS"]);
   const hasDataCentreAccess = isSuperAdmin || Boolean(allowedModules["DATA_CENTRE"]);
   const hasTapePlantAccess = isSuperAdmin || Boolean(allowedModules["TAPE_PLANT"]);
@@ -191,6 +200,48 @@ export function AppSidebar({ user, allowedModules, ...props }: AppSidebarProps) 
               </SidebarMenuButton>
             </SidebarMenuItem>
           ))}
+
+          {hasInventoryAccess && (
+            <Collapsible open={inventoryOpen} onOpenChange={setInventoryOpen} className="group/collapsible">
+              <SidebarMenuItem>
+                <CollapsibleTrigger render={<SidebarMenuButton tooltip="Inventory" />}>
+                  <PackageSearch className="h-4 w-4" />
+                  <span>Inventory</span>
+                  <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180" />
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <SidebarMenuSub>
+                    {inventoryItems.map((subItem) => {
+                      const isSubActive = pathname === subItem.url || pathname.startsWith(subItem.url + "/");
+                      return (
+                        <SidebarMenuSubItem key={subItem.url}>
+                          <SidebarMenuSubButton
+                            render={<Link href={subItem.url} />}
+                            isActive={isSubActive}
+                          >
+                            <span>{subItem.title}</span>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      );
+                    })}
+                  </SidebarMenuSub>
+                </CollapsibleContent>
+              </SidebarMenuItem>
+            </Collapsible>
+          )}
+
+          {hasHrAccess && (
+            <SidebarMenuItem key={hrNavItem.url}>
+              <SidebarMenuButton
+                render={<Link href={hrNavItem.url} />}
+                isActive={pathname === hrNavItem.url || pathname.startsWith(hrNavItem.url + "/")}
+                tooltip={hrNavItem.title}
+              >
+                <hrNavItem.icon className="h-4 w-4" />
+                <span>{hrNavItem.title}</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          )}
           
           {hasTapePlantAccess && (
             <Collapsible open={tapePlantOpen} onOpenChange={setTapePlantOpen} className="group/collapsible">

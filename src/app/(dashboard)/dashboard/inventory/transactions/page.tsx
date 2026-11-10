@@ -2,9 +2,10 @@ import { requirePermission } from "@/lib/permissions";
 import { Module } from "@/generated/prisma";
 import { Metadata } from "next";
 import { TransactionsClient } from "./transactions-client";
+import { InventorySubNav } from "@/components/inventory/InventorySubNav";
 
 export const metadata: Metadata = {
-  title: "Inventory Ledger | Flexicom ERP",
+  title: "Stock Ledger | Flexicom ERP",
   description: "Immutable ledger of all stock movements and adjustments",
 };
 
@@ -15,11 +16,14 @@ export default async function InventoryTransactionsPage() {
 
   return (
     <div className="flex flex-col gap-4 sm:gap-6 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full min-w-0">
-      <div>
-        <h1 className="text-xl sm:text-2xl font-bold text-slate-800">Inventory Ledger</h1>
-        <p className="text-xs sm:text-sm text-slate-500 mt-1">
-          Immutable audit trail of all IN, OUT, and ADJUSTMENT stock movements.
-        </p>
+      <div className="flex flex-col gap-3 sm:gap-4">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-800">Stock Ledger</h1>
+          <p className="text-xs sm:text-sm text-slate-500 mt-1">
+            Immutable audit trail of all IN, OUT, and ADJUSTMENT stock movements across factory operations.
+          </p>
+        </div>
+        <InventorySubNav />
       </div>
 
       <TransactionsClient />

@@ -125,7 +125,7 @@ export function GateReceiptsClient({ canCreate }: { canCreate: boolean }) {
         <PackageCheck className="h-10 w-10 text-slate-300 mb-3" />
         <p className="font-bold text-slate-800 text-sm sm:text-base">No Pending Gate Receipts</p>
         <p className="text-xs text-slate-500 mt-1 text-center max-w-sm">
-          All unloaded trucks have been fully verified and committed to inventory.
+          All gate consignment items have been verified and reconciled with inventory.
         </p>
       </div>
     );
@@ -153,6 +153,15 @@ export function GateReceiptsClient({ canCreate }: { canCreate: boolean }) {
                     <span className="font-mono text-xs px-2 py-0.5 rounded bg-slate-900 text-amber-300 font-bold">
                       {entry.truckNumber}
                     </span>
+                    <span
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider ${
+                        entry.purpose === "LOADING"
+                          ? "bg-blue-100 text-blue-800 border border-blue-200"
+                          : "bg-indigo-100 text-indigo-800 border border-indigo-200"
+                      }`}
+                    >
+                      {entry.purpose === "LOADING" ? "Loading (Outward)" : "Unloading (Incoming)"}
+                    </span>
                   </div>
                   <p className="text-xs text-slate-500 font-medium mt-0.5">
                     {entry.supplierCustomer || "Unknown Supplier"} • {entry.transporter || "Direct"}
@@ -172,9 +181,20 @@ export function GateReceiptsClient({ canCreate }: { canCreate: boolean }) {
             {/* Mobile Entry Header */}
             <div className="block md:hidden p-4 border-b border-slate-100 bg-slate-50/60 space-y-2.5">
               <div className="flex items-center justify-between gap-2">
-                <div className="inline-flex items-center gap-1.5 bg-slate-900 text-amber-300 px-2.5 py-1 rounded-lg font-mono font-bold text-xs shadow-xs">
-                  <Truck className="h-3.5 w-3.5 text-amber-300" />
-                  <span>{entry.truckNumber}</span>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <div className="inline-flex items-center gap-1.5 bg-slate-900 text-amber-300 px-2.5 py-1 rounded-lg font-mono font-bold text-xs shadow-xs">
+                    <Truck className="h-3.5 w-3.5 text-amber-300" />
+                    <span>{entry.truckNumber}</span>
+                  </div>
+                  <span
+                    className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${
+                      entry.purpose === "LOADING"
+                        ? "bg-blue-100 text-blue-800 border border-blue-200"
+                        : "bg-indigo-100 text-indigo-800 border border-indigo-200"
+                    }`}
+                  >
+                    {entry.purpose === "LOADING" ? "Loading" : "Unloading"}
+                  </span>
                 </div>
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
                   {entry.status}
