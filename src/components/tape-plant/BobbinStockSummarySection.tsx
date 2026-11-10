@@ -41,6 +41,7 @@ import {
   computeBobbinStockCount,
   computeCrateStockCount,
   computeBobbinStockTotals,
+  formatDiscreteCrates,
   exportBobbinStockExcel,
   printBobbinStockSummary,
 } from "@/lib/tape-plant/bobbin-stock";
@@ -260,15 +261,15 @@ export function BobbinStockSummarySection({
 
   return (
     <div className="space-y-5 w-full min-w-0 max-w-full">
-      {/* Minimalist Bento Metric Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        {/* Net Output Done (kg) */}
+      {/* Consolidated 3 Bento Metric Cards (BUG-015) */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {/* Card 1: Total Produced (Net) */}
         <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-2xs transition-all hover:border-slate-300">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">
               Total Produced (Net)
             </span>
-            <div className="p-1.5 bg-slate-100 text-slate-700 rounded-lg">
+            <div className="p-1.5 bg-emerald-50 text-emerald-700 rounded-lg border border-emerald-100">
               <Scale className="h-4 w-4" />
             </div>
           </div>
@@ -283,79 +284,23 @@ export function BobbinStockSummarySection({
                 })} kg`
               )}
             </div>
-            <p className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1.5">
-              <span>Gross: {totals.totalGrossDoneKg.toFixed(1)} kg</span>
+            <p className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-1.5 font-medium">
+              <span>{totals.uniqueQualitiesCount} Recipe(s) Produced</span>
               <span>•</span>
-              <span className="text-rose-600">Waste: {totals.totalWasteKg.toFixed(1)} kg</span>
+              <span className="text-slate-600 font-mono">
+                {formatDiscreteCrates(totals.totalProducedCrates, BOBBINS_PER_CRATE, true)}
+              </span>
             </p>
           </div>
         </div>
 
-        {/* Available Crate Stock (@ 12.8 kg) */}
+        {/* Card 2: Total Issued to Looms */}
         <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-2xs transition-all hover:border-slate-300">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">
-              Available Crate Stock
+              Total Issued to Looms
             </span>
-            <div className="p-1.5 bg-slate-100 text-slate-700 rounded-lg">
-              <Package className="h-4 w-4" />
-            </div>
-          </div>
-          <div className="mt-2.5">
-            <div className="text-xl font-bold font-mono text-slate-900 tracking-tight">
-              {loading ? (
-                <div className="h-6 w-20 bg-slate-100 animate-pulse rounded" />
-              ) : (
-                `${(totals.totalAvailableCrateStock ?? totals.totalCrateStock).toLocaleString(undefined, {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })} crates`
-              )}
-            </div>
-            <p className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1.5">
-              <span>{totals.uniqueQualitiesCount} Recipe(s)</span>
-              <span>•</span>
-              <span>@ {CRATE_WEIGHT_KG} kg/crate</span>
-            </p>
-          </div>
-        </div>
-
-        {/* Available Bobbin Stock (KG) */}
-        <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-2xs transition-all hover:border-slate-300">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">
-              Available Bobbin Stock (KG)
-            </span>
-            <div className="p-1.5 bg-slate-100 text-slate-700 rounded-lg">
-              <Boxes className="h-4 w-4" />
-            </div>
-          </div>
-          <div className="mt-2.5">
-            <div className="text-xl font-bold font-mono text-slate-900 tracking-tight">
-              {loading ? (
-                <div className="h-6 w-20 bg-slate-100 animate-pulse rounded" />
-              ) : (
-                `${(totals.totalAvailableKg ?? totals.totalNetProductionKg).toLocaleString(undefined, {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })} kg`
-              )}
-            </div>
-            <p className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1.5">
-              <span>Avail Crates: {(totals.totalAvailableCrateStock ?? totals.totalCrateStock).toFixed(2)} cr</span>
-              <span>•</span>
-              <span>@ {BOBBIN_WEIGHT_KG} kg/bobbin</span>
-            </p>
-          </div>
-        </div>
-
-        {/* Total Issued to Looms */}
-        <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-2xs transition-all hover:border-slate-300">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">
-              Issued to Looms
-            </span>
-            <div className="p-1.5 bg-slate-100 text-slate-700 rounded-lg">
+            <div className="p-1.5 bg-indigo-50 text-indigo-700 rounded-lg border border-indigo-100">
               <ArrowRightLeft className="h-4 w-4" />
             </div>
           </div>
@@ -370,10 +315,42 @@ export function BobbinStockSummarySection({
                 })} kg`
               )}
             </div>
-            <p className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1.5">
-              <span>{(totals.totalIssuedCrates ?? 0).toFixed(2)} crates</span>
+            <p className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-1.5 font-medium">
+              <span className="font-mono text-indigo-700">
+                {formatDiscreteCrates(totals.totalIssuedCrates, BOBBINS_PER_CRATE, true)}
+              </span>
               <span>•</span>
-              <span>{(totals.totalIssuedBobbins ?? 0).toFixed(2)} bobbins</span>
+              <span>Loom Hall Dispatch</span>
+            </p>
+          </div>
+        </div>
+
+        {/* Card 3: Current Available Stock */}
+        <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-2xs transition-all hover:border-slate-300">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">
+              Current Available Stock
+            </span>
+            <div className="p-1.5 bg-amber-50 text-amber-700 rounded-lg border border-amber-100">
+              <Boxes className="h-4 w-4" />
+            </div>
+          </div>
+          <div className="mt-2.5">
+            <div className="text-xl font-bold font-mono text-slate-900 tracking-tight">
+              {loading ? (
+                <div className="h-6 w-20 bg-slate-100 animate-pulse rounded" />
+              ) : (
+                `${(totals.totalAvailableKg ?? totals.totalNetProductionKg).toLocaleString(undefined, {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })} kg`
+              )}
+            </div>
+            <p className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-1.5 font-medium">
+              <span className="font-mono text-emerald-700 font-bold">
+                {formatDiscreteCrates(totals.totalAvailableCrateStock ?? totals.totalCrateStock, BOBBINS_PER_CRATE, false)}
+              </span>
+              <span>in Warehouse</span>
             </p>
           </div>
         </div>
@@ -408,9 +385,23 @@ export function BobbinStockSummarySection({
                 )}
               </button>
               <h2 className="text-sm font-semibold text-slate-900 tracking-tight">Bobbin & Crate Stock Summary</h2>
-              <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200/60">
-                {dateFilterMode === "all" ? "All Till Date" : "Filtered"}
-              </span>
+              {/* Scope / Ledger Indicator (BUG-015) */}
+              {dateFilterMode === "all" ? (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 text-[11px] font-semibold rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 shadow-2xs">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  Cumulative Warehouse Balance (All-Time)
+                </span>
+              ) : dateFilterMode === "single" ? (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 text-[11px] font-semibold rounded-full bg-amber-50 text-amber-800 border border-amber-200 shadow-2xs">
+                  <Clock className="h-3 w-3 text-amber-600" />
+                  Single Shift Batch Stock ({selectedSingleDate} • {shiftDescription})
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 text-[11px] font-semibold rounded-full bg-blue-50 text-blue-800 border border-blue-200 shadow-2xs">
+                  <Calendar className="h-3 w-3 text-blue-600" />
+                  Date Range ({dateFrom} to {dateTo})
+                </span>
+              )}
             </div>
 
             {/* Global Actions */}
@@ -584,24 +575,22 @@ export function BobbinStockSummarySection({
 
         {/* Table Content */}
         <div className={isFullscreen ? "overflow-auto flex-1" : "overflow-x-auto"}>
-          <table className="w-full text-left border-collapse min-w-[900px] text-xs">
+          <table className="w-full text-left border-collapse min-w-[850px] text-xs">
             <thead>
               <tr className="bg-slate-50/75 border-b border-slate-200 text-[11px] font-medium text-slate-600 uppercase tracking-wider">
-                <th className="py-2.5 px-3 w-10 text-center">#</th>
-                <th className="py-2.5 px-3">Quality Name</th>
-                <th className="py-2.5 px-3 text-right">Gross</th>
-                <th className="py-2.5 px-3 text-right">Waste</th>
-                <th className="py-2.5 px-3 text-right">Produced Net</th>
+                <th className="py-2.5 px-3 w-12 text-center">#</th>
+                <th className="py-2.5 px-3">Quality / Recipe</th>
+                <th className="py-2.5 px-3 text-right">Produced Net (KG)</th>
+                <th className="py-2.5 px-3 text-right">Issued to Looms (Crates / KG)</th>
+                <th className="py-2.5 px-3 text-right">Available Balance</th>
                 <th className="py-2.5 px-3 text-right">Available Crates</th>
-                <th className="py-2.5 px-3 text-right">Available Bobbins</th>
-                <th className="py-2.5 px-3 text-right">Issued to Looms</th>
-                <th className="py-2.5 px-3 text-center w-20">Action</th>
+                <th className="py-2.5 px-3 text-center w-24">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs text-slate-700">
               {loading ? (
                 <tr>
-                  <td colSpan={9} className="py-12 text-center text-slate-500">
+                  <td colSpan={7} className="py-12 text-center text-slate-500">
                     <div className="inline-flex items-center gap-2">
                       <RefreshCw className="h-4 w-4 animate-spin text-slate-600" />
                       <span className="font-medium">Loading Bobbin Stock summary...</span>
@@ -610,7 +599,7 @@ export function BobbinStockSummarySection({
                 </tr>
               ) : filteredItems.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="py-12 text-center">
+                  <td colSpan={7} className="py-12 text-center">
                     <div className="max-w-md mx-auto flex flex-col items-center justify-center p-4">
                       <div className="p-3 bg-slate-100 text-slate-400 rounded-xl mb-2.5">
                         <Boxes className="h-6 w-6" />
@@ -651,36 +640,12 @@ export function BobbinStockSummarySection({
                         {item.slNo}
                       </td>
 
-                      {/* Quality Name */}
+                      {/* Quality / Recipe */}
                       <td className="py-2.5 px-3">
                         <RecipeQualityBadge value={item.recipeQuality} />
                       </td>
 
-                      {/* Gross Production Done in KG */}
-                      <td className="py-2.5 px-3 text-right font-mono text-slate-600">
-                        {item.productionDoneKg.toLocaleString(undefined, {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}{" "}
-                        <span className="text-[10px] font-normal text-slate-400">kg</span>
-                      </td>
-
-                      {/* Wastage in KG */}
-                      <td className="py-2.5 px-3 text-right font-mono text-rose-600">
-                        {item.wasteKg > 0 ? (
-                          <>
-                            {item.wasteKg.toLocaleString(undefined, {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })}{" "}
-                            <span className="text-[10px] font-normal text-rose-400">kg</span>
-                          </>
-                        ) : (
-                          <span className="text-slate-300">0.00</span>
-                        )}
-                      </td>
-
-                      {/* Net Production Done in KG */}
+                      {/* Produced Net in KG */}
                       <td className="py-2.5 px-3 text-right font-mono font-semibold text-slate-900">
                         {item.netProductionKg.toLocaleString(undefined, {
                           minimumFractionDigits: 2,
@@ -689,16 +654,23 @@ export function BobbinStockSummarySection({
                         <span className="text-[10px] font-normal text-slate-400">kg</span>
                       </td>
 
-                      {/* Available Crate Stock (Net - Issued / 12.8) */}
-                      <td className="py-2.5 px-3 text-right font-mono font-semibold text-slate-900">
-                        {availCrates.toLocaleString(undefined, {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}{" "}
-                        <span className="text-[10px] font-normal text-slate-400">cr</span>
+                      {/* Issued to Looms (Discrete Whole Crates + Loose Bobbins & KG) */}
+                      <td className="py-2.5 px-3 text-right font-mono">
+                        {issuedCrates > 0 ? (
+                          <div>
+                            <span className="font-semibold text-indigo-900">
+                              {formatDiscreteCrates(issuedCrates, BOBBINS_PER_CRATE, true)}
+                            </span>
+                            <span className="text-[10px] text-slate-400 block font-normal">
+                              ({issuedKg.toFixed(1)} kg)
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-slate-300 font-normal">0 cr</span>
+                        )}
                       </td>
 
-                      {/* Available Bobbin Stock in KG (Net - Issued KG) */}
+                      {/* Available Balance in KG */}
                       <td className="py-2.5 px-3 text-right font-mono font-semibold text-slate-900">
                         {availKg.toLocaleString(undefined, {
                           minimumFractionDigits: 2,
@@ -707,16 +679,11 @@ export function BobbinStockSummarySection({
                         <span className="text-[10px] font-normal text-slate-400">kg</span>
                       </td>
 
-                      {/* Issued to Looms */}
+                      {/* Available Crates (Discrete Whole Crates + Loose Bobbins) */}
                       <td className="py-2.5 px-3 text-right font-mono">
-                        {issuedCrates > 0 ? (
-                          <div>
-                            <span className="font-semibold text-slate-900">{issuedCrates.toFixed(2)} cr</span>
-                            <span className="text-[10px] text-slate-400 block font-normal">({issuedKg.toFixed(1)} kg)</span>
-                          </div>
-                        ) : (
-                          <span className="text-slate-300 font-normal">0.00</span>
-                        )}
+                        <span className="font-semibold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 inline-block text-[11px]">
+                          {formatDiscreteCrates(availCrates, BOBBINS_PER_CRATE, false)}
+                        </span>
                       </td>
 
                       {/* Row Action: Quick Issue Button */}
@@ -724,7 +691,7 @@ export function BobbinStockSummarySection({
                         <button
                           type="button"
                           onClick={() => handleQuickIssue(item.recipeQuality)}
-                          className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded border border-slate-200/80 transition-colors cursor-pointer"
+                          className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded border border-slate-200/80 transition-colors cursor-pointer"
                           title={`Issue ${item.recipeQuality} to circular loom`}
                         >
                           <Send className="h-3 w-3 text-slate-500" />
@@ -737,26 +704,12 @@ export function BobbinStockSummarySection({
               )}
             </tbody>
 
-            {/* Table Footer with Grand Totals */}
+            {/* Table Footer with Grand Totals (7 Streamlined Columns) */}
             {filteredItems.length > 0 && (
               <tfoot>
                 <tr className="bg-slate-50/90 border-t border-slate-200 font-semibold text-xs text-slate-900">
                   <td colSpan={2} className="py-2.5 px-3 text-right text-slate-500 text-[11px] uppercase tracking-wider">
                     Grand Total:
-                  </td>
-                  <td className="py-2.5 px-3 text-right font-mono text-slate-600">
-                    {totals.totalGrossDoneKg.toLocaleString(undefined, {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}{" "}
-                    <span className="text-[10px] font-normal text-slate-400">kg</span>
-                  </td>
-                  <td className="py-2.5 px-3 text-right font-mono text-rose-600">
-                    {totals.totalWasteKg.toLocaleString(undefined, {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}{" "}
-                    <span className="text-[10px] font-normal text-rose-400">kg</span>
                   </td>
                   <td className="py-2.5 px-3 text-right font-mono text-slate-900">
                     {totals.totalNetProductionKg.toLocaleString(undefined, {
@@ -765,12 +718,13 @@ export function BobbinStockSummarySection({
                     })}{" "}
                     <span className="text-[10px] font-normal text-slate-400">kg</span>
                   </td>
-                  <td className="py-2.5 px-3 text-right font-mono text-slate-900">
-                    {(totals.totalAvailableCrateStock ?? totals.totalCrateStock).toLocaleString(undefined, {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}{" "}
-                    <span className="text-[10px] font-normal text-slate-400">cr</span>
+                  <td className="py-2.5 px-3 text-right font-mono text-indigo-900">
+                    <div>
+                      <span>{formatDiscreteCrates(totals.totalIssuedCrates, BOBBINS_PER_CRATE, true)}</span>
+                      <span className="text-[10px] text-slate-400 block font-normal">
+                        ({(totals.totalIssuedKg ?? 0).toFixed(1)} kg)
+                      </span>
+                    </div>
                   </td>
                   <td className="py-2.5 px-3 text-right font-mono text-slate-900">
                     {(totals.totalAvailableKg ?? totals.totalNetProductionKg).toLocaleString(undefined, {
@@ -779,12 +733,10 @@ export function BobbinStockSummarySection({
                     })}{" "}
                     <span className="text-[10px] font-normal text-slate-400">kg</span>
                   </td>
-                  <td className="py-2.5 px-3 text-right font-mono text-slate-900">
-                    {(totals.totalIssuedKg ?? 0).toLocaleString(undefined, {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}{" "}
-                    <span className="text-[10px] font-normal text-slate-400">kg</span>
+                  <td className="py-2.5 px-3 text-right font-mono text-emerald-800">
+                    <span className="bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 inline-block text-[11px]">
+                      {formatDiscreteCrates(totals.totalAvailableCrateStock ?? totals.totalCrateStock, BOBBINS_PER_CRATE, false)}
+                    </span>
                   </td>
                   <td className="py-2.5 px-3 text-center">
                     {onNavigateToBobbinIssue && (
