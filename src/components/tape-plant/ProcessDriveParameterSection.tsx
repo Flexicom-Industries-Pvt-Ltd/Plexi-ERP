@@ -94,7 +94,7 @@ export function ProcessDriveParameterSection({
   // Auth & RBAC State
   const [userRole, setUserRole] = useState<string>("");
   const [userPermissions, setUserPermissions] = useState<any[]>([]);
-  const [canUploadPhoto, setCanUploadPhoto] = useState<boolean>(false);
+  const [canUploadPhoto, setCanUploadPhoto] = useState<boolean>(true);
   const [canCapturePhoto, setCanCapturePhoto] = useState<boolean>(true);
   const isSupervisor = useMemo(() => {
     return canUserOverrideLock(userRole, userPermissions);
@@ -106,29 +106,38 @@ export function ProcessDriveParameterSection({
   // Photo Evidence Modal state
   const [photoModalRowIdx, setPhotoModalRowIdx] = useState<number | null>(null);
 
-  // Fetch current user session to determine role & permissions
-  useEffect(() => {
-    let isMounted = true;
-    fetch("/api/auth/session")
+  // Fetch current user session to determine role & permissions (live check)
+  const refreshUserPermissions = useCallback(() => {
+    fetch("/api/auth/session", { cache: "no-store", headers: { Pragma: "no-cache", "Cache-Control": "no-cache" } })
       .then((r) => (r.ok ? r.json() : null))
       .then((session) => {
-        if (!isMounted || !session?.user) return;
-        setUserRole(session.user.role || "");
+        if (!session?.user) return;
+        const roleName = session.user.role || "";
+        setUserRole(roleName);
         setUserPermissions(session.user.permissions || []);
+        const roleUpper = roleName.toUpperCase().replace(/[\s_-]+/g, "");
         const isSuperAdmin =
-          session.user.role === "SUPERADMIN" ||
-          session.user.role === "Super Admin" ||
-          session.user.role === "SUPER_ADMIN";
+          roleName === "SUPER ADMIN" ||
+          roleUpper === "SUPERADMIN" ||
+          roleUpper.includes("ADMIN");
         setCanUploadPhoto(isSuperAdmin ? true : Boolean(session.user.canUploadPhoto));
         setCanCapturePhoto(isSuperAdmin ? true : session.user.canCapturePhoto ?? true);
       })
       .catch((err) => {
         console.warn("Could not determine user session for RBAC:", err);
       });
-    return () => {
-      isMounted = false;
-    };
   }, []);
+
+  useEffect(() => {
+    refreshUserPermissions();
+  }, [refreshUserPermissions]);
+
+  // Re-fetch live session every time photo modal opens to ensure immediate sync
+  useEffect(() => {
+    if (photoModalRowIdx !== null) {
+      refreshUserPermissions();
+    }
+  }, [photoModalRowIdx, refreshUserPermissions]);
 
   // Fetch data on date / shift change
   useEffect(() => {
