@@ -603,7 +603,10 @@ export class GateService {
     if (data.status === GateEntryStatus.GATE_OUT && existing.status !== GateEntryStatus.GATE_OUT) {
       const validation = await validateGateOut(existing.id);
       if (!validation.ok) {
-        throw new Error(validation.error || "Gate Out validation failed");
+        const err: any = new Error(validation.error || "Gate Out validation failed");
+        err.code = validation.code;
+        err.blockers = validation.blockers;
+        throw err;
       }
       updatedData.exitTime = new Date();
     }
