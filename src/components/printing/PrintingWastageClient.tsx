@@ -306,9 +306,6 @@ export function PrintingWastageClient() {
                   </span>
                 ) : null}
               </div>
-              <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-                Track shift lamination and print fabric waste with live percentage calculation against production net weights.
-              </p>
             </div>
           </div>
         </div>

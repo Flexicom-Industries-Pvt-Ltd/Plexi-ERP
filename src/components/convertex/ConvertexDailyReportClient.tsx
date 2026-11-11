@@ -545,9 +545,6 @@ export function ConvertexDailyReportClient() {
             <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 mt-1">
               Convertex Daily Production Report
             </h1>
-            <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-              Accurate tracking of roll conversion into sacks with real-time meter readings, cover patch counts, and production in pcs & kg.
-            </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
@@ -679,37 +676,31 @@ export function ConvertexDailyReportClient() {
         <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-xs">
           <div className="text-[11px] font-semibold uppercase text-slate-500 tracking-wider">Total Rolls</div>
           <div className="text-xl font-bold font-mono text-slate-900 mt-1">{totals.totalRolls}</div>
-          <div className="text-[10px] text-slate-400 mt-0.5">Processed Rolls</div>
         </div>
 
         <div className="bg-white border border-sky-200 bg-sky-50/20 rounded-xl p-3.5 shadow-xs">
           <div className="text-[11px] font-semibold uppercase text-sky-700 tracking-wider">Roll Metres</div>
           <div className="text-xl font-bold font-mono text-sky-800 mt-1">{totals.totalRollMtr.toLocaleString()} m</div>
-          <div className="text-[10px] text-sky-600/80 mt-0.5">Input Fabric Length</div>
         </div>
 
         <div className="bg-white border border-purple-200 bg-purple-50/20 rounded-xl p-3.5 shadow-xs">
           <div className="text-[11px] font-semibold uppercase text-purple-700 tracking-wider">Net Weight</div>
           <div className="text-xl font-bold font-mono text-purple-800 mt-1">{totals.totalNetWt.toFixed(1)} kg</div>
-          <div className="text-[10px] text-purple-600/80 mt-0.5">Input Net Weight</div>
         </div>
 
         <div className="bg-white border border-blue-200 bg-blue-50/20 rounded-xl p-3.5 shadow-xs">
           <div className="text-[11px] font-semibold uppercase text-blue-700 tracking-wider">Avg Weight</div>
           <div className="text-xl font-bold font-mono text-blue-800 mt-1">{totals.avgWeightGsm.toFixed(1)} g/m</div>
-          <div className="text-[10px] text-blue-600/80 mt-0.5">Linear Density</div>
         </div>
 
         <div className="bg-white border border-emerald-200 bg-emerald-50/20 rounded-xl p-3.5 shadow-xs">
           <div className="text-[11px] font-semibold uppercase text-emerald-700 tracking-wider">Production (Pcs)</div>
           <div className="text-xl font-bold font-mono text-emerald-800 mt-1">{totals.totalProductionPcs.toLocaleString()}</div>
-          <div className="text-[10px] text-emerald-600/80 mt-0.5">Finished Sacks</div>
         </div>
 
         <div className="bg-white border border-teal-200 bg-teal-50/20 rounded-xl p-3.5 shadow-xs">
           <div className="text-[11px] font-semibold uppercase text-teal-700 tracking-wider">Production (Kg)</div>
           <div className="text-xl font-bold font-mono text-teal-800 mt-1">{totals.totalProductionKg.toFixed(1)} kg</div>
-          <div className="text-[10px] text-teal-600/80 mt-0.5">Total Finished Wt</div>
         </div>
 
         <div className="bg-white border border-indigo-200 bg-indigo-50/20 rounded-xl p-3.5 shadow-xs">

@@ -473,9 +473,6 @@ export function PrintingDailyReportClient() {
                   </span>
                 ) : null}
               </div>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Record flexo printing runs, party specifications, roll meterage, fabric consumption, and net print output.
-              </p>
             </div>
           </div>
 

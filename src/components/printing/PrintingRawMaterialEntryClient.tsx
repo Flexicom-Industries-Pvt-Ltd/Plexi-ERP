@@ -347,9 +347,6 @@ export function PrintingRawMaterialEntryClient() {
             <h1 className="text-2xl font-bold tracking-tight text-slate-900 mt-1">
               Raw Material Consumption Entry
             </h1>
-            <p className="text-xs md:text-sm text-slate-500 mt-0.5">
-              Record ink & solvent consumption with 0.82 density conversion, real-time mix ratio %, and printed mileage.
-            </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">

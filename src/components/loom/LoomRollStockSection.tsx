@@ -189,9 +189,6 @@ export function LoomRollStockSection() {
                 {summary.totalRolls} Rolls
               </span>
             </div>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Live inventory of rolls produced and cut from the Circular Loom floor
-            </p>
           </div>
         </div>
 

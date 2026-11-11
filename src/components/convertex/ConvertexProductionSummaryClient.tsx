@@ -163,9 +163,6 @@ export function ConvertexProductionSummaryClient() {
             <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 mt-1">
               Convertex Production & Wastage Summary
             </h1>
-            <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-              Aggregated reporting by Quality, comprehensive scrap stream analysis, and net factory output conversion.
-            </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">

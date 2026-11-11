@@ -592,9 +592,6 @@ export function LoomRollCuttingSection() {
                   {reportStatus}
                 </span>
               </h1>
-              <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
-                Physical floor log entry with contractor tracking, live quality summaries, and auto-weight computation.
-              </p>
             </div>
           </div>
         </div>

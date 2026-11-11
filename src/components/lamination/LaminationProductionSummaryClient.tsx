@@ -157,9 +157,6 @@ export function LaminationProductionSummaryClient() {
               <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-3">
                 Production Summary & Analytics
               </h1>
-              <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-                Aggregate shift performance, contractor volume, operator output, and quality metrics with export capabilities.
-              </p>
             </div>
           </div>
         </div>
@@ -282,7 +279,6 @@ export function LaminationProductionSummaryClient() {
             <h3 className="text-xl font-bold text-slate-900 mt-0.5">
               {summaryData.overall.totalShifts}
             </h3>
-            <span className="text-[10px] text-slate-400">recorded</span>
           </CardContent>
         </Card>
 
@@ -294,7 +290,6 @@ export function LaminationProductionSummaryClient() {
             <h3 className="text-xl font-bold text-slate-900 mt-0.5">
               {summaryData.overall.totalRolls}
             </h3>
-            <span className="text-[10px] text-slate-400">rolls laminated</span>
           </CardContent>
         </Card>
 
@@ -306,7 +301,6 @@ export function LaminationProductionSummaryClient() {
             <h3 className="text-xl font-bold text-sky-800 mt-0.5">
               {summaryData.overall.totalProductionMtrs.toLocaleString()}
             </h3>
-            <span className="text-[10px] text-slate-400">meters</span>
           </CardContent>
         </Card>
 
@@ -318,7 +312,6 @@ export function LaminationProductionSummaryClient() {
             <h3 className="text-xl font-bold text-emerald-800 mt-0.5">
               {summaryData.overall.totalNetWtAfter.toLocaleString()}
             </h3>
-            <span className="text-[10px] text-slate-400">kg output</span>
           </CardContent>
         </Card>
 
@@ -330,7 +323,6 @@ export function LaminationProductionSummaryClient() {
             <h3 className="text-xl font-bold text-purple-800 mt-0.5">
               {summaryData.overall.totalNetWtBefore.toLocaleString()}
             </h3>
-            <span className="text-[10px] text-slate-400">kg unlaminated</span>
           </CardContent>
         </Card>
 
@@ -342,7 +334,6 @@ export function LaminationProductionSummaryClient() {
             <h3 className="text-xl font-bold text-amber-800 mt-0.5">
               {summaryData.overall.avgCoating}
             </h3>
-            <span className="text-[10px] text-slate-400">g/m average</span>
           </CardContent>
         </Card>
       </div>

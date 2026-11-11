@@ -359,9 +359,6 @@ export function BobbinIssueSection({ onNavigateToBobbinStock }: BobbinIssueSecti
                 })} crates`
               )}
             </div>
-            <p className="text-[11px] text-slate-400 mt-0.5">
-              8 bobbins (12.8 kg) per crate
-            </p>
           </div>
         </div>
 
@@ -386,9 +383,6 @@ export function BobbinIssueSection({ onNavigateToBobbinStock }: BobbinIssueSecti
                 })} pcs`
               )}
             </div>
-            <p className="text-[11px] text-slate-400 mt-0.5">
-              Standard 1.6 kg per bobbin
-            </p>
           </div>
         </div>
 
@@ -413,9 +407,6 @@ export function BobbinIssueSection({ onNavigateToBobbinStock }: BobbinIssueSecti
                 })} kg`
               )}
             </div>
-            <p className="text-[11px] text-slate-400 mt-0.5">
-              Deducted live from Bobbin Stock
-            </p>
           </div>
         </div>
 
@@ -437,9 +428,6 @@ export function BobbinIssueSection({ onNavigateToBobbinStock }: BobbinIssueSecti
                 `${issueTotals.uniqueLoomsCount} Looms`
               )}
             </div>
-            <p className="text-[11px] text-slate-400 mt-0.5">
-              {issueTotals.totalIssuesCount} slips across {issueTotals.uniqueQualitiesCount} qualities
-            </p>
           </div>
         </div>
       </div>
