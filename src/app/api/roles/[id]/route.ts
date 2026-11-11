@@ -9,6 +9,8 @@ import { z } from "zod";
 const PatchRoleSchema = z.object({
   name: z.string().min(1).optional(),
   description: z.string().optional(),
+  canUploadPhoto: z.boolean().optional(),
+  canCapturePhoto: z.boolean().optional(),
   permissions: z.array(RolePermissionSchema).optional(),
 });
 
@@ -57,6 +59,8 @@ export async function PATCH(
     const updatedRole = await RoleService.updateRole(id, {
       name: parsed.data.name ?? currentRole.name,
       description: parsed.data.description ?? (currentRole.description || undefined),
+      canUploadPhoto: parsed.data.canUploadPhoto !== undefined ? parsed.data.canUploadPhoto : (currentRole as any).canUploadPhoto,
+      canCapturePhoto: parsed.data.canCapturePhoto !== undefined ? parsed.data.canCapturePhoto : (currentRole as any).canCapturePhoto,
       permissions: parsed.data.permissions ?? (currentRole.permissions as any),
     });
 

@@ -70,19 +70,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         // Return user object without the password
         const roleName = user.role?.name || "USER";
         const normalizedRole = roleName.toUpperCase().replace(/[\s_-]+/g, "");
-        const isSuperAdmin =
-          roleName === "SUPER ADMIN" ||
-          normalizedRole === "SUPERADMIN" ||
-          normalizedRole.includes("ADMIN");
-
         return {
           id: user.id,
           email: user.email,
           name: user.name,
           role: roleName,
           permissions: user.role?.permissions || [],
-          canUploadPhoto: isSuperAdmin ? true : Boolean(user.role?.canUploadPhoto),
-          canCapturePhoto: isSuperAdmin ? true : (user.role?.canCapturePhoto ?? true),
+          canUploadPhoto: Boolean(user.role?.canUploadPhoto),
+          canCapturePhoto: user.role?.canCapturePhoto !== undefined ? Boolean(user.role?.canCapturePhoto) : true,
         };
       }
     })
@@ -127,7 +122,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             if (userWithRole?.role) {
               session.user.role = userWithRole.role.name;
               canUpload = Boolean(userWithRole.role.canUploadPhoto);
-              canCapture = Boolean(userWithRole.role.canCapturePhoto);
+              canCapture = userWithRole.role.canCapturePhoto !== undefined ? Boolean(userWithRole.role.canCapturePhoto) : true;
               if (userWithRole.role.permissions) {
                 session.user.permissions = userWithRole.role.permissions as any[];
               }
@@ -137,14 +132,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           }
         }
 
-        const roleStr = (session.user.role || "").toUpperCase().replace(/[\s_-]+/g, "");
-        const isSuperAdmin =
-          session.user.role === "SUPER ADMIN" ||
-          roleStr === "SUPERADMIN" ||
-          roleStr.includes("ADMIN");
-
-        (session.user as any).canUploadPhoto = isSuperAdmin ? true : canUpload;
-        (session.user as any).canCapturePhoto = isSuperAdmin ? true : canCapture;
+        (session.user as any).canUploadPhoto = canUpload;
+        (session.user as any).canCapturePhoto = canCapture;
       }
       return session;
     }

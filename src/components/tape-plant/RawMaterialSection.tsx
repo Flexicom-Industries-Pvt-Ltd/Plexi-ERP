@@ -83,13 +83,8 @@ export function RawMaterialSection({ date, shiftId, shiftName }: RawMaterialSect
         const roleName = session.user.role || "";
         setUserRole(roleName);
         setUserPermissions(session.user.permissions || []);
-        const roleUpper = roleName.toUpperCase().replace(/[\s_-]+/g, "");
-        const isSuperAdmin =
-          roleName === "SUPER ADMIN" ||
-          roleUpper === "SUPERADMIN" ||
-          roleUpper.includes("ADMIN");
-        setCanUploadPhoto(isSuperAdmin ? true : Boolean(session.user.canUploadPhoto));
-        setCanCapturePhoto(isSuperAdmin ? true : session.user.canCapturePhoto ?? true);
+        setCanUploadPhoto(Boolean(session.user.canUploadPhoto));
+        setCanCapturePhoto(session.user.canCapturePhoto !== undefined ? Boolean(session.user.canCapturePhoto) : true);
       })
       .catch((err) => {
         console.warn("Could not determine user session for RBAC:", err);
