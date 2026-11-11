@@ -10,8 +10,6 @@ import {
   CheckCircle,
   Camera,
   Image as ImageIcon,
-  AlertCircle,
-  ShieldCheck,
 } from "lucide-react";
 import { SpreadsheetTable, ColumnDef } from "./SpreadsheetTable";
 import { OperatorSelect } from "./OperatorSelect";
@@ -359,15 +357,7 @@ export function RawMaterialSection({ date, shiftId, shiftName }: RawMaterialSect
             <FlaskConical className="h-5 w-5" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-base font-bold text-slate-900">4. Raw Material Movement</h2>
-              <span className="px-2 py-0.5 text-[10px] font-semibold bg-emerald-100 text-emerald-800 rounded-full border border-emerald-200">
-                Material Inventory
-              </span>
-            </div>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Opening, received, consumption, closing stock and setting percentages for {shiftName} ({date}).
-            </p>
+            <h2 className="text-base font-bold text-slate-900">4. Raw Material Movement</h2>
           </div>
         </div>
 
@@ -409,34 +399,9 @@ export function RawMaterialSection({ date, shiftId, shiftName }: RawMaterialSect
         </div>
       </div>
 
-      {/* Policy & RBAC Banner */}
-      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 bg-slate-50/90 border border-slate-200/80 rounded-lg text-xs text-slate-600">
-        <div className="flex items-center gap-2">
-          <AlertCircle className="h-4 w-4 text-slate-400 shrink-0" />
-          <span>
-            <strong>Audit Evidence Policy:</strong> Attach physical scale weight and polymer bag lot evidence.
-            {isSupervisor
-              ? " Supervisors are provisioned with both file upload and live camera capture."
-              : " Operators are restricted to live camera capture to enforce physical presence at scales."}
-          </span>
-        </div>
-        {isSupervisor ? (
-          <div className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-50 border border-indigo-200 text-indigo-700 rounded text-[11px] font-medium">
-            <ShieldCheck className="h-3 w-3" />
-            <span>Supervisor: Upload + Camera</span>
-          </div>
-        ) : (
-          <div className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-50 border border-amber-200 text-amber-700 rounded text-[11px] font-medium">
-            <Camera className="h-3 w-3" />
-            <span>Operator: Live Camera Only</span>
-          </div>
-        )}
-      </div>
-
       {/* Spreadsheet Table */}
       <SpreadsheetTable<RawMaterialRow>
         title="Raw Material Consumption & Inventory Position"
-        subtitle="Automatic calculation of Total and Closing stock. Click any cell to edit."
         columns={materialColumns}
         data={records}
         onChange={setRecords}
