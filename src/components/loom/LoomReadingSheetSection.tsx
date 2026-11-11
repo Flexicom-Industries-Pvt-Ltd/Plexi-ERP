@@ -804,7 +804,7 @@ export function LoomReadingSheetSection() {
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2.5">
-              <div className="h-9 w-9 rounded-xl bg-slate-900 text-white flex items-center justify-center font-bold text-sm shadow-2xs">
+              <div className="p-2 bg-primary/10 text-primary rounded-xl font-bold text-sm shrink-0">
                 2H
               </div>
               <div>
@@ -824,9 +824,6 @@ export function LoomReadingSheetSection() {
                     {sheetStatus === "SUBMITTED" ? "✓ Submitted" : sheetStatus === "APPROVED" ? "★ Approved" : "● Draft"}
                   </span>
                 </div>
-                <p className="text-xs text-slate-500 font-medium">
-                  Shop-floor bi-hourly circular loom meter log, progressive interval totals & shift production
-                </p>
               </div>
             </div>
           </div>
@@ -1005,7 +1002,7 @@ export function LoomReadingSheetSection() {
                 onClick={() => setFilterActiveOnly((prev) => !prev)}
                 className={`flex-1 py-1.5 px-2 text-[11px] font-semibold rounded-lg border transition-all cursor-pointer text-center ${
                   filterActiveOnly
-                    ? "bg-slate-900 text-white border-slate-900 shadow-2xs"
+                    ? "bg-primary text-white border-primary shadow-xs"
                     : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
                 }`}
               >
@@ -1109,10 +1106,10 @@ export function LoomReadingSheetSection() {
       </div>
 
       {/* Progressive Interval Totals Strip */}
-      <div className="bg-slate-900 text-white rounded-xl p-3 shadow-2xs flex flex-wrap items-center justify-between gap-3 text-xs">
+      <div className="bg-sky-50/80 border border-sky-200/80 rounded-xl p-3 shadow-2xs flex flex-wrap items-center justify-between gap-3 text-xs">
         <div className="flex items-center gap-2">
-          <div className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-          <span className="font-bold tracking-wide uppercase text-[11px] text-slate-300">
+          <div className="h-2 w-2 rounded-full bg-sky-500 animate-pulse" />
+          <span className="font-bold tracking-wide uppercase text-[11px] text-sky-900">
             Progressive Interval Totals:
           </span>
         </div>
@@ -1120,9 +1117,9 @@ export function LoomReadingSheetSection() {
           {timeSlots.map((slot, idx) => {
             const prog = liveTotals.progressiveTotals[idx] || 0;
             return (
-              <div key={slot} className="flex items-center gap-1 bg-slate-800/80 px-2.5 py-1 rounded-lg border border-slate-700">
-                <span className="text-slate-400 font-medium">{slot}:</span>
-                <span className="font-bold text-emerald-400">{prog.toLocaleString()} m</span>
+              <div key={slot} className="flex items-center gap-1 bg-white px-2.5 py-1 rounded-lg border border-sky-200 shadow-2xs">
+                <span className="text-slate-500 font-medium">{slot}:</span>
+                <span className="font-bold text-sky-700">{prog.toLocaleString()} m</span>
               </div>
             );
           })}

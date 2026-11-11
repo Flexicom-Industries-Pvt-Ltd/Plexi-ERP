@@ -201,9 +201,6 @@ export function LoomChangeoverSection() {
                 <h1 className="text-lg font-extrabold text-slate-900 tracking-tight">
                   Loom Quality Changeover Logs
                 </h1>
-                <p className="text-xs text-slate-500">
-                  Live audit trail of fabric quality transitions recorded across factory circular looms.
-                </p>
               </div>
             </div>
           </div>
@@ -212,7 +209,7 @@ export function LoomChangeoverSection() {
           <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={() => setScheduleModalOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-xl transition-all shadow-2xs cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-primary hover:bg-primary/90 rounded-lg transition-all shadow-xs cursor-pointer"
             >
               <Plus className="h-4 w-4" />
               <span>Schedule Changeover</span>
@@ -341,7 +338,6 @@ export function LoomChangeoverSection() {
           <div className="text-2xl font-black font-mono text-slate-900">
             {kpis.totalLogs}
           </div>
-          <p className="text-[10px] text-slate-400 mt-0.5">Recorded events across all looms</p>
         </div>
 
         <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-2xs">
@@ -351,7 +347,6 @@ export function LoomChangeoverSection() {
           <div className="text-2xl font-black font-mono text-amber-700">
             {kpis.totalDowntimeMinutes} <span className="text-xs font-semibold text-slate-400">mins ({kpis.totalDowntimeHours}h)</span>
           </div>
-          <p className="text-[10px] text-slate-400 mt-0.5">Cumulative downtime duration</p>
         </div>
 
         <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-2xs">
@@ -361,7 +356,6 @@ export function LoomChangeoverSection() {
           <div className="text-2xl font-black font-mono text-sky-700">
             {kpis.avgDowntimeMinutes} <span className="text-xs font-semibold text-slate-400">mins / event</span>
           </div>
-          <p className="text-[10px] text-slate-400 mt-0.5">Average time per quality swap</p>
         </div>
 
         <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-2xs">
@@ -371,7 +365,6 @@ export function LoomChangeoverSection() {
           <div className="text-2xl font-black font-mono text-emerald-700">
             {kpis.uniqueLoomsCount} <span className="text-xs font-semibold text-slate-400">/ {kpis.factoryTotalLooms}</span>
           </div>
-          <p className="text-[10px] text-slate-400 mt-0.5">Looms with logged transitions</p>
         </div>
       </div>
 
@@ -648,7 +641,7 @@ export function LoomChangeoverSection() {
                 <button
                   type="submit"
                   disabled={scheduling}
-                  className="px-4 py-1.5 text-xs font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-lg cursor-pointer disabled:opacity-50"
+                  className="px-4 py-1.5 text-xs font-semibold text-white bg-primary hover:bg-primary/90 rounded-lg shadow-xs cursor-pointer disabled:opacity-50"
                 >
                   {scheduling ? "Saving..." : "Schedule Changeover"}
                 </button>
