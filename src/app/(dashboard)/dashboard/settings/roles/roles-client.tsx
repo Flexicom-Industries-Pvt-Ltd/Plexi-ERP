@@ -238,7 +238,7 @@ export function RolesClient({ roles, modules }: Props) {
       </Card>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
+        <DialogContent className="sm:max-w-2xl md:max-w-3xl max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>{editingRole ? "Edit Role" : "Create New Role"}</DialogTitle>
             <DialogDescription>
