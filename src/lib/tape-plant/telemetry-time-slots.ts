@@ -106,7 +106,14 @@ export function isTimeSlotLocked(
  * Validates if the active user possesses supervisor or admin RBAC authority
  * to unlock an expired telemetry reading row.
  */
-export function canUserOverrideLock(userRole?: string, permissions?: any[]): boolean {
+export function canUserOverrideLock(
+  userRole?: string,
+  permissions?: any[],
+  canUnlockTimeSlots?: boolean
+): boolean {
+  if (canUnlockTimeSlots !== undefined) {
+    return Boolean(canUnlockTimeSlots);
+  }
   if (!userRole) return false;
 
   const normalized = userRole.toUpperCase();

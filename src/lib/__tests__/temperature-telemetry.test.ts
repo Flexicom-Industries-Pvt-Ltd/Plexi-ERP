@@ -88,6 +88,11 @@ describe("Telemetry Dynamic Shift Intervals & Auto-Lock (BUG-012)", () => {
       ];
       expect(canUserOverrideLock("CUSTOM_USER", permissions)).toBe(true);
     });
+
+    it("strictly respects explicit canUnlockTimeSlots flag when provided", () => {
+      expect(canUserOverrideLock("OPERATOR", [], true)).toBe(true);
+      expect(canUserOverrideLock("SUPERADMIN", [], false)).toBe(false);
+    });
   });
 });
 

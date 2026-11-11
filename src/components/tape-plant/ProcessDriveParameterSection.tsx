@@ -96,11 +96,10 @@ export function ProcessDriveParameterSection({
   const [userPermissions, setUserPermissions] = useState<any[]>([]);
   const [canUploadPhoto, setCanUploadPhoto] = useState<boolean>(true);
   const [canCapturePhoto, setCanCapturePhoto] = useState<boolean>(true);
-  const isSupervisor = useMemo(() => {
-    return canUserOverrideLock(userRole, userPermissions);
-  }, [userRole, userPermissions]);
+  const [canUnlockTimeSlots, setCanUnlockTimeSlots] = useState<boolean>(false);
+  const canUnlock = Boolean(canUnlockTimeSlots);
 
-  // Set of unlocked time slots (supervisor manual override)
+  // Set of unlocked time slots (persisted global overrides)
   const [unlockedSlots, setUnlockedSlots] = useState<Set<string>>(new Set());
 
   // Photo Evidence Modal state
@@ -117,15 +116,38 @@ export function ProcessDriveParameterSection({
         setUserPermissions(session.user.permissions || []);
         setCanUploadPhoto(Boolean(session.user.canUploadPhoto));
         setCanCapturePhoto(session.user.canCapturePhoto !== undefined ? Boolean(session.user.canCapturePhoto) : true);
+        setCanUnlockTimeSlots(Boolean(session.user.canUnlockTimeSlots));
       })
       .catch((err) => {
         console.warn("Could not determine user session for RBAC:", err);
       });
   }, []);
 
+  const fetchUnlockedSlots = useCallback(() => {
+    if (!date || !shiftId) return;
+    fetch(`/api/production/telemetry/unlock?module=TAPE_PLANT_DRIVE&date=${date}&shiftId=${shiftId}`, {
+      cache: "no-store",
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.unlockedSlots && Array.isArray(data.unlockedSlots)) {
+          setUnlockedSlots(new Set(data.unlockedSlots));
+        } else {
+          setUnlockedSlots(new Set());
+        }
+      })
+      .catch((err) => {
+        console.warn("Failed to fetch unlocked time slots:", err);
+      });
+  }, [date, shiftId]);
+
   useEffect(() => {
     refreshUserPermissions();
   }, [refreshUserPermissions]);
+
+  useEffect(() => {
+    fetchUnlockedSlots();
+  }, [fetchUnlockedSlots]);
 
   // Re-fetch live session every time photo modal opens to ensure immediate sync
   useEffect(() => {
@@ -361,23 +383,54 @@ export function ProcessDriveParameterSection({
     [date, unlockedSlots]
   );
 
-  // Toggle supervisor unlock override
-  const handleToggleUnlock = (row: DriveParameterReading, idx: number) => {
-    if (!isSupervisor) {
-      toast.error("Supervisor or Admin credentials required to unlock expired slots");
+  // Toggle supervisor unlock override (persisted in database for everyone)
+  const handleToggleUnlock = async (row: DriveParameterReading, idx: number) => {
+    if (!canUnlock) {
+      toast.error("Your role does not have permission to override or unlock expired time slots");
       return;
     }
     const slotKey = `${row.time}-${idx}`;
-    const next = new Set(unlockedSlots);
-    if (next.has(slotKey) || next.has(row.time)) {
-      next.delete(slotKey);
-      next.delete(row.time);
-      toast.info(`Slot ${row.time || `#${idx + 1}`} locked`);
-    } else {
-      next.add(slotKey);
-      toast.success(`Supervisor override: Slot ${row.time || `#${idx + 1}`} unlocked for edits`);
+    const isCurrentlyUnlocked = unlockedSlots.has(slotKey) || unlockedSlots.has(row.time);
+
+    try {
+      if (isCurrentlyUnlocked) {
+        const res = await fetch(
+          `/api/production/telemetry/unlock?module=TAPE_PLANT_DRIVE&date=${date}&shiftId=${shiftId}&timeSlot=${encodeURIComponent(row.time)}`,
+          { method: "DELETE" }
+        );
+        if (!res.ok) throw new Error("Failed to re-lock time slot");
+
+        const next = new Set(unlockedSlots);
+        next.delete(slotKey);
+        next.delete(row.time);
+        setUnlockedSlots(next);
+        toast.info(`Slot ${row.time || `#${idx + 1}`} re-locked`);
+      } else {
+        const res = await fetch("/api/production/telemetry/unlock", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            module: "TAPE_PLANT_DRIVE",
+            date,
+            shiftId,
+            timeSlot: row.time,
+          }),
+        });
+        if (!res.ok) {
+          const errData = await res.json();
+          throw new Error(errData.error || "Failed to unlock time slot");
+        }
+
+        const next = new Set(unlockedSlots);
+        next.add(row.time);
+        next.add(slotKey);
+        setUnlockedSlots(next);
+        toast.success(`Slot ${row.time || `#${idx + 1}`} unlocked for all operators`);
+      }
+    } catch (err: any) {
+      console.error("Time slot toggle error:", err);
+      toast.error(err.message || "Operation failed");
     }
-    setUnlockedSlots(next);
   };
 
   // Update photo for active row
@@ -703,13 +756,13 @@ export function ProcessDriveParameterSection({
         <div className="flex items-center gap-2">
           <AlertCircle className="h-4 w-4 text-slate-400 shrink-0" />
           <span>
-            <strong>Policy:</strong> Hourly/bi-hourly readings auto-lock 120 minutes past window start. Supervisors can click the lock icon to unlock expired rows.
+            <strong>Policy:</strong> Hourly/bi-hourly readings auto-lock 120 minutes past window start. Authorized roles can unlock expired slots globally for all factory operators.
           </span>
         </div>
-        {isSupervisor && (
-          <div className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-50 border border-indigo-200 text-indigo-700 rounded text-[11px] font-medium">
+        {canUnlock && (
+          <div className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded text-[11px] font-medium">
             <Unlock className="h-3 w-3" />
-            <span>Supervisor Override Active</span>
+            <span>Time Slot Unlock Authority Active</span>
           </div>
         )}
       </div>
@@ -735,10 +788,10 @@ export function ProcessDriveParameterSection({
           if (isOverridden) {
             return (
               <span
-                className="inline-flex items-center gap-0.5 px-1 py-0.5 text-[9px] font-bold bg-amber-100 text-amber-800 rounded border border-amber-300"
-                title="Unlocked by Supervisor"
+                className="inline-flex items-center gap-0.5 px-1 py-0.5 text-[9px] font-bold bg-emerald-100 text-emerald-800 rounded border border-emerald-300"
+                title="Slot Unlocked Globally for All Operators"
               >
-                <Unlock className="h-2.5 w-2.5" />
+                <Unlock className="h-2.5 w-2.5 text-emerald-600" />
                 <span>#{idx + 1}</span>
               </span>
             );
@@ -765,13 +818,24 @@ export function ProcessDriveParameterSection({
           const slotKey = `${row.time}-${idx}`;
           const isOverridden = unlockedSlots.has(slotKey) || unlockedSlots.has(row.time);
 
-          if (!isSupervisor) {
+          if (!canUnlock) {
             return (
               <div
-                title="Auto-Locked: Window expired. Contact supervisor to unlock."
-                className="p-1 text-slate-400 cursor-not-allowed"
+                title={
+                  isOverridden
+                    ? "Unlocked by Supervisor: Open for all operators to enter readings"
+                    : "Auto-Locked: Window expired. Contact supervisor to unlock."
+                }
+                className="p-1 cursor-default"
               >
-                <Lock className="h-3 w-3" />
+                {isOverridden ? (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                    <Unlock className="h-2.5 w-2.5 text-emerald-600" />
+                    <span>Unlocked</span>
+                  </span>
+                ) : (
+                  <Lock className="h-3 w-3 text-slate-400" />
+                )}
               </div>
             );
           }
@@ -780,18 +844,28 @@ export function ProcessDriveParameterSection({
             <button
               type="button"
               onClick={() => handleToggleUnlock(row, idx)}
-              className={`p-1 rounded transition-colors ${
+              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-semibold transition-all cursor-pointer ${
                 isOverridden
-                  ? "text-amber-600 hover:bg-amber-100"
-                  : "text-slate-500 hover:text-indigo-600 hover:bg-indigo-50"
+                  ? "bg-emerald-50 text-emerald-700 border border-emerald-300 hover:bg-emerald-100 shadow-2xs"
+                  : "bg-slate-100 text-slate-600 border border-slate-200 hover:bg-amber-50 hover:text-amber-700 hover:border-amber-300 shadow-2xs"
               }`}
               title={
                 isOverridden
-                  ? "Supervisor Override Active: Click to re-lock this slot"
-                  : "Click to unlock this expired slot (Supervisor Override)"
+                  ? "Unlocked for all operators. Click to re-lock this slot."
+                  : "Click to unlock this expired slot globally for all operators"
               }
             >
-              {isOverridden ? <Unlock className="h-3 w-3" /> : <Lock className="h-3 w-3" />}
+              {isOverridden ? (
+                <>
+                  <Unlock className="h-3 w-3 text-emerald-600" />
+                  <span>Unlocked</span>
+                </>
+              ) : (
+                <>
+                  <Lock className="h-3 w-3 text-slate-500" />
+                  <span>Unlock</span>
+                </>
+              )}
             </button>
           );
         }}

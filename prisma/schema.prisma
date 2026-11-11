@@ -32,15 +32,16 @@ enum Module {
 
 
 model Role {
-  id              String           @id @default(cuid())
-  name            String           @unique
-  description     String?
-  canUploadPhoto  Boolean          @default(false)
-  canCapturePhoto Boolean          @default(true)
-  permissions     RolePermission[]
-  users           User[]
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  id                 String           @id @default(cuid())
+  name               String           @unique
+  description        String?
+  canUploadPhoto     Boolean          @default(false)
+  canCapturePhoto    Boolean          @default(true)
+  canUnlockTimeSlots Boolean          @default(false)
+  permissions        RolePermission[]
+  users              User[]
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
 }
 
 model RolePermission {
@@ -1736,6 +1737,20 @@ model TapePlantTemperatureReading {
   shift Shift @relation(fields: [shiftId], references: [id])
 
   @@index([date, shiftId])
+}
+
+model TelemetryTimeSlotUnlock {
+  id          String   @id @default(cuid())
+  module      String   // e.g. "TAPE_PLANT_TEMPERATURE", "TAPE_PLANT_DRIVE"
+  date        String   // YYYY-MM-DD
+  shiftId     String
+  timeSlot    String   // e.g. "08:00", "10:00"
+  unlockedAt  DateTime @default(now())
+  unlockedBy  String?  // Name or ID of user who authorized unlock
+  notes       String?
+
+  @@unique([module, date, shiftId, timeSlot])
+  @@index([module, date, shiftId])
 }
 
 model TapePlantDriveParameter {

@@ -78,6 +78,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           permissions: user.role?.permissions || [],
           canUploadPhoto: Boolean(user.role?.canUploadPhoto),
           canCapturePhoto: user.role?.canCapturePhoto !== undefined ? Boolean(user.role?.canCapturePhoto) : true,
+          canUnlockTimeSlots: Boolean(user.role?.canUnlockTimeSlots),
         };
       }
     })
@@ -90,6 +91,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.permissions = user.permissions;
         token.canUploadPhoto = (user as any).canUploadPhoto;
         token.canCapturePhoto = (user as any).canCapturePhoto;
+        token.canUnlockTimeSlots = (user as any).canUnlockTimeSlots;
       }
       return token;
     },
@@ -101,8 +103,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         let canUpload = Boolean(token.canUploadPhoto);
         let canCapture = token.canCapturePhoto !== undefined ? Boolean(token.canCapturePhoto) : true;
+        let canUnlock = Boolean(token.canUnlockTimeSlots);
 
-        // Query live role and photo permissions directly from DB on every session query
+        // Query live role and photo/time-slot permissions directly from DB on every session query
         if (token.id) {
           try {
             const userWithRole = await db.user.findUnique({
@@ -113,6 +116,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                     name: true,
                     canUploadPhoto: true,
                     canCapturePhoto: true,
+                    canUnlockTimeSlots: true,
                     permissions: true,
                   },
                 },
@@ -123,6 +127,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
               session.user.role = userWithRole.role.name;
               canUpload = Boolean(userWithRole.role.canUploadPhoto);
               canCapture = userWithRole.role.canCapturePhoto !== undefined ? Boolean(userWithRole.role.canCapturePhoto) : true;
+              canUnlock = Boolean(userWithRole.role.canUnlockTimeSlots);
               if (userWithRole.role.permissions) {
                 session.user.permissions = userWithRole.role.permissions as any[];
               }
@@ -134,6 +139,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         (session.user as any).canUploadPhoto = canUpload;
         (session.user as any).canCapturePhoto = canCapture;
+        (session.user as any).canUnlockTimeSlots = canUnlock;
       }
       return session;
     }

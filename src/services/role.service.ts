@@ -15,6 +15,7 @@ export interface CreateRoleInput {
   description?: string;
   canUploadPhoto?: boolean;
   canCapturePhoto?: boolean;
+  canUnlockTimeSlots?: boolean;
   permissions: RolePermissionInput[];
 }
 
@@ -23,6 +24,7 @@ export interface UpdateRoleInput {
   description?: string;
   canUploadPhoto?: boolean;
   canCapturePhoto?: boolean;
+  canUnlockTimeSlots?: boolean;
   permissions: RolePermissionInput[];
 }
 
@@ -79,6 +81,7 @@ export class RoleService {
             description: data.description,
             canUploadPhoto: data.canUploadPhoto ?? false,
             canCapturePhoto: data.canCapturePhoto ?? true,
+            canUnlockTimeSlots: data.canUnlockTimeSlots ?? false,
             permissions: {
               create: data.permissions,
             },
@@ -127,6 +130,7 @@ export class RoleService {
             description: data.description,
             canUploadPhoto: data.canUploadPhoto ?? false,
             canCapturePhoto: data.canCapturePhoto ?? true,
+            canUnlockTimeSlots: data.canUnlockTimeSlots ?? false,
             permissions: {
               create: data.permissions,
             },
