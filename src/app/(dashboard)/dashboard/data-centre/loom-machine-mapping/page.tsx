@@ -1,11 +1,6 @@
-import { Metadata } from "next";
-import { LoomMachineMappingClient } from "./loom-machine-mapping-client";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = {
-  title: "Loom Machine Mapping | Data Centre | Plexi-ERP",
-  description: "Manage quality to loom machine number allocations and specifications.",
-};
-
+// BUG-019: Consolidated authoritatively into Circular Loom Summary
 export default function LoomMachineMappingPage() {
-  return <LoomMachineMappingClient />;
+  redirect("/dashboard/production/loom?tab=summary");
 }

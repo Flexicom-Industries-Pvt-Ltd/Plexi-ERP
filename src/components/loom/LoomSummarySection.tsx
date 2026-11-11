@@ -52,9 +52,7 @@ export function LoomSummarySection() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<LoomSummaryDataset | null>(null);
 
-  // Filters
-  const [selectedDate, setSelectedDate] = useState<string>("ALL");
-  const [selectedShiftId, setSelectedShiftId] = useState<string>("ALL");
+  // Filters (Persistent Lifetime Mapping - No Date or Shift Filters)
   const [search, setSearch] = useState("");
   const [selectedLoomFilter, setSelectedLoomFilter] = useState<string>("ALL");
 
@@ -68,16 +66,12 @@ export function LoomSummarySection() {
   const [singleLoomModalOpen, setSingleLoomModalOpen] = useState(false);
   const [assigningLoomNumber, setAssigningLoomNumber] = useState<number | null>(null);
   const [assigningQualityCode, setAssigningQualityCode] = useState<string>("");
-  const [assigningDate, setAssigningDate] = useState<string>("");
-  const [assigningShifts, setAssigningShifts] = useState<string[]>([]);
   const [isSubmittingSingleAssign, setIsSubmittingSingleAssign] = useState(false);
 
   // Recipe Bulk Loom Allocator Modal State
   const [bulkRecipeModalOpen, setBulkRecipeModalOpen] = useState(false);
   const [bulkSelectedRecipe, setBulkSelectedRecipe] = useState<string>("");
   const [bulkSelectedLooms, setBulkSelectedLooms] = useState<number[]>([]);
-  const [bulkDate, setBulkDate] = useState<string>("");
-  const [bulkShifts, setBulkShifts] = useState<string[]>([]);
   const [isSubmittingBulkAssign, setIsSubmittingBulkAssign] = useState(false);
 
   // Reset All Confirmation Modal State
@@ -99,8 +93,6 @@ export function LoomSummarySection() {
     setLoading(true);
     try {
       const params = new URLSearchParams();
-      if (selectedDate && selectedDate !== "ALL") params.set("date", selectedDate);
-      if (selectedShiftId && selectedShiftId !== "ALL") params.set("shiftId", selectedShiftId);
       if (search.trim()) params.set("search", search.trim());
       if (selectedLoomFilter !== "ALL") params.set("loomNumber", selectedLoomFilter);
 
@@ -121,16 +113,11 @@ export function LoomSummarySection() {
     } finally {
       setLoading(false);
     }
-  }, [selectedDate, selectedShiftId, search, selectedLoomFilter]);
+  }, [search, selectedLoomFilter]);
 
   useEffect(() => {
     fetchSummary();
   }, [fetchSummary]);
-
-  const selectedShiftName =
-    selectedShiftId !== "ALL" && data?.availableShifts
-      ? data.availableShifts.find((s) => s.id === selectedShiftId)?.name || "All Shifts"
-      : "All Shifts";
 
   const recipeList: RecipeLoomSummaryItem[] = data?.recipeSummaries || [];
   const rawLoomList: LoomMachineSummaryItem[] = data?.loomSummaries || [];
@@ -147,16 +134,8 @@ export function LoomSummarySection() {
   // Single Loom Assign Handlers
   const handleOpenSingleLoomModal = (loomNo: number) => {
     const current = rawLoomList.find((l) => l.loomNumber === loomNo);
-    const todayStr = new Date().toISOString().split("T")[0];
     setAssigningLoomNumber(loomNo);
     setAssigningQualityCode(current?.activeRecipe || availableRecipes[0]?.code || "");
-    setAssigningDate(
-      current?.allocationDate || (selectedDate !== "ALL" ? selectedDate : todayStr)
-    );
-    const defaultShifts = current?.activeShifts && current.activeShifts.length > 0
-      ? current.activeShifts
-      : (data?.availableShifts?.map((s) => s.name) || ["Day Shift", "Night Shift"]);
-    setAssigningShifts(defaultShifts);
     setSingleLoomModalOpen(true);
   };
 
@@ -187,8 +166,6 @@ export function LoomSummarySection() {
           action: "ASSIGN_LOOM",
           loomNumber: assigningLoomNumber,
           qualityCode: targetCode,
-          date: assigningDate,
-          shifts: assigningShifts,
         }),
       });
       const result = await res.json();
@@ -238,14 +215,6 @@ export function LoomSummarySection() {
     setBulkSelectedRecipe(targetCode);
     const existing = recipeList.find((r) => r.recipeQuality.toLowerCase() === targetCode?.toLowerCase());
     setBulkSelectedLooms(existing ? [...existing.assignedLooms] : []);
-    const todayStr = new Date().toISOString().split("T")[0];
-    setBulkDate(
-      existing?.allocationDate || (selectedDate !== "ALL" ? selectedDate : todayStr)
-    );
-    const defaultShifts = existing?.activeShifts && existing.activeShifts.length > 0
-      ? existing.activeShifts
-      : (data?.availableShifts?.map((s) => s.name) || ["Day Shift", "Night Shift"]);
-    setBulkShifts(defaultShifts);
     setBulkRecipeModalOpen(true);
   };
 
@@ -253,12 +222,6 @@ export function LoomSummarySection() {
     setBulkSelectedRecipe(code);
     const existing = recipeList.find((r) => r.recipeQuality.toLowerCase() === code.toLowerCase());
     setBulkSelectedLooms(existing ? [...existing.assignedLooms] : []);
-    if (existing?.allocationDate) {
-      setBulkDate(existing.allocationDate);
-    }
-    if (existing?.activeShifts && existing.activeShifts.length > 0) {
-      setBulkShifts(existing.activeShifts);
-    }
   };
 
   const handleToggleBulkLoom = (loomNo: number) => {
@@ -335,8 +298,6 @@ export function LoomSummarySection() {
           action: "ASSIGN_RECIPE_LOOMS",
           qualityCode: bulkSelectedRecipe.trim(),
           loomNumbers: bulkSelectedLooms,
-          date: bulkDate,
-          shifts: bulkShifts,
         }),
       });
       const result = await res.json();
@@ -403,9 +364,9 @@ export function LoomSummarySection() {
     }
     exportLoomSummaryExcel({
       ...data,
-      selectedDate,
-      selectedShiftId,
-      selectedShiftName,
+      selectedDate: "Continuous Lifetime",
+      selectedShiftId: "ALL",
+      selectedShiftName: "All Shifts",
       recipeSummaries: recipeList,
       loomSummaries: displayedLoomList,
     });
@@ -420,9 +381,9 @@ export function LoomSummarySection() {
     printLoomSummary({
       ...data,
       activeView,
-      selectedDate,
-      selectedShiftId,
-      selectedShiftName,
+      selectedDate: "Continuous Lifetime",
+      selectedShiftId: "ALL",
+      selectedShiftName: "All Shifts",
       search,
       selectedLoomFilter,
       showActiveOnly: loomStatusFilter === "ACTIVE_ONLY",
@@ -431,21 +392,7 @@ export function LoomSummarySection() {
     });
   };
 
-  const setDatePreset = (preset: "ALL" | "TODAY" | "YESTERDAY") => {
-    if (preset === "ALL") {
-      setSelectedDate("ALL");
-    } else if (preset === "TODAY") {
-      const today = new Date().toISOString().slice(0, 10);
-      setSelectedDate(today);
-    } else if (preset === "YESTERDAY") {
-      const y = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
-      setSelectedDate(y);
-    }
-  };
-
   const handleResetFilters = () => {
-    setSelectedDate("ALL");
-    setSelectedShiftId("ALL");
     setSearch("");
     setSelectedLoomFilter("ALL");
     setLoomStatusFilter("ALL");
@@ -453,8 +400,6 @@ export function LoomSummarySection() {
   };
 
   const isFilterActive =
-    selectedDate !== "ALL" ||
-    selectedShiftId !== "ALL" ||
     search !== "" ||
     selectedLoomFilter !== "ALL" ||
     loomStatusFilter !== "ALL";
@@ -533,7 +478,7 @@ export function LoomSummarySection() {
         </div>
       </div>
 
-      {/* 2. Sleek Minimalist KPIs Strip */}
+      {/* 2. Sleek Minimalist KPIs Strip (Persistent Machine Allocation) */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {/* Active Looms */}
         <div
@@ -572,31 +517,37 @@ export function LoomSummarySection() {
           </div>
         </div>
 
-        {/* Dispatched Crates */}
-        <div className="bg-white p-3.5 rounded-xl border border-slate-200/90 shadow-2xs">
+        {/* Idle Looms */}
+        <div
+          onClick={() => {
+            setActiveView("looms");
+            setLoomStatusFilter("ALL");
+          }}
+          className="bg-white p-3.5 rounded-xl border border-slate-200/90 shadow-2xs cursor-pointer hover:border-slate-300 transition-all group"
+        >
           <div className="flex items-center justify-between text-xs text-slate-500 font-medium">
-            <span>Dispatched Crates</span>
-            <Package className="h-3.5 w-3.5 text-slate-400" />
+            <span>Idle Looms</span>
+            <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
           </div>
           <div className="mt-1.5 flex items-baseline gap-1.5">
             <span className="text-xl font-bold font-mono text-slate-900">
-              {(kpis?.totalCratesDispatched ?? 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 1 })}
+              {kpis?.idleLoomsCount ?? Math.max(0, 91 - (kpis?.activeLoomsCount ?? 0))}
             </span>
-            <span className="text-xs text-slate-400">crates</span>
+            <span className="text-xs font-mono text-slate-400">/ 91 idle</span>
           </div>
         </div>
 
-        {/* Total Weight */}
+        {/* Shed Capacity */}
         <div className="bg-white p-3.5 rounded-xl border border-slate-200/90 shadow-2xs">
           <div className="flex items-center justify-between text-xs text-slate-500 font-medium">
-            <span>Dispatched Weight</span>
-            <Scale className="h-3.5 w-3.5 text-slate-400" />
+            <span>Total Shed Capacity</span>
+            <LayoutGrid className="h-3.5 w-3.5 text-slate-400" />
           </div>
           <div className="mt-1.5 flex items-baseline gap-1.5">
             <span className="text-xl font-bold font-mono text-slate-900">
-              {(kpis?.totalWeightDispatchedKg ?? 0).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+              91
             </span>
-            <span className="text-xs text-slate-400">kg</span>
+            <span className="text-xs text-slate-400">Circular Looms</span>
           </div>
         </div>
       </div>
@@ -658,67 +609,17 @@ export function LoomSummarySection() {
               </div>
             </div>
 
-          {/* Date & Shift Filter Strip */}
-          <div className="flex flex-wrap items-center gap-1.5">
-            <div className="inline-flex rounded-lg bg-slate-100 p-0.5 text-xs font-medium">
-              <button
-                type="button"
-                onClick={() => setDatePreset("ALL")}
-                className={`px-2.5 py-0.5 rounded transition-all cursor-pointer ${
-                  selectedDate === "ALL" ? "bg-white text-slate-900 shadow-2xs font-semibold" : "text-slate-600"
-                }`}
-              >
-                All
-              </button>
-              <button
-                type="button"
-                onClick={() => setDatePreset("TODAY")}
-                className={`px-2.5 py-0.5 rounded transition-all cursor-pointer ${
-                  selectedDate === new Date().toISOString().slice(0, 10) ? "bg-white text-slate-900 shadow-2xs font-semibold" : "text-slate-600"
-                }`}
-              >
-                Today
-              </button>
-            </div>
-
-            <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg px-2 py-0.5 text-xs">
-              <Calendar className="h-3 w-3 text-slate-400" />
-              <input
-                type="date"
-                value={selectedDate === "ALL" ? "" : selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value || "ALL")}
-                className="text-xs font-medium text-slate-800 bg-transparent outline-none cursor-pointer"
-              />
-            </div>
-
-            <div className="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg px-2 py-0.5 text-xs">
-              <Clock className="h-3 w-3 text-slate-400" />
-              <select
-                value={selectedShiftId}
-                onChange={(e) => setSelectedShiftId(e.target.value)}
-                className="text-xs font-medium text-slate-800 bg-transparent outline-none cursor-pointer"
-              >
-                <option value="ALL">All Shifts</option>
-                {data?.availableShifts?.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
             {isFilterActive && (
               <button
                 type="button"
                 onClick={handleResetFilters}
-                className="px-2 py-0.5 text-xs text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-md transition-colors cursor-pointer"
+                className="px-2.5 py-1 text-xs font-medium text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg border border-slate-200 transition-colors cursor-pointer"
                 title="Reset filters"
               >
-                Reset
+                Reset Filters
               </button>
             )}
           </div>
-        </div>
 
         {/* Search */}
         <div className="relative w-full">
@@ -739,22 +640,20 @@ export function LoomSummarySection() {
       {activeView === "recipes" && (
         <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[800px] text-xs">
+            <table className="w-full text-left border-collapse min-w-[700px] text-xs">
               <thead>
                 <tr className="bg-slate-50/80 border-b border-slate-200 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
                   <th className="py-2.5 px-3.5 w-10 text-center">#</th>
                   <th className="py-2.5 px-3.5">Recipe Quality</th>
                   <th className="py-2.5 px-3 text-center w-24">Looms</th>
                   <th className="py-2.5 px-3.5">Assigned Loom Numbers</th>
-                  <th className="py-2.5 px-3 text-right">Crates</th>
-                  <th className="py-2.5 px-3 text-right">Weight</th>
                   <th className="py-2.5 px-3 text-right w-24">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs text-slate-700">
                 {loading ? (
                   <tr>
-                    <td colSpan={7} className="py-12 text-center text-slate-400">
+                    <td colSpan={5} className="py-12 text-center text-slate-400">
                       <div className="inline-flex items-center gap-2">
                         <RefreshCw className="h-4 w-4 animate-spin text-slate-500" />
                         <span>Loading assignments...</span>
@@ -763,7 +662,7 @@ export function LoomSummarySection() {
                   </tr>
                 ) : recipeList.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="py-12 text-center">
+                    <td colSpan={5} className="py-12 text-center">
                       <div className="max-w-sm mx-auto flex flex-col items-center justify-center p-4 text-center">
                         <div className="h-10 w-10 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mb-2.5">
                           <Layers className="h-5 w-5" />
@@ -791,25 +690,7 @@ export function LoomSummarySection() {
                       </td>
 
                       <td className="py-3 px-3.5">
-                        <div className="space-y-1">
-                          <RecipeQualityBadge value={item.recipeQuality} />
-                          {(item.allocationDate || (item.activeShifts && item.activeShifts.length > 0)) && (
-                            <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-                              {item.allocationDate && (
-                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 text-[10px] font-mono">
-                                  <Calendar className="h-2.5 w-2.5 text-slate-400" />
-                                  <span>{item.allocationDate}</span>
-                                </span>
-                              )}
-                              {item.activeShifts && item.activeShifts.length > 0 && (
-                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 text-[10px]">
-                                  <Clock className="h-2.5 w-2.5 text-slate-400" />
-                                  <span>{item.activeShifts.join(", ")}</span>
-                                </span>
-                              )}
-                            </div>
-                          )}
-                        </div>
+                        <RecipeQualityBadge value={item.recipeQuality} />
                       </td>
 
                       <td className="py-3 px-3 text-center">
@@ -832,22 +713,6 @@ export function LoomSummarySection() {
                             </button>
                           ))}
                         </div>
-                      </td>
-
-                      <td className="py-3 px-3 text-right font-mono font-medium text-slate-800">
-                        {item.totalCratesIssued > 0 ? (
-                          `${item.totalCratesIssued.toFixed(1)} c`
-                        ) : (
-                          <span className="text-slate-300">—</span>
-                        )}
-                      </td>
-
-                      <td className="py-3 px-3 text-right font-mono font-medium text-slate-800">
-                        {item.totalWeightIssuedKg > 0 ? (
-                          `${item.totalWeightIssuedKg.toFixed(1)} kg`
-                        ) : (
-                          <span className="text-slate-300">—</span>
-                        )}
                       </td>
 
                       <td className="py-3 px-3 text-right">
@@ -962,8 +827,6 @@ export function LoomSummarySection() {
                     <th className="py-2.5 px-3.5 w-16 text-center">Loom #</th>
                     <th className="py-2.5 px-3 text-center w-20">Status</th>
                     <th className="py-2.5 px-3.5">Assigned Quality</th>
-                    <th className="py-2.5 px-3 text-right">Crates</th>
-                    <th className="py-2.5 px-3 text-right">Weight</th>
                     <th className="py-2.5 px-3 text-center w-20">Action</th>
                   </tr>
                 </thead>
@@ -1004,34 +867,10 @@ export function LoomSummarySection() {
                                 </span>
                               )}
                             </div>
-                            {(loom.allocationDate || (loom.activeShifts && loom.activeShifts.length > 0)) && (
-                              <div className="flex flex-wrap items-center gap-1.5">
-                                {loom.allocationDate && (
-                                  <span className="inline-flex items-center gap-0.5 text-[10px] font-mono text-slate-500">
-                                    <Calendar className="h-2.5 w-2.5 text-slate-400" />
-                                    <span>{loom.allocationDate}</span>
-                                  </span>
-                                )}
-                                {loom.activeShifts && loom.activeShifts.length > 0 && (
-                                  <span className="inline-flex items-center gap-0.5 text-[10px] text-slate-500">
-                                    <Clock className="h-2.5 w-2.5 text-slate-400" />
-                                    <span>{loom.activeShifts.join(", ")}</span>
-                                  </span>
-                                )}
-                              </div>
-                            )}
                           </div>
                         ) : (
                           <span className="text-slate-400 italic text-[11px]">Unassigned</span>
                         )}
-                      </td>
-
-                      <td className="py-2.5 px-3 text-right font-mono text-slate-700">
-                        {loom.totalCrates > 0 ? `${loom.totalCrates.toFixed(1)} c` : "—"}
-                      </td>
-
-                      <td className="py-2.5 px-3 text-right font-mono text-slate-700">
-                        {loom.totalWeightKg > 0 ? `${loom.totalWeightKg.toFixed(1)} kg` : "—"}
                       </td>
 
                       <td className="py-2.5 px-3 text-center">
@@ -1140,72 +979,7 @@ export function LoomSummarySection() {
                 );
               })()}
 
-              {/* Date & Multi-Shift Selection (Single Loom Modal) */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
-                    <Calendar className="h-3.5 w-3.5 text-slate-500" />
-                    <span>Allocation Date:</span>
-                  </label>
-                  <input
-                    type="date"
-                    value={assigningDate}
-                    onChange={(e) => setAssigningDate(e.target.value)}
-                    className="w-full px-2.5 py-1.5 text-xs font-medium bg-white border border-slate-200 rounded-lg outline-none focus:border-slate-800"
-                  />
-                </div>
-
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
-                      <Clock className="h-3.5 w-3.5 text-slate-500" />
-                      <span>Active Shift(s):</span>
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const allShiftNames = (data?.availableShifts || []).map((s) => s.name);
-                        if (assigningShifts.length === allShiftNames.length) {
-                          setAssigningShifts([]);
-                        } else {
-                          setAssigningShifts(allShiftNames);
-                        }
-                      }}
-                      className="text-[10px] text-slate-600 hover:text-slate-900 underline cursor-pointer"
-                    >
-                      {assigningShifts.length === (data?.availableShifts?.length || 2) ? "Deselect All" : "Select All"}
-                    </button>
-                  </div>
-
-                  <div className="flex flex-wrap gap-1.5">
-                    {(data?.availableShifts || [
-                      { id: "shift_day", name: "Day Shift" },
-                      { id: "shift_night", name: "Night Shift" },
-                    ]).map((s) => {
-                      const isSelected = assigningShifts.includes(s.name);
-                      return (
-                        <button
-                          key={s.id}
-                          type="button"
-                          onClick={() => {
-                            setAssigningShifts((prev) =>
-                              prev.includes(s.name) ? prev.filter((name) => name !== s.name) : [...prev, s.name]
-                            );
-                          }}
-                          className={`px-2 py-1 text-[11px] font-medium rounded-lg border transition-all cursor-pointer inline-flex items-center gap-1 ${
-                            isSelected
-                              ? "bg-slate-900 text-white border-slate-900 shadow-2xs font-semibold"
-                              : "bg-white text-slate-600 border-slate-200 hover:bg-slate-100"
-                          }`}
-                        >
-                          {isSelected && <Check className="h-3 w-3" />}
-                          <span>{s.name}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
+              {/* Auto-Fetched Specs End */}
             </div>
 
             <div className="px-5 py-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-2">
@@ -1231,7 +1005,7 @@ export function LoomSummarySection() {
                   type="button"
                   onClick={() => handleSaveSingleLoomAssign()}
                   disabled={isSubmittingSingleAssign || !assigningQualityCode.trim()}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white text-xs font-semibold rounded-lg shadow-2xs cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-primary hover:bg-primary/90 disabled:opacity-50 text-white text-xs font-semibold rounded-lg shadow-xs cursor-pointer"
                 >
                   <Check className="h-3.5 w-3.5" />
                   <span>{isSubmittingSingleAssign ? "Saving..." : "Save"}</span>
@@ -1313,72 +1087,7 @@ export function LoomSummarySection() {
                 );
               })()}
 
-              {/* Date & Multi-Shift Selection (Bulk Modal) */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
-                    <Calendar className="h-3.5 w-3.5 text-slate-500" />
-                    <span>Allocation Date:</span>
-                  </label>
-                  <input
-                    type="date"
-                    value={bulkDate}
-                    onChange={(e) => setBulkDate(e.target.value)}
-                    className="w-full px-2.5 py-1.5 text-xs font-medium bg-white border border-slate-200 rounded-lg outline-none focus:border-slate-800"
-                  />
-                </div>
-
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
-                      <Clock className="h-3.5 w-3.5 text-slate-500" />
-                      <span>Active Shift(s):</span>
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const allShiftNames = (data?.availableShifts || []).map((s) => s.name);
-                        if (bulkShifts.length === allShiftNames.length) {
-                          setBulkShifts([]);
-                        } else {
-                          setBulkShifts(allShiftNames);
-                        }
-                      }}
-                      className="text-[10px] text-slate-600 hover:text-slate-900 underline cursor-pointer"
-                    >
-                      {bulkShifts.length === (data?.availableShifts?.length || 2) ? "Deselect All" : "Select All"}
-                    </button>
-                  </div>
-
-                  <div className="flex flex-wrap gap-1.5">
-                    {(data?.availableShifts || [
-                      { id: "shift_day", name: "Day Shift" },
-                      { id: "shift_night", name: "Night Shift" },
-                    ]).map((s) => {
-                      const isSelected = bulkShifts.includes(s.name);
-                      return (
-                        <button
-                          key={s.id}
-                          type="button"
-                          onClick={() => {
-                            setBulkShifts((prev) =>
-                              prev.includes(s.name) ? prev.filter((name) => name !== s.name) : [...prev, s.name]
-                            );
-                          }}
-                          className={`px-2 py-1 text-[11px] font-medium rounded-lg border transition-all cursor-pointer inline-flex items-center gap-1 ${
-                            isSelected
-                              ? "bg-slate-900 text-white border-slate-900 shadow-2xs font-semibold"
-                              : "bg-white text-slate-600 border-slate-200 hover:bg-slate-100"
-                          }`}
-                        >
-                          {isSelected && <Check className="h-3 w-3" />}
-                          <span>{s.name}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
+              {/* Dynamic Auto-Fetched Specs End */}
 
               {/* Looms Interactive Grid */}
               <div className="space-y-2">
@@ -1445,7 +1154,7 @@ export function LoomSummarySection() {
                           disabled={isOtherOwner}
                           className={`p-1.5 rounded-lg border text-center transition-all flex flex-col items-center justify-center ${
                             isSelected
-                              ? "bg-slate-900 text-white border-slate-900 shadow-2xs font-bold cursor-pointer"
+                              ? "bg-primary text-white border-primary shadow-2xs font-bold cursor-pointer"
                               : isOtherOwner
                               ? "bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed opacity-60"
                               : "bg-white hover:bg-slate-100 border-slate-200 text-slate-700 font-medium cursor-pointer"
@@ -1475,7 +1184,7 @@ export function LoomSummarySection() {
                   <div className="flex items-center justify-between text-[10px] text-slate-500 pt-1 border-t border-slate-200/60">
                     <div className="flex items-center gap-3">
                       <span className="flex items-center gap-1">
-                        <span className="w-2 h-2 rounded-xs bg-slate-900 inline-block" /> Selected
+                        <span className="w-2 h-2 rounded-xs bg-primary inline-block" /> Selected
                       </span>
                       <span className="flex items-center gap-1">
                         <span className="w-2 h-2 rounded-xs bg-white border border-slate-300 inline-block" /> Free / Idle

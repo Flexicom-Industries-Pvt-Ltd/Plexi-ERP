@@ -116,7 +116,6 @@ const dataCentreItems = [
   { title: "Production Characteristics", url: "/dashboard/data-centre/production-characteristics" },
   { title: "Manpower Rules", url: "/dashboard/data-centre/manpower-rules" },
   { title: "Tape Plant Recipe", url: "/dashboard/data-centre/tape-plant-recipe" },
-  { title: "Loom Machine Mapping", url: "/dashboard/data-centre/loom-machine-mapping" },
   { title: "Lamination Raw Material", url: "/dashboard/data-centre/lamination-raw-materials" },
   { title: "Printing Raw Material", url: "/dashboard/data-centre/printing-raw-materials" },
   { title: "Party Printing Details", url: "/dashboard/data-centre/party-printing" },
