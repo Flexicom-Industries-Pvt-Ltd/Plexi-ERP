@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, Shield, Trash2, Edit, Camera, Upload, AlertCircle } from "lucide-react";
+import { PlusCircle, Shield, Trash2, Edit, Camera, Upload, AlertCircle, Unlock } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
@@ -36,6 +36,7 @@ export function RolesClient({ roles, modules }: Props) {
   const [description, setDescription] = useState("");
   const [canUploadPhoto, setCanUploadPhoto] = useState(false);
   const [canCapturePhoto, setCanCapturePhoto] = useState(true);
+  const [canUnlockTimeSlots, setCanUnlockTimeSlots] = useState(false);
   const [permissions, setPermissions] = useState<Record<string, { canRead: boolean; canCreate: boolean; canUpdate: boolean; canDelete: boolean }>>({});
 
   const handleOpenDialog = (role?: any) => {
@@ -45,6 +46,7 @@ export function RolesClient({ roles, modules }: Props) {
       setDescription(role.description || "");
       setCanUploadPhoto(role.canUploadPhoto || false);
       setCanCapturePhoto(role.canCapturePhoto ?? true);
+      setCanUnlockTimeSlots(role.canUnlockTimeSlots || false);
       
       const perms: any = {};
       modules.forEach(m => {
@@ -63,6 +65,7 @@ export function RolesClient({ roles, modules }: Props) {
       setDescription("");
       setCanUploadPhoto(false);
       setCanCapturePhoto(true);
+      setCanUnlockTimeSlots(false);
       
       const perms: any = {};
       modules.forEach(m => {
@@ -103,6 +106,7 @@ export function RolesClient({ roles, modules }: Props) {
           description,
           canUploadPhoto,
           canCapturePhoto,
+          canUnlockTimeSlots,
           permissions: permissionsArray,
         });
         if (res.success) {
@@ -117,6 +121,7 @@ export function RolesClient({ roles, modules }: Props) {
           description,
           canUploadPhoto,
           canCapturePhoto,
+          canUnlockTimeSlots,
           permissions: permissionsArray,
         });
         if (res.success) {
@@ -211,6 +216,11 @@ export function RolesClient({ roles, modules }: Props) {
                           ⛔ No Photo Access
                         </Badge>
                       )}
+                      {role.canUnlockTimeSlots && (
+                        <Badge variant="outline" className="text-[11px] font-medium bg-emerald-50 text-emerald-700 border-emerald-200">
+                          🔓 Time Slot Unlock
+                        </Badge>
+                      )}
                     </div>
                   </TableCell>
                   <TableCell>
@@ -269,19 +279,19 @@ export function RolesClient({ roles, modules }: Props) {
               </div>
             </div>
 
-            {/* Evidence Photo & Media Policy (RBAC) */}
+            {/* Evidence Photo & Operational Override Policy (RBAC) */}
             <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3.5 space-y-2.5">
               <div>
                 <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                  <Camera className="h-3.5 w-3.5 text-slate-700" />
-                  <span>Evidence Photo & Media Permissions</span>
+                  <Shield className="h-3.5 w-3.5 text-slate-700" />
+                  <span>Evidence Media & Operational Policies</span>
                 </h4>
                 <p className="text-[11px] text-slate-500 mt-0.5">
-                  Control which photo evidence options are rendered for users with this role across factory modules.
+                  Control photo evidence capabilities and expired time slot unlock authority across factory modules.
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
                 {/* 1. Device File Upload */}
                 <label className="flex items-start gap-2.5 p-2.5 bg-white rounded-lg border border-slate-200 hover:border-slate-300 transition-colors cursor-pointer shadow-2xs">
                   <Checkbox
@@ -293,10 +303,10 @@ export function RolesClient({ roles, modules }: Props) {
                   <div className="space-y-0.5">
                     <span className="text-xs font-semibold text-slate-900 flex items-center gap-1.5">
                       <Upload className="h-3.5 w-3.5 text-purple-600" />
-                      Allow Device File Upload
+                      Allow File Upload
                     </span>
                     <p className="text-[10px] text-slate-500 leading-tight">
-                      Enables uploading existing images from filesystem or gallery (e.g. Supervisors / Managers).
+                      Upload photos from disk or gallery (Supervisors/Managers).
                     </p>
                   </div>
                 </label>
@@ -312,10 +322,29 @@ export function RolesClient({ roles, modules }: Props) {
                   <div className="space-y-0.5">
                     <span className="text-xs font-semibold text-slate-900 flex items-center gap-1.5">
                       <Camera className="h-3.5 w-3.5 text-blue-600" />
-                      Allow Live Camera Capture
+                      Allow Live Camera
                     </span>
                     <p className="text-[10px] text-slate-500 leading-tight">
-                      Enables real-time camera capture on the factory floor (Audited physical presence for Operators).
+                      Take live photos at machine (Audited Operator presence).
+                    </p>
+                  </div>
+                </label>
+
+                {/* 3. Time Slot Override / Unlock */}
+                <label className="flex items-start gap-2.5 p-2.5 bg-white rounded-lg border border-slate-200 hover:border-slate-300 transition-colors cursor-pointer shadow-2xs">
+                  <Checkbox
+                    id="canUnlockTimeSlots"
+                    checked={canUnlockTimeSlots}
+                    onCheckedChange={(c) => setCanUnlockTimeSlots(!!c)}
+                    className="mt-0.5"
+                  />
+                  <div className="space-y-0.5">
+                    <span className="text-xs font-semibold text-slate-900 flex items-center gap-1.5">
+                      <Unlock className="h-3.5 w-3.5 text-emerald-600" />
+                      Unlock Time Slots
+                    </span>
+                    <p className="text-[10px] text-slate-500 leading-tight">
+                      Override & unlock expired slots globally for everyone.
                     </p>
                   </div>
                 </label>

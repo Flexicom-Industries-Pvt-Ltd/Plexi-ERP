@@ -11,6 +11,7 @@ const PatchRoleSchema = z.object({
   description: z.string().optional(),
   canUploadPhoto: z.boolean().optional(),
   canCapturePhoto: z.boolean().optional(),
+  canUnlockTimeSlots: z.boolean().optional(),
   permissions: z.array(RolePermissionSchema).optional(),
 });
 
@@ -61,6 +62,7 @@ export async function PATCH(
       description: parsed.data.description ?? (currentRole.description || undefined),
       canUploadPhoto: parsed.data.canUploadPhoto !== undefined ? parsed.data.canUploadPhoto : (currentRole as any).canUploadPhoto,
       canCapturePhoto: parsed.data.canCapturePhoto !== undefined ? parsed.data.canCapturePhoto : (currentRole as any).canCapturePhoto,
+      canUnlockTimeSlots: parsed.data.canUnlockTimeSlots !== undefined ? parsed.data.canUnlockTimeSlots : (currentRole as any).canUnlockTimeSlots,
       permissions: parsed.data.permissions ?? (currentRole.permissions as any),
     });
 
