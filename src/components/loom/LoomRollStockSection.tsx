@@ -178,17 +178,9 @@ export function LoomRollStockSection() {
             <Layers className="h-6 w-6 text-sky-600" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl font-bold text-slate-900 tracking-tight">
-                Roll Stock
-              </h1>
-              <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-sky-100 text-sky-800 border border-sky-200">
-                Circular Loom Stock
-              </span>
-              <span className="px-2 py-0.5 text-xs font-bold rounded-full bg-slate-100 text-slate-700 border border-slate-200">
-                {summary.totalRolls} Rolls
-              </span>
-            </div>
+            <h1 className="text-xl font-bold text-slate-900 tracking-tight">
+              Roll Stock
+            </h1>
           </div>
         </div>
 
@@ -241,9 +233,6 @@ export function LoomRollStockSection() {
             </span>
             <span className="text-xs font-bold text-slate-500 uppercase">Rolls</span>
           </div>
-          <p className="text-[11px] text-slate-500 mt-1">
-            Across {summary.uniqueLoomsCount} active circular looms
-          </p>
         </div>
 
         {/* Card 2: Total Quantity (Meters) */}
@@ -262,9 +251,6 @@ export function LoomRollStockSection() {
             </span>
             <span className="text-xs font-bold text-sky-700 uppercase">Meters</span>
           </div>
-          <p className="text-[11px] text-slate-500 mt-1">
-            Total linear fabric length in floor stock
-          </p>
         </div>
 
         {/* Card 3: Total Quantity (Nett Weight) */}
@@ -283,9 +269,6 @@ export function LoomRollStockSection() {
             </span>
             <span className="text-xs font-bold text-emerald-700 uppercase">KG Nett</span>
           </div>
-          <p className="text-[11px] text-slate-500 mt-1">
-            Gross: {summary.totalGrossWeightKg.toFixed(1)} kg • Tare: {summary.totalTareWeightKg.toFixed(1)} kg
-          </p>
         </div>
 
         {/* Card 4: Active Qualities & Avg Weight */}
@@ -304,68 +287,8 @@ export function LoomRollStockSection() {
             </span>
             <span className="text-xs font-bold text-purple-700 uppercase">Qualities</span>
           </div>
-          <p className="text-[11px] text-slate-500 mt-1">
-            Overall Linear Mass: <strong className="text-purple-900">{summary.averageWeightPerMeter.toFixed(1)} g/m</strong>
-          </p>
         </div>
       </div>
-
-      {/* 3. Quality Breakdown Pill Strip */}
-      {summary.qualityBreakdown.length > 0 && (
-        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs space-y-2">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-xs font-bold text-slate-700 uppercase tracking-wider">
-              <span className="h-2 w-2 rounded-full bg-sky-500 animate-pulse"></span>
-              <span>Stock by Quality (Click to filter):</span>
-            </div>
-            {selectedQuality !== "ALL" && (
-              <button
-                onClick={() => setSelectedQuality("ALL")}
-                className="text-xs text-sky-600 hover:text-sky-800 font-semibold cursor-pointer"
-              >
-                Clear Quality Filter
-              </button>
-            )}
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2 pt-1">
-            <button
-              onClick={() => setSelectedQuality("ALL")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer border ${
-                selectedQuality === "ALL"
-                  ? "bg-sky-600 text-white border-sky-600 shadow-xs"
-                  : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-sky-50 hover:text-sky-800 hover:border-sky-200"
-              }`}
-            >
-              All Qualities ({summary.totalRolls} rolls • {summary.totalNettWeightKg.toFixed(0)} kg)
-            </button>
-
-            {summary.qualityBreakdown.map((q) => {
-              const isSelected = selectedQuality === q.qualityType;
-              return (
-                <button
-                  key={q.qualityType}
-                  onClick={() => setSelectedQuality(isSelected ? "ALL" : q.qualityType)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer border flex items-center gap-1.5 ${
-                    isSelected
-                      ? "bg-sky-600 text-white border-sky-600 shadow-xs"
-                      : "bg-sky-50/70 text-sky-800 border-sky-200 hover:bg-sky-100 hover:border-sky-300"
-                  }`}
-                >
-                  <span>{q.qualityType}</span>
-                  <span
-                    className={`px-1.5 py-0.2 rounded-sm text-[10px] font-mono ${
-                      isSelected ? "bg-white/20 text-white" : "bg-sky-100 text-sky-700 font-bold"
-                    }`}
-                  >
-                    {q.rollsCount} rolls • {q.totalNettWeightKg.toFixed(0)} kg
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
 
       {/* 4. Minimalist Filter & Search Bar */}
       <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs space-y-3">
