@@ -284,13 +284,6 @@ export function BobbinStockSummarySection({
                 })} kg`
               )}
             </div>
-            <p className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-1.5 font-medium">
-              <span>{totals.uniqueQualitiesCount} Recipe(s) Produced</span>
-              <span>•</span>
-              <span className="text-slate-600 font-mono">
-                {formatDiscreteCrates(totals.totalProducedCrates, BOBBINS_PER_CRATE, true)}
-              </span>
-            </p>
           </div>
         </div>
 
@@ -315,13 +308,6 @@ export function BobbinStockSummarySection({
                 })} kg`
               )}
             </div>
-            <p className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-1.5 font-medium">
-              <span className="font-mono text-indigo-700">
-                {formatDiscreteCrates(totals.totalIssuedCrates, BOBBINS_PER_CRATE, true)}
-              </span>
-              <span>•</span>
-              <span>Loom Hall Dispatch</span>
-            </p>
           </div>
         </div>
 
@@ -346,12 +332,6 @@ export function BobbinStockSummarySection({
                 })} kg`
               )}
             </div>
-            <p className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-1.5 font-medium">
-              <span className="font-mono text-emerald-700 font-bold">
-                {formatDiscreteCrates(totals.totalAvailableCrateStock ?? totals.totalCrateStock, BOBBINS_PER_CRATE, false)}
-              </span>
-              <span>in Warehouse</span>
-            </p>
           </div>
         </div>
       </div>
@@ -385,23 +365,6 @@ export function BobbinStockSummarySection({
                 )}
               </button>
               <h2 className="text-sm font-semibold text-slate-900 tracking-tight">Bobbin & Crate Stock Summary</h2>
-              {/* Scope / Ledger Indicator (BUG-015) */}
-              {dateFilterMode === "all" ? (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 text-[11px] font-semibold rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 shadow-2xs">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  Cumulative Warehouse Balance (All-Time)
-                </span>
-              ) : dateFilterMode === "single" ? (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 text-[11px] font-semibold rounded-full bg-amber-50 text-amber-800 border border-amber-200 shadow-2xs">
-                  <Clock className="h-3 w-3 text-amber-600" />
-                  Single Shift Batch Stock ({selectedSingleDate} • {shiftDescription})
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 text-[11px] font-semibold rounded-full bg-blue-50 text-blue-800 border border-blue-200 shadow-2xs">
-                  <Calendar className="h-3 w-3 text-blue-600" />
-                  Date Range ({dateFrom} to {dateTo})
-                </span>
-              )}
             </div>
 
             {/* Global Actions */}
