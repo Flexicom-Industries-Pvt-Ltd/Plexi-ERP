@@ -232,9 +232,6 @@ export function LoomProductionReportSection() {
                   {startDate === endDate ? startDate : `${startDate} → ${endDate}`}
                 </span>
               </h1>
-              <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
-                Consolidated circular loom analytics across Loom-wise, Supervisor-wise, and Operator-wise criteria.
-              </p>
             </div>
           </div>
         </div>

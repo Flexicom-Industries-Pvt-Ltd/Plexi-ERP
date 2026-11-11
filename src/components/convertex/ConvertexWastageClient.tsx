@@ -494,9 +494,6 @@ export function ConvertexWastageClient() {
             <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 mt-1">
               Convertex Wastage Report
             </h1>
-            <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-              Roll-by-roll wastage breakdown across loom, lamination, printing, machine, and cover patches with live percentages & net production.
-            </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">

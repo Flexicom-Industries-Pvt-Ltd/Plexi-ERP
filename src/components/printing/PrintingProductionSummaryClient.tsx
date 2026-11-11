@@ -108,16 +108,10 @@ export function PrintingProductionSummaryClient() {
               <span className="text-xs font-semibold uppercase tracking-wider text-primary">
                 Printing & Conversion
               </span>
-              <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
-                Analytics & Dispatch
-              </span>
             </div>
             <h1 className="text-2xl font-bold tracking-tight text-slate-900 mt-1">
               Printing Production Summary
             </h1>
-            <p className="text-xs md:text-sm text-slate-500 mt-0.5">
-              Customer-wise printing, quality-wise printing, and overall total print meters analytics with printable executive reports.
-            </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">

@@ -264,9 +264,6 @@ export function PostProductionSection({ date, shiftId, shiftName }: PostProducti
                 {status === "SUBMITTED" ? "SUBMITTED" : "SAVED"}
               </span>
             </div>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Record actual production done, waste, and net output for planned recipes in {shiftName} ({date}).
-            </p>
           </div>
         </div>
 

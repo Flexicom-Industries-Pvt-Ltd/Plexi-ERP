@@ -145,17 +145,9 @@ export function TapePlantReportSection({ shifts }: TapePlantReportSectionProps) 
             <BarChart3 className="h-6 w-6" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
-                Tape Plant Production, Wastage & Efficiency Reports
-              </h2>
-              <span className="hidden sm:inline-block px-2 py-0.5 bg-slate-100 text-slate-700 text-[10px] font-bold uppercase rounded border border-slate-300">
-                Enterprise Audit
-              </span>
-            </div>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Shift-wise performance breakdown, wastage benchmarking, and production logs.
-            </p>
+            <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
+              Tape Plant Production, Wastage & Efficiency Reports
+            </h2>
           </div>
         </div>
 
@@ -281,17 +273,11 @@ export function TapePlantReportSection({ shifts }: TapePlantReportSectionProps) 
             <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
               Target Planned
             </span>
-            <span className="text-[10px] font-semibold text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100">
-              Schedule
-            </span>
           </div>
           <p className="text-2xl font-black text-slate-900 font-mono mt-1">
             {totals ? totals.totalPlannedKg.toLocaleString() : "—"}{" "}
             <span className="text-xs font-normal text-slate-400">KG</span>
           </p>
-          <span className="text-[11px] text-slate-500 mt-0.5 block">
-            Planned production target
-          </span>
         </div>
 
         {/* 2. Actual Output (Gross KG) */}
@@ -300,20 +286,11 @@ export function TapePlantReportSection({ shifts }: TapePlantReportSectionProps) 
             <span className="text-[10px] font-bold text-slate-700 uppercase tracking-wider">
               Actual Output
             </span>
-            <span className="text-[10px] font-semibold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded">
-              Gross Output
-            </span>
           </div>
           <p className="text-2xl font-black text-slate-900 font-mono mt-1">
             {totals ? totals.totalActualKg.toLocaleString() : "—"}{" "}
             <span className="text-xs font-normal text-slate-400">KG</span>
           </p>
-          <span className="text-[11px] text-slate-500 mt-0.5 block">
-            Variance:{" "}
-            <strong className="text-amber-700 font-mono">
-              {totals ? totals.totalGapKg.toLocaleString() : "—"} KG
-            </strong>
-          </span>
         </div>
 
         {/* 3. Waste (KG & %) */}
@@ -330,12 +307,6 @@ export function TapePlantReportSection({ shifts }: TapePlantReportSectionProps) 
             {totals ? totals.totalWasteKg.toLocaleString() : "—"}{" "}
             <span className="text-xs font-normal text-red-400">KG</span>
           </p>
-          <span className="text-[11px] text-slate-500 mt-0.5 block">
-            Avg Waste Rate:{" "}
-            <strong className="text-red-700 font-mono">
-              {totals ? `${totals.avgWastePercent.toFixed(2)}%` : "0%"}
-            </strong>
-          </span>
         </div>
 
         {/* 4. Net Output Delivered (KG & Efficiency %) */}
@@ -352,12 +323,6 @@ export function TapePlantReportSection({ shifts }: TapePlantReportSectionProps) 
             {totals ? totals.totalNetKg.toLocaleString() : "—"}{" "}
             <span className="text-xs font-normal text-emerald-600">KG</span>
           </p>
-          <span className="text-[11px] text-slate-500 mt-0.5 block">
-            Plant Efficiency:{" "}
-            <strong className="text-blue-700 font-mono">
-              {totals ? `${totals.avgEfficiencyPercent.toFixed(1)}%` : "—"}
-            </strong>
-          </span>
         </div>
       </div>
 

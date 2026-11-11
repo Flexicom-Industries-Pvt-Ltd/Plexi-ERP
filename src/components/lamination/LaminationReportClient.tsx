@@ -337,9 +337,6 @@ export function LaminationReportClient() {
                   {status}
                 </Badge>
               </h1>
-              <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-                Physical floor log entry with roll stock consumption, coating calculations, and real-time validation.
-              </p>
             </div>
           </div>
         </div>

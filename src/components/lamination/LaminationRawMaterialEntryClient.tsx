@@ -374,9 +374,6 @@ export function LaminationRawMaterialEntryClient() {
                   {status}
                 </Badge>
               </h1>
-              <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-                Compare theoretical manual recipe targets against actual machine dispenser inputs to evaluate shift material variance.
-              </p>
             </div>
           </div>
         </div>
