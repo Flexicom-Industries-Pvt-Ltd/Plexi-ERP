@@ -13,7 +13,6 @@ import {
   Unlock,
   Camera,
   Image as ImageIcon,
-  AlertCircle,
 } from "lucide-react";
 import { SpreadsheetTable, ColumnDef } from "./SpreadsheetTable";
 import { OperatorSelect } from "./OperatorSelect";
@@ -701,15 +700,7 @@ export function ProcessDriveParameterSection({
             <Gauge className="h-5 w-5" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-base font-bold text-slate-900">3. Process Drive Parameter</h2>
-              <span className="px-2 py-0.5 text-[10px] font-semibold bg-indigo-100 text-indigo-800 rounded-full border border-indigo-200">
-                Drive Telemetry
-              </span>
-            </div>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Extruder speeds, stretch ratios, line MPMs, and pressure telemetry aligned with {shiftName} ({date}). Auto-locks after 2h window expiry.
-            </p>
+            <h2 className="text-base font-bold text-slate-900">3. Process Drive Parameter</h2>
           </div>
         </div>
 
@@ -751,26 +742,9 @@ export function ProcessDriveParameterSection({
         </div>
       </div>
 
-      {/* Telemetry Status / Policy Banner */}
-      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 bg-slate-50/90 border border-slate-200/80 rounded-lg text-xs text-slate-600">
-        <div className="flex items-center gap-2">
-          <AlertCircle className="h-4 w-4 text-slate-400 shrink-0" />
-          <span>
-            <strong>Policy:</strong> Hourly/bi-hourly readings auto-lock 120 minutes past window start. Authorized roles can unlock expired slots globally for all factory operators.
-          </span>
-        </div>
-        {canUnlock && (
-          <div className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded text-[11px] font-medium">
-            <Unlock className="h-3 w-3" />
-            <span>Time Slot Unlock Authority Active</span>
-          </div>
-        )}
-      </div>
-
       {/* Spreadsheet Table with Lock and Evidence integration */}
       <SpreadsheetTable<DriveParameterReading>
         title="Extruder Line & Process Drive Parameter Spreadsheet"
-        subtitle={`Scheduled interval logging for ${shiftName}. Attach photo evidence per reading row.`}
         columns={driveColumns}
         data={records}
         onChange={setRecords}

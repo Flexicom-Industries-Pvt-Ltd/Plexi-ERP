@@ -107,9 +107,9 @@ export async function POST(request: NextRequest) {
       logEvent({
         userId: session.user.id,
         module: Module.PRODUCTION,
+        severity: "INFO",
         action: "UNLOCK_TIME_SLOT",
-        entity: "TelemetryTimeSlotUnlock",
-        entityId: unlockRecord.id,
+        payload: { entity: "TelemetryTimeSlotUnlock", entityId: unlockRecord.id },
         meta: { module, date, shiftId, timeSlot, unlockedBy: userName },
       });
     } catch (logErr) {
@@ -172,9 +172,9 @@ export async function DELETE(request: NextRequest) {
       logEvent({
         userId: session.user.id,
         module: Module.PRODUCTION,
+        severity: "INFO",
         action: "RELOCK_TIME_SLOT",
-        entity: "TelemetryTimeSlotUnlock",
-        entityId: `${module}-${date}-${shiftId}-${timeSlot}`,
+        payload: { entity: "TelemetryTimeSlotUnlock", entityId: `${module}-${date}-${shiftId}-${timeSlot}` },
         meta: { module, date, shiftId, timeSlot },
       });
     } catch (logErr) {

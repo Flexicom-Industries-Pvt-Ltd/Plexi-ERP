@@ -173,17 +173,9 @@ export function TapePlantClient() {
                 <HeaderIcon className="h-6 w-6" />
               </div>
               <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <h1 className="text-xl font-extrabold text-slate-900 tracking-tight">
-                    {currentTabMeta.title}
-                  </h1>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 shrink-0">
-                    {currentTabMeta.badge}
-                  </span>
-                </div>
-                <p className="text-xs text-slate-500 mt-0.5 truncate">
-                  {currentTabMeta.subtitle}
-                </p>
+                <h1 className="text-xl font-extrabold text-slate-900 tracking-tight">
+                  {currentTabMeta.title}
+                </h1>
               </div>
             </div>
           </div>
