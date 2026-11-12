@@ -19,7 +19,10 @@ import {
   Trash2,
   Clock,
   Sparkles,
+  Printer,
+  FileSpreadsheet,
 } from "lucide-react";
+import dynamic from "next/dynamic";
 import { SpreadsheetTable, ColumnDef } from "./SpreadsheetTable";
 import { OperatorSelect } from "./OperatorSelect";
 import { PhotoEvidenceModal } from "./PhotoEvidenceModal";
@@ -29,6 +32,11 @@ import {
   isTimeSlotLocked,
   canUserOverrideLock,
 } from "@/lib/tape-plant/telemetry-time-slots";
+
+const TemperaturePrintPreviewModal = dynamic(
+  () => import("./TemperaturePrintPreviewModal").then((m) => m.TemperaturePrintPreviewModal),
+  { ssr: false }
+);
 
 export interface TemperatureReading {
   id?: string;
@@ -112,6 +120,9 @@ export function ProcessTemperatureSection({
 
   // Mobile accordion expanded slots state
   const [expandedSlots, setExpandedSlots] = useState<Set<number>>(new Set());
+
+  // Print Preview Modal state
+  const [showPrintModal, setShowPrintModal] = useState(false);
 
   // Fetch current user session to determine role & permissions (live check)
   const refreshUserPermissions = useCallback(() => {
@@ -845,7 +856,7 @@ export function ProcessTemperatureSection({
             </div>
           </div>
 
-          {/* Mobile Save Button on Header */}
+          {/* Mobile Save and Print Buttons on Header */}
           <div className="sm:hidden flex items-center gap-1.5">
             {autoSaving ? (
               <span className="p-1.5 bg-slate-100 text-slate-500 rounded-lg" title="Auto-saving...">
@@ -856,6 +867,17 @@ export function ProcessTemperatureSection({
                 <CheckCircle className="h-3.5 w-3.5" />
               </span>
             ) : null}
+
+            <button
+              type="button"
+              onClick={() => setShowPrintModal(true)}
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-lg shadow-xs transition-all active:scale-95 cursor-pointer"
+              title="Print / View Report"
+            >
+              <Printer className="h-3.5 w-3.5 text-slate-600" />
+              <span>Print</span>
+            </button>
+
             <button
               type="button"
               disabled={saving}
@@ -900,6 +922,16 @@ export function ProcessTemperatureSection({
 
           <button
             type="button"
+            onClick={() => setShowPrintModal(true)}
+            className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-lg shadow-xs transition-all active:scale-95 h-8 cursor-pointer"
+            title="Print / View Temperature Report"
+          >
+            <Printer className="h-3.5 w-3.5 text-slate-600" />
+            <span>Print</span>
+          </button>
+
+          <button
+            type="button"
             disabled={saving}
             onClick={handleSave}
             className="hidden sm:inline-flex items-center gap-1.5 px-4 py-2 bg-primary hover:bg-primary/90 text-white text-xs font-semibold rounded-lg shadow-xs transition-all active:scale-95 disabled:opacity-50 h-8 cursor-pointer"
@@ -918,6 +950,15 @@ export function ProcessTemperatureSection({
             <span>Time Slots Recorded</span>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowPrintModal(true)}
+              className="inline-flex items-center gap-1 text-xs text-slate-700 font-semibold hover:text-primary"
+            >
+              <Printer className="h-3 w-3 text-slate-500" />
+              <span>Print</span>
+            </button>
+            <span className="text-slate-300">•</span>
             <button
               type="button"
               onClick={handleExpandAll}
@@ -1476,6 +1517,17 @@ export function ProcessTemperatureSection({
           }}
         />
       )}
+
+      {/* Temperature Print Preview Modal */}
+      <TemperaturePrintPreviewModal
+        open={showPrintModal}
+        onClose={() => setShowPrintModal(false)}
+        date={date}
+        shiftName={shiftName}
+        operatorName={operatorName}
+        status="SAVED"
+        readings={readings}
+      />
     </div>
   );
 }
