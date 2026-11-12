@@ -188,52 +188,52 @@ export function generateTapePlantReportHtml(options: PrintReportOptions): string
       margin: 0 auto;
     }
 
-    /* Minimalist Header */
-    .header-table {
-      width: 100%;
+    /* Minimalist Centered Header */
+    .header-container {
+      text-align: center;
       border-bottom: 2px solid #0f172a;
       padding-bottom: 4px;
       margin-bottom: 5px;
     }
     .company-title {
       font-size: 13pt;
-      font-weight: 800;
-      letter-spacing: 0.5px;
+      font-weight: 900;
+      letter-spacing: 0.6px;
       color: #000000;
       text-transform: uppercase;
+      text-align: center;
     }
     .company-sub {
-      font-size: 7.5pt;
-      color: #334155;
-      margin-top: 1px;
-    }
-    .doc-badge-title {
-      display: inline-block;
-      border: 1px solid #0f172a;
-      background: #f8fafc;
-      padding: 2px 8px;
-      font-size: 8pt;
-      font-weight: 800;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-top: 3px;
-    }
-    .doc-meta-box {
-      text-align: right;
-      vertical-align: top;
-    }
-    .doc-ref-no {
-      font-family: monospace;
-      font-size: 9pt;
-      font-weight: 800;
-      color: #0f172a;
-    }
-    .doc-meta-item {
       font-size: 7pt;
       color: #475569;
       margin-top: 1px;
+      text-align: center;
     }
-    .doc-meta-item strong {
+    .doc-main-heading {
+      display: inline-block;
+      border: 1.5px solid #0f172a;
+      background: #f8fafc;
+      padding: 2px 12px;
+      font-size: 8.5pt;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-top: 3px;
+      margin-bottom: 2px;
+      text-align: center;
+    }
+    .doc-meta-strip {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
+      font-size: 7pt;
+      color: #334155;
+      margin-top: 2px;
+      text-align: center;
+    }
+    .doc-meta-strip strong {
       color: #000000;
     }
 
@@ -241,17 +241,18 @@ export function generateTapePlantReportHtml(options: PrintReportOptions): string
     .kpi-table {
       width: 100%;
       border-collapse: collapse;
-      margin-bottom: 6px;
+      margin-bottom: 5px;
       background-color: #f8fafc;
       border: 1px solid #94a3b8;
     }
     .kpi-table td {
-      padding: 3px 5px;
+      padding: 2.5px 5px;
       border: 1px solid #cbd5e1;
       vertical-align: middle;
+      text-align: center;
     }
     .kpi-label {
-      font-size: 6.5pt;
+      font-size: 6pt;
       font-weight: 700;
       text-transform: uppercase;
       color: #475569;
@@ -264,17 +265,19 @@ export function generateTapePlantReportHtml(options: PrintReportOptions): string
       color: #0f172a;
     }
 
-    /* Section styling */
+    /* Centered Section Titles */
     .section-title {
       font-size: 7.5pt;
-      font-weight: 800;
+      font-weight: 900;
       text-transform: uppercase;
-      letter-spacing: 0.5px;
-      border-bottom: 1px solid #0f172a;
-      padding-bottom: 2px;
-      margin-top: 6px;
-      margin-bottom: 3px;
-      color: #000000;
+      letter-spacing: 0.6px;
+      text-align: center;
+      background-color: #e2e8f0;
+      border: 1px solid #94a3b8;
+      border-bottom: none;
+      padding: 2.5px 5px;
+      margin-top: 4px;
+      color: #0f172a;
     }
 
     /* Data Tables */
@@ -371,24 +374,30 @@ export function generateTapePlantReportHtml(options: PrintReportOptions): string
 </head>
 <body>
   <div class="report-container">
-    <!-- HEADER -->
-    <table class="header-table">
-      <tr>
-        <td style="vertical-align: top;">
+    <!-- MAIN HEADER WITH TOP-LEFT VIVID FLEXICOM LOGO -->
+    <div class="header-container">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px;">
+        <div style="width: 60px; text-align: left; display: flex; align-items: center;">
+          <img src="/logo.png" alt="Flexicom Logo" style="height: 44px; width: auto; object-fit: contain; filter: contrast(1.25) saturate(1.25);" onerror="this.style.display='none'" />
+        </div>
+        <div style="flex: 1; text-align: center;">
           <div class="company-title">Flexicom Industries Pvt. Ltd.</div>
-          <div class="company-sub">Tape Plant Extrusion & Winding Division • Kathua Industrial Complex, Phase-II, Kathua (J&K)</div>
-          <div class="doc-badge-title">${docTitle}</div>
-        </td>
-        <td class="doc-meta-box">
-          <div class="doc-ref-no">${docRef}</div>
-          <div class="doc-meta-item">Period: <strong>${dateRangeLabel}</strong> &nbsp;|&nbsp; Generated: <strong>${genTimestamp}</strong></div>
-          ${filterShiftName || filterOperatorName || filterRecipeQuality ? `
-            <div class="doc-meta-item">
-              Filters: ${filterShiftName ? `Shift: <strong>${filterShiftName}</strong> ` : ''}${filterOperatorName ? `Operator: <strong>${filterOperatorName}</strong> ` : ''}${filterRecipeQuality ? `Recipe: <strong>${filterRecipeQuality}</strong>` : ''}
-            </div>` : ''}
-        </td>
-      </tr>
-    </table>
+          <div class="company-sub">Tape Plant Extrusion &amp; Winding Division • Kathua Industrial Complex, Phase-II, Kathua (J&amp;K)</div>
+          <div class="doc-main-heading">${docTitle.toUpperCase()}</div>
+        </div>
+        <div style="width: 60px;" aria-hidden="true"></div>
+      </div>
+      <div class="doc-meta-strip">
+        <span>Doc Ref: <strong>${docRef}</strong></span>
+        <span>•</span>
+        <span>Period: <strong>${dateRangeLabel}</strong></span>
+        ${filterShiftName ? `<span>•</span><span>Shift: <strong>${filterShiftName}</strong></span>` : ''}
+        ${filterOperatorName ? `<span>•</span><span>Operator: <strong>${filterOperatorName}</strong></span>` : ''}
+        ${filterRecipeQuality ? `<span>•</span><span>Recipe: <strong>${filterRecipeQuality}</strong></span>` : ''}
+        <span>•</span>
+        <span>Generated: <strong>${genTimestamp}</strong></span>
+      </div>
+    </div>
 
     <!-- KEY REPORT KPI BAR -->
     <table class="kpi-table">
