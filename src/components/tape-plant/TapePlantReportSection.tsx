@@ -26,6 +26,7 @@ import {
   exportTapePlantReportsExcel,
 } from "@/lib/tape-plant/reports-export";
 import { printTapePlantReport } from "@/lib/tape-plant/print-report-sheet";
+import { ReportPrintPreviewModal } from "./ReportPrintPreviewModal";
 
 export type ReportSubTab =
   | "shift"
@@ -45,6 +46,7 @@ export function TapePlantReportSection({ shifts }: TapePlantReportSectionProps) 
   const [activeTab, setActiveTab] = useState<ReportSubTab>("shift");
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showOperatorBenchmarks, setShowOperatorBenchmarks] = useState(false);
+  const [showPrintModal, setShowPrintModal] = useState(false);
 
   // Mobile Collapsible Cards State (Default Collapsed on Load)
   const [expandedShiftReports, setExpandedShiftReports] = useState<Set<string>>(new Set());
@@ -142,17 +144,7 @@ export function TapePlantReportSection({ shifts }: TapePlantReportSectionProps) 
       toast.error("No report data available to print");
       return;
     }
-    const selectedShift = shifts.find((s) => s.id === shiftFilter)?.name;
-    const printMode = activeTab === "summary" ? "summary" : "shift";
-    printTapePlantReport({
-      data,
-      dateFrom,
-      dateTo,
-      mode: printMode,
-      filterShiftName: selectedShift,
-      filterOperatorName: operatorFilter,
-      filterRecipeQuality: recipeFilter,
-    });
+    setShowPrintModal(true);
   };
 
   const handleExportExcel = () => {
@@ -395,53 +387,56 @@ export function TapePlantReportSection({ shifts }: TapePlantReportSectionProps) 
             )}
           </button>
 
-          <button
-            type="button"
-            onClick={() => setActiveTab("shift")}
-            className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-              activeTab === "shift"
-                ? "bg-slate-900 text-white shadow-xs"
-                : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
-            }`}
-          >
-            <Clock className={`h-4 w-4 ${activeTab === "shift" ? "text-cyan-400" : "text-slate-500"}`} />
-            <span>Shift Performance Summary</span>
-            {data && (
-              <span
-                className={`px-1.5 py-0.5 text-[10px] font-mono font-bold rounded-full ${
-                  activeTab === "shift"
-                    ? "bg-slate-800 text-cyan-300"
-                    : "bg-slate-100 text-slate-700"
-                }`}
-              >
-                {data.shiftWise.length}
-              </span>
-            )}
-          </button>
+          {/* Sleek Subtab Pill Control */}
+          <div className="inline-flex rounded-lg bg-slate-100 p-0.5 text-xs font-medium border border-slate-200/80">
+            <button
+              type="button"
+              onClick={() => setActiveTab("shift")}
+              className={`px-3.5 py-1.5 rounded-md transition-all flex items-center gap-2 cursor-pointer ${
+                activeTab === "shift"
+                  ? "bg-white text-slate-900 shadow-2xs font-semibold"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              <Clock className="h-3.5 w-3.5 text-slate-500" />
+              <span>Shift Performance Summary</span>
+              {data && (
+                <span
+                  className={`px-1.5 py-0.5 text-[10px] font-mono font-bold rounded-full ${
+                    activeTab === "shift"
+                      ? "bg-slate-100 text-slate-900 border border-slate-200"
+                      : "bg-slate-200/70 text-slate-600"
+                  }`}
+                >
+                  {data.shiftWise.length}
+                </span>
+              )}
+            </button>
 
-          <button
-            type="button"
-            onClick={() => setActiveTab("summary")}
-            className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-              activeTab === "summary"
-                ? "bg-slate-900 text-white shadow-xs"
-                : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
-            }`}
-          >
-            <FileText className={`h-4 w-4 ${activeTab === "summary" ? "text-blue-400" : "text-slate-500"}`} />
-            <span>Detailed Batch Logs</span>
-            {data && (
-              <span
-                className={`px-1.5 py-0.5 text-[10px] font-mono font-bold rounded-full ${
-                  activeTab === "summary"
-                    ? "bg-slate-800 text-blue-300"
-                    : "bg-slate-100 text-slate-700"
-                }`}
-              >
-                {data.summary.length}
-              </span>
-            )}
-          </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("summary")}
+              className={`px-3.5 py-1.5 rounded-md transition-all flex items-center gap-2 cursor-pointer ${
+                activeTab === "summary"
+                  ? "bg-white text-slate-900 shadow-2xs font-semibold"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              <FileText className="h-3.5 w-3.5 text-slate-500" />
+              <span>Detailed Batch Logs</span>
+              {data && (
+                <span
+                  className={`px-1.5 py-0.5 text-[10px] font-mono font-bold rounded-full ${
+                    activeTab === "summary"
+                      ? "bg-slate-100 text-slate-900 border border-slate-200"
+                      : "bg-slate-200/70 text-slate-600"
+                  }`}
+                >
+                  {data.summary.length}
+                </span>
+              )}
+            </button>
+          </div>
         </div>
 
         {loading ? (
@@ -1190,6 +1185,19 @@ export function TapePlantReportSection({ shifts }: TapePlantReportSectionProps) 
           </>
         )}
       </div>
+
+      {/* Standard Interactive Report Print Preview Modal */}
+      <ReportPrintPreviewModal
+        open={showPrintModal}
+        onClose={() => setShowPrintModal(false)}
+        data={data}
+        dateFrom={dateFrom}
+        dateTo={dateTo}
+        activeTab={activeTab === "summary" ? "summary" : "shift"}
+        filterShiftName={shifts.find((s) => s.id === shiftFilter)?.name}
+        filterOperatorName={operatorFilter}
+        filterRecipeQuality={recipeFilter}
+      />
     </div>
   );
 }
