@@ -21,6 +21,8 @@ import {
   Trash2,
   Maximize2,
   Minimize2,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { RecipeQualityBadge } from "./RecipeQualityBadge";
 import { BobbinIssueModal } from "./BobbinIssueModal";
@@ -140,6 +142,44 @@ export function BobbinIssueSection({ onNavigateToBobbinStock }: BobbinIssueSecti
   const [issueSlipModalOpen, setIssueSlipModalOpen] = useState(false);
   const [selectedInwardSlip, setSelectedInwardSlip] = useState<BobbinInwardSlipData | null>(null);
   const [inwardSlipModalOpen, setInwardSlipModalOpen] = useState(false);
+
+  // Mobile Collapsible Cards State (Default Collapsed on Load)
+  const [expandedIssues, setExpandedIssues] = useState<Set<string>>(new Set());
+  const [expandedLedger, setExpandedLedger] = useState<Set<string>>(new Set());
+
+  const toggleExpandIssue = (id: string) => {
+    setExpandedIssues((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleExpandLedger = (id: string) => {
+    setExpandedLedger((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const expandAll = () => {
+    if (activeSubTab === "issues") {
+      setExpandedIssues(new Set(issues.map((i) => i.id)));
+    } else {
+      setExpandedLedger(new Set(transactions.map((t) => t.id)));
+    }
+  };
+
+  const collapseAll = () => {
+    if (activeSubTab === "issues") {
+      setExpandedIssues(new Set());
+    } else {
+      setExpandedLedger(new Set());
+    }
+  };
 
   // Fetch shifts
   useEffect(() => {
@@ -336,8 +376,8 @@ export function BobbinIssueSection({ onNavigateToBobbinStock }: BobbinIssueSecti
 
   return (
     <div className="space-y-5 w-full min-w-0 max-w-full">
-      {/* Minimalist Bento Metric Strip */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      {/* Minimalist Bento Metric Strip (Desktop Only) */}
+      <div className="hidden md:grid md:grid-cols-2 lg:grid-cols-4 gap-3">
         {/* Total Crates Issued */}
         <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-2xs transition-all hover:border-slate-300">
           <div className="flex items-center justify-between">
@@ -432,12 +472,13 @@ export function BobbinIssueSection({ onNavigateToBobbinStock }: BobbinIssueSecti
         </div>
       </div>
 
-      {/* Main Container Card */}
-      <div className={`bg-white rounded-xl border border-slate-200/80 shadow-2xs overflow-hidden ${
-        isFullscreen
-          ? "fixed inset-0 z-50 rounded-none border-0 p-4 md:p-6 flex flex-col bg-background h-screen w-screen"
-          : ""
-      }`}>
+      {/* Desktop Main Container Card (100% Intact Spreadsheet View) */}
+      <div className="hidden md:block">
+        <div className={`bg-white rounded-xl border border-slate-200/80 shadow-2xs overflow-hidden ${
+          isFullscreen
+            ? "fixed inset-0 z-50 rounded-none border-0 p-4 md:p-6 flex flex-col bg-background h-screen w-screen"
+            : ""
+        }`}>
         {/* Header & Sub-tab Switcher */}
         <div className="p-4 border-b border-slate-100 bg-white flex flex-col gap-3 shrink-0">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -978,6 +1019,471 @@ export function BobbinIssueSection({ onNavigateToBobbinStock }: BobbinIssueSecti
                 )}
               </tbody>
             </table>
+          </div>
+        )}
+      </div>
+      </div>
+
+      {/* Mobile Card View (Default Collapsed, Streamlined Controls) */}
+      <div className="block md:hidden space-y-3">
+        {/* Mobile Header Card */}
+        <div className="bg-white rounded-xl border border-slate-200/80 p-3.5 shadow-2xs space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <div className="p-2 bg-indigo-50 text-indigo-700 rounded-lg border border-indigo-100">
+                <Package className="h-4 w-4" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 tracking-tight">
+                  Bobbin Issue & Loom Feeding
+                </h3>
+                <span className="text-[10px] text-slate-500 font-medium">
+                  {activeSubTab === "issues" ? "Outward Dispatches to Looms" : "Stock In/Out Ledger"}
+                </span>
+              </div>
+            </div>
+
+            {/* Refresh */}
+            <button
+              type="button"
+              onClick={() => {
+                fetchIssuesData(true);
+                fetchLedgerData();
+                fetchAvailableStock();
+              }}
+              disabled={refreshing || loading}
+              className="p-2 text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 active:bg-slate-100 shadow-2xs transition-colors disabled:opacity-50 cursor-pointer"
+              title="Refresh Data"
+            >
+              <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin text-slate-700" : "text-slate-500"}`} />
+            </button>
+          </div>
+
+          {/* Subtab Switcher Pills */}
+          <div className="grid grid-cols-2 gap-1 rounded-lg bg-slate-100 p-0.5 text-xs font-medium border border-slate-200/60">
+            <button
+              type="button"
+              onClick={() => setActiveSubTab("issues")}
+              className={`py-1.5 px-2 rounded-md transition-all text-center cursor-pointer ${
+                activeSubTab === "issues"
+                  ? "bg-white text-slate-900 shadow-2xs font-semibold"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              Loom Issues (Out)
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveSubTab("ledger")}
+              className={`py-1.5 px-2 rounded-md transition-all text-center cursor-pointer ${
+                activeSubTab === "ledger"
+                  ? "bg-white text-slate-900 shadow-2xs font-semibold"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              Full Ledger (In/Out)
+            </button>
+          </div>
+
+          {/* Issue to Loom Full Width Button */}
+          <button
+            type="button"
+            onClick={() => setIssueModalOpen(true)}
+            className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 active:bg-black rounded-lg shadow-xs transition-colors cursor-pointer"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            <span>Issue Bobbins to Loom</span>
+          </button>
+        </div>
+
+        {/* 4 Compact Mobile Bento Cards */}
+        <div className="grid grid-cols-2 gap-2 bg-white rounded-xl border border-slate-200/80 p-3 shadow-2xs">
+          <div className="border-r border-b border-slate-100 pb-2 pr-2">
+            <span className="text-[10px] font-medium text-slate-500 uppercase tracking-wider block">
+              Crates Issued
+            </span>
+            <div className="mt-1 font-mono font-bold text-slate-900 text-xs sm:text-sm">
+              {loading ? (
+                <div className="h-4 w-12 bg-slate-100 animate-pulse rounded" />
+              ) : (
+                `${issueTotals.totalCratesIssued.toLocaleString(undefined, { maximumFractionDigits: 1 })} cr`
+              )}
+            </div>
+          </div>
+
+          <div className="border-b border-slate-100 pb-2 pl-2">
+            <span className="text-[10px] font-medium text-slate-500 uppercase tracking-wider block">
+              Bobbins Issued
+            </span>
+            <div className="mt-1 font-mono font-bold text-slate-900 text-xs sm:text-sm">
+              {loading ? (
+                <div className="h-4 w-12 bg-slate-100 animate-pulse rounded" />
+              ) : (
+                `${issueTotals.totalBobbinsIssued.toLocaleString()} pcs`
+              )}
+            </div>
+          </div>
+
+          <div className="border-r border-slate-100 pt-2 pr-2">
+            <span className="text-[10px] font-medium text-slate-500 uppercase tracking-wider block">
+              Weight Issued
+            </span>
+            <div className="mt-1 font-mono font-bold text-slate-900 text-xs sm:text-sm">
+              {loading ? (
+                <div className="h-4 w-12 bg-slate-100 animate-pulse rounded" />
+              ) : (
+                `${issueTotals.totalWeightIssuedKg.toLocaleString(undefined, { maximumFractionDigits: 1 })} kg`
+              )}
+            </div>
+          </div>
+
+          <div className="pt-2 pl-2">
+            <span className="text-[10px] font-medium text-slate-500 uppercase tracking-wider block">
+              Looms Fed
+            </span>
+            <div className="mt-1 font-mono font-bold text-slate-900 text-xs sm:text-sm">
+              {loading ? (
+                <div className="h-4 w-12 bg-slate-100 animate-pulse rounded" />
+              ) : (
+                `${issueTotals.uniqueLoomsCount} Looms`
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Streamlined Mobile Toolbar */}
+        <div className="bg-white rounded-xl border border-slate-200/80 px-3.5 py-2.5 shadow-2xs flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-bold text-slate-900">
+              {activeSubTab === "issues" ? issues.length : transactions.length}
+            </span>
+            <span className="text-xs text-slate-500 font-medium">
+              Records Tracked
+            </span>
+          </div>
+
+          <div className="flex items-center gap-1.5 text-xs">
+            <button
+              type="button"
+              onClick={expandAll}
+              className="text-xs font-semibold text-sky-600 hover:text-sky-800 transition-colors cursor-pointer"
+            >
+              Expand All
+            </button>
+            <span className="text-slate-300">•</span>
+            <button
+              type="button"
+              onClick={collapseAll}
+              className="text-xs font-semibold text-slate-600 hover:text-slate-800 transition-colors cursor-pointer"
+            >
+              Collapse All
+            </button>
+          </div>
+        </div>
+
+        {/* Active SubTab: Issues List */}
+        {activeSubTab === "issues" && (
+          <div className="space-y-2.5">
+            {loading ? (
+              <div className="bg-white rounded-xl border border-slate-200 p-8 text-center text-slate-500">
+                <div className="inline-flex items-center gap-2">
+                  <RefreshCw className="h-4 w-4 animate-spin text-slate-600" />
+                  <span className="text-xs font-medium">Loading issue records...</span>
+                </div>
+              </div>
+            ) : issues.length === 0 ? (
+              <div className="bg-white rounded-xl border border-slate-200 p-6 text-center">
+                <div className="p-3 bg-slate-100 text-slate-400 rounded-xl mb-2.5 mx-auto w-fit">
+                  <Package className="h-6 w-6" />
+                </div>
+                <h3 className="text-xs font-semibold text-slate-800">No Bobbin Issues Recorded</h3>
+                <p className="text-[11px] text-slate-500 mt-1">
+                  No crates have been issued for the selected filter scope.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setIssueModalOpen(true)}
+                  className="mt-3.5 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-slate-900 hover:bg-slate-800 rounded-lg shadow-xs cursor-pointer"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>Issue Bobbins to Loom</span>
+                </button>
+              </div>
+            ) : (
+              issues.map((item, idx) => {
+                const isExpanded = expandedIssues.has(item.id);
+                return (
+                  <div
+                    key={item.id}
+                    id={`bobbin-issue-card-${idx}`}
+                    className="bg-white rounded-xl border border-slate-200 shadow-2xs overflow-hidden transition-all"
+                  >
+                    {/* Collapsible Card Header (Default Collapsed) */}
+                    <div
+                      onClick={() => toggleExpandIssue(item.id)}
+                      className="p-3.5 flex items-center justify-between gap-2.5 cursor-pointer hover:bg-slate-50/70 select-none transition-colors"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-600 font-mono text-[10px] font-bold flex items-center justify-center shrink-0">
+                          {item.slNo}
+                        </span>
+                        <div className="min-w-0">
+                          <div className="font-mono text-xs font-bold text-slate-900 truncate">
+                            {item.slipNumber}
+                          </div>
+                          <div className="truncate mt-0.5">
+                            <RecipeQualityBadge value={item.recipeQuality} />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <div className="text-right">
+                          <span className="font-semibold text-indigo-900 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200 text-[11px] font-mono block">
+                            {item.crateCount} cr
+                          </span>
+                          <span className="text-[10px] text-slate-400 block font-mono">
+                            {item.weightKg.toFixed(1)} kg
+                          </span>
+                        </div>
+                        {isExpanded ? (
+                          <ChevronUp className="h-4 w-4 text-slate-400" />
+                        ) : (
+                          <ChevronDown className="h-4 w-4 text-slate-400" />
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Expanded Card Details */}
+                    {isExpanded && (
+                      <div className="p-3.5 pt-0 border-t border-slate-100 bg-slate-50/40 space-y-3 mt-1">
+                        <div className="grid grid-cols-2 gap-2 text-xs pt-2">
+                          <div className="bg-white rounded-lg border border-slate-200/80 p-2.5">
+                            <span className="text-[10px] font-medium text-slate-500 uppercase tracking-wider block">
+                              Loom Target
+                            </span>
+                            <div className="mt-1 font-mono font-bold text-slate-900 text-xs">
+                              {item.loomIdentifier || (item.loomNumber ? `Loom #${item.loomNumber}` : "Loom Shed")}
+                            </div>
+                          </div>
+
+                          <div className="bg-white rounded-lg border border-slate-200/80 p-2.5">
+                            <span className="text-[10px] font-medium text-slate-500 uppercase tracking-wider block">
+                              Date & Shift
+                            </span>
+                            <div className="mt-1 font-medium text-slate-900 text-xs">
+                              {item.date} • <span className="text-slate-500">{item.shiftName}</span>
+                            </div>
+                          </div>
+
+                          <div className="bg-white rounded-lg border border-slate-200/80 p-2.5">
+                            <span className="text-[10px] font-medium text-slate-500 uppercase tracking-wider block">
+                              Bobbins Count
+                            </span>
+                            <div className="mt-1 font-mono font-bold text-slate-900 text-xs">
+                              {item.bobbinCount.toLocaleString()} pcs
+                            </div>
+                          </div>
+
+                          <div className="bg-white rounded-lg border border-slate-200/80 p-2.5">
+                            <span className="text-[10px] font-medium text-slate-500 uppercase tracking-wider block">
+                              Total Weight
+                            </span>
+                            <div className="mt-1 font-mono font-bold text-slate-900 text-xs">
+                              {item.weightKg.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kg
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Issuer & Receiver */}
+                        <div className="bg-white rounded-lg border border-slate-200/80 p-2.5 text-xs">
+                          <div className="flex items-center justify-between text-slate-600">
+                            <span>Issued By: <strong className="text-slate-800">{item.issuedBy || "—"}</strong></span>
+                            <span>Received By: <strong className="text-slate-800">{item.receivedBy || "—"}</strong></span>
+                          </div>
+                          {item.remarks && (
+                            <div className="text-[11px] text-slate-500 mt-1 italic border-t border-slate-100 pt-1">
+                              Note: {item.remarks}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex items-center gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => handlePrintExistingIssueSlip(item)}
+                            className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 px-3 text-xs font-semibold text-slate-800 bg-white hover:bg-slate-100 active:bg-slate-200 rounded-lg border border-slate-200 shadow-2xs transition-colors cursor-pointer"
+                          >
+                            <Printer className="h-3.5 w-3.5 text-slate-600" />
+                            <span>View / Print Slip</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleCancelIssue(item.id, item.slipNumber)}
+                            className="inline-flex items-center justify-center gap-1.5 py-2 px-3 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 active:bg-rose-200 rounded-lg border border-rose-200 shadow-2xs transition-colors cursor-pointer"
+                            title="Cancel Issue"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                            <span>Cancel</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+        )}
+
+        {/* Active SubTab: Ledger List */}
+        {activeSubTab === "ledger" && (
+          <div className="space-y-2.5">
+            {transactions.length === 0 ? (
+              <div className="bg-white rounded-xl border border-slate-200 p-6 text-center text-slate-500 italic text-xs">
+                No stock movement transactions recorded for the selected scope.
+              </div>
+            ) : (
+              transactions.map((tx, idx) => {
+                const isExpanded = expandedLedger.has(tx.id);
+                const isInward = tx.type === "INWARD";
+                return (
+                  <div
+                    key={tx.id}
+                    id={`bobbin-ledger-card-${idx}`}
+                    className="bg-white rounded-xl border border-slate-200 shadow-2xs overflow-hidden transition-all"
+                  >
+                    {/* Collapsible Card Header (Default Collapsed) */}
+                    <div
+                      onClick={() => toggleExpandLedger(tx.id)}
+                      className="p-3.5 flex items-center justify-between gap-2.5 cursor-pointer hover:bg-slate-50/70 select-none transition-colors"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        {isInward ? (
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                            <ArrowDownLeft className="h-3 w-3 text-emerald-600" />
+                            IN
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-800 border border-slate-200">
+                            <ArrowUpRight className="h-3 w-3 text-slate-600" />
+                            OUT
+                          </span>
+                        )}
+                        <div className="min-w-0">
+                          <div className="font-mono text-xs font-bold text-slate-900 truncate">
+                            {tx.referenceNo}
+                          </div>
+                          <div className="truncate mt-0.5">
+                            <RecipeQualityBadge value={tx.recipeQuality} />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span
+                          className={`font-semibold font-mono text-xs px-2 py-0.5 rounded border ${
+                            isInward
+                              ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                              : "bg-slate-100 text-slate-800 border-slate-200"
+                          }`}
+                        >
+                          {isInward ? "+" : "−"}{tx.netKg.toLocaleString(undefined, { maximumFractionDigits: 1 })} kg
+                        </span>
+                        {isExpanded ? (
+                          <ChevronUp className="h-4 w-4 text-slate-400" />
+                        ) : (
+                          <ChevronDown className="h-4 w-4 text-slate-400" />
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Expanded Card Details */}
+                    {isExpanded && (
+                      <div className="p-3.5 pt-0 border-t border-slate-100 bg-slate-50/40 space-y-3 mt-1">
+                        <div className="grid grid-cols-2 gap-2 text-xs pt-2">
+                          <div className="bg-white rounded-lg border border-slate-200/80 p-2.5">
+                            <span className="text-[10px] font-medium text-slate-500 uppercase tracking-wider block">
+                              Movement
+                            </span>
+                            <div className="mt-1 font-medium text-slate-900 text-xs">
+                              {isInward
+                                ? "Post-Production Output"
+                                : (tx.loomIdentifier || (tx.loomNumber ? `Loom #${tx.loomNumber}` : "Loom Shed"))}
+                            </div>
+                          </div>
+
+                          <div className="bg-white rounded-lg border border-slate-200/80 p-2.5">
+                            <span className="text-[10px] font-medium text-slate-500 uppercase tracking-wider block">
+                              Date & Shift
+                            </span>
+                            <div className="mt-1 font-medium text-slate-900 text-xs">
+                              {tx.date} • <span className="text-slate-500">{tx.shiftName}</span>
+                            </div>
+                          </div>
+
+                          <div className="bg-white rounded-lg border border-slate-200/80 p-2.5">
+                            <span className="text-[10px] font-medium text-slate-500 uppercase tracking-wider block">
+                              Crates
+                            </span>
+                            <div className="mt-1 font-mono font-bold text-slate-900 text-xs">
+                              {isInward ? "+" : "−"}{tx.crates.toLocaleString(undefined, { maximumFractionDigits: 1 })} cr
+                            </div>
+                          </div>
+
+                          <div className="bg-white rounded-lg border border-slate-200/80 p-2.5">
+                            <span className="text-[10px] font-medium text-slate-500 uppercase tracking-wider block">
+                              Bobbins
+                            </span>
+                            <div className="mt-1 font-mono font-bold text-slate-900 text-xs">
+                              {isInward ? "+" : "−"}{tx.bobbins.toLocaleString(undefined, { maximumFractionDigits: 1 })} pcs
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Operator & Receiver */}
+                        <div className="bg-white rounded-lg border border-slate-200/80 p-2.5 text-xs text-slate-600">
+                          <div>Operator: <strong className="text-slate-800">{tx.operator || "—"}</strong></div>
+                          {tx.receiver && <div className="mt-0.5">Receiver: <strong className="text-slate-800">{tx.receiver}</strong></div>}
+                          {tx.remarks && <div className="mt-1 text-[11px] text-slate-500 italic">Note: {tx.remarks}</div>}
+                        </div>
+
+                        {/* Print Action */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (isInward) handlePrintInwardSlip(tx);
+                            else {
+                              setSelectedIssueSlip({
+                                slipNumber: tx.referenceNo,
+                                date: tx.date,
+                                shiftName: tx.shiftName,
+                                recipeQuality: tx.recipeQuality,
+                                loomNumber: tx.loomNumber,
+                                loomIdentifier: tx.loomIdentifier,
+                                crateCount: tx.crates,
+                                bobbinCount: tx.bobbins,
+                                weightKg: tx.netKg,
+                                issuedBy: tx.operator,
+                                receivedBy: tx.receiver,
+                                remarks: tx.remarks,
+                              });
+                              setIssueSlipModalOpen(true);
+                            }
+                          }}
+                          className="w-full inline-flex items-center justify-center gap-1.5 py-2 px-3 text-xs font-semibold text-slate-800 bg-white hover:bg-slate-100 active:bg-slate-200 rounded-lg border border-slate-200 shadow-2xs transition-colors cursor-pointer"
+                        >
+                          <Printer className="h-3.5 w-3.5 text-slate-600" />
+                          <span>View / Print {isInward ? "Inward" : "Issue"} Slip</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
           </div>
         )}
       </div>
