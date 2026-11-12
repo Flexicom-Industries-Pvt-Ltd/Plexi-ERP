@@ -390,7 +390,7 @@ export function BobbinStockSummarySection({
                   </>
                 )}
               </button>
-              <h2 className="text-sm font-semibold text-slate-900 tracking-tight">Bobbin & Crate Stock Summary</h2>
+              <h2 className="text-sm font-semibold text-slate-900 tracking-tight hidden sm:inline">Bobbin & Crate Stock Summary</h2>
             </div>
 
             {/* Global Actions */}

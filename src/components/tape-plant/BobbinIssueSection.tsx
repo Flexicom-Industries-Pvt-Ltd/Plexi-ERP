@@ -1030,17 +1030,9 @@ export function BobbinIssueSection({ onNavigateToBobbinStock }: BobbinIssueSecti
         <div className="bg-white rounded-xl border border-slate-200/80 p-3.5 shadow-2xs space-y-3">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              <div className="p-2 bg-indigo-50 text-indigo-700 rounded-lg border border-indigo-100">
-                <Package className="h-4 w-4" />
-              </div>
-              <div>
-                <h3 className="text-sm font-bold text-slate-900 tracking-tight">
-                  Bobbin Issue & Loom Feeding
-                </h3>
-                <span className="text-[10px] text-slate-500 font-medium">
-                  {activeSubTab === "issues" ? "Outward Dispatches to Looms" : "Stock In/Out Ledger"}
-                </span>
-              </div>
+              <span className="text-xs font-bold text-slate-800">
+                {activeSubTab === "issues" ? "Outward Dispatches to Looms" : "Stock In/Out Ledger"}
+              </span>
             </div>
 
             {/* Refresh */}
