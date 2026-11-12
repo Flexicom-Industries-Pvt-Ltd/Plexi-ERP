@@ -3,7 +3,6 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { toast } from "sonner";
 import {
-  Download,
   Filter,
   Loader2,
   BarChart3,
@@ -25,7 +24,6 @@ import {
   TapePlantReportDataset,
   exportTapePlantReportsExcel,
 } from "@/lib/tape-plant/reports-export";
-import { printTapePlantReport } from "@/lib/tape-plant/print-report-sheet";
 import { ReportPrintPreviewModal } from "./ReportPrintPreviewModal";
 
 export type ReportSubTab =
