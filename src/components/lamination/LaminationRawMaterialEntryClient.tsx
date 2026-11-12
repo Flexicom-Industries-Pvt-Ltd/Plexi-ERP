@@ -16,22 +16,15 @@ import {
   AlertTriangle,
   Layers,
   ArrowRight,
-  RotateCcw,
   FlaskConical,
   Maximize2,
   Minimize2,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { toast } from "sonner";
 import {
   calculateRawMaterialRow,
@@ -270,8 +263,9 @@ export function LaminationRawMaterialEntryClient() {
     return computeRawMaterialTotals(entries, numManual);
   }, [entries, numManual]);
 
-  // Save report
-  const handleSave = () => {
+  // Save report (Draft or Submit)
+  const handleSave = (targetStatus?: "DRAFT" | "SUBMITTED") => {
+    const finalStatus = targetStatus || status;
     startTransition(async () => {
       try {
         const payload = {
@@ -281,7 +275,7 @@ export function LaminationRawMaterialEntryClient() {
           manualTotalKg: totals.manualTotalKg,
           machineTotalKg: totals.machineTotalKg,
           diffTotalKg: totals.diffTotalKg,
-          status,
+          status: finalStatus,
           remarks: remarks.trim() || null,
           entries,
         };
@@ -294,7 +288,12 @@ export function LaminationRawMaterialEntryClient() {
 
         const data = await res.json();
         if (data.success) {
-          toast.success("Lamination Raw Material report saved successfully");
+          setStatus(finalStatus);
+          toast.success(
+            finalStatus === "SUBMITTED"
+              ? "Lamination Raw Material report submitted successfully"
+              : "Lamination Raw Material report draft saved successfully"
+          );
           fetchReport();
         } else {
           toast.error(data.error || "Failed to save report");
@@ -337,24 +336,6 @@ export function LaminationRawMaterialEntryClient() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-5">
         <div>
           <div className="flex items-center gap-2.5">
-            <button
-              type="button"
-              onClick={() => setIsFullscreen((prev) => !prev)}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg border bg-white hover:bg-slate-50 text-slate-700 transition-colors cursor-pointer shadow-2xs"
-              title={isFullscreen ? "Collapse (Esc)" : "Expand to Fullscreen"}
-            >
-              {isFullscreen ? (
-                <>
-                  <Minimize2 className="w-3.5 h-3.5" />
-                  <span>Collapse</span>
-                </>
-              ) : (
-                <>
-                  <Maximize2 className="w-3.5 h-3.5" />
-                  <span>Expand</span>
-                </>
-              )}
-            </button>
             <div className="p-2.5 rounded-xl bg-purple-500/10 text-purple-600">
               <FlaskConical className="w-6 h-6" />
             </div>
@@ -405,29 +386,37 @@ export function LaminationRawMaterialEntryClient() {
           <Button
             variant="outline"
             size="sm"
-            onClick={handleSyncWithMaster}
-            title="Sync with Data Centre Master"
+            onClick={() => handleSave("DRAFT")}
+            disabled={isPending || isLoading}
             className="h-9 text-xs border-slate-200 hover:bg-slate-50"
           >
-            <RotateCcw className="h-3.5 w-3.5 mr-1 text-slate-600" />
-            Sync Master
+            {isPending ? (
+              <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+            ) : (
+              <Save className="h-4 w-4 mr-1.5" />
+            )}
+            Save Draft
           </Button>
 
           <Button
             size="sm"
-            onClick={handleSave}
-            disabled={isPending || isLoading}
+            onClick={() => handleSave("SUBMITTED")}
+            disabled={isPending || isLoading || entries.length === 0}
             className="h-9 text-xs bg-sky-600 hover:bg-sky-700 text-white shadow-xs"
           >
-            <Save className="h-4 w-4 mr-1.5" />
-            {isPending ? "Saving..." : "Save Shift Report"}
+            {isPending ? (
+              <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+            ) : (
+              <CheckCircle2 className="h-4 w-4 mr-1.5" />
+            )}
+            Submit Report
           </Button>
         </div>
       </div>
 
       {/* Shift & Date Control Bar */}
       <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs">
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3.5 items-end">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 items-end">
           {/* Date */}
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
@@ -467,28 +456,6 @@ export function LaminationRawMaterialEntryClient() {
               inputClassName="h-9"
             />
           </div>
-
-          {/* Status */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Status
-            </label>
-            <Select
-              value={status}
-              onValueChange={(val: any) => {
-                if (val) setStatus(val);
-              }}
-            >
-              <SelectTrigger className="h-9 text-xs">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="DRAFT" className="text-xs">Draft</SelectItem>
-                <SelectItem value="SUBMITTED" className="text-xs">Submitted</SelectItem>
-                <SelectItem value="APPROVED" className="text-xs">Approved</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
         </div>
 
         {/* Remarks Input */}
@@ -502,6 +469,39 @@ export function LaminationRawMaterialEntryClient() {
             onChange={(e) => setRemarks(e.target.value)}
             className="h-8.5 text-xs bg-slate-50/50"
           />
+        </div>
+      </div>
+
+      {/* Table / Grid Toolbar */}
+      <div className="p-3 bg-white rounded-lg border border-slate-200 shadow-2xs flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2.5">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsFullscreen(!isFullscreen)}
+            className="h-8 text-xs border-slate-300 hover:bg-slate-100 flex items-center gap-1.5 cursor-pointer active:scale-95"
+            title={isFullscreen ? "Collapse back to normal view (Esc)" : "Expand view to fullscreen"}
+          >
+            {isFullscreen ? (
+              <>
+                <Minimize2 className="h-3.5 w-3.5 text-sky-600" />
+                <span>Collapse</span>
+              </>
+            ) : (
+              <>
+                <Maximize2 className="h-3.5 w-3.5 text-sky-600" />
+                <span>Expand</span>
+              </>
+            )}
+          </Button>
+          <span className="h-2 w-2 rounded-full bg-purple-600"></span>
+          <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+            Raw Material Reconciliation Matrix (Recipe Target vs Machine Actuals)
+          </h3>
+        </div>
+
+        <div className="flex items-center gap-3 text-xs text-slate-500">
+          <span>Net Variance: <strong className={totals.diffTotalKg >= 0 ? "text-emerald-600" : "text-amber-600"}>{netDiffSign} kg</strong></span>
         </div>
       </div>
 

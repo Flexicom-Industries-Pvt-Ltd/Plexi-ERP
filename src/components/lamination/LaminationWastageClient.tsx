@@ -4,13 +4,11 @@ import React, { useState, useEffect, useTransition, useMemo } from "react";
 import { format } from "date-fns";
 import {
   Calendar as CalendarIcon,
-  Clock,
   User,
   Building,
   Save,
   Printer,
   FileSpreadsheet,
-  RefreshCw,
   AlertCircle,
   CheckCircle2,
   Trash2,
@@ -18,18 +16,12 @@ import {
   Scale,
   Maximize2,
   Minimize2,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { toast } from "sonner";
 import {
   calculateWastage,
@@ -38,13 +30,12 @@ import {
 import dynamic from "next/dynamic";
 import { exportWastageReportExcel } from "@/lib/lamination/wastage-export";
 import { UniversalPersonnelInput } from "@/components/ui/UniversalPersonnelInput";
+import { UniversalShiftSelector } from "@/components/production/UniversalShiftSelector";
 
 const WastagePrintModal = dynamic(
   () => import("./WastagePrintModal").then((m) => m.WastagePrintModal),
   { ssr: false }
 );
-
-const SHIFTS = ["Day Shift", "Night Shift"];
 
 export function LaminationWastageClient() {
   const [date, setDate] = useState<string>(format(new Date(), "yyyy-MM-dd"));
@@ -134,6 +125,21 @@ export function LaminationWastageClient() {
           setFabricNetWeightKg(String(rep.fabricNetWeightKg || 0));
           setLumpsWastageKg(rep.lumpsWastageKg > 0 ? String(rep.lumpsWastageKg) : "");
           setFabricWastageKg(rep.fabricWastageKg > 0 ? String(rep.fabricWastageKg) : "");
+        } else {
+          // Reactive hydration from shift reports if new draft
+          setOperatorName("");
+          setContractorName("");
+          setStatus("DRAFT");
+          setRemarks("");
+          setLumpsWastageKg("");
+          setFabricWastageKg("");
+          if (data.sources) {
+            setRawMaterialUsedKg(data.sources.sourceRawMaterialKg > 0 ? String(data.sources.sourceRawMaterialKg) : "");
+            setFabricNetWeightKg(data.sources.sourceFabricNetWtKg > 0 ? String(data.sources.sourceFabricNetWtKg) : "");
+          } else {
+            setRawMaterialUsedKg("");
+            setFabricNetWeightKg("");
+          }
         }
       } else {
         toast.error(data.error || "Failed to load wastage report");
@@ -160,18 +166,8 @@ export function LaminationWastageClient() {
     );
   }, [rawMaterialUsedKg, lumpsWastageKg, fabricNetWeightKg, fabricWastageKg]);
 
-  // Sync / pull fresh base quantities from Raw Material & Production reports
-  const handleReSyncSources = () => {
-    if (sources.sourceRawMaterialKg > 0) {
-      setRawMaterialUsedKg(String(sources.sourceRawMaterialKg));
-    }
-    if (sources.sourceFabricNetWtKg > 0) {
-      setFabricNetWeightKg(String(sources.sourceFabricNetWtKg));
-    }
-    toast.success("Synchronized base input quantities from shift reports");
-  };
-
-  const handleSave = () => {
+  const handleSave = (targetStatus?: "DRAFT" | "SUBMITTED") => {
+    const finalStatus = targetStatus || status;
     startTransition(async () => {
       try {
         const payload = {
@@ -183,7 +179,7 @@ export function LaminationWastageClient() {
           lumpsWastageKg: calculated.lumpsWastageKg,
           fabricNetWeightKg: calculated.fabricNetWeightKg,
           fabricWastageKg: calculated.fabricWastageKg,
-          status,
+          status: finalStatus,
           remarks: remarks.trim() || null,
         };
 
@@ -195,7 +191,12 @@ export function LaminationWastageClient() {
 
         const data = await res.json();
         if (data.success) {
-          toast.success("Lamination Wastage report saved successfully");
+          setStatus(finalStatus);
+          toast.success(
+            finalStatus === "SUBMITTED"
+              ? "Lamination Wastage report submitted successfully"
+              : "Lamination Wastage report draft saved successfully"
+          );
           fetchReport();
         } else {
           toast.error(data.error || "Failed to save wastage report");
@@ -271,29 +272,37 @@ export function LaminationWastageClient() {
           <Button
             variant="outline"
             size="sm"
-            onClick={handleReSyncSources}
-            title="Re-sync base numbers from shift reports"
+            onClick={() => handleSave("DRAFT")}
+            disabled={isPending || isLoading}
             className="h-9 text-xs border-slate-200 hover:bg-slate-50"
           >
-            <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${isLoading ? "animate-spin" : ""}`} />
-            Sync Sources
+            {isPending ? (
+              <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+            ) : (
+              <Save className="h-4 w-4 mr-1.5" />
+            )}
+            Save Draft
           </Button>
 
           <Button
             size="sm"
-            onClick={handleSave}
+            onClick={() => handleSave("SUBMITTED")}
             disabled={isPending || isLoading}
             className="h-9 text-xs bg-sky-600 hover:bg-sky-700 text-white shadow-xs"
           >
-            <Save className="h-4 w-4 mr-1.5" />
-            {isPending ? "Saving..." : "Save Shift Wastage"}
+            {isPending ? (
+              <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+            ) : (
+              <CheckCircle2 className="h-4 w-4 mr-1.5" />
+            )}
+            Submit Report
           </Button>
         </div>
       </div>
 
       {/* Shift & Date Header */}
       <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs">
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3.5 items-end">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3.5 items-end">
           {/* Date */}
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
@@ -310,27 +319,12 @@ export function LaminationWastageClient() {
 
           {/* Shift */}
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
-              <Clock className="h-3.5 w-3.5 text-slate-400" />
-              Shift
-            </label>
-            <Select
+            <UniversalShiftSelector
               value={shiftName}
-              onValueChange={(val) => {
-                if (val) setShiftName(val);
-              }}
-            >
-              <SelectTrigger className="h-9 text-xs">
-                <SelectValue placeholder="Select Shift" />
-              </SelectTrigger>
-              <SelectContent>
-                {SHIFTS.map((s) => (
-                  <SelectItem key={s} value={s} className="text-xs">
-                    {s}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              onChange={(val) => setShiftName(val)}
+              mode="byName"
+              label="Shift"
+            />
           </div>
 
           {/* Operator Name */}
@@ -368,28 +362,6 @@ export function LaminationWastageClient() {
               placeholder="In-House / None"
               inputClassName="h-9"
             />
-          </div>
-
-          {/* Status */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Status
-            </label>
-            <Select
-              value={status}
-              onValueChange={(val: any) => {
-                if (val) setStatus(val);
-              }}
-            >
-              <SelectTrigger className="h-9 text-xs">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="DRAFT" className="text-xs">Draft</SelectItem>
-                <SelectItem value="SUBMITTED" className="text-xs">Submitted</SelectItem>
-                <SelectItem value="APPROVED" className="text-xs">Approved</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
         </div>
 
@@ -521,7 +493,7 @@ export function LaminationWastageClient() {
               variant="outline"
               size="sm"
               onClick={() => setIsFullscreen(!isFullscreen)}
-              className="h-7 px-2 text-xs border-slate-300 hover:bg-slate-100 flex items-center gap-1.5 cursor-pointer active:scale-95"
+              className="h-8 text-xs border-slate-300 hover:bg-slate-100 flex items-center gap-1.5 cursor-pointer active:scale-95"
               title={isFullscreen ? "Collapse back to normal view (Esc)" : "Expand table to fullscreen"}
             >
               {isFullscreen ? (
