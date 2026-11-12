@@ -8,12 +8,8 @@ import {
   Printer,
   FileSpreadsheet,
   LayoutGrid,
-  Calendar,
-  Clock,
   Layers,
   Activity,
-  Package,
-  Scale,
   RotateCcw,
   Plus,
   Edit2,
@@ -25,6 +21,8 @@ import {
   Lock,
   Maximize2,
   Minimize2,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import {
   LoomSummaryDataset,
@@ -78,6 +76,26 @@ export function LoomSummarySection() {
   const [resetConfirmModalOpen, setResetConfirmModalOpen] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Mobile Collapsible Cards State (Default Collapsed on Load)
+  const [expandedRecipes, setExpandedRecipes] = useState<Set<string>>(new Set());
+
+  const toggleExpandRecipe = (recipeQuality: string) => {
+    setExpandedRecipes((prev) => {
+      const next = new Set(prev);
+      if (next.has(recipeQuality)) next.delete(recipeQuality);
+      else next.add(recipeQuality);
+      return next;
+    });
+  };
+
+  const expandAllRecipes = () => {
+    setExpandedRecipes(new Set(recipeList.map((r) => r.recipeQuality)));
+  };
+
+  const collapseAllRecipes = () => {
+    setExpandedRecipes(new Set());
+  };
 
   // Close fullscreen on Escape
   useEffect(() => {
@@ -408,8 +426,12 @@ export function LoomSummarySection() {
 
   return (
     <div className="space-y-4 w-full min-w-0 max-w-full font-sans text-slate-800">
-      {/* 1. Header Toolbar (Minimalist, Sleek, Professional) */}
-      <div className="bg-white px-5 py-4 rounded-xl border border-slate-200/90 shadow-2xs flex flex-wrap items-center justify-between gap-3">
+      {/* ======================================================== */}
+      {/* DESKTOP VIEW (100% INTACT SPREADSHEETS & FULL GRID)      */}
+      {/* ======================================================== */}
+      <div className="hidden md:block space-y-4">
+        {/* 1. Header Toolbar (Minimalist, Sleek, Professional) */}
+        <div className="bg-white px-5 py-4 rounded-xl border border-slate-200/90 shadow-2xs flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-primary/10 text-primary rounded-xl shrink-0">
             <LayoutGrid className="h-5 w-5" />
@@ -891,13 +913,438 @@ export function LoomSummarySection() {
         </div>
       )}
     </div>
+    </div>
+
+      {/* ======================================================== */}
+      {/* MOBILE CARD-BASED VIEW (DEFAULT COLLAPSED, TOUCH-FIRST)  */}
+      {/* ======================================================== */}
+      <div className="block md:hidden space-y-3">
+        {/* Mobile Header Card */}
+        <div className="bg-white rounded-xl border border-slate-200/90 p-3.5 shadow-2xs space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 bg-primary/10 text-primary rounded-lg shrink-0">
+                <LayoutGrid className="h-4 w-4" />
+              </div>
+              <h2 className="text-sm font-bold text-slate-900 tracking-tight">
+                Loom Machine Allocations
+              </h2>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => handleOpenBulkRecipeModal()}
+              className="inline-flex items-center gap-1 px-3 py-1.5 bg-primary hover:bg-primary/90 text-white text-xs font-semibold rounded-lg shadow-2xs transition-colors cursor-pointer shrink-0"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              <span>Assign Quality</span>
+            </button>
+          </div>
+
+          {/* Sub-bar with secondary actions */}
+          <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-100 text-xs">
+            <span className="text-[11px] font-medium text-slate-500 font-mono">
+              91 Circular Looms Shed
+            </span>
+
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={handlePrint}
+                className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 active:bg-slate-100 shadow-2xs transition-colors cursor-pointer"
+                title="Print PDF"
+              >
+                <Printer className="h-3.5 w-3.5 text-slate-600" />
+                <span>PDF</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleExportExcel}
+                className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 active:bg-slate-100 shadow-2xs transition-colors cursor-pointer"
+                title="Export Excel"
+              >
+                <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600" />
+                <span>Excel</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={fetchSummary}
+                disabled={loading}
+                className="p-1 text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 active:bg-slate-100 shadow-2xs transition-colors cursor-pointer"
+                title="Refresh Data"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin text-slate-700" : "text-slate-500"}`} />
+              </button>
+            </div>
+          </div>
+
+          {/* Mobile 2x2 KPI Grid */}
+          <div className="grid grid-cols-2 gap-2 text-xs pt-1 border-t border-slate-100">
+            <div
+              onClick={() => {
+                setActiveView("looms");
+                setLoomStatusFilter("ACTIVE_ONLY");
+              }}
+              className="bg-emerald-50/60 p-2 rounded-lg border border-emerald-200/80 cursor-pointer active:scale-98 transition-all"
+            >
+              <div className="flex items-center justify-between text-[10px] text-emerald-800 font-semibold uppercase">
+                <span>Running Looms</span>
+                <Activity className="h-3 w-3 text-emerald-600" />
+              </div>
+              <div className="mt-1 flex items-baseline gap-1">
+                <span className="text-lg font-bold font-mono text-emerald-950">
+                  {kpis?.activeLoomsCount ?? 0}
+                </span>
+                <span className="text-[10px] font-mono text-emerald-700">/ 91</span>
+              </div>
+            </div>
+
+            <div
+              onClick={() => setActiveView("recipes")}
+              className="bg-blue-50/60 p-2 rounded-lg border border-blue-200/80 cursor-pointer active:scale-98 transition-all"
+            >
+              <div className="flex items-center justify-between text-[10px] text-blue-800 font-semibold uppercase">
+                <span>Active Qualities</span>
+                <Layers className="h-3 w-3 text-blue-600" />
+              </div>
+              <div className="mt-1 flex items-baseline gap-1">
+                <span className="text-lg font-bold font-mono text-blue-950">
+                  {recipeList.length}
+                </span>
+                <span className="text-[10px] text-blue-700">recipes</span>
+              </div>
+            </div>
+
+            <div
+              onClick={() => {
+                setActiveView("looms");
+                setLoomStatusFilter("ALL");
+              }}
+              className="bg-amber-50/60 p-2 rounded-lg border border-amber-200/80 cursor-pointer active:scale-98 transition-all"
+            >
+              <div className="flex items-center justify-between text-[10px] text-amber-800 font-semibold uppercase">
+                <span>Idle Looms</span>
+                <AlertTriangle className="h-3 w-3 text-amber-600" />
+              </div>
+              <div className="mt-1 flex items-baseline gap-1">
+                <span className="text-lg font-bold font-mono text-amber-950">
+                  {kpis?.idleLoomsCount ?? Math.max(0, 91 - (kpis?.activeLoomsCount ?? 0))}
+                </span>
+                <span className="text-[10px] font-mono text-amber-700">/ 91 idle</span>
+              </div>
+            </div>
+
+            <div className="bg-slate-50 p-2 rounded-lg border border-slate-200/80">
+              <div className="flex items-center justify-between text-[10px] text-slate-500 font-semibold uppercase">
+                <span>Shed Capacity</span>
+                <LayoutGrid className="h-3 w-3 text-slate-400" />
+              </div>
+              <div className="mt-1 flex items-baseline gap-1">
+                <span className="text-lg font-bold font-mono text-slate-900">91</span>
+                <span className="text-[10px] text-slate-500">Looms</span>
+              </div>
+            </div>
+          </div>
+
+          {/* View Switcher Pills */}
+          <div className="grid grid-cols-2 gap-1 rounded-lg bg-slate-100 p-0.5 text-xs font-medium border border-slate-200/60">
+            <button
+              type="button"
+              onClick={() => setActiveView("recipes")}
+              className={`py-1.5 px-2 rounded-md transition-all text-center cursor-pointer ${
+                activeView === "recipes"
+                  ? "bg-white text-slate-900 shadow-2xs font-semibold"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              Recipe Schedule ({recipeList.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveView("looms")}
+              className={`py-1.5 px-2 rounded-md transition-all text-center cursor-pointer ${
+                activeView === "looms"
+                  ? "bg-white text-slate-900 shadow-2xs font-semibold"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              Loom Shed (1–91)
+            </button>
+          </div>
+
+          {/* Search Input */}
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search quality code, loom #..."
+              className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200/90 rounded-lg outline-none focus:border-slate-800 focus:bg-white transition-colors"
+            />
+          </div>
+        </div>
+
+        {/* VIEW 1 (MOBILE): RECIPE ALLOCATIONS CARDS */}
+        {activeView === "recipes" && (
+          <div className="space-y-2">
+            {/* List Control Strip (Expand All / Collapse All) */}
+            <div className="flex items-center justify-between text-xs px-1 text-slate-600">
+              <span className="font-semibold text-slate-800">
+                {recipeList.length} Recipe {recipeList.length === 1 ? "Allocation" : "Allocations"}
+              </span>
+              <div className="flex items-center gap-2 text-xs">
+                <button
+                  type="button"
+                  onClick={expandAllRecipes}
+                  className="text-primary hover:underline font-medium cursor-pointer"
+                >
+                  Expand All
+                </button>
+                <span className="text-slate-300">•</span>
+                <button
+                  type="button"
+                  onClick={collapseAllRecipes}
+                  className="text-slate-500 hover:underline font-medium cursor-pointer"
+                >
+                  Collapse All
+                </button>
+              </div>
+            </div>
+
+            {loading ? (
+              <div className="bg-white rounded-xl border border-slate-200 p-8 text-center text-slate-500 text-xs">
+                <RefreshCw className="h-5 w-5 animate-spin mx-auto mb-2 text-slate-400" />
+                <span>Loading loom allocations...</span>
+              </div>
+            ) : recipeList.length === 0 ? (
+              <div className="bg-white rounded-xl border border-slate-200 p-8 text-center text-slate-500 text-xs space-y-2">
+                <Layers className="h-6 w-6 mx-auto text-slate-400" />
+                <p className="font-semibold text-slate-700">No Recipe Allocations</p>
+                <p className="text-[11px] text-slate-400">Click &quot;Assign&quot; above to allocate looms to a quality formulation.</p>
+              </div>
+            ) : (
+              recipeList.map((item, idx) => {
+                const isExpanded = expandedRecipes.has(item.recipeQuality);
+                return (
+                  <div
+                    key={item.recipeQuality}
+                    id={`recipe-card-${idx}`}
+                    className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden transition-all"
+                  >
+                    {/* Accordion Card Header */}
+                    <div
+                      onClick={() => toggleExpandRecipe(item.recipeQuality)}
+                      className="p-3.5 flex items-center justify-between gap-3 cursor-pointer hover:bg-slate-50/70 transition-colors"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span className="text-[11px] font-mono font-bold text-slate-400 w-5 shrink-0 text-center">
+                          #{idx + 1}
+                        </span>
+                        <div className="min-w-0">
+                          <RecipeQualityBadge value={item.recipeQuality} />
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-800 font-bold font-mono text-[11px] border border-slate-200/80">
+                          {item.totalLoomsCount} {item.totalLoomsCount === 1 ? "Loom" : "Looms"}
+                        </span>
+                        {isExpanded ? (
+                          <ChevronUp className="h-4 w-4 text-slate-400 shrink-0" />
+                        ) : (
+                          <ChevronDown className="h-4 w-4 text-slate-400 shrink-0" />
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Accordion Card Body */}
+                    {isExpanded && (
+                      <div className="px-3.5 pb-3.5 pt-1 border-t border-slate-100 space-y-3 bg-slate-50/30">
+                        <div>
+                          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1.5">
+                            Assigned Machines ({item.assignedLooms.length}):
+                          </span>
+                          <div className="flex flex-wrap gap-1.5">
+                            {item.assignedLooms.map((loomNo) => (
+                              <button
+                                key={loomNo}
+                                type="button"
+                                onClick={() => handleOpenSingleLoomModal(loomNo)}
+                                className="px-2 py-1 bg-white hover:bg-blue-50 text-slate-800 hover:text-blue-900 font-mono font-bold text-xs rounded-lg border border-slate-200 hover:border-blue-300 shadow-2xs transition-colors cursor-pointer active:scale-95"
+                                title={`Click to edit Loom #${loomNo}`}
+                              >
+                                #{loomNo}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Quick Actions */}
+                        <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200/60">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenBulkRecipeModal(item.recipeQuality)}
+                            className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 shadow-2xs transition-colors cursor-pointer"
+                          >
+                            <Edit2 className="h-3.5 w-3.5 text-slate-500" />
+                            <span>Edit Looms</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteRecipeMapping(item.recipeQuality)}
+                            className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-rose-600 bg-rose-50/70 border border-rose-200 rounded-lg hover:bg-rose-100/70 shadow-2xs transition-colors cursor-pointer"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                            <span>Delete</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+        )}
+
+        {/* VIEW 2 (MOBILE): LOOM SHED (1–91) MATRIX & LIST */}
+        {activeView === "looms" && (
+          <div className="space-y-3">
+            {/* Filter Switcher Bar */}
+            <div className="bg-white p-3 rounded-xl border border-slate-200/90 shadow-2xs flex items-center justify-between gap-2">
+              <span className="text-xs font-bold text-slate-800">Shed Filter</span>
+              <div className="inline-flex rounded-lg bg-slate-100 p-0.5 text-xs font-medium">
+                <button
+                  type="button"
+                  onClick={() => setLoomStatusFilter("ALL")}
+                  className={`px-2.5 py-1 rounded transition-all cursor-pointer ${
+                    loomStatusFilter === "ALL"
+                      ? "bg-white text-slate-900 shadow-2xs font-semibold"
+                      : "text-slate-600"
+                  }`}
+                >
+                  All (91)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLoomStatusFilter("ACTIVE_ONLY")}
+                  className={`px-2.5 py-1 rounded transition-all cursor-pointer ${
+                    loomStatusFilter === "ACTIVE_ONLY"
+                      ? "bg-white text-slate-900 shadow-2xs font-semibold"
+                      : "text-slate-600"
+                  }`}
+                >
+                  Active ({kpis?.activeLoomsCount ?? 0})
+                </button>
+              </div>
+            </div>
+
+            {/* 5-Column Touch Grid */}
+            <div className="bg-white p-3 rounded-xl border border-slate-200/90 shadow-2xs space-y-2">
+              <div className="flex items-center justify-between text-[11px] text-slate-500 pb-1 border-b border-slate-100">
+                <span className="font-semibold text-slate-700">1–91 Machine Matrix</span>
+                <span>Tap machine to assign</span>
+              </div>
+
+              <div className="grid grid-cols-5 gap-1.5 max-h-80 overflow-y-auto p-0.5">
+                {displayedLoomList.map((loom) => {
+                  const isFiltered = selectedLoomFilter === String(loom.loomNumber);
+                  return (
+                    <button
+                      key={loom.loomNumber}
+                      type="button"
+                      onClick={() => handleOpenSingleLoomModal(loom.loomNumber)}
+                      className={`p-2 rounded-lg border text-center transition-all cursor-pointer flex flex-col items-center justify-center active:scale-95 ${
+                        isFiltered
+                          ? "bg-slate-900 text-white border-slate-900 shadow-xs"
+                          : loom.isActive
+                          ? "bg-emerald-50/80 hover:bg-emerald-100 border-emerald-300 text-emerald-900 font-bold"
+                          : "bg-slate-50/70 hover:bg-slate-100 border-slate-200 text-slate-400 font-medium"
+                      }`}
+                    >
+                      <span className="text-xs font-mono font-bold leading-none">
+                        #{loom.loomNumber}
+                      </span>
+                      <span className="text-[8px] font-mono leading-none mt-1 truncate max-w-full">
+                        {loom.isActive ? (loom.activeRecipe?.split("/")[0] || "Active") : "Idle"}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Detailed Mobile Loom Cards List */}
+            <div className="space-y-2">
+              <div className="text-xs font-semibold text-slate-700 px-1">
+                Machines List ({displayedLoomList.length})
+              </div>
+              {displayedLoomList.map((loom) => (
+                <div
+                  key={loom.loomNumber}
+                  className={`p-3 rounded-xl border shadow-2xs flex items-center justify-between gap-3 ${
+                    loom.isActive
+                      ? "bg-white border-slate-200/90"
+                      : "bg-slate-50/50 border-slate-200/60"
+                  }`}
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="flex flex-col items-center shrink-0">
+                      <span className="text-xs font-mono font-bold text-slate-900">
+                        #{loom.loomNumber}
+                      </span>
+                      <span
+                        className={`text-[8px] font-bold uppercase px-1.5 py-0.2 rounded-full mt-0.5 ${
+                          loom.isActive
+                            ? "bg-emerald-100 text-emerald-800"
+                            : "bg-slate-200 text-slate-500"
+                        }`}
+                      >
+                        {loom.isActive ? "RUNNING" : "IDLE"}
+                      </span>
+                    </div>
+
+                    <div className="min-w-0">
+                      {loom.activeRecipe ? (
+                        <div className="space-y-1">
+                          <RecipeQualityBadge value={loom.activeRecipe} />
+                          {(loom.size || loom.denier) && (
+                            <div className="flex items-center gap-1.5 text-[10px] text-slate-500 font-mono">
+                              {loom.size && <span>{loom.size} mm</span>}
+                              {loom.size && loom.denier && <span>•</span>}
+                              {loom.denier && <span>{loom.denier} D</span>}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-xs text-slate-400 italic">Unassigned Machine</span>
+                      )}
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => handleOpenSingleLoomModal(loom.loomNumber)}
+                    className="px-2.5 py-1 text-xs font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 active:bg-slate-100 rounded-lg shadow-2xs transition-colors shrink-0 cursor-pointer"
+                  >
+                    Edit
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* ======================================================== */}
       {/* MODAL 1: SINGLE LOOM QUICK ASSIGN MODAL                  */}
       {/* ======================================================== */}
       {singleLoomModalOpen && assigningLoomNumber !== null && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-2xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-xl border border-slate-200 max-w-md w-full overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-2xs flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-white rounded-xl shadow-xl border border-slate-200 max-w-md w-full overflow-hidden animate-in fade-in zoom-in-95 duration-100 max-h-[92vh] flex flex-col">
             <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between bg-slate-50/60">
               <div className="flex items-center gap-2">
                 <span className="font-mono font-bold text-sm bg-slate-900 text-white px-2 py-0.5 rounded">
@@ -1020,8 +1467,8 @@ export function LoomSummarySection() {
       {/* MODAL 2: BULK RECIPE LOOM ALLOCATOR MODAL                 */}
       {/* ======================================================== */}
       {bulkRecipeModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-2xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-2xl border border-slate-200 max-w-2xl w-full overflow-hidden animate-in fade-in zoom-in-95 duration-100 max-h-[90vh] flex flex-col">
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-2xs flex items-center justify-center p-3 sm:p-4">
+          <div className="bg-white rounded-xl shadow-2xl border border-slate-200 max-w-lg md:max-w-2xl w-full overflow-hidden animate-in fade-in zoom-in-95 duration-100 max-h-[92vh] flex flex-col">
             <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between bg-slate-50/60 shrink-0">
               <div className="flex items-center gap-2">
                 <SlidersHorizontal className="h-4 w-4 text-slate-700" />
@@ -1140,7 +1587,7 @@ export function LoomSummarySection() {
 
                 {/* 1–91 Grid */}
                 <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200 space-y-2">
-                  <div className="grid grid-cols-7 sm:grid-cols-10 md:grid-cols-13 gap-1.5 max-h-56 overflow-y-auto p-0.5">
+                  <div className="grid grid-cols-5 sm:grid-cols-10 md:grid-cols-13 gap-1.5 max-h-56 overflow-y-auto p-0.5">
                     {Array.from({ length: 91 }, (_, i) => i + 1).map((loomNo) => {
                       const isSelected = bulkSelectedLooms.includes(loomNo);
                       const currentOwner = rawLoomList.find((l) => l.loomNumber === loomNo)?.activeRecipe;
