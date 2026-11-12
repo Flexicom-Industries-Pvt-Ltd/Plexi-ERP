@@ -9,7 +9,7 @@ import {
   computeLaminationReportTotals,
 } from "@/lib/lamination/lamination-types";
 import dynamic from "next/dynamic";
-import { RollStockPickerModal } from "./RollStockPickerModal";
+import { UniversalRollSelector } from "./UniversalRollSelector";
 import { UniversalQualityInput } from "@/components/ui/UniversalQualityInput";
 import { UniversalPersonnelInput } from "@/components/ui/UniversalPersonnelInput";
 
@@ -71,10 +71,33 @@ export function LaminationReportClient() {
   const [loading, setLoading] = useState<boolean>(false);
   const [saving, setSaving] = useState<boolean>(false);
 
-  // Modals
-  const [rollPickerOpen, setRollPickerOpen] = useState(false);
+  // Available Rolls from Circular Loom Roll Stock
+  const [availableRolls, setAvailableRolls] = useState<AvailableLaminationRoll[]>([]);
+  const [rollsLoading, setRollsLoading] = useState(false);
+
+  // Modals & Viewport
   const [printModalOpen, setPrintModalOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Fetch available rolls from Circular Loom Roll Stock
+  const fetchAvailableRolls = useCallback(async () => {
+    setRollsLoading(true);
+    try {
+      const res = await fetch("/api/production/lamination/available-rolls");
+      const json = await res.json();
+      if (json.success && Array.isArray(json.rolls)) {
+        setAvailableRolls(json.rolls);
+      }
+    } catch (err) {
+      console.error("Failed to load available rolls:", err);
+    } finally {
+      setRollsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchAvailableRolls();
+  }, [fetchAvailableRolls]);
 
   // Close fullscreen on Escape
   useEffect(() => {
@@ -187,37 +210,57 @@ export function LaminationReportClient() {
       ...prev,
       calculateLaminationEntry({
         sequence: prev.length + 1,
-        quality: prev.length > 0 ? prev[prev.length - 1].quality : "NUVOCO SI",
+        rollNumber: "",
+        quality: prev.length > 0 ? prev[prev.length - 1].quality : "",
         size: "500",
         loomNumber: 0,
-        rollNumber: "",
         rollMeter: 0,
         netWeightBefore: 0,
+        avgWeightBefore: 0,
         productionMeter: 0,
         netWeightAfter: 0,
+        avgWeightAfter: 0,
+        coating: 0,
+        remarks: "",
       }),
     ]);
   };
 
-  // Add rolls imported from Roll Stock
-  const handleImportRolls = (selectedRolls: AvailableLaminationRoll[]) => {
-    const newEntries: LaminationProductionEntryData[] = selectedRolls.map((r, idx) =>
-      calculateLaminationEntry({
-        sequence: entries.length + idx + 1,
-        quality: r.qualityType,
-        size: r.size || "500",
-        loomNumber: r.loomNumber,
-        rollNumber: r.rollNumber,
-        rollMeter: r.meter,
-        netWeightBefore: r.nettWeightKg,
-        productionMeter: 0,
-        netWeightAfter: 0,
-        loomRollCuttingEntryId: r.id,
-      })
-    );
-
-    setEntries((prev) => [...prev, ...newEntries]);
-    toast.success(`Imported ${newEntries.length} rolls from Roll Stock`);
+  // Handle Roll ID selection and auto-populate upstream specs
+  const handleRollSelect = (
+    index: number,
+    rollNumber: string,
+    selectedRoll?: AvailableLaminationRoll
+  ) => {
+    setEntries((prev) => {
+      const next = [...prev];
+      if (selectedRoll) {
+        next[index] = calculateLaminationEntry({
+          ...next[index],
+          rollNumber: selectedRoll.rollNumber,
+          loomRollCuttingEntryId: selectedRoll.id,
+          quality: selectedRoll.qualityType || next[index].quality,
+          size: selectedRoll.size || next[index].size || "500",
+          loomNumber: selectedRoll.loomNumber || next[index].loomNumber,
+          rollMeter: selectedRoll.meter,
+          netWeightBefore: selectedRoll.nettWeightKg,
+          avgWeightBefore:
+            selectedRoll.avgWeightPerMeter ||
+            (selectedRoll.meter > 0
+              ? Math.round(((selectedRoll.nettWeightKg * 1000) / selectedRoll.meter) * 10) / 10
+              : 0),
+        });
+        toast.success(
+          `Bound ${selectedRoll.rollNumber} specs (${selectedRoll.qualityType}, Loom #${selectedRoll.loomNumber})`
+        );
+      } else {
+        next[index] = calculateLaminationEntry({
+          ...next[index],
+          rollNumber,
+        });
+      }
+      return next;
+    });
   };
 
   // Save report
@@ -551,25 +594,16 @@ export function LaminationReportClient() {
             </Button>
             <Button
               size="sm"
-              onClick={() => setRollPickerOpen(true)}
-              className="h-8.5 text-xs bg-sky-600 hover:bg-sky-700 text-white shadow-xs cursor-pointer"
-            >
-              <Layers className="h-4 w-4 mr-1.5" />
-              Import from Roll Stock
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
               onClick={handleAddManualRow}
-              className="h-8.5 text-xs border-slate-300 hover:bg-slate-100 cursor-pointer"
+              className="h-8.5 text-xs bg-sky-600 hover:bg-sky-700 text-white shadow-xs cursor-pointer flex items-center gap-1.5"
             >
-              <Plus className="h-4 w-4 mr-1" />
-              Add Blank Row
+              <Plus className="h-4 w-4" />
+              <span>Add Blank Row</span>
             </Button>
           </div>
 
           <div className="text-xs text-slate-500">
-            {entries.length} row(s) listed • Values auto-calculate in real time
+            {entries.length} row(s) listed • Selecting a Roll ID auto-populates specs • Output values auto-calculate in real time
           </div>
         </div>
 
@@ -585,15 +619,15 @@ export function LaminationReportClient() {
               <Sparkles className="h-8 w-8 mx-auto text-sky-300 mb-2" />
               <div className="font-semibold text-sm text-slate-700">No Production Entries Yet</div>
               <p className="text-xs text-slate-400 max-w-sm mx-auto mt-1 mb-4">
-                Click &ldquo;Import from Roll Stock&rdquo; to load rolls serially by quality, or add a row manually.
+                Click &ldquo;+ Add Blank Row&rdquo; to select an authoritative Roll ID from Circular Loom stock and begin logging.
               </p>
               <Button
                 size="sm"
-                onClick={() => setRollPickerOpen(true)}
-                className="h-8.5 text-xs bg-sky-600 hover:bg-sky-700 text-white"
+                onClick={handleAddManualRow}
+                className="h-8.5 text-xs bg-sky-600 hover:bg-sky-700 text-white cursor-pointer shadow-xs"
               >
-                <Layers className="h-4 w-4 mr-1.5" />
-                Select Rolls from Roll Stock
+                <Plus className="h-4 w-4 mr-1.5" />
+                Add Blank Row
               </Button>
             </div>
           ) : (
@@ -601,13 +635,13 @@ export function LaminationReportClient() {
               <thead>
                 <tr className="border-b bg-slate-100 text-slate-700 font-semibold">
                   <th className="py-2.5 px-2 text-center w-10">S.No.</th>
-                  <th className="py-2.5 px-3 min-w-[170px]">Quality</th>
+                  <th className="py-2.5 px-3 min-w-[210px]">Roll ID (Stock)</th>
+                  <th className="py-2.5 px-3 min-w-[180px]">Quality</th>
                   <th className="py-2.5 px-2 text-center w-16">Width</th>
                   <th className="py-2.5 px-2 text-center w-16">Loom #</th>
-                  <th className="py-2.5 px-2.5 min-w-[95px]">Roll No.</th>
-                  <th className="py-2.5 px-2.5 text-right w-24">Roll Mtr.</th>
-                  <th className="py-2.5 px-2.5 text-right w-24">Net Wt. (Kg)</th>
-                  <th className="py-2.5 px-2.5 text-right w-24 bg-slate-50">Avg Wt. (g/m)</th>
+                  <th className="py-2.5 px-2.5 text-right w-24">Roll Mtr. (In)</th>
+                  <th className="py-2.5 px-2.5 text-right w-24">Net Wt. (In)</th>
+                  <th className="py-2.5 px-2.5 text-right w-24 bg-slate-50">Avg Wt. (In)</th>
                   <th className="py-2.5 px-2.5 text-right w-28 bg-sky-50 text-sky-800">
                     Production (M) *
                   </th>
@@ -615,7 +649,7 @@ export function LaminationReportClient() {
                     Net Wt. (Kg) *
                   </th>
                   <th className="py-2.5 px-2.5 text-right w-24 bg-sky-100/60 text-sky-900 font-bold">
-                    Avg (g/m)
+                    Avg (Out)
                   </th>
                   <th className="py-2.5 px-2.5 text-right w-24 bg-emerald-50 text-emerald-900 font-bold">
                     Coating (g/m)
@@ -636,19 +670,33 @@ export function LaminationReportClient() {
                         {entry.sequence}
                       </td>
 
-                      {/* Quality */}
-                      <td className="py-2 px-2.5 min-w-[200px]">
+                      {/* Column 2: Roll ID Dropdown / Autocomplete */}
+                      <td className="py-2 px-2.5 min-w-[210px]">
+                        <UniversalRollSelector
+                          value={entry.rollNumber}
+                          availableRolls={availableRolls}
+                          alreadySelectedRollNumbers={entries
+                            .map((e, i) => (i !== index ? e.rollNumber : ""))
+                            .filter(Boolean)}
+                          onChange={(rollNo, selectedRoll) =>
+                            handleRollSelect(index, rollNo, selectedRoll)
+                          }
+                        />
+                      </td>
+
+                      {/* Column 3: Quality (Auto-populated from Roll ID) */}
+                      <td className="py-2 px-2.5 min-w-[180px]">
                         <UniversalQualityInput
                           value={entry.quality}
                           onChange={(val) => handleUpdateEntry(index, "quality", val)}
                           options={allQualities}
-                          placeholder="— Select / Type Quality —"
+                          placeholder="— Quality —"
                           compact={true}
-                          inputClassName="h-8 font-semibold"
+                          inputClassName="h-8 font-semibold text-slate-900"
                         />
                       </td>
 
-                      {/* Width / Size */}
+                      {/* Column 4: Width / Size (Auto-populated) */}
                       <td className="py-2 px-2">
                         <Input
                           value={entry.size || ""}
@@ -658,7 +706,7 @@ export function LaminationReportClient() {
                         />
                       </td>
 
-                      {/* Loom Number */}
+                      {/* Column 5: Loom Number (Auto-populated) */}
                       <td className="py-2 px-2">
                         <Input
                           type="number"
@@ -666,22 +714,12 @@ export function LaminationReportClient() {
                           onChange={(e) =>
                             handleUpdateEntry(index, "loomNumber", Number(e.target.value) || 0)
                           }
-                          className="h-8 text-xs text-center font-bold text-slate-800 bg-transparent border-slate-200 focus:bg-white"
+                          className="h-8 text-xs text-center font-bold text-sky-700 bg-transparent border-slate-200 focus:bg-white"
                           placeholder="88"
                         />
                       </td>
 
-                      {/* Roll Number */}
-                      <td className="py-2 px-2.5">
-                        <Input
-                          value={entry.rollNumber}
-                          onChange={(e) => handleUpdateEntry(index, "rollNumber", e.target.value)}
-                          className="h-8 text-xs font-mono font-semibold text-slate-900 bg-transparent border-slate-200 focus:bg-white"
-                          placeholder="DI13614"
-                        />
-                      </td>
-
-                      {/* Roll Meter (Before) */}
+                      {/* Column 6: Roll Meter (Before) (Auto-populated) */}
                       <td className="py-2 px-2.5">
                         <Input
                           type="number"
@@ -695,7 +733,7 @@ export function LaminationReportClient() {
                         />
                       </td>
 
-                      {/* Net Wt Before */}
+                      {/* Column 7: Net Wt Before (Auto-populated) */}
                       <td className="py-2 px-2.5">
                         <Input
                           type="number"
@@ -709,12 +747,12 @@ export function LaminationReportClient() {
                         />
                       </td>
 
-                      {/* Avg Wt Before (Auto) */}
+                      {/* Column 8: Avg Wt Before (Auto-calculated) */}
                       <td className="py-2 px-2.5 text-right font-medium text-slate-600 bg-slate-50/70">
                         {entry.avgWeightBefore > 0 ? entry.avgWeightBefore.toFixed(1) : "—"}
                       </td>
 
-                      {/* Production Meter (Laminated) */}
+                      {/* Column 9: Production Meter (Laminated Output) */}
                       <td className="py-2 px-2.5 bg-sky-50/40">
                         <Input
                           type="number"
@@ -728,7 +766,7 @@ export function LaminationReportClient() {
                         />
                       </td>
 
-                      {/* Net Wt After (Laminated) */}
+                      {/* Column 10: Net Wt After (Laminated Output) */}
                       <td className="py-2 px-2.5 bg-sky-50/40">
                         <Input
                           type="number"
@@ -742,17 +780,17 @@ export function LaminationReportClient() {
                         />
                       </td>
 
-                      {/* Avg Wt After (Auto-Calculated in Light Blue) */}
+                      {/* Column 11: Avg Wt After (Auto-Calculated in Light Blue) */}
                       <td className="py-2 px-2.5 text-right font-bold text-sky-700 bg-sky-50/90 border-x border-sky-100">
                         {entry.avgWeightAfter > 0 ? entry.avgWeightAfter.toFixed(1) : "—"}
                       </td>
 
-                      {/* Coating g/m (Auto-Calculated) */}
+                      {/* Column 12: Coating g/m (Auto-Calculated in Light Green) */}
                       <td className="py-2 px-2.5 text-right font-bold text-emerald-700 bg-emerald-50/70 border-r border-emerald-100">
                         {entry.coating !== 0 ? entry.coating.toFixed(1) : "—"}
                       </td>
 
-                      {/* Remarks */}
+                      {/* Column 13: Remarks */}
                       <td className="py-2 px-3">
                         <Input
                           value={entry.remarks || ""}
@@ -762,12 +800,12 @@ export function LaminationReportClient() {
                         />
                       </td>
 
-                      {/* Delete */}
+                      {/* Column 14: Delete */}
                       <td className="py-2 px-2 text-center">
                         <button
                           type="button"
                           onClick={() => handleDeleteRow(index)}
-                          className="p-1 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                          className="p-1 rounded-md text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
                           title="Delete row"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
@@ -811,14 +849,7 @@ export function LaminationReportClient() {
         </div>
       </div>
 
-      {/* Modals */}
-      <RollStockPickerModal
-        open={rollPickerOpen}
-        onOpenChange={setRollPickerOpen}
-        onSelectRolls={handleImportRolls}
-        alreadyAddedRollNumbers={entries.map((e) => e.rollNumber).filter(Boolean)}
-      />
-
+      {/* Print Preview Modal */}
       <LaminationReportPrintModal
         open={printModalOpen}
         onOpenChange={setPrintModalOpen}
