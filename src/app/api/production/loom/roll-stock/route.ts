@@ -168,6 +168,7 @@ export async function GET(request: NextRequest) {
         remarks: e.remarks || "",
         date: e.report?.date || e.createdAt.toISOString().slice(0, 10),
         shiftName: e.report?.shiftName || "Day Shift",
+        photoUrl: e.photoUrl || null,
         reportId: e.reportId,
         status: e.report?.status || "LOGGED",
         createdAt: e.createdAt.toISOString(),

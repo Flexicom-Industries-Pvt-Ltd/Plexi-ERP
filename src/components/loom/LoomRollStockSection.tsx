@@ -22,6 +22,7 @@ import {
   Package,
   Maximize2,
   Minimize2,
+  Camera,
 } from "lucide-react";
 import {
   LoomRollStockItem,
@@ -55,6 +56,7 @@ export function LoomRollStockSection() {
 
   // Filter States
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selectedQuality, setSelectedQuality] = useState<string>("ALL");
   const [selectedShift, setSelectedShift] = useState<string>("ALL");
   const [selectedLoom, setSelectedLoom] = useState<string>("ALL");
@@ -65,6 +67,15 @@ export function LoomRollStockSection() {
   const [copiedRoll, setCopiedRoll] = useState<string | null>(null);
   const [printModalOpen, setPrintModalOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [previewPhotoUrl, setPreviewPhotoUrl] = useState<string | null>(null);
+
+  // Debounce search query to eliminate excessive API round-trips
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   // Close fullscreen on Escape
   useEffect(() => {
@@ -81,7 +92,7 @@ export function LoomRollStockSection() {
     setLoading(true);
     try {
       const params = new URLSearchParams();
-      if (search.trim()) params.append("search", search.trim());
+      if (debouncedSearch.trim()) params.append("search", debouncedSearch.trim());
       if (selectedQuality !== "ALL") params.append("quality", selectedQuality);
       if (selectedShift !== "ALL") params.append("shiftName", selectedShift);
       if (selectedLoom !== "ALL") params.append("loomNumber", selectedLoom);
@@ -122,7 +133,7 @@ export function LoomRollStockSection() {
     } finally {
       setLoading(false);
     }
-  }, [search, selectedQuality, selectedShift, selectedLoom, datePreset, dateFrom, dateTo]);
+  }, [debouncedSearch, selectedQuality, selectedShift, selectedLoom, datePreset, dateFrom, dateTo]);
 
   useEffect(() => {
     fetchStockData();
@@ -531,12 +542,22 @@ export function LoomRollStockSection() {
                       {idx + 1}
                     </td>
 
-                    {/* Roll Number with Quick Copy */}
+                    {/* Roll Number with Quick Copy & Evidence Photo Indicator */}
                     <td className="py-2.5 px-3">
                       <div className="inline-flex items-center gap-1.5">
                         <span className="font-mono font-bold text-xs text-slate-900 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200 group-hover:border-slate-300">
                           {r.rollNumber || "—"}
                         </span>
+                        {r.photoUrl && (
+                          <button
+                            type="button"
+                            onClick={() => setPreviewPhotoUrl(r.photoUrl || null)}
+                            className="p-1 text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded border border-emerald-200 transition-colors cursor-pointer"
+                            title="View Physical Roll Evidence Photo"
+                          >
+                            <Camera className="h-3 w-3" />
+                          </button>
+                        )}
                         <button
                           onClick={() => handleCopyRoll(r.rollNumber)}
                           className="p-1 text-slate-400 hover:text-slate-700 rounded-sm opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
@@ -677,6 +698,43 @@ export function LoomRollStockSection() {
           summary={summary}
           filterLabel={filterLabel}
         />
+      )}
+
+      {/* 7. Evidence Photo Preview Modal */}
+      {previewPhotoUrl && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-lg w-full overflow-hidden">
+            <div className="flex items-center justify-between p-4 border-b border-slate-200 bg-slate-50">
+              <div className="flex items-center gap-2">
+                <Camera className="h-4 w-4 text-emerald-600" />
+                <h3 className="text-sm font-bold text-slate-900">Physical Roll Evidence Photo</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPreviewPhotoUrl(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="p-4 bg-slate-900 flex items-center justify-center min-h-[300px]">
+              <img
+                src={previewPhotoUrl}
+                alt="Roll Evidence"
+                className="max-h-[500px] w-auto max-w-full rounded-lg object-contain shadow-md"
+              />
+            </div>
+            <div className="p-3 border-t border-slate-200 flex justify-end bg-slate-50">
+              <button
+                type="button"
+                onClick={() => setPreviewPhotoUrl(null)}
+                className="px-4 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
+              >
+                Close Preview
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
