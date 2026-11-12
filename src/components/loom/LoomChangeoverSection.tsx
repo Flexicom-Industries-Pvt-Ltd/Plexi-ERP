@@ -189,7 +189,9 @@ export function LoomChangeoverSection() {
 
   return (
     <div className="space-y-5">
-      {/* Header & Actions Bar */}
+      {/* DESKTOP VIEW (100% PRESERVED) */}
+      <div className="hidden md:block space-y-5">
+        {/* Header & Actions Bar */}
       <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-2xs">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
@@ -533,6 +535,325 @@ export function LoomChangeoverSection() {
               )}
             </tbody>
           </table>
+        </div>
+      </div>
+      </div>
+
+      {/* MOBILE APP VIEW */}
+      <div className="block md:hidden space-y-3">
+        {/* Mobile Header Card */}
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-2xs space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="h-9 w-9 rounded-xl bg-amber-50 border border-amber-200/60 flex items-center justify-center text-amber-700 shrink-0">
+                <Layers className="h-5 w-5" />
+              </div>
+              <div className="min-w-0">
+                <h1 className="text-base font-extrabold text-slate-900 tracking-tight leading-snug">
+                  Loom Changeovers
+                </h1>
+                <p className="text-[11px] text-slate-500 font-medium">
+                  Recipe Transitions Feed
+                </p>
+              </div>
+            </div>
+
+            {/* Primary Schedule Button */}
+            <button
+              onClick={() => setScheduleModalOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-primary hover:bg-primary/90 rounded-xl transition-all shadow-xs shrink-0 cursor-pointer"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              <span>Schedule</span>
+            </button>
+          </div>
+
+          {/* Secondary Action Toolbar */}
+          <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
+            <span className="text-[11px] text-slate-400 font-medium">
+              {logs.length} changeover event(s)
+            </span>
+
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                onClick={handlePrint}
+                className="p-1.5 text-slate-600 hover:text-slate-900 border border-slate-200 rounded-lg hover:bg-slate-50 shadow-2xs cursor-pointer"
+                title="Print Official Log Sheet"
+              >
+                <Printer className="h-3.5 w-3.5" />
+              </button>
+
+              <button
+                onClick={handleExportExcel}
+                className="p-1.5 text-emerald-700 hover:text-emerald-800 border border-slate-200 rounded-lg hover:bg-slate-50 shadow-2xs cursor-pointer"
+                title="Export Excel"
+              >
+                <FileSpreadsheet className="h-3.5 w-3.5" />
+              </button>
+
+              <button
+                onClick={fetchData}
+                disabled={loading}
+                className="p-1.5 text-slate-600 hover:text-slate-900 border border-slate-200 rounded-lg hover:bg-slate-50 shadow-2xs cursor-pointer"
+                title="Refresh Data"
+              >
+                <RotateCcw className={`h-3.5 w-3.5 ${loading ? "animate-spin text-slate-400" : ""}`} />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Mobile Date & Shift Filter Card */}
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-3 shadow-2xs space-y-2">
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1">
+                <Calendar className="h-2.5 w-2.5 text-slate-400" />
+                <span>Date:</span>
+              </label>
+              <input
+                type="date"
+                value={filterDate}
+                onChange={(e) => setFilterDate(e.target.value)}
+                className="w-full px-2 py-1 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-lg outline-none focus:bg-white"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1">
+                <Clock className="h-2.5 w-2.5 text-slate-400" />
+                <span>Shift:</span>
+              </label>
+              <select
+                value={filterShift}
+                onChange={(e) => setFilterShift(e.target.value)}
+                className="w-full px-2 py-1 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-lg outline-none focus:bg-white truncate cursor-pointer"
+              >
+                <option value="ALL">All Shifts</option>
+                <option value="DAY">Day Shift</option>
+                <option value="NIGHT">Night Shift</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Quick Date Pills */}
+          <div className="flex items-center gap-1.5 pt-1 border-t border-slate-100">
+            <button
+              onClick={() => handleSetQuickDate("ALL")}
+              className={`px-2 py-0.5 text-[10px] font-bold rounded-md border transition-all cursor-pointer ${
+                !filterDate ? "bg-slate-900 text-white border-slate-900" : "bg-slate-50 text-slate-600 border-slate-200"
+              }`}
+            >
+              All Dates
+            </button>
+            <button
+              onClick={() => handleSetQuickDate("TODAY")}
+              className={`px-2 py-0.5 text-[10px] font-bold rounded-md border transition-all cursor-pointer ${
+                filterDate === new Date().toISOString().slice(0, 10)
+                  ? "bg-slate-900 text-white border-slate-900"
+                  : "bg-slate-50 text-slate-600 border-slate-200"
+              }`}
+            >
+              Today
+            </button>
+            <button
+              onClick={() => handleSetQuickDate("YESTERDAY")}
+              className="px-2 py-0.5 text-[10px] font-bold rounded-md border bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100 cursor-pointer"
+            >
+              Yesterday
+            </button>
+          </div>
+        </div>
+
+        {/* Mobile 2x2 KPI Grid */}
+        <div className="grid grid-cols-2 gap-2">
+          <div className="bg-white border border-slate-200/80 rounded-xl p-2.5 shadow-2xs">
+            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Changeovers</div>
+            <div className="mt-0.5 text-xl font-black font-mono text-slate-900">
+              {kpis.totalLogs}
+            </div>
+          </div>
+
+          <div className="bg-white border border-slate-200/80 rounded-xl p-2.5 shadow-2xs">
+            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Downtime</div>
+            <div className="mt-0.5 flex items-baseline gap-1">
+              <span className="text-xl font-black font-mono text-amber-700">
+                {kpis.totalDowntimeMinutes}
+              </span>
+              <span className="text-[10px] font-semibold text-slate-400">mins ({kpis.totalDowntimeHours}h)</span>
+            </div>
+          </div>
+
+          <div className="bg-white border border-slate-200/80 rounded-xl p-2.5 shadow-2xs">
+            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Avg Duration</div>
+            <div className="mt-0.5 flex items-baseline gap-1">
+              <span className="text-xl font-black font-mono text-sky-700">
+                {kpis.avgDowntimeMinutes}
+              </span>
+              <span className="text-[10px] font-semibold text-slate-400">mins / event</span>
+            </div>
+          </div>
+
+          <div className="bg-white border border-slate-200/80 rounded-xl p-2.5 shadow-2xs">
+            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Looms Involved</div>
+            <div className="mt-0.5 flex items-baseline gap-1">
+              <span className="text-xl font-black font-mono text-emerald-700">
+                {kpis.uniqueLoomsCount}
+              </span>
+              <span className="text-[10px] font-semibold text-slate-400">/ {kpis.factoryTotalLooms}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Mobile Search & Status Pills */}
+        <div className="space-y-2">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search loom #, quality, operator..."
+              className="w-full pl-8 pr-7 py-2 text-xs bg-white border border-slate-200 rounded-xl outline-none focus:border-slate-800 shadow-2xs"
+            />
+            {search && (
+              <button
+                onClick={() => setSearch("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+
+          {/* Status Pills */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+            <button
+              onClick={() => setFilterStatus("ALL")}
+              className={`px-2.5 py-1 text-[11px] font-bold rounded-lg border transition-all shrink-0 cursor-pointer ${
+                filterStatus === "ALL"
+                  ? "bg-slate-900 text-white border-slate-900"
+                  : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+              }`}
+            >
+              All Statuses
+            </button>
+            <button
+              onClick={() => setFilterStatus("LOGGED")}
+              className={`px-2.5 py-1 text-[11px] font-bold rounded-lg border transition-all shrink-0 cursor-pointer ${
+                filterStatus === "LOGGED"
+                  ? "bg-emerald-600 text-white border-emerald-600"
+                  : "bg-white text-emerald-700 border-emerald-200 hover:bg-emerald-50"
+              }`}
+            >
+              Logged
+            </button>
+            <button
+              onClick={() => setFilterStatus("CHANGEOVER")}
+              className={`px-2.5 py-1 text-[11px] font-bold rounded-lg border transition-all shrink-0 cursor-pointer ${
+                filterStatus === "CHANGEOVER"
+                  ? "bg-amber-600 text-white border-amber-600"
+                  : "bg-white text-amber-700 border-amber-200 hover:bg-amber-50"
+              }`}
+            >
+              In Changeover
+            </button>
+            <button
+              onClick={() => setFilterStatus("SCHEDULED")}
+              className={`px-2.5 py-1 text-[11px] font-bold rounded-lg border transition-all shrink-0 cursor-pointer ${
+                filterStatus === "SCHEDULED"
+                  ? "bg-sky-600 text-white border-sky-600"
+                  : "bg-white text-sky-700 border-sky-200 hover:bg-sky-50"
+              }`}
+            >
+              Scheduled
+            </button>
+          </div>
+        </div>
+
+        {/* Mobile Cards List */}
+        <div className="space-y-2.5">
+          {loading ? (
+            <div className="bg-white border border-slate-200 rounded-2xl p-8 text-center text-xs text-slate-500 flex flex-col items-center justify-center gap-2 shadow-2xs">
+              <div className="h-5 w-5 border-2 border-slate-300 border-t-slate-800 rounded-full animate-spin" />
+              <span>Loading Changeover Logs...</span>
+            </div>
+          ) : logs.length === 0 ? (
+            <div className="bg-white border border-slate-200 rounded-2xl p-6 text-center space-y-2 shadow-2xs">
+              <div className="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mx-auto">
+                <Layers className="h-5 w-5" />
+              </div>
+              <p className="text-xs font-bold text-slate-700">No Changeover Logs Found</p>
+              <p className="text-[11px] text-slate-400">
+                Changeovers recorded during 2-hour reading sheets will automatically appear here.
+              </p>
+            </div>
+          ) : (
+            logs.map((item, idx) => (
+              <div
+                key={item.id || idx}
+                className="bg-white border border-slate-200/80 rounded-2xl p-3.5 shadow-2xs space-y-2.5"
+              >
+                {/* Card Header: Loom #, Shift, Date, Status */}
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-1 text-xs font-black font-mono rounded-lg border bg-amber-50 text-amber-800 border-amber-300">
+                      #{item.loomNumber}
+                    </span>
+                    <div className="text-xs font-bold text-slate-800 truncate">
+                      {item.operatorName}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span className="px-1.5 py-0.5 text-[10px] font-mono font-medium text-slate-600 bg-slate-100 rounded">
+                      {item.date} • {item.shiftName}
+                    </span>
+                    <span
+                      className={`px-1.5 py-0.5 text-[9px] font-bold uppercase rounded border ${
+                        item.status === "LOGGED"
+                          ? "bg-emerald-50 text-emerald-800 border-emerald-300"
+                          : item.status === "CHANGEOVER"
+                          ? "bg-amber-50 text-amber-800 border-amber-300"
+                          : "bg-sky-50 text-sky-800 border-sky-300"
+                      }`}
+                    >
+                      {item.status}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Quality Transition Box */}
+                <div className="p-2.5 bg-slate-50 border border-slate-100 rounded-xl space-y-1.5">
+                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                    Recipe Transition:
+                  </div>
+                  <div className="flex items-center gap-2 text-xs font-mono font-semibold">
+                    <div className="flex-1 min-w-0 bg-white px-2 py-1.5 rounded-lg border border-slate-200 text-slate-700 truncate" title={item.fromQuality}>
+                      {item.fromQuality || "Previous Quality"}
+                    </div>
+                    <ArrowRight className="h-4 w-4 text-amber-600 shrink-0" />
+                    <div className="flex-1 min-w-0 bg-amber-50/80 px-2 py-1.5 rounded-lg border border-amber-200 text-amber-900 truncate font-bold" title={item.toQuality}>
+                      {item.toQuality || "Target Quality"}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Footer: Downtime & Remarks */}
+                <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-100 text-xs">
+                  <div className="flex items-center gap-1 text-amber-700 font-mono font-bold">
+                    <Clock className="h-3 w-3 text-amber-500" />
+                    <span>{item.downtimeMinutes > 0 ? `${item.downtimeMinutes} mins downtime` : "0 mins"}</span>
+                  </div>
+                  {item.remarks && (
+                    <span className="text-[11px] text-slate-500 truncate max-w-[180px]" title={item.remarks}>
+                      {item.remarks}
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
 
