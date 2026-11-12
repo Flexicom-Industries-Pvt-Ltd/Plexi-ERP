@@ -12,6 +12,7 @@ import {
   AlertCircle,
   Layers,
   ChevronDown,
+  ChevronUp,
   ChevronRight,
   Filter,
   Check,
@@ -167,6 +168,27 @@ export function LoomReadingSheetSection() {
 
   const [resetModalOpen, setResetModalOpen] = useState<boolean>(false);
   const [notification, setNotification] = useState<{ message: string; type: "success" | "error" } | null>(null);
+
+  // Mobile Accordion state for Loom Cards
+  const [expandedLooms, setExpandedLooms] = useState<Set<string>>(new Set());
+
+  const toggleExpandLoom = (key: string) => {
+    setExpandedLooms((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const expandAllLooms = () => {
+    const allKeys = new Set(filteredEntries.map((e) => `${e.loomNumber}-${e.rowSequence || 1}`));
+    setExpandedLooms(allKeys);
+  };
+
+  const collapseAllLooms = () => {
+    setExpandedLooms(new Set());
+  };
 
   // Auth & RBAC State (Time Slot Unlock & Camera vs Upload)
   const [canUploadPhoto, setCanUploadPhoto] = useState<boolean>(true);
@@ -932,7 +954,9 @@ export function LoomReadingSheetSection() {
         </div>
       )}
 
-      {/* Top Header Card */}
+      {/* DESKTOP VIEW (100% PRESERVED) */}
+      <div className="hidden md:block space-y-4">
+        {/* Top Header Card */}
       <div className="bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-5 shadow-2xs">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div>
@@ -2216,6 +2240,755 @@ export function LoomReadingSheetSection() {
               className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg outline-none focus:bg-white focus:border-slate-800 transition-all font-medium"
             />
           </div>
+        </div>
+      </div>
+      </div>
+
+      {/* MOBILE APP VIEW */}
+      <div className="block md:hidden space-y-3">
+        {/* Mobile Header Card */}
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-3.5 shadow-2xs space-y-2.5">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="p-2 bg-primary/10 text-primary rounded-xl font-bold text-xs shrink-0">
+                2H
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <h1 className="text-base font-bold text-slate-900 tracking-tight leading-tight">
+                    2H Reading Sheet
+                  </h1>
+                  <span
+                    className={`px-1.5 py-0.5 text-[9px] font-bold uppercase rounded-full border ${
+                      sheetStatus === "SUBMITTED"
+                        ? "bg-emerald-50 text-emerald-700 border-emerald-300"
+                        : sheetStatus === "APPROVED"
+                        ? "bg-blue-50 text-blue-700 border-blue-300"
+                        : "bg-slate-100 text-slate-700 border-slate-300"
+                    }`}
+                  >
+                    {sheetStatus === "SUBMITTED" ? "✓ Submitted" : sheetStatus === "APPROVED" ? "★ Approved" : "Draft"}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Primary Submit Button */}
+            <button
+              onClick={() => handleSaveSheet("SUBMITTED")}
+              disabled={saving || autoSaving}
+              className="px-3 py-1.5 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs transition-all inline-flex items-center gap-1 cursor-pointer disabled:opacity-50 shrink-0"
+            >
+              <Check className="h-3.5 w-3.5" />
+              <span>{saving && sheetStatus === "SUBMITTED" ? "..." : "Submit"}</span>
+            </button>
+          </div>
+
+          {/* Subtitle & Secondary Action Toolbar */}
+          <div className="flex items-center justify-between pt-1.5 border-t border-slate-100 text-xs">
+            {autoSaving ? (
+              <div className="flex items-center gap-1 text-[11px] text-amber-700 font-medium">
+                <div className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-ping" />
+                <span>Saving...</span>
+              </div>
+            ) : lastAutoSavedAt ? (
+              <div className="flex items-center gap-1 text-[11px] text-emerald-700 font-medium truncate max-w-[150px]">
+                <CheckCircle2 className="h-3 w-3 text-emerald-600 shrink-0" />
+                <span className="truncate">Saved {lastAutoSavedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+              </div>
+            ) : (
+              <span className="text-[11px] text-slate-400 font-medium">Auto-save on</span>
+            )}
+
+            <div className="flex items-center gap-1 shrink-0">
+              <button
+                onClick={() => setBulkModalOpen(true)}
+                className="px-2 py-1 text-[11px] font-semibold rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition-all inline-flex items-center gap-1 shadow-2xs cursor-pointer"
+                title="Assign Operator Range"
+              >
+                <Users className="h-3 w-3 text-slate-500" />
+                <span>+ Range</span>
+              </button>
+
+              <button
+                onClick={() => setPreviewModalOpen(true)}
+                className="p-1.5 text-slate-600 hover:text-slate-900 border border-slate-200 rounded-lg hover:bg-slate-50 shadow-2xs cursor-pointer"
+                title="Print Preview"
+              >
+                <Printer className="h-3.5 w-3.5" />
+              </button>
+
+              <button
+                onClick={() =>
+                  exportLoomReadingSheetExcel({
+                    date: selectedDate,
+                    shiftName: selectedShift,
+                    preparedBy,
+                    checkedBy,
+                    approvedBy,
+                    timeSlots,
+                    initialTimeSlot,
+                    entries: filteredEntries,
+                    kpis: {
+                      totalLooms: 91,
+                      runningLoomsCount: liveTotals.runningLooms,
+                      idleLoomsCount: liveTotals.idleLooms,
+                      totalShiftMeters: liveTotals.totalShiftMeters,
+                      totalShiftKg: liveTotals.totalShiftKg,
+                      totalWastageKg: parseFloat(totalWastageKg) || 0,
+                      averageEfficiency: liveTotals.averageEfficiency,
+                      totalBreakdownMins: liveTotals.totalBreakdownMins,
+                      intervalTotals: [],
+                    },
+                    filterActiveOnly: false,
+                  })
+                }
+                className="p-1.5 text-emerald-700 hover:text-emerald-800 border border-slate-200 rounded-lg hover:bg-slate-50 shadow-2xs cursor-pointer"
+                title="Export Excel"
+              >
+                <FileSpreadsheet className="h-3.5 w-3.5" />
+              </button>
+
+              <button
+                onClick={() => setResetModalOpen(true)}
+                className="p-1.5 text-slate-400 hover:text-rose-600 border border-slate-200 rounded-lg hover:bg-rose-50 shadow-2xs cursor-pointer"
+                title="Reset Sheet"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Mobile Date & Shift Card */}
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-3 shadow-2xs grid grid-cols-2 gap-2">
+          <div>
+            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1">
+              <Calendar className="h-2.5 w-2.5 text-slate-400" />
+              <span>Date:</span>
+            </label>
+            <div className="flex items-center gap-1">
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => handleDateChange(e.target.value)}
+                className="w-full min-w-0 px-2 py-1 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-lg outline-none focus:bg-white"
+              />
+              <button
+                type="button"
+                onClick={() => handleDateChange(new Date().toISOString().slice(0, 10))}
+                className="px-1.5 py-1 text-[10px] font-bold text-slate-600 bg-slate-100 rounded-lg border border-slate-200 shrink-0 cursor-pointer"
+              >
+                Today
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1">
+              <Clock className="h-2.5 w-2.5 text-slate-400" />
+              <span>Shift:</span>
+            </label>
+            <select
+              value={selectedShift}
+              onChange={(e) => handleShiftChange(e.target.value)}
+              className="w-full px-2 py-1 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-lg outline-none focus:bg-white truncate cursor-pointer"
+            >
+              {shiftOptions.map((s) => (
+                <option key={s.id} value={s.name}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Mobile 2x2 KPI Grid */}
+        <div className="grid grid-cols-2 gap-2">
+          <div className="bg-white border border-slate-200/80 rounded-xl p-2.5 shadow-2xs">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Running Looms</div>
+            <div className="mt-0.5 flex items-baseline gap-1">
+              <span className="text-xl font-extrabold text-emerald-700 font-mono">
+                {liveTotals.runningLooms}
+              </span>
+              <span className="text-[11px] text-slate-500 font-medium">/ 91 Active</span>
+            </div>
+          </div>
+
+          <div className="bg-white border border-slate-200/80 rounded-xl p-2.5 shadow-2xs">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Total Shift Output</div>
+            <div className="mt-0.5 flex items-baseline gap-1">
+              <span className="text-xl font-extrabold text-slate-900 font-mono">
+                {liveTotals.totalShiftMeters.toLocaleString()}
+              </span>
+              <span className="text-[11px] text-slate-500 font-medium">m</span>
+            </div>
+          </div>
+
+          <div className="bg-white border border-slate-200/80 rounded-xl p-2.5 shadow-2xs">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 flex items-center justify-between">
+              <span>Avg Efficiency</span>
+              <Gauge className="h-3 w-3 text-sky-500" />
+            </div>
+            <div className="mt-0.5 flex items-baseline gap-1">
+              <span
+                className={`text-xl font-extrabold font-mono ${
+                  liveTotals.averageEfficiency >= 85
+                    ? "text-emerald-600"
+                    : liveTotals.averageEfficiency >= 70
+                    ? "text-amber-600"
+                    : "text-slate-900"
+                }`}
+              >
+                {liveTotals.averageEfficiency}%
+              </span>
+              <span className="text-[10px] text-slate-400 font-medium">speed</span>
+            </div>
+          </div>
+
+          <div className="bg-white border border-slate-200/80 rounded-xl p-2.5 shadow-2xs">
+            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 flex items-center justify-between">
+              <span>Breakdown & Waste</span>
+              <Timer className="h-3 w-3 text-amber-500" />
+            </div>
+            <div className="mt-0.5 flex items-baseline gap-1">
+              <span className="text-xl font-extrabold text-amber-700 font-mono">
+                {liveTotals.totalBreakdownMins}m
+              </span>
+              <span className="text-[10px] text-rose-600 font-medium font-mono">
+                / {totalWastageKg || "0"}kg
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Mobile Progressive Interval Strip */}
+        <div className="bg-sky-50/70 border border-sky-200/70 rounded-xl p-2.5 shadow-2xs">
+          <div className="flex items-center gap-1.5 mb-1.5">
+            <div className="h-1.5 w-1.5 rounded-full bg-sky-500 animate-pulse" />
+            <span className="font-bold tracking-wide uppercase text-[10px] text-sky-900">
+              Progressive Interval Meters:
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-[11px] font-mono no-scrollbar">
+            {timeSlots.map((slot, idx) => {
+              const prog = liveTotals.progressiveTotals[idx] || 0;
+              return (
+                <div key={slot} className="flex items-center gap-1 bg-white px-2 py-0.5 rounded-md border border-sky-200 shrink-0 shadow-2xs">
+                  <span className="text-slate-500 font-medium text-[10px]">{slot}:</span>
+                  <span className="font-bold text-sky-700">{prog.toLocaleString()}m</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Mobile Search & Filters Toolbar */}
+        <div className="space-y-2">
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Search loom #, operator, quality..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-8 pr-7 py-2 text-xs bg-white border border-slate-200 rounded-xl outline-none focus:border-slate-800 shadow-2xs"
+            />
+            <Search className="h-3.5 w-3.5 text-slate-400 absolute left-2.5 top-2.5" />
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm("")}
+                className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+
+          {/* Quick Filter Pills */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+            <button
+              onClick={() => {
+                setFilterActiveOnly(false);
+                setStatusFilter("ALL");
+              }}
+              className={`px-2.5 py-1 text-[11px] font-bold rounded-lg border transition-all shrink-0 cursor-pointer ${
+                statusFilter === "ALL" && !filterActiveOnly
+                  ? "bg-slate-900 text-white border-slate-900"
+                  : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+              }`}
+            >
+              All ({entries.length})
+            </button>
+            <button
+              onClick={() => {
+                setFilterActiveOnly(true);
+                setStatusFilter("ALL");
+              }}
+              className={`px-2.5 py-1 text-[11px] font-bold rounded-lg border transition-all shrink-0 cursor-pointer ${
+                statusFilter === "ALL" && filterActiveOnly
+                  ? "bg-sky-600 text-white border-sky-600"
+                  : "bg-white text-sky-700 border-sky-200 hover:bg-sky-50"
+              }`}
+            >
+              Active ({entries.filter((e) => isLoomActive(e)).length})
+            </button>
+            <button
+              onClick={() => {
+                setFilterActiveOnly(false);
+                setStatusFilter("RUNNING");
+              }}
+              className={`px-2.5 py-1 text-[11px] font-bold rounded-lg border transition-all shrink-0 cursor-pointer ${
+                statusFilter === "RUNNING"
+                  ? "bg-emerald-600 text-white border-emerald-600"
+                  : "bg-white text-emerald-700 border-emerald-200 hover:bg-emerald-50"
+              }`}
+            >
+              Running ({liveTotals.runningLooms})
+            </button>
+            <button
+              onClick={() => {
+                setFilterActiveOnly(false);
+                setStatusFilter("STOP");
+              }}
+              className={`px-2.5 py-1 text-[11px] font-bold rounded-lg border transition-all shrink-0 cursor-pointer ${
+                statusFilter === "STOP"
+                  ? "bg-rose-600 text-white border-rose-600"
+                  : "bg-white text-rose-700 border-rose-200 hover:bg-rose-50"
+              }`}
+            >
+              Stopped ({liveTotals.idleLooms})
+            </button>
+            <button
+              onClick={() => {
+                setFilterActiveOnly(false);
+                setStatusFilter("CHANGEOVER");
+              }}
+              className={`px-2.5 py-1 text-[11px] font-bold rounded-lg border transition-all shrink-0 cursor-pointer ${
+                statusFilter === "CHANGEOVER"
+                  ? "bg-amber-600 text-white border-amber-600"
+                  : "bg-white text-amber-700 border-amber-200 hover:bg-amber-50"
+              }`}
+            >
+              C/O
+            </button>
+          </div>
+
+          {/* Loom Count and Expand / Collapse All buttons */}
+          <div className="flex items-center justify-between text-xs text-slate-500 px-1 pt-1">
+            <span className="font-bold text-slate-800">
+              {filteredEntries.length} Looms Recorded
+            </span>
+            <div className="flex items-center gap-2 font-medium">
+              <button
+                onClick={expandAllLooms}
+                className="text-sky-600 hover:text-sky-800 cursor-pointer font-semibold"
+              >
+                Expand All
+              </button>
+              <span className="text-slate-300">•</span>
+              <button
+                onClick={collapseAllLooms}
+                className="text-slate-600 hover:text-slate-800 cursor-pointer font-semibold"
+              >
+                Collapse All
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Mobile Loom Cards List */}
+        <div className="space-y-2.5">
+          {loading ? (
+            <div className="bg-white border border-slate-200 rounded-2xl p-8 text-center text-xs text-slate-500 flex flex-col items-center justify-center gap-2.5 shadow-2xs">
+              <div className="h-5 w-5 border-2 border-slate-300 border-t-slate-800 rounded-full animate-spin" />
+              <span className="font-medium text-slate-600">Loading Circular Loom 2-Hours Reading Sheet...</span>
+            </div>
+          ) : filteredEntries.length === 0 ? (
+            <div className="bg-white border border-slate-200 rounded-2xl p-6 text-center text-xs text-slate-500 space-y-2 shadow-2xs">
+              <p className="font-medium">No circular looms found matching current filter.</p>
+              {entries.length > 0 && filterActiveOnly && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFilterActiveOnly(false);
+                    setStatusFilter("ALL");
+                  }}
+                  className="px-3 py-1.5 text-xs font-bold text-sky-700 bg-sky-50 hover:bg-sky-100 rounded-xl border border-sky-200 transition-all inline-flex items-center gap-1 cursor-pointer"
+                >
+                  Show All {entries.length} Looms
+                </button>
+              )}
+            </div>
+          ) : (
+            filteredEntries.map((e) => {
+              const rowSeq = e.rowSequence || 1;
+              const cardKey = `${e.loomNumber}-${rowSeq}`;
+              const isExpanded = expandedLooms.has(cardKey);
+              const isSplitRow = rowSeq > 1;
+
+              const isInitialLocked = isSlotLocked(initialTimeSlot);
+              const isR1Locked = isSlotLocked(timeSlots[0] || "10:00");
+              const isR2Locked = isSlotLocked(timeSlots[1] || "12:00");
+              const isR3Locked = isSlotLocked(timeSlots[2] || "14:00");
+              const isR4Locked = isSlotLocked(timeSlots[3] || "16:00");
+              const isR5Locked = isSlotLocked(timeSlots[4] || "18:00");
+              const isR6Locked = isSlotLocked(timeSlots[5] || "20:00");
+
+              const intervals = [
+                { label: `I/R (${initialTimeSlot})`, field: "initialReading" as const, val: e.initialReading, prod: null, locked: isInitialLocked },
+                { label: timeSlots[0] || "10:00", field: "r1Reading" as const, val: e.r1Reading, prod: e.r1Prod, locked: isR1Locked },
+                { label: timeSlots[1] || "12:00", field: "r2Reading" as const, val: e.r2Reading, prod: e.r2Prod, locked: isR2Locked },
+                { label: timeSlots[2] || "14:00", field: "r3Reading" as const, val: e.r3Reading, prod: e.r3Prod, locked: isR3Locked },
+                { label: timeSlots[3] || "16:00", field: "r4Reading" as const, val: e.r4Reading, prod: e.r4Prod, locked: isR4Locked },
+                { label: timeSlots[4] || "18:00", field: "r5Reading" as const, val: e.r5Reading, prod: e.r5Prod, locked: isR5Locked },
+                { label: timeSlots[5] || "20:00", field: "r6Reading" as const, val: e.r6Reading, prod: e.r6Prod, locked: isR6Locked },
+              ];
+
+              return (
+                <div
+                  key={cardKey}
+                  id={`loom-card-${cardKey}`}
+                  className="bg-white border border-slate-200/80 rounded-2xl shadow-2xs overflow-hidden transition-all"
+                >
+                  {/* Collapsed Card Header */}
+                  <div
+                    onClick={() => toggleExpandLoom(cardKey)}
+                    className="p-3 cursor-pointer flex items-center justify-between gap-2 transition-colors hover:bg-slate-50/80"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span
+                        className={`px-2 py-1 text-xs font-black font-mono rounded-lg border shrink-0 ${
+                          e.status === "RUNNING"
+                            ? "bg-emerald-50 text-emerald-800 border-emerald-300"
+                            : e.status === "STOP"
+                            ? "bg-rose-50 text-rose-800 border-rose-300"
+                            : e.status === "CLEANING"
+                            ? "bg-amber-50 text-amber-800 border-amber-300"
+                            : e.status === "CHANGEOVER"
+                            ? "bg-amber-100 text-amber-900 border-amber-400"
+                            : "bg-slate-100 text-slate-700 border-slate-300"
+                        }`}
+                      >
+                        #{e.loomNumber}{isSplitRow ? ` (${rowSeq})` : ""}
+                      </span>
+
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-xs font-bold text-slate-900 truncate">
+                            {e.operatorName || "Unassigned"}
+                          </span>
+                          <span
+                            className={`px-1.5 py-0.2 text-[9px] font-bold rounded uppercase ${
+                              e.status === "RUNNING"
+                                ? "bg-emerald-100 text-emerald-800"
+                                : e.status === "STOP"
+                                ? "bg-rose-100 text-rose-800"
+                                : "bg-slate-100 text-slate-600"
+                            }`}
+                          >
+                            {e.status}
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-slate-500 font-mono truncate">
+                          {e.qualityType || "No Quality"} • {e.size ? `${e.size}mm` : "-"} / {e.denier ? `${e.denier}D` : "-"}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <div className="text-right">
+                        <div className="text-xs font-mono font-black text-blue-900">
+                          {e.totalProduction > 0 ? `${e.totalProduction.toLocaleString()} m` : "0 m"}
+                        </div>
+                        <div className="text-[10px] text-slate-400 font-mono">
+                          {e.efficiencyPct ? `${e.efficiencyPct}% eff` : "0% eff"}
+                        </div>
+                      </div>
+                      {isExpanded ? (
+                        <ChevronUp className="h-4 w-4 text-slate-400" />
+                      ) : (
+                        <ChevronDown className="h-4 w-4 text-slate-400" />
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Expanded Card Body */}
+                  {isExpanded && (
+                    <div className="p-3 pt-0 border-t border-slate-100 space-y-3 bg-slate-50/30">
+                      {/* Operator & Machine Status */}
+                      <div className="pt-2 grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Operator:</label>
+                          <select
+                            value={e.operatorName || ""}
+                            onChange={(ev) => handleEntryChange(e.loomNumber, rowSeq, "operatorName", ev.target.value)}
+                            onBlur={() => triggerAutoSave(true)}
+                            className="w-full px-2 py-1.5 text-xs bg-white border border-slate-200 rounded-lg outline-none font-medium truncate cursor-pointer"
+                          >
+                            <option value="">-- Unassigned --</option>
+                            {(data?.availableOperators || []).map((op) => (
+                              <option key={op.id || op.name} value={op.name}>
+                                {op.name}
+                              </option>
+                            ))}
+                            {e.operatorName &&
+                              !(data?.availableOperators || []).some(
+                                (op) => op.name.toLowerCase() === e.operatorName?.toLowerCase()
+                              ) && <option value={e.operatorName}>{e.operatorName}</option>}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Machine Status:</label>
+                          <select
+                            value={e.status}
+                            onChange={(ev) => handleEntryChange(e.loomNumber, rowSeq, "status", ev.target.value)}
+                            onBlur={() => triggerAutoSave(true)}
+                            className={`w-full text-xs font-bold px-2 py-1.5 rounded-lg border outline-none cursor-pointer ${
+                              e.status === "RUNNING"
+                                ? "bg-emerald-50 text-emerald-800 border-emerald-300"
+                                : e.status === "STOP"
+                                ? "bg-rose-50 text-rose-800 border-rose-300"
+                                : e.status === "CLEANING"
+                                ? "bg-amber-50 text-amber-800 border-amber-300"
+                                : e.status === "CHANGEOVER"
+                                ? "bg-amber-100 text-amber-900 border-amber-400"
+                                : "bg-slate-100 text-slate-600 border-slate-300"
+                            }`}
+                          >
+                            <option value="RUNNING">RUN</option>
+                            <option value="STOP">STOP</option>
+                            <option value="CLEANING">CLEAN</option>
+                            <option value="CHANGEOVER">C/O</option>
+                            <option value="IDLE">IDLE</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Photo & Notes Row */}
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setPhotoModalEntry(e)}
+                          className={`px-2.5 py-1.5 text-xs font-semibold rounded-lg border transition-all inline-flex items-center gap-1.5 shrink-0 cursor-pointer ${
+                            e.photoUrl
+                              ? "bg-emerald-50 text-emerald-700 border-emerald-300"
+                              : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                          }`}
+                        >
+                          {e.photoUrl ? (
+                            <>
+                              <ImageIcon className="h-3.5 w-3.5 text-emerald-600" />
+                              <span>Photo (1)</span>
+                            </>
+                          ) : (
+                            <>
+                              <Camera className="h-3.5 w-3.5 text-slate-400" />
+                              <span>+ Photo</span>
+                            </>
+                          )}
+                        </button>
+
+                        <input
+                          type="text"
+                          value={e.remarks || ""}
+                          onChange={(ev) => handleEntryChange(e.loomNumber, rowSeq, "remarks", ev.target.value)}
+                          onBlur={() => triggerAutoSave(true)}
+                          placeholder="Notes / comments..."
+                          className="flex-1 min-w-0 px-2.5 py-1.5 text-xs bg-white border border-slate-200 rounded-lg outline-none focus:border-slate-800"
+                        />
+
+                        {isSplitRow && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveSplitRow(e.loomNumber, rowSeq)}
+                            className="p-1.5 rounded-lg text-rose-500 bg-rose-50 border border-rose-200 hover:bg-rose-100 cursor-pointer"
+                            title="Remove split row"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Interval Readings Touch Grid */}
+                      <div className="space-y-1.5">
+                        <div className="text-[10px] font-bold uppercase tracking-wider text-slate-600">
+                          Bi-Hourly Meter Readings (Meters)
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          {intervals.map((item, iIdx) => (
+                            <div
+                              key={item.label}
+                              className={`p-2 rounded-xl border ${
+                                item.locked ? "bg-slate-100/70 border-slate-200" : "bg-white border-slate-200/90 shadow-2xs"
+                              } space-y-1`}
+                            >
+                              <div className="flex items-center justify-between text-[10px] font-bold text-slate-500">
+                                <span className="truncate">{item.label}</span>
+                                <div className="flex items-center gap-1 shrink-0">
+                                  {item.locked && <Lock className="h-2.5 w-2.5 text-slate-400" />}
+                                  {item.prod !== null && item.prod > 0 && (
+                                    <span className="text-emerald-700 font-mono font-bold">+{item.prod}m</span>
+                                  )}
+                                </div>
+                              </div>
+                              <input
+                                type="number"
+                                disabled={item.locked}
+                                readOnly={item.locked}
+                                value={item.val !== null && item.val !== undefined ? item.val : ""}
+                                onChange={(ev) =>
+                                  handleEntryChange(
+                                    e.loomNumber,
+                                    rowSeq,
+                                    item.field,
+                                    ev.target.value === "" ? null : parseFloat(ev.target.value)
+                                  )
+                                }
+                                onBlur={() => triggerAutoSave(true)}
+                                placeholder="0"
+                                className={`w-full px-2 py-1 text-xs text-right font-mono font-bold rounded-lg border outline-none transition-all ${
+                                  item.locked
+                                    ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"
+                                    : "bg-slate-50 text-slate-900 border-slate-200 focus:bg-white focus:border-slate-800"
+                                }`}
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Breakdown / Downtime Drawer */}
+                      <div className="p-2.5 bg-amber-50/70 border border-amber-200/80 rounded-xl space-y-2">
+                        <div className="text-[10px] font-bold uppercase tracking-wider text-amber-900 flex items-center justify-between">
+                          <span>Breakdown & Downtime</span>
+                          <Timer className="h-3 w-3 text-amber-600" />
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-[10px] font-medium text-slate-600 mb-0.5">Reason:</label>
+                            <select
+                              value={e.breakdownReason || ""}
+                              onChange={(ev) => handleEntryChange(e.loomNumber, rowSeq, "breakdownReason", ev.target.value || null)}
+                              onBlur={() => triggerAutoSave(true)}
+                              className="w-full text-xs font-semibold px-2 py-1.5 bg-white border border-amber-300 rounded-lg outline-none cursor-pointer"
+                            >
+                              <option value="">No Breakdown</option>
+                              {LOOM_BREAKDOWN_REASONS.map((r) => (
+                                <option key={r} value={r}>
+                                  {r}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-medium text-slate-600 mb-0.5">Downtime (Mins):</label>
+                            <div className="flex items-center gap-1 bg-white px-2 py-1 border border-amber-300 rounded-lg">
+                              <input
+                                type="number"
+                                min="0"
+                                max="720"
+                                value={e.breakdownMinutes !== null && e.breakdownMinutes !== undefined ? e.breakdownMinutes : ""}
+                                onChange={(ev) =>
+                                  handleEntryChange(
+                                    e.loomNumber,
+                                    rowSeq,
+                                    "breakdownMinutes",
+                                    ev.target.value === "" ? 0 : Math.max(0, parseInt(ev.target.value, 10) || 0)
+                                  )
+                                }
+                                onBlur={() => triggerAutoSave(true)}
+                                placeholder="0"
+                                className="w-full text-xs text-right font-mono font-bold text-amber-950 outline-none"
+                              />
+                              <span className="text-[10px] font-bold text-amber-700">m</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Changeover Target Quality */}
+                        {(e.breakdownReason === "Change Over" || e.changeoverTargetQuality) && (
+                          <div className="pt-1.5 border-t border-amber-200/60 space-y-1.5">
+                            <label className="block text-[10px] font-bold text-amber-900">Target Changeover Quality:</label>
+                            <UniversalQualityInput
+                              value={e.changeoverTargetQuality || ""}
+                              onChange={(newCode) => {
+                                handleEntryChange(e.loomNumber, rowSeq, "changeoverTargetQuality", newCode || null);
+                                triggerAutoSave(true);
+                              }}
+                              options={data?.availableQualities || []}
+                              placeholder="Select new quality..."
+                              compact={true}
+                              inputClassName="h-8 text-xs font-bold text-amber-950 border-amber-300 bg-white"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleAddSplitRow(e.loomNumber)}
+                              className="w-full py-1.5 px-2 text-xs font-bold text-amber-900 bg-amber-100 hover:bg-amber-200 border border-amber-300 rounded-lg transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                            >
+                              <Plus className="h-3.5 w-3.5" />
+                              <span>Add Split Row for New Quality</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Mobile Official Sign-off Card */}
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-2xs space-y-3">
+          <div className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+            Official Shift Approvals
+          </div>
+          <div className="space-y-2">
+            <div>
+              <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">Prepared By:</label>
+              <input
+                type="text"
+                value={preparedBy}
+                onChange={(e) => setPreparedBy(e.target.value)}
+                onBlur={() => triggerAutoSave(true)}
+                placeholder="Loom Shed In-Charge"
+                className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg outline-none font-medium focus:bg-white"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">Checked By:</label>
+              <input
+                type="text"
+                value={checkedBy}
+                onChange={(e) => setCheckedBy(e.target.value)}
+                onBlur={() => triggerAutoSave(true)}
+                placeholder="Shift Supervisor"
+                className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg outline-none font-medium focus:bg-white"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">Approved By:</label>
+              <input
+                type="text"
+                value={approvedBy}
+                onChange={(e) => setApprovedBy(e.target.value)}
+                onBlur={() => triggerAutoSave(true)}
+                placeholder="Plant Manager"
+                className="w-full px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg outline-none font-medium focus:bg-white"
+              />
+            </div>
+          </div>
+
+          <button
+            onClick={() => handleSaveSheet("SUBMITTED")}
+            disabled={saving || autoSaving}
+            className="w-full py-2.5 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs transition-all flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer"
+          >
+            <Check className="h-4 w-4" />
+            <span>{saving && sheetStatus === "SUBMITTED" ? "Submitting..." : "Submit Reading Sheet"}</span>
+          </button>
         </div>
       </div>
 
