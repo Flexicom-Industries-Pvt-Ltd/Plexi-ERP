@@ -817,17 +817,9 @@ export function TapePlantReportSection({ shifts }: TapePlantReportSectionProps) 
         <div className="bg-white rounded-xl border border-slate-200 p-3.5 shadow-2xs space-y-3">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              <div className="p-2 bg-slate-900 text-cyan-400 rounded-lg">
-                <BarChart3 className="h-4 w-4" />
-              </div>
-              <div>
-                <h3 className="text-sm font-bold text-slate-900 tracking-tight">
-                  Tape Plant Reports
-                </h3>
-                <span className="text-[10px] text-slate-500 font-medium">
-                  {dateFrom} to {dateTo}
-                </span>
-              </div>
+              <span className="text-xs font-mono font-semibold text-slate-800 bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200">
+                {dateFrom} to {dateTo}
+              </span>
             </div>
 
             <div className="flex items-center gap-1.5">
