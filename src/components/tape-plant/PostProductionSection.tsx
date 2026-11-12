@@ -15,6 +15,8 @@ import {
   ClipboardList,
   RefreshCw,
   Printer,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { RecipeQualityBadge } from "./RecipeQualityBadge";
 import { OperatorSelect } from "./OperatorSelect";
@@ -57,6 +59,7 @@ export function PostProductionSection({ date, shiftId, shiftName }: PostProducti
   const [operatorId, setOperatorId] = useState("");
   const [entries, setEntries] = useState<RecipePostProductionEntry[]>([]);
   const [showPrintModal, setShowPrintModal] = useState(false);
+  const [expandedRuns, setExpandedRuns] = useState<Set<number>>(new Set());
 
   const fetchPostProductionData = useCallback(
     async (showSyncToast = false) => {
@@ -183,6 +186,26 @@ export function PostProductionSection({ date, shiftId, shiftName }: PostProducti
     });
   };
 
+  const toggleRunExpanded = (idx: number) => {
+    setExpandedRuns((prev) => {
+      const next = new Set(prev);
+      if (next.has(idx)) {
+        next.delete(idx);
+      } else {
+        next.add(idx);
+      }
+      return next;
+    });
+  };
+
+  const handleExpandAll = () => {
+    setExpandedRuns(new Set(entries.map((_, i) => i)));
+  };
+
+  const handleCollapseAll = () => {
+    setExpandedRuns(new Set());
+  };
+
   // Aggregated shift summary statistics
   const totalPlannedKg = entries.reduce((acc, e) => acc + (Number(e.plannedProductionKg) || 0), 0);
   const totalDoneKg = entries.reduce((acc, e) => acc + (Number(e.productionDoneKg) || 0), 0);
@@ -244,81 +267,116 @@ export function PostProductionSection({ date, shiftId, shiftName }: PostProducti
   }
 
   return (
-    <div className="space-y-6 w-full min-w-0 max-w-full">
-      {/* Top Action Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm min-w-0">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-purple-50 text-purple-600 rounded-xl border border-purple-100">
-            <PackageCheck className="h-5 w-5" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-base font-bold text-slate-900">5. Post Production Entry</h2>
-              <span
-                className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border ${
-                  status === "SUBMITTED"
-                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                    : "bg-blue-50 text-blue-700 border-blue-200"
-                }`}
-              >
-                {status === "SUBMITTED" ? "SUBMITTED" : "SAVED"}
-              </span>
+    <div className="space-y-4 md:space-y-6 w-full min-w-0 max-w-full">
+      {/* ── Top Header & Action Bar ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-slate-200 shadow-sm min-w-0">
+        <div className="flex items-center justify-between sm:justify-start gap-3 w-full sm:w-auto">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2.5 bg-purple-50 text-purple-600 rounded-xl border border-purple-100 shrink-0">
+              <PackageCheck className="h-5 w-5" />
             </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-bold text-slate-900 leading-tight">5. Post Production Entry</h2>
+                <span
+                  className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border ${
+                    status === "SUBMITTED"
+                      ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                      : "bg-blue-50 text-blue-700 border-blue-200"
+                  }`}
+                >
+                  {status === "SUBMITTED" ? "SUBMITTED" : "SAVED"}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-500 hidden sm:block">Actual production reconciliation, waste tracking &amp; efficiency</p>
+            </div>
+          </div>
+
+          {/* Mobile Top Actions (< sm) */}
+          <div className="sm:hidden flex items-center gap-1.5">
+            <button
+              type="button"
+              disabled={entries.length === 0}
+              onClick={() => setShowPrintModal(true)}
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-lg shadow-xs transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
+              title="Print Sheet"
+            >
+              <Printer className="h-3.5 w-3.5 text-slate-600" />
+              <span>Print</span>
+            </button>
+
+            <button
+              type="button"
+              disabled={saving || entries.length === 0}
+              onClick={() => handleSave("SUBMITTED")}
+              className="inline-flex items-center gap-1 px-3 py-1.5 bg-primary hover:bg-primary/90 text-white text-xs font-semibold rounded-lg shadow-sm transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
+            >
+              {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle className="h-3.5 w-3.5" />}
+              <span>Submit</span>
+            </button>
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5">
-          <OperatorSelect
-            value={operatorName}
-            operatorId={operatorId}
-            onChange={(name, id) => {
-              setOperatorName(name);
-              setOperatorId(id || "");
-            }}
-            section="TAPE_PLANT"
-          />
+        <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap w-full sm:w-auto">
+          <div className="flex-1 sm:flex-none min-w-[200px]">
+            <OperatorSelect
+              value={operatorName}
+              operatorId={operatorId}
+              onChange={(name, id) => {
+                setOperatorName(name);
+                setOperatorId(id || "");
+              }}
+              section="TAPE_PLANT"
+            />
+          </div>
 
-          {/* Auto-save Status Indicator */}
-          {autoSaving ? (
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 text-slate-600 border border-slate-200 text-xs font-medium rounded-lg h-8">
-              <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
-              <span className="hidden sm:inline">Auto-saving...</span>
-            </div>
-          ) : lastAutoSavedAt ? (
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-medium rounded-lg h-8">
-              <CheckCircle className="h-3.5 w-3.5 text-emerald-600" />
-              <span className="hidden sm:inline">Auto-saved {lastAutoSavedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</span>
-            </div>
-          ) : null}
+          {/* Desktop Auto-save Status Indicator */}
+          <div className="hidden sm:inline-flex">
+            {autoSaving ? (
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 text-slate-600 border border-slate-200 text-xs font-medium rounded-lg h-8">
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+                <span>Auto-saving...</span>
+              </div>
+            ) : lastAutoSavedAt ? (
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-medium rounded-lg h-8">
+                <CheckCircle className="h-3.5 w-3.5 text-emerald-600" />
+                <span>
+                  Auto-saved {lastAutoSavedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                </span>
+              </div>
+            ) : null}
+          </div>
 
           <button
             type="button"
             disabled={loading || refreshing || saving}
             onClick={() => fetchPostProductionData(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition-all active:scale-95 disabled:opacity-50 h-8 cursor-pointer"
+            className="hidden sm:inline-flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition-all active:scale-95 disabled:opacity-50 h-8 cursor-pointer"
             title="Reload latest recipes from Planning"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin text-primary" : ""}`} />
-            Sync Planning
+            <span>Sync Planning</span>
           </button>
+
           <button
             type="button"
             disabled={entries.length === 0}
             onClick={() => setShowPrintModal(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold rounded-lg transition-all active:scale-95 disabled:opacity-50 h-8 cursor-pointer shadow-xs"
+            className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold rounded-lg transition-all active:scale-95 disabled:opacity-50 h-8 cursor-pointer shadow-xs"
             title="Print Post-Production Entry Sheet"
           >
             <Printer className="h-3.5 w-3.5 text-slate-600" />
             <span>Print Sheet</span>
           </button>
+
           <button
             type="button"
             disabled={saving || entries.length === 0}
             onClick={() => handleSave("SUBMITTED")}
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary hover:bg-primary/90 text-white text-xs font-semibold rounded-lg shadow-sm transition-all active:scale-95 disabled:opacity-50 h-8 cursor-pointer"
+            className="hidden sm:inline-flex items-center gap-1.5 px-4 py-2 bg-primary hover:bg-primary/90 text-white text-xs font-semibold rounded-lg shadow-sm transition-all active:scale-95 disabled:opacity-50 h-8 cursor-pointer"
           >
             {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle className="h-3.5 w-3.5" />}
-            Submit Output
+            <span>Submit Output</span>
           </button>
         </div>
       </div>
@@ -340,80 +398,265 @@ export function PostProductionSection({ date, shiftId, shiftName }: PostProducti
               type="button"
               disabled={refreshing}
               onClick={() => fetchPostProductionData(true)}
-              className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary hover:bg-primary/90 text-white text-xs font-semibold rounded-lg shadow-sm transition-all"
+              className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary hover:bg-primary/90 text-white text-xs font-semibold rounded-lg shadow-sm transition-all cursor-pointer"
             >
               <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
-              Refresh from Planning
+              <span>Refresh from Planning</span>
             </button>
           </div>
         </div>
       ) : (
         <>
-          {/* Shift Aggregate Summary KPI Cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-            <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-sm">
+          {/* Shift Aggregate Summary KPI Cards (Responsive for both Mobile & Desktop) */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
+            <div className="p-2.5 sm:p-3 bg-white rounded-xl border border-slate-200 shadow-sm">
               <div className="flex items-center justify-between text-slate-500 mb-1">
-                <span className="text-[11px] font-bold uppercase">Total Planned</span>
+                <span className="text-[10px] sm:text-[11px] font-bold uppercase">Planned</span>
                 <Scale className="h-3.5 w-3.5 text-slate-400" />
               </div>
-              <div className="text-base font-extrabold text-slate-900 font-mono">
-                {totalPlannedKg.toLocaleString()} <span className="text-xs font-medium text-slate-400">KG</span>
+              <div className="text-sm sm:text-base font-extrabold text-slate-900 font-mono">
+                {totalPlannedKg.toLocaleString()} <span className="text-[10px] sm:text-xs font-medium text-slate-400">KG</span>
               </div>
             </div>
 
-            <div className="p-3 bg-blue-50/50 rounded-xl border border-blue-200 shadow-sm">
+            <div className="p-2.5 sm:p-3 bg-blue-50/50 rounded-xl border border-blue-200 shadow-sm">
               <div className="flex items-center justify-between text-blue-700 mb-1">
-                <span className="text-[11px] font-extrabold uppercase">Total Done</span>
+                <span className="text-[10px] sm:text-[11px] font-extrabold uppercase">Done</span>
                 <TrendingUp className="h-3.5 w-3.5 text-blue-500" />
               </div>
-              <div className="text-base font-extrabold text-blue-950 font-mono">
-                {totalDoneKg.toLocaleString()} <span className="text-xs font-medium text-blue-600">KG</span>
+              <div className="text-sm sm:text-base font-extrabold text-blue-950 font-mono">
+                {totalDoneKg.toLocaleString()} <span className="text-[10px] sm:text-xs font-medium text-blue-600">KG</span>
               </div>
             </div>
 
-            <div className="p-3 bg-amber-50/50 rounded-xl border border-amber-200 shadow-sm">
+            <div className="p-2.5 sm:p-3 bg-amber-50/50 rounded-xl border border-amber-200 shadow-sm">
               <div className="flex items-center justify-between text-amber-700 mb-1">
-                <span className="text-[11px] font-bold uppercase">Total Gap</span>
+                <span className="text-[10px] sm:text-[11px] font-bold uppercase">Gap</span>
                 <AlertCircle className="h-3.5 w-3.5 text-amber-500" />
               </div>
-              <div className="text-base font-extrabold text-amber-900 font-mono">
-                {totalGapKg.toLocaleString()} <span className="text-xs font-medium text-amber-600">KG</span>
+              <div className="text-sm sm:text-base font-extrabold text-amber-900 font-mono">
+                {totalGapKg.toLocaleString()} <span className="text-[10px] sm:text-xs font-medium text-amber-600">KG</span>
               </div>
             </div>
 
-            <div className="p-3 bg-red-50/50 rounded-xl border border-red-200 shadow-sm">
+            <div className="p-2.5 sm:p-3 bg-red-50/50 rounded-xl border border-red-200 shadow-sm">
               <div className="flex items-center justify-between text-red-700 mb-1">
-                <span className="text-[11px] font-extrabold uppercase">Total Waste</span>
+                <span className="text-[10px] sm:text-[11px] font-extrabold uppercase">Waste</span>
                 <Percent className="h-3.5 w-3.5 text-red-500" />
               </div>
-              <div className="text-base font-extrabold text-red-950 font-mono">
-                {totalWasteKg.toLocaleString()} <span className="text-xs font-medium text-red-600">KG</span>
+              <div className="text-sm sm:text-base font-extrabold text-red-950 font-mono">
+                {totalWasteKg.toLocaleString()} <span className="text-[10px] sm:text-xs font-medium text-red-600">KG</span>
               </div>
             </div>
 
-            <div className="p-3 bg-emerald-50/50 rounded-xl border border-emerald-200 shadow-sm">
+            <div className="p-2.5 sm:p-3 bg-emerald-50/50 rounded-xl border border-emerald-200 shadow-sm">
               <div className="flex items-center justify-between text-emerald-800 mb-1">
-                <span className="text-[11px] font-extrabold uppercase">Net Output</span>
+                <span className="text-[10px] sm:text-[11px] font-extrabold uppercase">Net Output</span>
                 <PackageCheck className="h-3.5 w-3.5 text-emerald-600" />
               </div>
-              <div className="text-base font-black text-emerald-950 font-mono">
-                {totalNetKg.toLocaleString()} <span className="text-xs font-semibold text-emerald-700">KG</span>
+              <div className="text-sm sm:text-base font-black text-emerald-950 font-mono">
+                {totalNetKg.toLocaleString()} <span className="text-[10px] sm:text-xs font-semibold text-emerald-700">KG</span>
               </div>
             </div>
 
-            <div className="p-3 bg-indigo-50/50 rounded-xl border border-indigo-200 shadow-sm">
+            <div className="p-2.5 sm:p-3 bg-indigo-50/50 rounded-xl border border-indigo-200 shadow-sm col-span-2 sm:col-span-1">
               <div className="flex items-center justify-between text-indigo-700 mb-1">
-                <span className="text-[11px] font-bold uppercase">Efficiency</span>
+                <span className="text-[10px] sm:text-[11px] font-bold uppercase">Efficiency</span>
                 <Layers className="h-3.5 w-3.5 text-indigo-500" />
               </div>
-              <div className="text-base font-extrabold text-indigo-950 font-mono">
+              <div className="text-sm sm:text-base font-extrabold text-indigo-950 font-mono">
                 {overallEfficiency}%
               </div>
             </div>
           </div>
 
-          {/* Per-Recipe Output Cards / Table */}
-          <div className="space-y-4">
+          {/* ── Mobile Toolbar (Expand All / Collapse All on < md) ── */}
+          <div className="flex md:hidden items-center justify-between p-3 bg-white rounded-xl border border-slate-200 shadow-xs text-xs font-semibold text-slate-600">
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-slate-900">{entries.length}</span>
+              <span>Recipe Runs</span>
+              <button
+                type="button"
+                disabled={loading || refreshing || saving}
+                onClick={() => fetchPostProductionData(true)}
+                className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-[11px] font-semibold transition-colors cursor-pointer ml-1"
+                title="Sync from Planning"
+              >
+                <RefreshCw className={`h-3 w-3 ${refreshing ? "animate-spin text-primary" : ""}`} />
+                <span>Sync</span>
+              </button>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleExpandAll}
+                className="text-xs text-primary hover:underline font-semibold cursor-pointer"
+              >
+                Expand All
+              </button>
+              <span className="text-slate-300">•</span>
+              <button
+                type="button"
+                onClick={handleCollapseAll}
+                className="text-xs text-slate-500 hover:underline font-medium cursor-pointer"
+              >
+                Collapse All
+              </button>
+            </div>
+          </div>
+
+          {/* ── Mobile Recipe Output Cards (< md) ── */}
+          <div className="flex md:hidden flex-col gap-3">
+            {entries.map((entry, index) => {
+              const isExpanded = expandedRuns.has(index);
+              const planned = Number(entry.plannedProductionKg) || 0;
+              const done = Number(entry.productionDoneKg) || 0;
+              const gap = planned - done;
+              const waste = Number(entry.wasteKg) || 0;
+              const net = done - waste;
+
+              return (
+                <div
+                  key={entry.id || `entry-mobile-${index}`}
+                  id={`recipe-run-card-${index}`}
+                  className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden transition-all"
+                >
+                  {/* Card Header (Tap to expand/collapse) */}
+                  <div
+                    onClick={() => toggleRunExpanded(index)}
+                    className={`flex items-center justify-between p-3 cursor-pointer select-none transition-colors ${
+                      isExpanded ? "bg-slate-50/80 border-b border-slate-200" : "bg-white hover:bg-slate-50/50"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                      <span className="inline-flex items-center justify-center px-2 py-0.5 rounded text-[11px] font-bold bg-purple-100 text-purple-900 shrink-0">
+                        Run #{index + 1}
+                      </span>
+                      <RecipeQualityBadge value={entry.recipeQuality} />
+                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full">
+                        <span>Done:</span>
+                        <strong className="text-blue-700 font-mono">{done.toLocaleString()} KG</strong>
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <div className="p-1 text-slate-400">
+                        {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Card Body (When expanded) */}
+                  {isExpanded && (
+                    <div className="p-3.5 space-y-3 bg-white">
+                      {/* Section 1: Target vs Actual Output */}
+                      <div className="rounded-xl border border-blue-200/80 bg-blue-50/20 p-3 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-blue-900 tracking-tight">Production Output</span>
+                          <span className="text-[10px] font-semibold text-blue-700 bg-blue-100/70 px-1.5 py-0.5 rounded border border-blue-200">
+                            KG
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="space-y-0.5">
+                            <label className="text-[10px] font-bold text-slate-500 block truncate">Planned Target</label>
+                            <div className="h-8 px-2.5 flex items-center justify-end font-mono font-bold text-xs text-slate-700 bg-slate-100 border border-slate-200 rounded">
+                              {planned.toLocaleString()} KG
+                            </div>
+                          </div>
+
+                          <div className="space-y-0.5">
+                            <label className="text-[10px] font-bold text-blue-700 block truncate">
+                              Production Done <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                              type="number"
+                              inputMode="decimal"
+                              value={entry.productionDoneKg}
+                              placeholder="0.0"
+                              onChange={(e) => updateEntryField(index, "productionDoneKg", e.target.value)}
+                              className="w-full h-8 px-2.5 text-xs font-extrabold text-blue-900 bg-white border border-blue-300 rounded focus:ring-2 focus:ring-primary outline-none text-right shadow-xs"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Section 2: Gap & Net Yield */}
+                      <div className="rounded-xl border border-emerald-200/80 bg-emerald-50/20 p-3 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-emerald-900 tracking-tight">Yield &amp; Balance</span>
+                          <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-100/70 px-1.5 py-0.5 rounded border border-emerald-200">
+                            Net
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="space-y-0.5">
+                            <label className="text-[10px] font-bold text-slate-500 block truncate">Gap (Planned - Done)</label>
+                            <div
+                              className={`h-8 px-2.5 flex items-center justify-end font-mono font-extrabold text-xs bg-white border rounded ${
+                                gap <= 0 ? "text-emerald-700 border-emerald-300" : "text-amber-700 border-amber-200"
+                              }`}
+                            >
+                              {gap.toLocaleString()} KG
+                            </div>
+                          </div>
+
+                          <div className="space-y-0.5">
+                            <label className="text-[10px] font-bold text-emerald-800 block truncate">Net Output (Done - Waste)</label>
+                            <div className="h-8 px-2.5 flex items-center justify-end font-mono font-black text-xs text-emerald-800 bg-white border border-emerald-300 rounded shadow-xs">
+                              {net.toLocaleString()} KG
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Section 3: Wastage Log */}
+                      <div className="rounded-xl border border-rose-200/80 bg-rose-50/20 p-3 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-rose-900 tracking-tight">Wastage &amp; Losses</span>
+                          <span className="text-[10px] font-semibold text-rose-700 bg-rose-100/70 px-1.5 py-0.5 rounded border border-rose-200">
+                            Loss
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="space-y-0.5">
+                            <label className="text-[10px] font-bold text-rose-800 block truncate">Waste (KG)</label>
+                            <input
+                              type="number"
+                              inputMode="decimal"
+                              value={entry.wasteKg}
+                              placeholder="0.0"
+                              onChange={(e) => updateEntryField(index, "wasteKg", e.target.value)}
+                              className="w-full h-8 px-2.5 text-xs font-extrabold text-rose-900 bg-white border border-rose-300 rounded focus:ring-2 focus:ring-rose-500 outline-none text-right shadow-xs"
+                            />
+                          </div>
+
+                          <div className="space-y-0.5">
+                            <label className="text-[10px] font-bold text-slate-700 block truncate">Waste %</label>
+                            <input
+                              type="number"
+                              inputMode="decimal"
+                              step="0.01"
+                              value={entry.wastePercent}
+                              placeholder="%"
+                              onChange={(e) => updateEntryField(index, "wastePercent", e.target.value)}
+                              className="w-full h-8 px-2.5 text-xs font-semibold text-slate-800 bg-slate-50 border border-slate-200 rounded focus:bg-white focus:ring-1 focus:ring-primary outline-none text-right"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* ── Desktop Dense Per-Recipe Output Cards (md+) ── */}
+          <div className="hidden md:flex md:flex-col md:space-y-4">
             {entries.map((entry, index) => {
               const planned = Number(entry.plannedProductionKg) || 0;
               const done = Number(entry.productionDoneKg) || 0;
@@ -423,7 +666,7 @@ export function PostProductionSection({ date, shiftId, shiftName }: PostProducti
 
               return (
                 <div
-                  key={entry.id || `entry-${index}`}
+                  key={entry.id || `entry-desktop-${index}`}
                   className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden transition-all hover:border-slate-300"
                 >
                   {/* Header Row for Recipe Run */}
