@@ -1156,27 +1156,6 @@ export function LoomReadingSheetSection() {
         </div>
       </div>
 
-      {/* Policy Banner for Auto-Lock & RBAC Override */}
-      <div className="bg-slate-50/80 border border-slate-200/80 rounded-xl px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 text-xs">
-        <div className="flex items-center gap-2 text-slate-600">
-          <Info className="h-4 w-4 text-sky-600 shrink-0" />
-          <span>
-            <strong className="text-slate-800">Policy:</strong> Bi-hourly readings auto-lock 120 minutes past window start. Authorized roles can unlock expired slots globally for all factory operators.
-          </span>
-        </div>
-        {canUnlockTimeSlots ? (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-bold rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-300">
-            <Unlock className="h-3 w-3 text-emerald-600" />
-            <span>Time Slot Unlock Authority Active</span>
-          </span>
-        ) : (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-medium rounded-lg bg-slate-100 text-slate-500 border border-slate-200">
-            <Lock className="h-3 w-3 text-slate-400" />
-            <span>Auto-Lock Enforced</span>
-          </span>
-        )}
-      </div>
-
       {/* Live KPI Cards Strip */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-2xs">
