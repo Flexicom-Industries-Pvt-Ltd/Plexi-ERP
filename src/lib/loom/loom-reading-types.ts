@@ -47,6 +47,8 @@ export interface LoomReadingEntryItem {
   efficiencyPct?: number | null;
   status: "RUNNING" | "STOP" | "CLEANING" | "CHANGEOVER" | "IDLE" | string;
   remarks: string | null;
+  photoUrl?: string | null;
+  intervalPhotos?: Record<string, string> | null;
 }
 
 export interface IntervalKpiSummary {

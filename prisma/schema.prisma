@@ -2050,6 +2050,8 @@ model LoomReadingEntry {
   efficiencyPct   Float?           @default(0) // Calculated Efficiency %
   status          String           @default("RUNNING") // "RUNNING" | "STOP" | "CLEANING" | "CHANGEOVER"
   remarks         String?          // e.g. "STOP", "Cleaning", "Winder emery cheese"
+  photoUrl        String?          // Physical meter counter evidence photo URL
+  intervalPhotos  Json?            // Interval-specific meter photos mapping: { "10:00": url, ... }
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 

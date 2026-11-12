@@ -24,6 +24,11 @@ import {
   Trash2,
   Maximize2,
   Minimize2,
+  Camera,
+  Image as ImageIcon,
+  Lock,
+  Unlock,
+  Info,
 } from "lucide-react";
 import {
   LoomReadingEntryItem,
@@ -37,6 +42,8 @@ import { exportLoomReadingSheetExcel } from "@/lib/loom/loom-reading-export";
 import { printLoomReadingSheet } from "@/lib/loom/print-loom-reading";
 import { LoomReadingPrintPreviewModal } from "./LoomReadingPrintPreviewModal";
 import { UniversalQualityInput } from "@/components/ui/UniversalQualityInput";
+import { PhotoEvidenceModal } from "@/components/tape-plant/PhotoEvidenceModal";
+import { isTimeSlotLocked } from "@/lib/tape-plant/telemetry-time-slots";
 
 interface AvailableShift {
   id: string;
@@ -161,6 +168,39 @@ export function LoomReadingSheetSection() {
   const [resetModalOpen, setResetModalOpen] = useState<boolean>(false);
   const [notification, setNotification] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
+  // Auth & RBAC State (Time Slot Unlock & Camera vs Upload)
+  const [canUploadPhoto, setCanUploadPhoto] = useState<boolean>(true);
+  const [canCapturePhoto, setCanCapturePhoto] = useState<boolean>(true);
+  const [canUnlockTimeSlots, setCanUnlockTimeSlots] = useState<boolean>(false);
+  const [userRole, setUserRole] = useState<string>("");
+  const [unlockedSlots, setUnlockedSlots] = useState<Set<string>>(new Set());
+  const [photoModalEntry, setPhotoModalEntry] = useState<LoomReadingEntryItem | null>(null);
+
+  const refreshUserPermissions = useCallback(() => {
+    fetch("/api/auth/session", { cache: "no-store", headers: { Pragma: "no-cache", "Cache-Control": "no-cache" } })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((session) => {
+        if (!session?.user) return;
+        setUserRole(session.user.role || "");
+        setCanUploadPhoto(Boolean(session.user.canUploadPhoto));
+        setCanCapturePhoto(session.user.canCapturePhoto !== undefined ? Boolean(session.user.canCapturePhoto) : true);
+        setCanUnlockTimeSlots(Boolean(session.user.canUnlockTimeSlots));
+      })
+      .catch((err) => {
+        console.warn("Could not determine user session for RBAC:", err);
+      });
+  }, []);
+
+  useEffect(() => {
+    refreshUserPermissions();
+  }, [refreshUserPermissions]);
+
+  useEffect(() => {
+    if (photoModalEntry) {
+      refreshUserPermissions();
+    }
+  }, [photoModalEntry, refreshUserPermissions]);
+
   const showNotification = (message: string, type: "success" | "error" = "success") => {
     setNotification({ message, type });
     setTimeout(() => setNotification(null), 4000);
@@ -247,6 +287,8 @@ export function LoomReadingSheetSection() {
         remarks: json.sheet?.remarks || "",
         status: json.sheet?.status || "DRAFT",
         shiftHours: json.sheet?.shiftHours || 12,
+        timeSlots: json.sheet?.timeSlots,
+        initialTimeSlot: json.sheet?.initialTimeSlot,
       };
       latestPayloadRef.current = initialPayload;
       lastSavedPayloadRef.current = JSON.stringify(initialPayload);
@@ -328,6 +370,8 @@ export function LoomReadingSheetSection() {
       remarks: sheetRemarks,
       status: sheetStatus,
       shiftHours: data?.sheet?.shiftHours || 12,
+      timeSlots: data?.sheet?.timeSlots,
+      initialTimeSlot: data?.sheet?.initialTimeSlot,
     };
 
     latestPayloadRef.current = payload;
@@ -648,6 +692,8 @@ export function LoomReadingSheetSection() {
         remarks: sheetRemarks,
         status: targetStatus,
         shiftHours: data?.sheet?.shiftHours || 12,
+        timeSlots: data?.sheet?.timeSlots,
+        initialTimeSlot: data?.sheet?.initialTimeSlot,
       };
 
       const res = await fetch("/api/production/loom/reading-sheet", {
@@ -778,6 +824,93 @@ export function LoomReadingSheetSection() {
 
     return result;
   }, [data]);
+
+  const currentShiftId = useMemo(() => {
+    const active = shiftOptions.find((s) => s.name === selectedShift);
+    return active?.id || selectedShift;
+  }, [shiftOptions, selectedShift]);
+
+  const fetchUnlockedSlots = useCallback(() => {
+    if (!selectedDate || !currentShiftId) return;
+    fetch(
+      `/api/production/telemetry/unlock?module=LOOM_READING_SHEET&date=${selectedDate}&shiftId=${encodeURIComponent(
+        currentShiftId
+      )}`,
+      { cache: "no-store" }
+    )
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.unlockedSlots && Array.isArray(data.unlockedSlots)) {
+          setUnlockedSlots(new Set(data.unlockedSlots));
+        } else {
+          setUnlockedSlots(new Set());
+        }
+      })
+      .catch((err) => {
+        console.warn("Failed to fetch unlocked time slots for Loom:", err);
+      });
+  }, [selectedDate, currentShiftId]);
+
+  useEffect(() => {
+    fetchUnlockedSlots();
+  }, [fetchUnlockedSlots]);
+
+  const isSlotLocked = useCallback(
+    (slotTime: string): boolean => {
+      if (!slotTime) return false;
+      const expired = isTimeSlotLocked(selectedDate, slotTime, 120);
+      if (!expired) return false;
+      return !unlockedSlots.has(slotTime);
+    },
+    [selectedDate, unlockedSlots]
+  );
+
+  const handleToggleSlotUnlock = async (slotTime: string) => {
+    if (!canUnlockTimeSlots) {
+      showNotification("Your role does not have permission to override or unlock expired time slots.", "error");
+      return;
+    }
+    const isCurrentlyUnlocked = unlockedSlots.has(slotTime);
+    try {
+      if (isCurrentlyUnlocked) {
+        const res = await fetch(
+          `/api/production/telemetry/unlock?module=LOOM_READING_SHEET&date=${selectedDate}&shiftId=${encodeURIComponent(
+            currentShiftId
+          )}&timeSlot=${encodeURIComponent(slotTime)}`,
+          { method: "DELETE" }
+        );
+        if (!res.ok) throw new Error("Failed to re-lock time slot");
+
+        const next = new Set(unlockedSlots);
+        next.delete(slotTime);
+        setUnlockedSlots(next);
+        showNotification(`Slot ${slotTime} re-locked globally.`);
+      } else {
+        const res = await fetch("/api/production/telemetry/unlock", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            module: "LOOM_READING_SHEET",
+            date: selectedDate,
+            shiftId: currentShiftId,
+            timeSlot: slotTime,
+          }),
+        });
+        if (!res.ok) {
+          const errData = await res.json();
+          throw new Error(errData.error || "Failed to unlock time slot");
+        }
+
+        const next = new Set(unlockedSlots);
+        next.add(slotTime);
+        setUnlockedSlots(next);
+        showNotification(`Slot ${slotTime} unlocked globally for all factory operators.`);
+      }
+    } catch (err: any) {
+      console.error("Loom slot unlock toggle error:", err);
+      showNotification(err.message || "Operation failed", "error");
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -1023,6 +1156,27 @@ export function LoomReadingSheetSection() {
         </div>
       </div>
 
+      {/* Policy Banner for Auto-Lock & RBAC Override */}
+      <div className="bg-slate-50/80 border border-slate-200/80 rounded-xl px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 text-xs">
+        <div className="flex items-center gap-2 text-slate-600">
+          <Info className="h-4 w-4 text-sky-600 shrink-0" />
+          <span>
+            <strong className="text-slate-800">Policy:</strong> Bi-hourly readings auto-lock 120 minutes past window start. Authorized roles can unlock expired slots globally for all factory operators.
+          </span>
+        </div>
+        {canUnlockTimeSlots ? (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-bold rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-300">
+            <Unlock className="h-3 w-3 text-emerald-600" />
+            <span>Time Slot Unlock Authority Active</span>
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-medium rounded-lg bg-slate-100 text-slate-500 border border-slate-200">
+            <Lock className="h-3 w-3 text-slate-400" />
+            <span>Auto-Lock Enforced</span>
+          </span>
+        )}
+      </div>
+
       {/* Live KPI Cards Strip */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-2xs">
@@ -1168,6 +1322,9 @@ export function LoomReadingSheetSection() {
                 <th className="sticky left-0 bg-slate-100 z-20 py-3 px-3 text-center w-20 min-w-[80px] border-r-2 border-slate-300 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)]" rowSpan={2}>
                   Loom #
                 </th>
+                <th className="py-3 px-2 text-center w-20 min-w-[75px] border-r border-slate-200" rowSpan={2}>
+                  Photo
+                </th>
                 <th className="py-3 px-3.5 w-48 min-w-[180px] border-r border-slate-200" rowSpan={2}>
                   Operator Name
                 </th>
@@ -1181,25 +1338,277 @@ export function LoomReadingSheetSection() {
                   Type / Quality
                 </th>
                 <th className="py-3 px-3 text-right w-32 min-w-[120px] bg-slate-200/60 border-r border-slate-200" rowSpan={2}>
-                  I/R {initialTimeSlot}
+                  <div className="flex items-center justify-end gap-1.5">
+                    <span>I/R {initialTimeSlot}</span>
+                    {isTimeSlotLocked(selectedDate, initialTimeSlot, 120) && (
+                      canUnlockTimeSlots ? (
+                        <button
+                          type="button"
+                          onClick={(ev) => {
+                            ev.stopPropagation();
+                            handleToggleSlotUnlock(initialTimeSlot);
+                          }}
+                          className={`p-1 rounded cursor-pointer transition-colors ${
+                            unlockedSlots.has(initialTimeSlot)
+                              ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200"
+                              : "bg-amber-100 text-amber-800 hover:bg-amber-200"
+                          }`}
+                          title={
+                            unlockedSlots.has(initialTimeSlot)
+                              ? `Interval ${initialTimeSlot} is Unlocked globally. Click to re-lock.`
+                              : `Interval ${initialTimeSlot} is Auto-Locked. Click to unlock globally for all operators.`
+                          }
+                        >
+                          {unlockedSlots.has(initialTimeSlot) ? <Unlock className="h-3 w-3 text-emerald-700" /> : <Lock className="h-3 w-3 text-amber-700" />}
+                        </button>
+                      ) : (
+                        <span
+                          className="p-0.5"
+                          title={
+                            unlockedSlots.has(initialTimeSlot)
+                              ? `Interval ${initialTimeSlot} is Unlocked by supervisor.`
+                              : `Interval ${initialTimeSlot} is Auto-Locked (>2h). Supervisor authorization required.`
+                          }
+                        >
+                          {unlockedSlots.has(initialTimeSlot) ? <Unlock className="h-3 w-3 text-emerald-600" /> : <Lock className="h-3 w-3 text-slate-400" />}
+                        </span>
+                      )
+                    )}
+                  </div>
                 </th>
                 <th className="py-1.5 px-2 text-center border-r border-slate-200" colSpan={2}>
-                  {timeSlots[0] || "10:00"}
+                  <div className="flex items-center justify-center gap-1.5">
+                    <span>{timeSlots[0] || "10:00"}</span>
+                    {isTimeSlotLocked(selectedDate, timeSlots[0] || "10:00", 120) && (
+                      canUnlockTimeSlots ? (
+                        <button
+                          type="button"
+                          onClick={(ev) => {
+                            ev.stopPropagation();
+                            handleToggleSlotUnlock(timeSlots[0] || "10:00");
+                          }}
+                          className={`p-1 rounded cursor-pointer transition-colors ${
+                            unlockedSlots.has(timeSlots[0] || "10:00")
+                              ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200"
+                              : "bg-amber-100 text-amber-800 hover:bg-amber-200"
+                          }`}
+                          title={
+                            unlockedSlots.has(timeSlots[0] || "10:00")
+                              ? `Interval ${timeSlots[0] || "10:00"} is Unlocked globally. Click to re-lock.`
+                              : `Interval ${timeSlots[0] || "10:00"} is Auto-Locked. Click to unlock globally for all operators.`
+                          }
+                        >
+                          {unlockedSlots.has(timeSlots[0] || "10:00") ? <Unlock className="h-3 w-3 text-emerald-700" /> : <Lock className="h-3 w-3 text-amber-700" />}
+                        </button>
+                      ) : (
+                        <span
+                          className="p-0.5"
+                          title={
+                            unlockedSlots.has(timeSlots[0] || "10:00")
+                              ? `Interval ${timeSlots[0] || "10:00"} is Unlocked by supervisor.`
+                              : `Interval ${timeSlots[0] || "10:00"} is Auto-Locked (>2h). Supervisor authorization required.`
+                          }
+                        >
+                          {unlockedSlots.has(timeSlots[0] || "10:00") ? <Unlock className="h-3 w-3 text-emerald-600" /> : <Lock className="h-3 w-3 text-slate-400" />}
+                        </span>
+                      )
+                    )}
+                  </div>
                 </th>
                 <th className="py-1.5 px-2 text-center border-r border-slate-200" colSpan={2}>
-                  {timeSlots[1] || "12:00"}
+                  <div className="flex items-center justify-center gap-1.5">
+                    <span>{timeSlots[1] || "12:00"}</span>
+                    {isTimeSlotLocked(selectedDate, timeSlots[1] || "12:00", 120) && (
+                      canUnlockTimeSlots ? (
+                        <button
+                          type="button"
+                          onClick={(ev) => {
+                            ev.stopPropagation();
+                            handleToggleSlotUnlock(timeSlots[1] || "12:00");
+                          }}
+                          className={`p-1 rounded cursor-pointer transition-colors ${
+                            unlockedSlots.has(timeSlots[1] || "12:00")
+                              ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200"
+                              : "bg-amber-100 text-amber-800 hover:bg-amber-200"
+                          }`}
+                          title={
+                            unlockedSlots.has(timeSlots[1] || "12:00")
+                              ? `Interval ${timeSlots[1] || "12:00"} is Unlocked globally. Click to re-lock.`
+                              : `Interval ${timeSlots[1] || "12:00"} is Auto-Locked. Click to unlock globally for all operators.`
+                          }
+                        >
+                          {unlockedSlots.has(timeSlots[1] || "12:00") ? <Unlock className="h-3 w-3 text-emerald-700" /> : <Lock className="h-3 w-3 text-amber-700" />}
+                        </button>
+                      ) : (
+                        <span
+                          className="p-0.5"
+                          title={
+                            unlockedSlots.has(timeSlots[1] || "12:00")
+                              ? `Interval ${timeSlots[1] || "12:00"} is Unlocked by supervisor.`
+                              : `Interval ${timeSlots[1] || "12:00"} is Auto-Locked (>2h). Supervisor authorization required.`
+                          }
+                        >
+                          {unlockedSlots.has(timeSlots[1] || "12:00") ? <Unlock className="h-3 w-3 text-emerald-600" /> : <Lock className="h-3 w-3 text-slate-400" />}
+                        </span>
+                      )
+                    )}
+                  </div>
                 </th>
                 <th className="py-1.5 px-2 text-center border-r border-slate-200" colSpan={2}>
-                  {timeSlots[2] || "02:00"}
+                  <div className="flex items-center justify-center gap-1.5">
+                    <span>{timeSlots[2] || "14:00"}</span>
+                    {isTimeSlotLocked(selectedDate, timeSlots[2] || "14:00", 120) && (
+                      canUnlockTimeSlots ? (
+                        <button
+                          type="button"
+                          onClick={(ev) => {
+                            ev.stopPropagation();
+                            handleToggleSlotUnlock(timeSlots[2] || "14:00");
+                          }}
+                          className={`p-1 rounded cursor-pointer transition-colors ${
+                            unlockedSlots.has(timeSlots[2] || "14:00")
+                              ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200"
+                              : "bg-amber-100 text-amber-800 hover:bg-amber-200"
+                          }`}
+                          title={
+                            unlockedSlots.has(timeSlots[2] || "14:00")
+                              ? `Interval ${timeSlots[2] || "14:00"} is Unlocked globally. Click to re-lock.`
+                              : `Interval ${timeSlots[2] || "14:00"} is Auto-Locked. Click to unlock globally for all operators.`
+                          }
+                        >
+                          {unlockedSlots.has(timeSlots[2] || "14:00") ? <Unlock className="h-3 w-3 text-emerald-700" /> : <Lock className="h-3 w-3 text-amber-700" />}
+                        </button>
+                      ) : (
+                        <span
+                          className="p-0.5"
+                          title={
+                            unlockedSlots.has(timeSlots[2] || "14:00")
+                              ? `Interval ${timeSlots[2] || "14:00"} is Unlocked by supervisor.`
+                              : `Interval ${timeSlots[2] || "14:00"} is Auto-Locked (>2h). Supervisor authorization required.`
+                          }
+                        >
+                          {unlockedSlots.has(timeSlots[2] || "14:00") ? <Unlock className="h-3 w-3 text-emerald-600" /> : <Lock className="h-3 w-3 text-slate-400" />}
+                        </span>
+                      )
+                    )}
+                  </div>
                 </th>
                 <th className="py-1.5 px-2 text-center border-r border-slate-200" colSpan={2}>
-                  {timeSlots[3] || "04:00"}
+                  <div className="flex items-center justify-center gap-1.5">
+                    <span>{timeSlots[3] || "16:00"}</span>
+                    {isTimeSlotLocked(selectedDate, timeSlots[3] || "16:00", 120) && (
+                      canUnlockTimeSlots ? (
+                        <button
+                          type="button"
+                          onClick={(ev) => {
+                            ev.stopPropagation();
+                            handleToggleSlotUnlock(timeSlots[3] || "16:00");
+                          }}
+                          className={`p-1 rounded cursor-pointer transition-colors ${
+                            unlockedSlots.has(timeSlots[3] || "16:00")
+                              ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200"
+                              : "bg-amber-100 text-amber-800 hover:bg-amber-200"
+                          }`}
+                          title={
+                            unlockedSlots.has(timeSlots[3] || "16:00")
+                              ? `Interval ${timeSlots[3] || "16:00"} is Unlocked globally. Click to re-lock.`
+                              : `Interval ${timeSlots[3] || "16:00"} is Auto-Locked. Click to unlock globally for all operators.`
+                          }
+                        >
+                          {unlockedSlots.has(timeSlots[3] || "16:00") ? <Unlock className="h-3 w-3 text-emerald-700" /> : <Lock className="h-3 w-3 text-amber-700" />}
+                        </button>
+                      ) : (
+                        <span
+                          className="p-0.5"
+                          title={
+                            unlockedSlots.has(timeSlots[3] || "16:00")
+                              ? `Interval ${timeSlots[3] || "16:00"} is Unlocked by supervisor.`
+                              : `Interval ${timeSlots[3] || "16:00"} is Auto-Locked (>2h). Supervisor authorization required.`
+                          }
+                        >
+                          {unlockedSlots.has(timeSlots[3] || "16:00") ? <Unlock className="h-3 w-3 text-emerald-600" /> : <Lock className="h-3 w-3 text-slate-400" />}
+                        </span>
+                      )
+                    )}
+                  </div>
                 </th>
                 <th className="py-1.5 px-2 text-center border-r border-slate-200" colSpan={2}>
-                  {timeSlots[4] || "06:00"}
+                  <div className="flex items-center justify-center gap-1.5">
+                    <span>{timeSlots[4] || "18:00"}</span>
+                    {isTimeSlotLocked(selectedDate, timeSlots[4] || "18:00", 120) && (
+                      canUnlockTimeSlots ? (
+                        <button
+                          type="button"
+                          onClick={(ev) => {
+                            ev.stopPropagation();
+                            handleToggleSlotUnlock(timeSlots[4] || "18:00");
+                          }}
+                          className={`p-1 rounded cursor-pointer transition-colors ${
+                            unlockedSlots.has(timeSlots[4] || "18:00")
+                              ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200"
+                              : "bg-amber-100 text-amber-800 hover:bg-amber-200"
+                          }`}
+                          title={
+                            unlockedSlots.has(timeSlots[4] || "18:00")
+                              ? `Interval ${timeSlots[4] || "18:00"} is Unlocked globally. Click to re-lock.`
+                              : `Interval ${timeSlots[4] || "18:00"} is Auto-Locked. Click to unlock globally for all operators.`
+                          }
+                        >
+                          {unlockedSlots.has(timeSlots[4] || "18:00") ? <Unlock className="h-3 w-3 text-emerald-700" /> : <Lock className="h-3 w-3 text-amber-700" />}
+                        </button>
+                      ) : (
+                        <span
+                          className="p-0.5"
+                          title={
+                            unlockedSlots.has(timeSlots[4] || "18:00")
+                              ? `Interval ${timeSlots[4] || "18:00"} is Unlocked by supervisor.`
+                              : `Interval ${timeSlots[4] || "18:00"} is Auto-Locked (>2h). Supervisor authorization required.`
+                          }
+                        >
+                          {unlockedSlots.has(timeSlots[4] || "18:00") ? <Unlock className="h-3 w-3 text-emerald-600" /> : <Lock className="h-3 w-3 text-slate-400" />}
+                        </span>
+                      )
+                    )}
+                  </div>
                 </th>
                 <th className="py-3 px-3 text-right w-32 min-w-[120px] bg-slate-200/60 border-r border-slate-200" rowSpan={2}>
-                  {timeSlots[5] || "08:00"} End
+                  <div className="flex items-center justify-end gap-1.5">
+                    <span>{timeSlots[5] || "20:00"} End</span>
+                    {isTimeSlotLocked(selectedDate, timeSlots[5] || "20:00", 120) && (
+                      canUnlockTimeSlots ? (
+                        <button
+                          type="button"
+                          onClick={(ev) => {
+                            ev.stopPropagation();
+                            handleToggleSlotUnlock(timeSlots[5] || "20:00");
+                          }}
+                          className={`p-1 rounded cursor-pointer transition-colors ${
+                            unlockedSlots.has(timeSlots[5] || "20:00")
+                              ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200"
+                              : "bg-amber-100 text-amber-800 hover:bg-amber-200"
+                          }`}
+                          title={
+                            unlockedSlots.has(timeSlots[5] || "20:00")
+                              ? `Interval ${timeSlots[5] || "20:00"} is Unlocked globally. Click to re-lock.`
+                              : `Interval ${timeSlots[5] || "20:00"} is Auto-Locked. Click to unlock globally for all operators.`
+                          }
+                        >
+                          {unlockedSlots.has(timeSlots[5] || "20:00") ? <Unlock className="h-3 w-3 text-emerald-700" /> : <Lock className="h-3 w-3 text-amber-700" />}
+                        </button>
+                      ) : (
+                        <span
+                          className="p-0.5"
+                          title={
+                            unlockedSlots.has(timeSlots[5] || "20:00")
+                              ? `Interval ${timeSlots[5] || "20:00"} is Unlocked by supervisor.`
+                              : `Interval ${timeSlots[5] || "20:00"} is Auto-Locked (>2h). Supervisor authorization required.`
+                          }
+                        >
+                          {unlockedSlots.has(timeSlots[5] || "20:00") ? <Unlock className="h-3 w-3 text-emerald-600" /> : <Lock className="h-3 w-3 text-slate-400" />}
+                        </span>
+                      )
+                    )}
+                  </div>
                 </th>
                 <th className="py-3 px-3 text-right w-36 min-w-[130px] bg-blue-50/80 border-r border-slate-200 text-blue-950 font-black" rowSpan={2}>
                   T PROD (M)
@@ -1233,7 +1642,7 @@ export function LoomReadingSheetSection() {
             <tbody className="divide-y divide-slate-100">
               {loading ? (
                 <tr>
-                  <td colSpan={23} className="py-16 text-center text-slate-400">
+                  <td colSpan={24} className="py-16 text-center text-slate-400">
                     <div className="inline-flex items-center gap-2.5 font-semibold text-sm">
                       <div className="h-5 w-5 border-2 border-slate-300 border-t-slate-800 rounded-full animate-spin" />
                       <span>Loading Circular Loom 2-Hours Reading Sheet...</span>
@@ -1242,7 +1651,7 @@ export function LoomReadingSheetSection() {
                 </tr>
               ) : filteredEntries.length === 0 ? (
                 <tr>
-                  <td colSpan={23} className="py-12 text-center text-slate-400 font-medium italic text-sm">
+                  <td colSpan={24} className="py-12 text-center text-slate-400 font-medium italic text-sm">
                     No loom machines match the active filters.
                   </td>
                 </tr>
@@ -1254,6 +1663,14 @@ export function LoomReadingSheetSection() {
                   const effVal = typeof e.efficiencyPct === "number" && e.efficiencyPct > 0 ? e.efficiencyPct : 0;
                   const rowSeq = e.rowSequence || 1;
                   const isSplitRow = rowSeq > 1;
+
+                  const isInitialLocked = isSlotLocked(initialTimeSlot);
+                  const isR1Locked = isSlotLocked(timeSlots[0] || "10:00");
+                  const isR2Locked = isSlotLocked(timeSlots[1] || "12:00");
+                  const isR3Locked = isSlotLocked(timeSlots[2] || "14:00");
+                  const isR4Locked = isSlotLocked(timeSlots[3] || "16:00");
+                  const isR5Locked = isSlotLocked(timeSlots[4] || "18:00");
+                  const isR6Locked = isSlotLocked(timeSlots[5] || "20:00");
 
                   return (
                     <tr
@@ -1299,6 +1716,36 @@ export function LoomReadingSheetSection() {
                             </button>
                           )}
                         </div>
+                      </td>
+
+                      {/* Physical Meter Counter Photo Cell */}
+                      <td className="py-1.5 px-2 text-center border-r border-slate-100">
+                        <button
+                          type="button"
+                          onClick={() => setPhotoModalEntry(e)}
+                          className={`inline-flex items-center justify-center gap-1 px-2 py-1 text-[11px] font-semibold rounded-md border transition-all cursor-pointer ${
+                            e.photoUrl
+                              ? "bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100 shadow-2xs"
+                              : "bg-white text-slate-600 border-slate-300 hover:border-slate-500 hover:bg-slate-50 shadow-2xs"
+                          }`}
+                          title={
+                            e.photoUrl
+                              ? "View / change physical meter counter photo"
+                              : "Attach physical meter counter photo"
+                          }
+                        >
+                          {e.photoUrl ? (
+                            <>
+                              <ImageIcon className="h-3 w-3 text-emerald-600" />
+                              <span>View</span>
+                            </>
+                          ) : (
+                            <>
+                              <Camera className="h-3 w-3 text-slate-400" />
+                              <span>+ Photo</span>
+                            </>
+                          )}
+                        </button>
                       </td>
 
                       {/* Operator Name Dropdown (from Data Centre) */}
@@ -1367,6 +1814,8 @@ export function LoomReadingSheetSection() {
                       <td className="py-1.5 px-2.5 bg-slate-50/50 border-r border-slate-100">
                         <input
                           type="number"
+                          disabled={isInitialLocked}
+                          readOnly={isInitialLocked}
                           value={e.initialReading !== null && e.initialReading !== undefined ? e.initialReading : ""}
                           onChange={(ev) =>
                             handleEntryChange(
@@ -1378,14 +1827,21 @@ export function LoomReadingSheetSection() {
                           }
                           onBlur={() => triggerAutoSave(true)}
                           placeholder="I/R"
-                          className="w-full px-2 py-1.5 text-xs text-right font-mono font-black text-slate-800 bg-slate-100/70 group-hover:bg-white focus:bg-white border border-transparent hover:border-slate-300 focus:border-slate-800 rounded-lg outline-none placeholder:text-slate-300 transition-all"
+                          title={isInitialLocked ? `Auto-locked (>2h window past ${initialTimeSlot}). Supervisor unlock required.` : "Initial reading"}
+                          className={`w-full px-2 py-1.5 text-xs text-right font-mono font-black rounded-lg outline-none transition-all ${
+                            isInitialLocked
+                              ? "bg-slate-100 text-slate-400 cursor-not-allowed border-slate-200 select-none"
+                              : "text-slate-800 bg-slate-100/70 group-hover:bg-white focus:bg-white border border-transparent hover:border-slate-300 focus:border-slate-800 placeholder:text-slate-300"
+                          }`}
                         />
                       </td>
 
-                      {/* 10:00 Reading & Prod */}
+                      {/* Interval 1 Reading & Prod */}
                       <td className="py-1.5 px-2">
                         <input
                           type="number"
+                          disabled={isR1Locked}
+                          readOnly={isR1Locked}
                           value={e.r1Reading !== null && e.r1Reading !== undefined ? e.r1Reading : ""}
                           onChange={(ev) =>
                             handleEntryChange(
@@ -1397,17 +1853,24 @@ export function LoomReadingSheetSection() {
                           }
                           onBlur={() => triggerAutoSave(true)}
                           placeholder="—"
-                          className="w-full px-2 py-1.5 text-xs text-right font-mono text-slate-800 bg-slate-50/40 group-hover:bg-white focus:bg-white border border-transparent hover:border-slate-200 focus:border-slate-800 rounded-lg outline-none transition-all"
+                          title={isR1Locked ? `Auto-locked (>2h window past ${timeSlots[0] || "10:00"}). Supervisor unlock required.` : undefined}
+                          className={`w-full px-2 py-1.5 text-xs text-right font-mono rounded-lg outline-none transition-all ${
+                            isR1Locked
+                              ? "bg-slate-100 text-slate-400 cursor-not-allowed border-slate-200 select-none"
+                              : "text-slate-800 bg-slate-50/40 group-hover:bg-white focus:bg-white border border-transparent hover:border-slate-200 focus:border-slate-800"
+                          }`}
                         />
                       </td>
                       <td className="py-1.5 px-2.5 text-right font-mono font-black text-xs text-emerald-800 bg-emerald-50/50 border-r border-slate-100">
                         {e.r1Prod !== null && e.r1Prod > 0 ? e.r1Prod.toLocaleString() : e.r1Prod === 0 ? "0" : "—"}
                       </td>
 
-                      {/* 12:00 Reading & Prod */}
+                      {/* Interval 2 Reading & Prod */}
                       <td className="py-1.5 px-2">
                         <input
                           type="number"
+                          disabled={isR2Locked}
+                          readOnly={isR2Locked}
                           value={e.r2Reading !== null && e.r2Reading !== undefined ? e.r2Reading : ""}
                           onChange={(ev) =>
                             handleEntryChange(
@@ -1419,17 +1882,24 @@ export function LoomReadingSheetSection() {
                           }
                           onBlur={() => triggerAutoSave(true)}
                           placeholder="—"
-                          className="w-full px-2 py-1.5 text-xs text-right font-mono text-slate-800 bg-slate-50/40 group-hover:bg-white focus:bg-white border border-transparent hover:border-slate-200 focus:border-slate-800 rounded-lg outline-none transition-all"
+                          title={isR2Locked ? `Auto-locked (>2h window past ${timeSlots[1] || "12:00"}). Supervisor unlock required.` : undefined}
+                          className={`w-full px-2 py-1.5 text-xs text-right font-mono rounded-lg outline-none transition-all ${
+                            isR2Locked
+                              ? "bg-slate-100 text-slate-400 cursor-not-allowed border-slate-200 select-none"
+                              : "text-slate-800 bg-slate-50/40 group-hover:bg-white focus:bg-white border border-transparent hover:border-slate-200 focus:border-slate-800"
+                          }`}
                         />
                       </td>
                       <td className="py-1.5 px-2.5 text-right font-mono font-black text-xs text-emerald-800 bg-emerald-50/50 border-r border-slate-100">
                         {e.r2Prod !== null && e.r2Prod > 0 ? e.r2Prod.toLocaleString() : e.r2Prod === 0 ? "0" : "—"}
                       </td>
 
-                      {/* 02:00 Reading & Prod */}
+                      {/* Interval 3 Reading & Prod */}
                       <td className="py-1.5 px-2">
                         <input
                           type="number"
+                          disabled={isR3Locked}
+                          readOnly={isR3Locked}
                           value={e.r3Reading !== null && e.r3Reading !== undefined ? e.r3Reading : ""}
                           onChange={(ev) =>
                             handleEntryChange(
@@ -1441,17 +1911,24 @@ export function LoomReadingSheetSection() {
                           }
                           onBlur={() => triggerAutoSave(true)}
                           placeholder="—"
-                          className="w-full px-2 py-1.5 text-xs text-right font-mono text-slate-800 bg-slate-50/40 group-hover:bg-white focus:bg-white border border-transparent hover:border-slate-200 focus:border-slate-800 rounded-lg outline-none transition-all"
+                          title={isR3Locked ? `Auto-locked (>2h window past ${timeSlots[2] || "14:00"}). Supervisor unlock required.` : undefined}
+                          className={`w-full px-2 py-1.5 text-xs text-right font-mono rounded-lg outline-none transition-all ${
+                            isR3Locked
+                              ? "bg-slate-100 text-slate-400 cursor-not-allowed border-slate-200 select-none"
+                              : "text-slate-800 bg-slate-50/40 group-hover:bg-white focus:bg-white border border-transparent hover:border-slate-200 focus:border-slate-800"
+                          }`}
                         />
                       </td>
                       <td className="py-1.5 px-2.5 text-right font-mono font-black text-xs text-emerald-800 bg-emerald-50/50 border-r border-slate-100">
                         {e.r3Prod !== null && e.r3Prod > 0 ? e.r3Prod.toLocaleString() : e.r3Prod === 0 ? "0" : "—"}
                       </td>
 
-                      {/* 04:00 Reading & Prod */}
+                      {/* Interval 4 Reading & Prod */}
                       <td className="py-1.5 px-2">
                         <input
                           type="number"
+                          disabled={isR4Locked}
+                          readOnly={isR4Locked}
                           value={e.r4Reading !== null && e.r4Reading !== undefined ? e.r4Reading : ""}
                           onChange={(ev) =>
                             handleEntryChange(
@@ -1463,17 +1940,24 @@ export function LoomReadingSheetSection() {
                           }
                           onBlur={() => triggerAutoSave(true)}
                           placeholder="—"
-                          className="w-full px-2 py-1.5 text-xs text-right font-mono text-slate-800 bg-slate-50/40 group-hover:bg-white focus:bg-white border border-transparent hover:border-slate-200 focus:border-slate-800 rounded-lg outline-none transition-all"
+                          title={isR4Locked ? `Auto-locked (>2h window past ${timeSlots[3] || "16:00"}). Supervisor unlock required.` : undefined}
+                          className={`w-full px-2 py-1.5 text-xs text-right font-mono rounded-lg outline-none transition-all ${
+                            isR4Locked
+                              ? "bg-slate-100 text-slate-400 cursor-not-allowed border-slate-200 select-none"
+                              : "text-slate-800 bg-slate-50/40 group-hover:bg-white focus:bg-white border border-transparent hover:border-slate-200 focus:border-slate-800"
+                          }`}
                         />
                       </td>
                       <td className="py-1.5 px-2.5 text-right font-mono font-black text-xs text-emerald-800 bg-emerald-50/50 border-r border-slate-100">
                         {e.r4Prod !== null && e.r4Prod > 0 ? e.r4Prod.toLocaleString() : e.r4Prod === 0 ? "0" : "—"}
                       </td>
 
-                      {/* 06:00 Reading & Prod */}
+                      {/* Interval 5 Reading & Prod */}
                       <td className="py-1.5 px-2">
                         <input
                           type="number"
+                          disabled={isR5Locked}
+                          readOnly={isR5Locked}
                           value={e.r5Reading !== null && e.r5Reading !== undefined ? e.r5Reading : ""}
                           onChange={(ev) =>
                             handleEntryChange(
@@ -1485,17 +1969,24 @@ export function LoomReadingSheetSection() {
                           }
                           onBlur={() => triggerAutoSave(true)}
                           placeholder="—"
-                          className="w-full px-2 py-1.5 text-xs text-right font-mono text-slate-800 bg-slate-50/40 group-hover:bg-white focus:bg-white border border-transparent hover:border-slate-200 focus:border-slate-800 rounded-lg outline-none transition-all"
+                          title={isR5Locked ? `Auto-locked (>2h window past ${timeSlots[4] || "18:00"}). Supervisor unlock required.` : undefined}
+                          className={`w-full px-2 py-1.5 text-xs text-right font-mono rounded-lg outline-none transition-all ${
+                            isR5Locked
+                              ? "bg-slate-100 text-slate-400 cursor-not-allowed border-slate-200 select-none"
+                              : "text-slate-800 bg-slate-50/40 group-hover:bg-white focus:bg-white border border-transparent hover:border-slate-200 focus:border-slate-800"
+                          }`}
                         />
                       </td>
                       <td className="py-1.5 px-2.5 text-right font-mono font-black text-xs text-emerald-800 bg-emerald-50/50 border-r border-slate-100">
                         {e.r5Prod !== null && e.r5Prod > 0 ? e.r5Prod.toLocaleString() : e.r5Prod === 0 ? "0" : "—"}
                       </td>
 
-                      {/* 08:00 (Final Reading) */}
+                      {/* Interval 6 (Final Reading) */}
                       <td className="py-1.5 px-2.5 bg-slate-50/50 border-r border-slate-100">
                         <input
                           type="number"
+                          disabled={isR6Locked}
+                          readOnly={isR6Locked}
                           value={e.r6Reading !== null && e.r6Reading !== undefined ? e.r6Reading : ""}
                           onChange={(ev) =>
                             handleEntryChange(
@@ -1507,7 +1998,12 @@ export function LoomReadingSheetSection() {
                           }
                           onBlur={() => triggerAutoSave(true)}
                           placeholder="End Read"
-                          className="w-full px-2 py-1.5 text-xs text-right font-mono font-black text-slate-800 bg-slate-100/70 group-hover:bg-white focus:bg-white border border-transparent hover:border-slate-300 focus:border-slate-800 rounded-lg outline-none placeholder:text-slate-300 transition-all"
+                          title={isR6Locked ? `Auto-locked (>2h window past ${timeSlots[5] || "20:00"}). Supervisor unlock required.` : "Final reading"}
+                          className={`w-full px-2 py-1.5 text-xs text-right font-mono font-black rounded-lg outline-none transition-all ${
+                            isR6Locked
+                              ? "bg-slate-100 text-slate-400 cursor-not-allowed border-slate-200 select-none"
+                              : "text-slate-800 bg-slate-100/70 group-hover:bg-white focus:bg-white border border-transparent hover:border-slate-300 focus:border-slate-800 placeholder:text-slate-300"
+                          }`}
                         />
                       </td>
 
@@ -1653,7 +2149,7 @@ export function LoomReadingSheetSection() {
                 <td className="sticky left-0 bg-slate-200/90 z-20 py-3 px-3 text-center font-black font-mono text-sm text-slate-900 border-r-2 border-slate-300 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.08)]">
                   TOTAL
                 </td>
-                <td colSpan={5} className="py-3 px-4 text-right uppercase text-[11px] font-bold text-slate-700 border-r border-slate-200">
+                <td colSpan={6} className="py-3 px-4 text-right uppercase text-[11px] font-bold text-slate-700 border-r border-slate-200">
                   Total Interval Production (Meters):
                 </td>
                 <td className="border-r border-slate-200"></td>
@@ -1926,6 +2422,32 @@ export function LoomReadingSheetSection() {
         isFiltered={isFiltered}
         filterLabel={filterLabel}
       />
+
+      {/* Physical Meter Counter Photo Evidence Modal */}
+      {photoModalEntry && (
+        <PhotoEvidenceModal
+          isOpen={true}
+          onClose={() => setPhotoModalEntry(null)}
+          title={`Meter Counter Photo — Loom #${photoModalEntry.loomNumber} (${selectedDate} - ${selectedShift})`}
+          timeSlot={`${selectedShift} Meter`}
+          currentPhotoUrl={photoModalEntry.photoUrl || undefined}
+          allowUpload={canUploadPhoto}
+          allowCapture={canCapturePhoto}
+          disabled={false}
+          onSavePhoto={(url) => {
+            handleEntryChange(photoModalEntry.loomNumber, photoModalEntry.rowSequence || 1, "photoUrl", url);
+            setPhotoModalEntry(null);
+            showNotification(`Photo attached to Loom #${photoModalEntry.loomNumber}`);
+            triggerAutoSave(true);
+          }}
+          onRemovePhoto={() => {
+            handleEntryChange(photoModalEntry.loomNumber, photoModalEntry.rowSequence || 1, "photoUrl", null);
+            setPhotoModalEntry(null);
+            showNotification(`Photo removed from Loom #${photoModalEntry.loomNumber}`);
+            triggerAutoSave(true);
+          }}
+        />
+      )}
     </div>
   );
 }
