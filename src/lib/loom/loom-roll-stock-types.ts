@@ -21,6 +21,7 @@ export interface LoomRollStockItem {
   remarks: string;
   date: string;
   shiftName: string;
+  photoUrl?: string | null;
   reportId?: string;
   status?: string;
   createdAt?: string;
