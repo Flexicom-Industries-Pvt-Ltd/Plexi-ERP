@@ -6,13 +6,6 @@ import {
   Printer,
   FileSpreadsheet,
   BarChart3,
-  Scale,
-  TrendingUp,
-  AlertCircle,
-  Percent,
-  CheckCircle2,
-  Clock,
-  FileText,
 } from "lucide-react";
 import { TapePlantReportDataset, exportTapePlantReportsExcel } from "@/lib/tape-plant/reports-export";
 import { printTapePlantReport } from "@/lib/tape-plant/print-report-sheet";
@@ -418,3 +411,4 @@ export function ReportPrintPreviewModal({
     </div>
   );
 }
+
