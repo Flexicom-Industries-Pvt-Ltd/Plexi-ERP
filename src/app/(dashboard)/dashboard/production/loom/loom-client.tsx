@@ -23,7 +23,7 @@ export function LoomClient() {
         <LoomRollCuttingSection />
       ) : tabParam === "roll-stock" || tabParam === "stock" ? (
         <LoomRollStockSection />
-      ) : tabParam === "production-report" || tabParam === "report" || tabParam === "reports" ? (
+      ) : tabParam === "production-report" || tabParam === "production_report" || tabParam === "report" || tabParam === "reports" ? (
         <LoomProductionReportSection />
       ) : (
         <LoomSummarySection />

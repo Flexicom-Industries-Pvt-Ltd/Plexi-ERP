@@ -31,6 +31,7 @@ import {
   printLoomProductionReport,
 } from "@/lib/loom/print-loom-production-report";
 import { exportLoomProductionReportExcel } from "@/lib/loom/loom-production-report-export";
+import { LoomProductionReportPrintModal } from "./LoomProductionReportPrintModal";
 
 type ViewCriteria = "LOOM" | "SUPERVISOR" | "OPERATOR" | "CONSOLIDATED";
 
@@ -57,6 +58,8 @@ export function LoomProductionReportSection() {
   const [activeCriteria, setActiveCriteria] = useState<ViewCriteria>("LOOM");
   const [tableSearch, setTableSearch] = useState("");
   const [printMenuOpen, setPrintMenuOpen] = useState(false);
+  const [printModalOpen, setPrintModalOpen] = useState(false);
+  const [modalCriteria, setModalCriteria] = useState<ViewCriteria>("CONSOLIDATED");
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   // Close fullscreen on Escape
@@ -194,17 +197,12 @@ export function LoomProductionReportSection() {
     targetOperator: selectedOperator !== "ALL" ? selectedOperator : null,
   };
 
-  const handlePrint = (criteria: ViewCriteria) => {
+  const handleOpenPrintModal = (criteria?: ViewCriteria) => {
     setPrintMenuOpen(false);
-    printLoomProductionReport({
-      criteria,
-      period: currentPeriod,
-      kpis,
-      loomWise,
-      supervisorWise,
-      operatorWise,
-    });
+    setModalCriteria(criteria || activeCriteria || "CONSOLIDATED");
+    setPrintModalOpen(true);
   };
+  const handlePrint = handleOpenPrintModal;
 
   const handleExportExcel = () => {
     exportLoomProductionReportExcel({
@@ -279,46 +277,56 @@ export function LoomProductionReportSection() {
             Export Excel
           </button>
 
-          {/* Print Dropdown */}
+          {/* Print Button & Dropdown */}
           <div className="relative">
-            <button
-              onClick={() => setPrintMenuOpen((prev) => !prev)}
-              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors cursor-pointer shadow-xs"
-            >
-              <Printer className="w-3.5 h-3.5" />
-              Print Report
-              <ChevronDown className="w-3.5 h-3.5" />
-            </button>
+            <div className="inline-flex rounded-lg shadow-xs">
+              <button
+                onClick={() => handleOpenPrintModal(activeCriteria)}
+                disabled={loading}
+                className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-l-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors cursor-pointer disabled:opacity-50"
+                title="Open Print Preview Modal"
+              >
+                <Printer className="w-3.5 h-3.5" />
+                Print Report
+              </button>
+              <button
+                onClick={() => setPrintMenuOpen((prev) => !prev)}
+                className="inline-flex items-center px-2 py-2 text-xs font-semibold rounded-r-lg bg-primary text-primary-foreground hover:bg-primary/90 border-l border-primary-foreground/20 transition-colors cursor-pointer"
+                title="Choose print criteria"
+              >
+                <ChevronDown className="w-3.5 h-3.5" />
+              </button>
+            </div>
 
             {printMenuOpen && (
               <div className="absolute right-0 mt-1.5 w-56 rounded-xl border bg-card shadow-xl p-1.5 z-50 text-xs animate-in fade-in zoom-in-95">
                 <button
-                  onClick={() => handlePrint("LOOM")}
+                  onClick={() => handleOpenPrintModal("LOOM")}
                   className="w-full text-left px-3 py-2 rounded-lg hover:bg-muted font-medium flex items-center justify-between cursor-pointer"
                 >
-                  <span>Print Loom-Wise</span>
+                  <span>Preview Loom-Wise</span>
                   <span className="text-[10px] text-muted-foreground font-mono">Loom #1-91</span>
                 </button>
                 <button
-                  onClick={() => handlePrint("SUPERVISOR")}
+                  onClick={() => handleOpenPrintModal("SUPERVISOR")}
                   className="w-full text-left px-3 py-2 rounded-lg hover:bg-muted font-medium flex items-center justify-between cursor-pointer"
                 >
-                  <span>Print Supervisor-Wise</span>
+                  <span>Preview Supervisor-Wise</span>
                   <span className="text-[10px] text-muted-foreground font-mono">Floor In-Charge</span>
                 </button>
                 <button
-                  onClick={() => handlePrint("OPERATOR")}
+                  onClick={() => handleOpenPrintModal("OPERATOR")}
                   className="w-full text-left px-3 py-2 rounded-lg hover:bg-muted font-medium flex items-center justify-between cursor-pointer"
                 >
-                  <span>Print Operator-Wise</span>
+                  <span>Preview Operator-Wise</span>
                   <span className="text-[10px] text-muted-foreground font-mono">Output & Eff.</span>
                 </button>
                 <div className="my-1 border-t" />
                 <button
-                  onClick={() => handlePrint("CONSOLIDATED")}
+                  onClick={() => handleOpenPrintModal("CONSOLIDATED")}
                   className="w-full text-left px-3 py-2 rounded-lg bg-primary/10 text-primary hover:bg-primary/20 font-bold flex items-center justify-between cursor-pointer"
                 >
-                  <span>Print Consolidated Total</span>
+                  <span>Preview Consolidated Total</span>
                   <span className="text-[10px] uppercase font-mono">All Criteria</span>
                 </button>
               </div>
@@ -951,6 +959,20 @@ export function LoomProductionReportSection() {
       )}
         </div>
       </div>
+
+      {/* In-App Print Preview Modal */}
+      {printModalOpen && (
+        <LoomProductionReportPrintModal
+          open={printModalOpen}
+          onClose={() => setPrintModalOpen(false)}
+          initialCriteria={modalCriteria}
+          period={currentPeriod}
+          kpis={kpis}
+          loomWise={loomWise}
+          supervisorWise={supervisorWise}
+          operatorWise={operatorWise}
+        />
+      )}
     </div>
   );
 }
