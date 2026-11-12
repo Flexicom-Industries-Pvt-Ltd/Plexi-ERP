@@ -488,16 +488,60 @@ export function generateLoomProductionReportHtml(options: PrintLoomProductionRep
 
 export function printLoomProductionReport(options: PrintLoomProductionReportOptions): void {
   const html = generateLoomProductionReportHtml(options);
-  const printWindow = window.open("", "_blank");
-  if (!printWindow) {
-    alert("Please allow popups to print the production report.");
-    return;
+  if (typeof window === "undefined") return;
+
+  const iframeId = "__loom_production_report_print_iframe__";
+  let iframe = document.getElementById(iframeId) as HTMLIFrameElement;
+  if (!iframe) {
+    iframe = document.createElement("iframe");
+    iframe.id = iframeId;
+    iframe.style.position = "fixed";
+    iframe.style.right = "0";
+    iframe.style.bottom = "0";
+    iframe.style.width = "0";
+    iframe.style.height = "0";
+    iframe.style.border = "0";
+    document.body.appendChild(iframe);
   }
-  printWindow.document.open();
-  printWindow.document.write(html);
-  printWindow.document.close();
-  printWindow.focus();
-  setTimeout(() => {
-    printWindow.print();
-  }, 350);
+
+  const doc = iframe.contentWindow?.document || iframe.contentDocument;
+  if (doc && iframe.contentWindow) {
+    doc.open();
+    doc.write(html);
+    doc.close();
+
+    const logoImg = doc.querySelector("img");
+    const triggerPrint = () => {
+      try {
+        iframe?.contentWindow?.focus();
+        iframe?.contentWindow?.print();
+      } catch (err) {
+        console.error("Iframe print failed, falling back to window print", err);
+        fallbackWindowPrint(html);
+      }
+    };
+
+    if (logoImg && !logoImg.complete) {
+      logoImg.onload = () => setTimeout(triggerPrint, 100);
+      logoImg.onerror = () => setTimeout(triggerPrint, 100);
+      setTimeout(triggerPrint, 800);
+    } else {
+      setTimeout(triggerPrint, 250);
+    }
+  } else {
+    fallbackWindowPrint(html);
+  }
+}
+
+function fallbackWindowPrint(html: string): void {
+  const win = window.open("", "_blank", "width=1200,height=850");
+  if (win) {
+    win.document.open();
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    setTimeout(() => {
+      win.print();
+    }, 350);
+  }
 }
