@@ -345,12 +345,7 @@ export function ProcessTemperatureSection({
     }
   };
 
-  // Auto-expand all reading slots on initial load
-  useEffect(() => {
-    if (readings.length > 0 && expandedSlots.size === 0) {
-      setExpandedSlots(new Set(readings.map((_, i) => i)));
-    }
-  }, [readings.length]);
+  // Mobile cards are collapsed by default on initial load. Users can expand individually or tap "Expand All".
 
   const toggleSlotExpanded = (idx: number) => {
     setExpandedSlots((prev) => {
@@ -942,69 +937,29 @@ export function ProcessTemperatureSection({
         </div>
       </div>
 
-      {/* ── Mobile Toolbar (Quick navigation & slot actions on < md) ── */}
-      <div className="flex md:hidden flex-col gap-2 p-3 bg-white rounded-xl border border-slate-200 shadow-xs">
-        <div className="flex items-center justify-between text-xs font-semibold text-slate-600">
-          <div className="flex items-center gap-1.5">
-            <span className="font-bold text-slate-900">{readings.length}</span>
-            <span>Time Slots Recorded</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setShowPrintModal(true)}
-              className="inline-flex items-center gap-1 text-xs text-slate-700 font-semibold hover:text-primary"
-            >
-              <Printer className="h-3 w-3 text-slate-500" />
-              <span>Print</span>
-            </button>
-            <span className="text-slate-300">•</span>
-            <button
-              type="button"
-              onClick={handleExpandAll}
-              className="text-xs text-primary hover:underline font-semibold"
-            >
-              Expand All
-            </button>
-            <span className="text-slate-300">•</span>
-            <button
-              type="button"
-              onClick={handleCollapseAll}
-              className="text-xs text-slate-500 hover:underline font-medium"
-            >
-              Collapse All
-            </button>
-          </div>
+      {/* ── Mobile Toolbar (Expand All / Collapse All on < md) ── */}
+      <div className="flex md:hidden items-center justify-between p-3 bg-white rounded-xl border border-slate-200 shadow-xs text-xs font-semibold text-slate-600">
+        <div className="flex items-center gap-1.5">
+          <span className="font-bold text-slate-900">{readings.length}</span>
+          <span>Time Slots Recorded</span>
         </div>
-
-        {/* Horizontal Quick-Jump Chips */}
-        {readings.length > 0 && (
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar pt-1">
-            {readings.map((r, i) => {
-              const isLocked = isRowLocked(r, i);
-              return (
-                <button
-                  key={i}
-                  type="button"
-                  onClick={() => {
-                    setExpandedSlots((prev) => new Set([...prev, i]));
-                    const el = document.getElementById(`reading-slot-${i}`);
-                    el?.scrollIntoView({ behavior: "smooth", block: "start" });
-                  }}
-                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold shrink-0 border transition-all ${
-                    isLocked
-                      ? "bg-slate-100 text-slate-500 border-slate-200"
-                      : "bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100"
-                  }`}
-                >
-                  {isLocked ? <Lock className="h-2.5 w-2.5 text-slate-400" /> : <Clock className="h-2.5 w-2.5 text-amber-600" />}
-                  <span>{r.time || `#${i + 1}`}</span>
-                  {r.photoUrl && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />}
-                </button>
-              );
-            })}
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleExpandAll}
+            className="text-xs text-primary hover:underline font-semibold cursor-pointer"
+          >
+            Expand All
+          </button>
+          <span className="text-slate-300">•</span>
+          <button
+            type="button"
+            onClick={handleCollapseAll}
+            className="text-xs text-slate-500 hover:underline font-medium cursor-pointer"
+          >
+            Collapse All
+          </button>
+        </div>
       </div>
 
       {/* ── Mobile Readings Cards (< md) ── */}
