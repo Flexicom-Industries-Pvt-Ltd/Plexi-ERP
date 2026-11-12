@@ -21,6 +21,8 @@ import {
   ArrowRightLeft,
   Maximize2,
   Minimize2,
+  Camera,
+  Image as ImageIcon,
 } from "lucide-react";
 import {
   LoomRollCuttingEntryItem,
@@ -41,6 +43,11 @@ import { UniversalPersonnelInput } from "@/components/ui/UniversalPersonnelInput
 
 const LoomRollCuttingPrintModal = dynamic(
   () => import("./LoomRollCuttingPrintModal").then((m) => m.LoomRollCuttingPrintModal),
+  { ssr: false }
+);
+
+const PhotoEvidenceModal = dynamic(
+  () => import("@/components/tape-plant/PhotoEvidenceModal").then((m) => m.PhotoEvidenceModal),
   { ssr: false }
 );
 
@@ -100,9 +107,31 @@ export function LoomRollCuttingSection() {
   const [availableContractors, setAvailableContractors] = useState<AvailableContractor[]>([]);
   const [availableSupervisors, setAvailableSupervisors] = useState<AvailableSupervisor[]>([]);
   const [loomAllocations, setLoomAllocations] = useState<Record<number, { qualityCode: string; size: string; denier: string }>>({});
-  const [suggestedRollNumber, setSuggestedRollNumber] = useState("CT-14376");
+  const [suggestedRollNumber, setSuggestedRollNumber] = useState("ROL-202611-00001");
   const [printModalOpen, setPrintModalOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Evidence Photo Attachment & RBAC State (Live Camera Capture vs File Upload)
+  const [photoModalIndex, setPhotoModalIndex] = useState<number | null>(null);
+  const [canUploadPhoto, setCanUploadPhoto] = useState<boolean>(true);
+  const [canCapturePhoto, setCanCapturePhoto] = useState<boolean>(true);
+  const [userRole, setUserRole] = useState<string>("");
+
+  useEffect(() => {
+    fetch("/api/auth/session")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((session) => {
+        if (!session?.user) return;
+        setUserRole(session.user.role || "");
+        setCanUploadPhoto(Boolean(session.user.canUploadPhoto));
+        setCanCapturePhoto(
+          session.user.canCapturePhoto !== undefined ? Boolean(session.user.canCapturePhoto) : true
+        );
+      })
+      .catch((err) => {
+        console.warn("Could not determine user session for RBAC:", err);
+      });
+  }, []);
 
   // Close fullscreen on Escape
   useEffect(() => {
@@ -462,9 +491,22 @@ export function LoomRollCuttingSection() {
   };
 
   // Add new roll entry
-  const handleAddEntry = () => {
+  const handleAddEntry = async () => {
+    let nextRoll = suggestedRollNumber;
+    try {
+      const res = await fetch(`/api/production/loom/roll-cutting?action=next-roll&date=${selectedDate}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.rollNumber) {
+          nextRoll = data.rollNumber;
+        }
+      }
+    } catch {
+      const lastEntry = entries[entries.length - 1];
+      nextRoll = generateNextRollNumber(lastEntry?.rollNumber || suggestedRollNumber, selectedDate);
+    }
+
     const lastEntry = entries[entries.length - 1];
-    const nextRoll = generateNextRollNumber(lastEntry?.rollNumber || suggestedRollNumber);
     const defaultLoom = lastEntry ? (Number(lastEntry.loomNumber) % 91) + 1 : 1;
     const alloc = loomAllocations[defaultLoom];
 
@@ -484,16 +526,29 @@ export function LoomRollCuttingSection() {
       avgWeightPerMeter: 0,
       supervisorSign: supervisorName,
       remarks: "",
+      photoUrl: null,
     };
 
     setEntries((prev) => [...prev, newEntry]);
-    setSuggestedRollNumber(generateNextRollNumber(nextRoll));
+    setSuggestedRollNumber(generateNextRollNumber(nextRoll, selectedDate));
   };
 
   // Duplicate an entry
-  const handleDuplicateEntry = (index: number) => {
+  const handleDuplicateEntry = async (index: number) => {
     const target = entries[index];
-    const nextRoll = generateNextRollNumber(target.rollNumber);
+    let nextRoll = generateNextRollNumber(suggestedRollNumber || target.rollNumber, selectedDate);
+    try {
+      const res = await fetch(`/api/production/loom/roll-cutting?action=next-roll&date=${selectedDate}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.rollNumber) {
+          nextRoll = data.rollNumber;
+        }
+      }
+    } catch {
+      // fallback
+    }
+
     const newEntry: LoomRollCuttingEntryItem = {
       ...target,
       id: undefined,
@@ -507,8 +562,10 @@ export function LoomRollCuttingSection() {
       tareWeightKg: target.tareWeightKg !== undefined ? target.tareWeightKg : 1.2,
       nettWeightKg: 0,
       avgWeightPerMeter: 0,
+      photoUrl: null, // Always require fresh photo for physical evidence
     };
     setEntries((prev) => [...prev, newEntry]);
+    setSuggestedRollNumber(generateNextRollNumber(nextRoll, selectedDate));
     toast.success(`Duplicated entry #${index + 1} with Roll #${nextRoll}`);
   };
 
@@ -889,25 +946,26 @@ export function LoomRollCuttingSection() {
         </div>
 
         <div className={isFullscreen ? "overflow-x-auto overflow-y-auto flex-1 border rounded-lg bg-card" : "overflow-x-auto min-h-[300px]"}>
-          <table className="w-full text-xs text-left border-collapse min-w-[2140px]">
+          <table className="w-full text-xs text-left border-collapse min-w-[2200px]">
             <thead>
-              <tr className="bg-slate-900 border-b border-slate-800 text-xs font-bold uppercase tracking-wider text-white">
-                <th className="p-3 text-center border-r border-slate-800 w-14 min-w-[56px] text-white font-bold">S.No.</th>
-                <th className="p-3 border-r border-slate-800 w-36 min-w-[144px] text-white font-bold">Roll No.</th>
-                <th className="p-3 border-r border-slate-800 w-36 min-w-[130px] text-center text-white font-bold">Loom #</th>
-                <th className="p-3 border-r border-slate-800 w-28 min-w-[100px] text-center text-white font-bold">Size (mm)</th>
-                <th className="p-3 border-r border-slate-800 w-80 min-w-[300px] text-white font-bold">Quality Code</th>
-                <th className="p-3 border-r border-slate-800 w-64 min-w-[240px] text-white font-bold">Contractor</th>
-                <th className="p-3 border-r border-slate-800 w-32 min-w-[120px] text-right text-white font-bold">Init Reading</th>
-                <th className="p-3 border-r border-slate-800 w-32 min-w-[120px] text-right text-white font-bold">Final Reading</th>
-                <th className="p-3 border-r border-slate-800 w-28 min-w-[110px] text-right bg-slate-950 text-white font-extrabold">Meter</th>
-                <th className="p-3 border-r border-slate-800 w-32 min-w-[120px] text-right text-white font-bold">Gross Wt (kg)</th>
-                <th className="p-3 border-r border-slate-800 w-28 min-w-[100px] text-right text-slate-300 font-bold">Tare (kg)</th>
-                <th className="p-3 border-r border-slate-800 w-32 min-w-[120px] text-right font-extrabold text-emerald-300 bg-emerald-950/70">Nett (kg)</th>
-                <th className="p-3 border-r border-slate-800 w-28 min-w-[110px] text-right text-purple-300 font-extrabold bg-purple-950/70">Avg (g/m)</th>
-                <th className="p-3 border-r border-slate-800 w-44 min-w-[160px] text-center text-white font-bold">Sup. Sign</th>
-                <th className="p-3 border-r border-slate-800 w-64 min-w-[220px] text-white font-bold">Remarks</th>
-                <th className="p-3 text-center border-slate-800 w-28 min-w-[100px] text-white font-bold">Actions</th>
+              <tr className="bg-slate-100 border-b border-slate-200 text-xs font-bold uppercase tracking-wider text-slate-700">
+                <th className="p-3 text-center border-r border-slate-200 w-14 min-w-[56px] text-slate-700 font-bold">S.No.</th>
+                <th className="p-3 border-r border-slate-200 w-44 min-w-[170px] text-center text-slate-700 font-bold">Roll No.</th>
+                <th className="p-3 border-r border-slate-200 w-28 min-w-[100px] text-center text-slate-700 font-bold">Photo</th>
+                <th className="p-3 border-r border-slate-200 w-32 min-w-[120px] text-center text-slate-700 font-bold">Loom #</th>
+                <th className="p-3 border-r border-slate-200 w-28 min-w-[100px] text-center text-slate-700 font-bold">Size (mm)</th>
+                <th className="p-3 border-r border-slate-200 w-80 min-w-[300px] text-slate-700 font-bold">Quality Code</th>
+                <th className="p-3 border-r border-slate-200 w-64 min-w-[240px] text-slate-700 font-bold">Contractor</th>
+                <th className="p-3 border-r border-slate-200 w-32 min-w-[120px] text-right text-slate-700 font-bold">Init Reading</th>
+                <th className="p-3 border-r border-slate-200 w-32 min-w-[120px] text-right text-slate-700 font-bold">Final Reading</th>
+                <th className="p-3 border-r border-slate-200 w-28 min-w-[110px] text-right bg-slate-200/70 text-slate-900 font-extrabold">Meter</th>
+                <th className="p-3 border-r border-slate-200 w-32 min-w-[120px] text-right text-slate-700 font-bold">Gross Wt (kg)</th>
+                <th className="p-3 border-r border-slate-200 w-28 min-w-[100px] text-right text-slate-600 font-bold">Tare (kg)</th>
+                <th className="p-3 border-r border-slate-200 w-32 min-w-[120px] text-right font-extrabold text-emerald-800 bg-emerald-100/70">Nett (kg)</th>
+                <th className="p-3 border-r border-slate-200 w-28 min-w-[110px] text-right text-purple-800 font-extrabold bg-purple-100/70">Avg (g/m)</th>
+                <th className="p-3 border-r border-slate-200 w-44 min-w-[160px] text-center text-slate-700 font-bold">Sup. Sign</th>
+                <th className="p-3 border-r border-slate-200 w-64 min-w-[220px] text-slate-700 font-bold">Remarks</th>
+                <th className="p-3 text-center border-slate-200 w-28 min-w-[100px] text-slate-700 font-bold">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/60 font-sans">
@@ -919,15 +977,44 @@ export function LoomRollCuttingSection() {
                       {idx + 1}
                     </td>
 
-                    {/* Roll No */}
-                    <td className="p-2 border-r">
-                      <input
-                        type="text"
-                        value={entry.rollNumber}
-                        onChange={(e) => handleUpdateEntry(idx, "rollNumber", e.target.value)}
-                        className="w-full text-xs font-mono font-bold px-3 py-2 rounded-lg border bg-background text-foreground focus:ring-2 focus:ring-primary/20 outline-hidden uppercase shadow-2xs"
-                        placeholder="CT-14376"
-                      />
+                    {/* Roll No - Immutable System Generated Badge */}
+                    <td className="p-2 border-r text-center font-mono">
+                      <div className="flex items-center justify-center">
+                        <span
+                          data-testid={`roll-number-badge-${idx}`}
+                          className="inline-flex items-center px-2.5 py-1 text-xs font-bold font-mono tracking-tight bg-slate-100 text-slate-800 border border-slate-300 rounded-md shadow-2xs select-all"
+                          title="System-Generated Unique Roll Number (Immutable)"
+                        >
+                          {entry.rollNumber || "ROL-PENDING"}
+                        </span>
+                      </div>
+                    </td>
+
+                    {/* Evidence Photo Attachment Column */}
+                    <td className="p-2 border-r text-center">
+                      {entry.photoUrl ? (
+                        <div className="flex items-center justify-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => setPhotoModalIndex(idx)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-300 rounded-md text-[11px] font-bold transition-all cursor-pointer shadow-2xs"
+                            title="View / Replace Evidence Photo"
+                          >
+                            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                            <span>Photo</span>
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setPhotoModalIndex(idx)}
+                          className="inline-flex items-center gap-1 px-2 py-1 bg-slate-50 hover:bg-sky-50 text-slate-600 hover:text-sky-700 border border-slate-200 hover:border-sky-300 rounded-md text-[11px] font-medium transition-all cursor-pointer shadow-2xs"
+                          title="Attach Scale Reading / Physical Roll Evidence Photo"
+                        >
+                          <Camera className="h-3.5 w-3.5 text-slate-400" />
+                          <span>+ Photo</span>
+                        </button>
+                      )}
                     </td>
 
                     {/* Loom No - Fast Typing Input with Datalist */}
@@ -1266,6 +1353,24 @@ export function LoomRollCuttingSection() {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Evidence Photo Modal Governed by RBAC (Camera vs Upload) */}
+      {photoModalIndex !== null && entries[photoModalIndex] && (
+        <PhotoEvidenceModal
+          isOpen={photoModalIndex !== null}
+          onClose={() => setPhotoModalIndex(null)}
+          title={`Roll Evidence Photo — ${entries[photoModalIndex].rollNumber} (Loom #${entries[photoModalIndex].loomNumber})`}
+          timeSlot={`${selectedShift} - Loom #${entries[photoModalIndex].loomNumber}`}
+          currentPhotoUrl={entries[photoModalIndex].photoUrl || undefined}
+          allowUpload={canUploadPhoto}
+          allowCapture={canCapturePhoto}
+          disabled={false}
+          onSavePhoto={(url) => {
+            handleUpdateEntry(photoModalIndex, "photoUrl", url);
+            setPhotoModalIndex(null);
+          }}
+        />
       )}
 
       {/* Print Preview Modal */}

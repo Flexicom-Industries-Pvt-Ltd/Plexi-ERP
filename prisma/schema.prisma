@@ -2107,6 +2107,7 @@ model LoomRollCuttingEntry {
   supervisorSign    String?               // Name / Initials
   remarks           String?
   contractor        String?               // Contractor / Labour Agency name
+  photoUrl          String?               // Scale reading / physical roll evidence photo URL
   productionRollId  String?               // Reference to ProductionRoll if synced to central roll stock
   createdAt         DateTime              @default(now())
   updatedAt         DateTime              @updatedAt
