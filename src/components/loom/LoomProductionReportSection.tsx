@@ -21,6 +21,7 @@ import {
   Filter,
   Maximize2,
   Minimize2,
+  X,
 } from "lucide-react";
 import {
   LoomWiseRow,
@@ -216,7 +217,11 @@ export function LoomProductionReportSection() {
 
   return (
     <div className="space-y-6">
-      {/* Header Banner */}
+      {/* =========================================================================
+          DESKTOP VIEW (100% Preserved - 0 Regression)
+          ========================================================================= */}
+      <div className="hidden md:block space-y-6">
+        {/* Header Banner */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-5">
         <div>
           <div className="flex items-center gap-2.5">
@@ -957,6 +962,476 @@ export function LoomProductionReportSection() {
           </div>
         </div>
       )}
+        </div>
+      </div>
+      </div>
+
+      {/* =========================================================================
+          MOBILE VIEW (Touch-First App Experience)
+          ========================================================================= */}
+      <div className="block md:hidden space-y-3">
+        {/* Mobile Header Card */}
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-2xs">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="p-2 rounded-xl bg-sky-50 text-sky-700 border border-sky-200/90 shadow-2xs shrink-0">
+                <FileBarChart className="h-5 w-5 text-sky-600" />
+              </div>
+              <div className="min-w-0">
+                <h1 className="text-base font-bold text-slate-900 tracking-tight leading-tight truncate">
+                  Production Report
+                </h1>
+                <p className="text-[11px] font-mono text-slate-400 font-medium truncate">
+                  {startDate === endDate ? startDate : `${startDate} → ${endDate}`}
+                </p>
+              </div>
+            </div>
+
+            {/* Quick Actions */}
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                type="button"
+                onClick={fetchReport}
+                disabled={loading}
+                className="p-1.5 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg border border-slate-200 shadow-2xs transition-all cursor-pointer disabled:opacity-50"
+                title="Refresh Report"
+              >
+                <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+              </button>
+
+              <button
+                type="button"
+                onClick={handleExportExcel}
+                className="p-1.5 text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 rounded-lg border border-emerald-200 shadow-2xs transition-all cursor-pointer"
+                title="Export Excel"
+              >
+                <FileSpreadsheet className="h-4 w-4" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleOpenPrintModal(activeCriteria)}
+                disabled={loading}
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold text-white bg-sky-600 hover:bg-sky-700 rounded-lg shadow-2xs transition-all cursor-pointer disabled:opacity-50"
+                title="Print Report"
+              >
+                <Printer className="h-3.5 w-3.5" />
+                <span>Print</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Mobile 2x2 Bento KPI Cards */}
+        <div className="grid grid-cols-2 gap-2">
+          {/* Card 1: Cut Length */}
+          <div className="bg-white border border-slate-200/80 rounded-xl p-3 shadow-2xs">
+            <div className="flex items-center justify-between text-sky-500 mb-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-sky-700">Cut Length</span>
+              <span className="text-[10px] font-bold text-slate-400 font-mono">{kpis.totalRollsCut} Rolls</span>
+            </div>
+            <div className="flex items-baseline gap-1">
+              <span className="text-xl font-black font-mono text-sky-700">
+                {kpis.totalCutMeters.toLocaleString()}
+              </span>
+              <span className="text-[10px] font-bold text-sky-600">m</span>
+            </div>
+          </div>
+
+          {/* Card 2: Nett Weight */}
+          <div className="bg-white border border-slate-200/80 rounded-xl p-3 shadow-2xs">
+            <div className="flex items-center justify-between text-emerald-500 mb-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Nett Weight</span>
+              <span className="text-[10px] font-bold text-slate-400 font-mono">{kpis.totalNettMT} MT</span>
+            </div>
+            <div className="flex items-baseline gap-1">
+              <span className="text-xl font-black font-mono text-emerald-700">
+                {kpis.totalNettKg.toLocaleString()}
+              </span>
+              <span className="text-[10px] font-bold text-emerald-600">kg</span>
+            </div>
+          </div>
+
+          {/* Card 3: Avg Efficiency */}
+          <div className="bg-white border border-slate-200/80 rounded-xl p-3 shadow-2xs">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Efficiency</span>
+              <span className="text-[10px] font-bold text-purple-700 font-mono">{kpis.avgWeightPerMeter.toFixed(1)} g/m</span>
+            </div>
+            <div className="flex items-baseline gap-1">
+              <span
+                className={`text-xl font-black font-mono ${
+                  kpis.avgEfficiency >= 80
+                    ? "text-emerald-700"
+                    : kpis.avgEfficiency >= 65
+                    ? "text-amber-700"
+                    : "text-rose-700"
+                }`}
+              >
+                {kpis.avgEfficiency.toFixed(1)}%
+              </span>
+            </div>
+          </div>
+
+          {/* Card 4: Total Downtime */}
+          <div className="bg-white border border-slate-200/80 rounded-xl p-3 shadow-2xs">
+            <div className="flex items-center justify-between text-rose-500 mb-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-rose-700">Downtime</span>
+              <span className="text-[10px] font-bold text-slate-400">{kpis.activeLoomsCount} Looms</span>
+            </div>
+            <div className="flex items-baseline gap-1">
+              <span className="text-xl font-black font-mono text-rose-700">
+                {Math.round(kpis.totalBreakdownMinutes / 60)}h {kpis.totalBreakdownMinutes % 60}m
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Mobile Filters & Presets Card */}
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-3 shadow-2xs space-y-2.5">
+          {/* Date Presets Row */}
+          <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
+            {(["today", "yesterday", "week", "month"] as const).map((preset) => (
+              <button
+                key={preset}
+                type="button"
+                onClick={() => applyPreset(preset)}
+                className="px-2 py-1 rounded-md text-[10px] font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all shrink-0 cursor-pointer"
+              >
+                {preset === "today"
+                  ? "Today"
+                  : preset === "yesterday"
+                  ? "Yesterday"
+                  : preset === "week"
+                  ? "Last 7 Days"
+                  : "This Month"}
+              </button>
+            ))}
+          </div>
+
+          {/* Date Range Inputs */}
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1">
+                <Calendar className="h-2.5 w-2.5 text-slate-400" />
+                <span>From:</span>
+              </label>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="w-full text-xs font-mono px-2 py-1 rounded-lg border border-slate-200 bg-slate-50 text-slate-900"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1">
+                <Calendar className="h-2.5 w-2.5 text-slate-400" />
+                <span>To:</span>
+              </label>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="w-full text-xs font-mono px-2 py-1 rounded-lg border border-slate-200 bg-slate-50 text-slate-900"
+              />
+            </div>
+          </div>
+
+          {/* Dropdown Filters Grid */}
+          <div className="grid grid-cols-2 gap-1.5 pt-1 border-t border-slate-100">
+            <select
+              value={selectedShift}
+              onChange={(e) => setSelectedShift(e.target.value)}
+              className="w-full px-2 py-1.5 text-[11px] bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-medium"
+            >
+              <option value="ALL">All Shifts</option>
+              <option value="Day Shift">Day Shift</option>
+              <option value="Night Shift">Night Shift</option>
+            </select>
+
+            <select
+              value={selectedLoom}
+              onChange={(e) => setSelectedLoom(e.target.value)}
+              className="w-full px-2 py-1.5 text-[11px] bg-slate-50 border border-slate-200 rounded-lg text-slate-900 font-medium"
+            >
+              <option value="ALL">All Looms</option>
+              {Array.from({ length: 91 }, (_, i) => i + 1).map((num) => (
+                <option key={num} value={num}>
+                  Loom #{num}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Mobile Segmented Criteria Switcher Pills */}
+        <div className="grid grid-cols-4 gap-1 p-1 bg-slate-100 rounded-xl">
+          {(["LOOM", "SUPERVISOR", "OPERATOR", "CONSOLIDATED"] as const).map((c) => (
+            <button
+              key={c}
+              type="button"
+              onClick={() => setActiveCriteria(c)}
+              className={`py-1.5 px-1 rounded-lg text-[10px] font-bold transition-all text-center truncate cursor-pointer ${
+                activeCriteria === c
+                  ? "bg-white text-slate-900 shadow-2xs font-black"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              {c === "LOOM"
+                ? `Looms (${loomWise.length})`
+                : c === "SUPERVISOR"
+                ? `Sup (${supervisorWise.length})`
+                : c === "OPERATOR"
+                ? `Ops (${operatorWise.length})`
+                : "All"}
+            </button>
+          ))}
+        </div>
+
+        {/* Search bar inside selected criteria */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+          <input
+            type="text"
+            placeholder={`Filter ${activeCriteria.toLowerCase()} records...`}
+            value={tableSearch}
+            onChange={(e) => setTableSearch(e.target.value)}
+            className="w-full pl-8 pr-7 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-sky-500 text-slate-900 placeholder:text-slate-400 transition-all shadow-2xs"
+          />
+          {tableSearch && (
+            <button
+              type="button"
+              onClick={() => setTableSearch("")}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+
+        {/* Mobile Cards Feed */}
+        <div className="space-y-2.5">
+          {loading ? (
+            <div className="bg-white border border-slate-200 rounded-2xl p-8 text-center text-xs text-slate-500 flex flex-col items-center justify-center gap-2 shadow-2xs">
+              <RefreshCw className="h-5 w-5 animate-spin text-slate-500" />
+              <span>Compiling production analytics...</span>
+            </div>
+          ) : activeCriteria === "LOOM" ? (
+            filteredLoomWise.length === 0 ? (
+              <div className="bg-white border border-slate-200 rounded-2xl p-6 text-center text-xs text-slate-400 shadow-2xs">
+                No loom performance data found.
+              </div>
+            ) : (
+              filteredLoomWise.map((r) => (
+                <div key={r.loomNumber} className="bg-white border border-slate-200/80 rounded-2xl p-3 shadow-2xs space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="px-2 py-0.5 text-xs font-mono font-bold rounded-lg bg-sky-50 text-sky-800 border border-sky-200">
+                      Loom #{r.loomNumber}
+                    </span>
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-[11px] font-mono font-bold ${
+                        r.avgEfficiency >= 80
+                          ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                          : r.avgEfficiency >= 65
+                          ? "bg-amber-50 text-amber-700 border border-amber-200"
+                          : "bg-rose-50 text-rose-700 border border-rose-200"
+                      }`}
+                    >
+                      {r.avgEfficiency.toFixed(1)}% Eff
+                    </span>
+                  </div>
+
+                  <div className="text-xs font-bold text-slate-800 truncate">
+                    {r.qualities || "No Active Quality"}
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-1 bg-slate-50/80 p-2 rounded-xl border border-slate-100 text-center">
+                    <div>
+                      <span className="block text-[9px] font-bold uppercase text-slate-400">Meters</span>
+                      <span className="text-xs font-black font-mono text-sky-700">
+                        {r.cutMeters.toLocaleString()}m
+                      </span>
+                    </div>
+                    <div className="border-x border-slate-200/60">
+                      <span className="block text-[9px] font-bold uppercase text-emerald-600">Nett Wt</span>
+                      <span className="text-xs font-black font-mono text-emerald-700">
+                        {r.nettWeightKg.toFixed(1)}kg
+                      </span>
+                    </div>
+                    <div>
+                      <span className="block text-[9px] font-bold uppercase text-slate-400">Rolls</span>
+                      <span className="text-xs font-black font-mono text-slate-900">
+                        {r.totalRolls}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1 border-t border-slate-100 font-medium">
+                    <span>Linear: {r.avgWeightPerMeter.toFixed(1)} g/m</span>
+                    <span className={r.breakdownMinutes > 0 ? "text-rose-600 font-bold" : "text-slate-400"}>
+                      Downtime: {r.breakdownMinutes}m {r.primaryBreakdownReason ? `(${r.primaryBreakdownReason})` : ""}
+                    </span>
+                  </div>
+                </div>
+              ))
+            )
+          ) : activeCriteria === "SUPERVISOR" ? (
+            filteredSupervisorWise.length === 0 ? (
+              <div className="bg-white border border-slate-200 rounded-2xl p-6 text-center text-xs text-slate-400 shadow-2xs">
+                No supervisor records found.
+              </div>
+            ) : (
+              filteredSupervisorWise.map((r) => (
+                <div key={r.supervisorName} className="bg-white border border-slate-200/80 rounded-2xl p-3 shadow-2xs space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-full bg-sky-100 text-sky-700 flex items-center justify-center font-bold text-xs">
+                        {r.supervisorName.charAt(0).toUpperCase()}
+                      </div>
+                      <span className="text-xs font-bold text-slate-900">{r.supervisorName}</span>
+                    </div>
+                    <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-bold font-mono">
+                      {r.sharePct.toFixed(1)}% Share
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-1 bg-slate-50/80 p-2 rounded-xl border border-slate-100 text-center">
+                    <div>
+                      <span className="block text-[9px] font-bold uppercase text-slate-400">Rolls Cut</span>
+                      <span className="text-xs font-black font-mono text-slate-900">{r.totalRolls}</span>
+                    </div>
+                    <div className="border-x border-slate-200/60">
+                      <span className="block text-[9px] font-bold uppercase text-sky-600">Meters</span>
+                      <span className="text-xs font-black font-mono text-sky-700">{r.cutMeters.toLocaleString()}m</span>
+                    </div>
+                    <div>
+                      <span className="block text-[9px] font-bold uppercase text-emerald-600">Nett Wt</span>
+                      <span className="text-xs font-black font-mono text-emerald-700">{r.nettWeightKg.toFixed(1)}kg</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1 border-t border-slate-100 font-medium">
+                    <span>{r.shiftsSupervised} Shifts Supervised</span>
+                    <span>{r.loomsCoveredCount} Looms Covered</span>
+                  </div>
+                </div>
+              ))
+            )
+          ) : activeCriteria === "OPERATOR" ? (
+            filteredOperatorWise.length === 0 ? (
+              <div className="bg-white border border-slate-200 rounded-2xl p-6 text-center text-xs text-slate-400 shadow-2xs">
+                No operator records found.
+              </div>
+            ) : (
+              filteredOperatorWise.map((r) => (
+                <div key={r.operatorName} className="bg-white border border-slate-200/80 rounded-2xl p-3 shadow-2xs space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center font-bold text-xs">
+                        {r.operatorName.charAt(0).toUpperCase()}
+                      </div>
+                      <span className="text-xs font-bold text-slate-900">{r.operatorName}</span>
+                    </div>
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${
+                        r.avgEfficiency >= 80
+                          ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                          : r.avgEfficiency >= 65
+                          ? "bg-amber-50 text-amber-700 border border-amber-200"
+                          : "bg-rose-50 text-rose-700 border border-rose-200"
+                      }`}
+                    >
+                      {r.avgEfficiency.toFixed(1)}% Eff
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-1 bg-slate-50/80 p-2 rounded-xl border border-slate-100 text-center">
+                    <div>
+                      <span className="block text-[9px] font-bold uppercase text-sky-600">Meters</span>
+                      <span className="text-xs font-black font-mono text-sky-700">
+                        {r.totalProductionMeters.toLocaleString()}m
+                      </span>
+                    </div>
+                    <div className="border-x border-slate-200/60">
+                      <span className="block text-[9px] font-bold uppercase text-slate-400">Shift Logs</span>
+                      <span className="text-xs font-black font-mono text-slate-900">{r.shiftLogsCount}</span>
+                    </div>
+                    <div>
+                      <span className="block text-[9px] font-bold uppercase text-rose-600">Downtime</span>
+                      <span className="text-xs font-black font-mono text-rose-700">{r.breakdownMinutes}m</span>
+                    </div>
+                  </div>
+
+                  <div className="text-[10px] text-slate-500 pt-1 border-t border-slate-100 truncate">
+                    Looms: {r.loomsList || "—"}
+                  </div>
+                </div>
+              ))
+            )
+          ) : (
+            /* CONSOLIDATED VIEW */
+            <div className="space-y-4">
+              {/* Loom summary block */}
+              <div className="bg-white border border-slate-200/80 rounded-2xl p-3 shadow-2xs space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                    Loom Output ({loomWise.length} Looms)
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handlePrint("LOOM")}
+                    className="text-[11px] font-bold text-sky-600 inline-flex items-center gap-1 cursor-pointer"
+                  >
+                    <Printer className="h-3 w-3" />
+                    <span>Print</span>
+                  </button>
+                </div>
+                <div className="text-[11px] text-slate-500">
+                  Total Production: <span className="font-bold text-sky-700 font-mono">{kpis.totalCutMeters.toLocaleString()} m</span> across {kpis.activeLoomsCount} active looms.
+                </div>
+              </div>
+
+              {/* Supervisor summary block */}
+              <div className="bg-white border border-slate-200/80 rounded-2xl p-3 shadow-2xs space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                    Supervisor Performance ({supervisorWise.length} In-Charges)
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handlePrint("SUPERVISOR")}
+                    className="text-[11px] font-bold text-sky-600 inline-flex items-center gap-1 cursor-pointer"
+                  >
+                    <Printer className="h-3 w-3" />
+                    <span>Print</span>
+                  </button>
+                </div>
+                <div className="text-[11px] text-slate-500">
+                  Total Rolls Cut: <span className="font-bold text-slate-900 font-mono">{kpis.totalRollsCut}</span> • Weight: <span className="font-bold text-emerald-700 font-mono">{kpis.totalNettKg.toLocaleString()} kg</span>
+                </div>
+              </div>
+
+              {/* Operator summary block */}
+              <div className="bg-white border border-slate-200/80 rounded-2xl p-3 shadow-2xs space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                    Operator Statistics ({operatorWise.length} Operators)
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handlePrint("OPERATOR")}
+                    className="text-[11px] font-bold text-purple-600 inline-flex items-center gap-1 cursor-pointer"
+                  >
+                    <Printer className="h-3 w-3" />
+                    <span>Print</span>
+                  </button>
+                </div>
+                <div className="text-[11px] text-slate-500">
+                  Avg Efficiency: <span className="font-bold text-emerald-700 font-mono">{kpis.avgEfficiency.toFixed(1)}%</span> • Total Downtime: <span className="font-bold text-rose-700 font-mono">{Math.round(kpis.totalBreakdownMinutes / 60)}h {kpis.totalBreakdownMinutes % 60}m</span>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
