@@ -696,7 +696,7 @@ export function ValvomaticWastageClient() {
       </div>
 
       {/* Main Wastage Table Card */}
-      <div className="bg-white border border-slate-200 rounded-xl shadow-xs overflow-hidden">
+      <div className="hidden md:block bg-white border border-slate-200 rounded-xl shadow-xs overflow-hidden">
         <div className="p-3 bg-slate-50/80 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
@@ -1026,6 +1026,311 @@ export function ValvomaticWastageClient() {
             placeholder="Add any specific observations for this shift's scrap generation (e.g. edge trimming variation, printing defect rolls sent to recycling)..."
             className="w-full text-xs p-2 border border-slate-300 rounded-lg focus:outline-hidden focus:ring-1 focus:ring-primary bg-white"
           />
+        </div>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* MOBILE TOUCH FEED (<md) - ZERO DESKTOP REGRESSION                        */}
+      {/* ========================================================================= */}
+      <div className="block md:hidden space-y-4">
+        {/* Mobile Toolbar */}
+        <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-2xs flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={handleSyncFromDailyProduction}
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-sky-50 text-sky-700 border border-sky-300 text-xs font-semibold active:scale-95 transition-all"
+              title="Populate roll numbers and production kg from daily report"
+            >
+              <ArrowDownToLine className="h-3.5 w-3.5 text-sky-600" />
+              <span>Sync ({linkedProductionEntries.length})</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleAddRow}
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-primary text-white text-xs font-bold shadow-xs active:scale-95 transition-all"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              <span>Add</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleAdd5Rows}
+              className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg border border-slate-200 bg-slate-50 text-slate-700 text-xs font-semibold active:scale-95 transition-all"
+            >
+              <Plus className="h-3.5 w-3.5 text-slate-400" />
+              <span>+5</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleResetToBlank}
+              className="p-1.5 rounded-lg border border-slate-200 bg-slate-50 text-slate-600 hover:text-rose-600 active:scale-95 transition-all"
+              title="Reset blank"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+            </button>
+          </div>
+          <span className="text-xs font-bold font-mono text-rose-700 bg-rose-50 px-2.5 py-1 rounded-full border border-rose-200">
+            {totals.totalWastageKg.toFixed(1)} kg waste
+          </span>
+        </div>
+
+        {/* Mobile Cards List */}
+        <div className="space-y-3">
+          {entries.length === 0 ? (
+            <div className="bg-white rounded-xl border border-dashed border-slate-300 p-8 text-center text-slate-400 text-xs">
+              No wastage entries. Tap &quot;Sync&quot; or &quot;Add&quot; to begin.
+            </div>
+          ) : (
+            entries.map((entry, index) => (
+              <div
+                key={index}
+                className="bg-white border border-slate-200/90 rounded-xl shadow-2xs overflow-hidden"
+              >
+                {/* Card Header Strip */}
+                <div className="bg-slate-50/90 px-3.5 py-2 border-b border-slate-100 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="h-5 w-5 rounded-md bg-slate-900 text-white font-bold text-[10px] flex items-center justify-center">
+                      {entry.sequence}
+                    </span>
+                    <span className="text-xs font-mono font-bold text-slate-900">
+                      {entry.rollNumber ? entry.rollNumber : `Roll ${index + 1}`}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {entry.totalWasteKg > 0 && (
+                      <span className="text-xs font-black font-mono text-rose-700 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200">
+                        {entry.totalWasteKg.toFixed(2)} kg ({entry.totalWastePct.toFixed(1)}%)
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteRow(index)}
+                      className="p-1 text-slate-400 hover:text-rose-600 rounded active:scale-90 transition-all"
+                      title="Delete row"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="p-3.5 space-y-3 text-xs">
+                  {/* Quality & Gross Prod */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                        Quality
+                      </label>
+                      <UniversalQualityInput
+                        value={entry.quality || ""}
+                        onChange={(newVal) => handleCellChange(index, "quality", newVal)}
+                        placeholder="Select quality..."
+                        compact={false}
+                        inputClassName="h-9 text-xs font-semibold"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
+                          Roll Number
+                        </label>
+                        <input
+                          type="text"
+                          value={entry.rollNumber}
+                          onChange={(e) => handleCellChange(index, "rollNumber", e.target.value)}
+                          placeholder="e.g. V-101"
+                          className="w-full h-9 px-2.5 text-xs font-mono font-bold border border-slate-200 rounded-md focus:ring-1 focus:ring-primary"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-teal-800 mb-0.5">
+                          Gross Prod (Kg)
+                        </label>
+                        <input
+                          type="number"
+                          step="0.1"
+                          value={entry.productionKg || ""}
+                          onChange={(e) => handleCellChange(index, "productionKg", parseFloat(e.target.value) || 0)}
+                          placeholder="0.0"
+                          className="w-full h-9 px-2.5 text-xs font-mono font-black text-teal-900 bg-teal-50/40 border border-teal-200 rounded-md focus:ring-1 focus:ring-teal-500"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Scrap Streams Input Grid */}
+                  <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100 space-y-2">
+                    <span className="text-[10px] font-bold uppercase text-slate-600 tracking-wider block">
+                      Scrap Streams (Kg)
+                    </span>
+                    <div className="grid grid-cols-3 gap-2 text-center">
+                      <div>
+                        <span className="text-[9px] uppercase font-bold text-slate-500 block">Loom Waste</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={entry.loomWasteKg || ""}
+                          onChange={(e) => handleCellChange(index, "loomWasteKg", parseFloat(e.target.value) || 0)}
+                          placeholder="0.00"
+                          className="w-full h-7 text-center font-mono font-bold text-xs border border-slate-200 rounded bg-white"
+                        />
+                        <span className="text-[9px] text-slate-400 font-mono block mt-0.5">
+                          {entry.loomWastePct > 0 ? `${entry.loomWastePct.toFixed(1)}%` : "—"}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[9px] uppercase font-bold text-slate-500 block">Lam Waste</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={entry.lamWasteKg || ""}
+                          onChange={(e) => handleCellChange(index, "lamWasteKg", parseFloat(e.target.value) || 0)}
+                          placeholder="0.00"
+                          className="w-full h-7 text-center font-mono font-bold text-xs border border-slate-200 rounded bg-white"
+                        />
+                        <span className="text-[9px] text-slate-400 font-mono block mt-0.5">
+                          {entry.lamWastePct > 0 ? `${entry.lamWastePct.toFixed(1)}%` : "—"}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[9px] uppercase font-bold text-slate-500 block">Print Waste</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={entry.printWasteKg || ""}
+                          onChange={(e) => handleCellChange(index, "printWasteKg", parseFloat(e.target.value) || 0)}
+                          placeholder="0.00"
+                          className="w-full h-7 text-center font-mono font-bold text-xs border border-slate-200 rounded bg-white"
+                        />
+                        <span className="text-[9px] text-slate-400 font-mono block mt-0.5">
+                          {entry.printWastePct > 0 ? `${entry.printWastePct.toFixed(1)}%` : "—"}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-center pt-1 border-t border-slate-200/60">
+                      <div>
+                        <span className="text-[9px] uppercase font-bold text-amber-700 block">Machine Waste</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={entry.machineWasteKg || ""}
+                          onChange={(e) => handleCellChange(index, "machineWasteKg", parseFloat(e.target.value) || 0)}
+                          placeholder="0.00"
+                          className="w-full h-7 text-center font-mono font-bold text-xs border border-amber-200 rounded bg-white text-amber-800"
+                        />
+                        <span className="text-[9px] text-amber-600 font-mono block mt-0.5">
+                          {entry.machineWastePct > 0 ? `${entry.machineWastePct.toFixed(1)}%` : "—"}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[9px] uppercase font-bold text-indigo-700 block">Cover Patch Waste</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={entry.coverPatchWasteKg || ""}
+                          onChange={(e) => handleCellChange(index, "coverPatchWasteKg", parseFloat(e.target.value) || 0)}
+                          placeholder="0.00"
+                          className="w-full h-7 text-center font-mono font-bold text-xs border border-indigo-200 rounded bg-white text-indigo-800"
+                        />
+                        <span className="text-[9px] text-indigo-600 font-mono block mt-0.5">
+                          {entry.coverPatchWastePct > 0 ? `${entry.coverPatchWastePct.toFixed(1)}%` : "—"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Waste & Net Yield Summary Pills */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="bg-rose-50/60 p-2 rounded-lg border border-rose-200 flex items-center justify-between">
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-rose-700 block">Total Waste</span>
+                        <span className="text-[10px] text-rose-600 font-mono">{entry.totalWastePct.toFixed(1)}% of prod</span>
+                      </div>
+                      <span className="font-mono font-black text-rose-800 text-sm">
+                        {entry.totalWasteKg.toFixed(2)} kg
+                      </span>
+                    </div>
+                    <div className="bg-emerald-50/60 p-2 rounded-lg border border-emerald-200 flex items-center justify-between">
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-emerald-700 block">Net Good Prod</span>
+                        <span className="text-[10px] text-emerald-600">Net yield</span>
+                      </div>
+                      <span className="font-mono font-black text-emerald-800 text-sm">
+                        {entry.netProductionKg.toFixed(1)} kg
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Remarks Input */}
+                  <div>
+                    <input
+                      type="text"
+                      value={entry.remarks || ""}
+                      onChange={(e) => handleCellChange(index, "remarks", e.target.value)}
+                      placeholder="Scrap observations or recycling notes..."
+                      className="w-full h-8 px-2.5 text-xs border border-slate-200 rounded-md focus:ring-1 focus:ring-primary"
+                    />
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Mobile Remarks Card */}
+        <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-2xs">
+          <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+            Wastage Remarks / Scrap Observations / Recycling Route
+          </label>
+          <textarea
+            rows={2}
+            value={remarks}
+            onChange={(e) => {
+              isDirtyRef.current = true;
+              setRemarks(e.target.value);
+            }}
+            placeholder="Add any specific observations for this shift's scrap generation..."
+            className="w-full text-xs p-2.5 border border-slate-200 rounded-lg focus:outline-hidden focus:ring-1 focus:ring-primary bg-white"
+          />
+        </div>
+
+        {/* Mobile Sticky Actions Bar */}
+        <div className="sticky bottom-3 z-20 bg-slate-900 text-white rounded-2xl p-3 shadow-xl border border-slate-800 flex items-center justify-between gap-3">
+          <div className="leading-tight">
+            <span className="text-[10px] uppercase font-bold text-slate-400 block">Total Shift Scrap</span>
+            <div className="flex items-center gap-2">
+              <span className="text-base font-black font-mono text-rose-400">
+                {totals.totalWastageKg.toFixed(1)} <span className="text-xs font-normal">kg</span>
+              </span>
+              <span className="text-xs text-amber-300 font-mono">
+                ({totals.totalWastagePct.toFixed(1)}%)
+              </span>
+              <span className="text-[10px] text-emerald-400 font-mono font-bold ml-1">
+                Net: {totals.totalNetProductionKg.toFixed(1)} kg
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => saveWastageReport("DRAFT")}
+              disabled={saving}
+              className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold active:scale-95 transition-all flex items-center gap-1.5 border border-slate-700"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${saving ? "animate-spin" : ""}`} />
+              <span>Draft</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => saveWastageReport("SUBMITTED")}
+              disabled={saving}
+              className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold active:scale-95 transition-all flex items-center gap-1.5 shadow-lg shadow-emerald-950/40"
+            >
+              <FileCheck className="h-3.5 w-3.5" />
+              <span>Submit</span>
+            </button>
+          </div>
         </div>
       </div>
 
