@@ -517,8 +517,8 @@ export function PrintingWastageClient() {
         </div>
       </div>
 
-      {/* Main Wastage Table */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+      {/* Main Wastage Table (Desktop: hidden md:block) */}
+      <div className="hidden md:block bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
         <div className="p-3 bg-slate-50/70 border-b border-slate-200 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="h-2 w-2 rounded-full bg-amber-500"></span>
@@ -671,6 +671,239 @@ export function PrintingWastageClient() {
               </tr>
             </tfoot>
           </table>
+        </div>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* MOBILE-RESPONSIVE TOUCH VIEW (<md) - ZERO DESKTOP REGRESSION */}
+      {/* ========================================================================= */}
+      <div className="block md:hidden space-y-4">
+        {/* CARD 1: LAMINATION FABRIC WASTE */}
+        <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden">
+          <div className="bg-amber-50/80 px-3.5 py-2.5 border-b border-amber-100 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="p-1 rounded-md bg-amber-100 text-amber-700">
+                <Layers className="w-4 h-4" />
+              </div>
+              <h3 className="text-xs font-bold text-amber-950">
+                1. Lamination Fabric Waste
+              </h3>
+            </div>
+            <span className="text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-amber-100/80 text-amber-800 border border-amber-200">
+              {calc.laminationFabricWastePct.toFixed(2)}%
+            </span>
+          </div>
+
+          <div className="p-3.5 space-y-3">
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-[11px] font-semibold text-slate-600">
+                  Base Production Net Weight
+                </label>
+                {totalProductionKg > 0 ? (
+                  <span className="text-[10px] text-emerald-600 font-bold flex items-center gap-1">
+                    <CheckCircle2 className="w-2.5 h-2.5" /> Synced
+                  </span>
+                ) : (
+                  <span className="text-[10px] text-amber-600 font-medium">Manual</span>
+                )}
+              </div>
+              <div className="relative">
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  value={totalProductionKg}
+                  onChange={(e) => setTotalProductionKg(parseFloat(e.target.value) || 0)}
+                  placeholder="0.00"
+                  className="w-full h-9 px-3 text-xs font-bold text-slate-900 pr-7 bg-slate-50 border border-slate-200 rounded-lg focus:ring-1 focus:ring-primary"
+                />
+                <span className="absolute right-2.5 top-2.5 text-[10px] font-bold text-slate-400 pointer-events-none">
+                  kg
+                </span>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold text-amber-900 mb-1">
+                Lamination Fabric Waste Weight
+              </label>
+              <div className="relative">
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={laminationFabricWasteKg}
+                  onChange={(e) => setLaminationFabricWasteKg(e.target.value)}
+                  placeholder="Enter wastage kg"
+                  className="w-full h-10 px-3 text-sm font-extrabold text-amber-950 pr-7 bg-amber-50/40 border border-amber-300 rounded-lg focus:ring-1 focus:ring-amber-500"
+                />
+                <span className="absolute right-2.5 top-2.5 text-xs font-bold text-amber-600 pointer-events-none">
+                  kg
+                </span>
+              </div>
+            </div>
+
+            <div className="p-2 rounded-lg bg-amber-50/40 border border-amber-100 flex items-center justify-between text-xs">
+              <span className="text-slate-500 text-[11px]">Calculated Scrap Ratio:</span>
+              <span className="font-extrabold text-amber-800 text-sm">
+                {calc.laminationFabricWastePct.toFixed(2)}%
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* CARD 2: PRINT FABRIC WASTE */}
+        <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden">
+          <div className="bg-purple-50/80 px-3.5 py-2.5 border-b border-purple-100 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="p-1 rounded-md bg-purple-100 text-purple-700">
+                <TrendingDown className="w-4 h-4" />
+              </div>
+              <h3 className="text-xs font-bold text-purple-950">
+                2. Print Fabric Waste
+              </h3>
+            </div>
+            <span className="text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-purple-100/80 text-purple-800 border border-purple-200">
+              {calc.printFabricWastePct.toFixed(2)}%
+            </span>
+          </div>
+
+          <div className="p-3.5 space-y-3">
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-[11px] font-semibold text-slate-600">
+                  Base Production Net Weight
+                </label>
+                {totalProductionKg > 0 ? (
+                  <span className="text-[10px] text-emerald-600 font-bold flex items-center gap-1">
+                    <CheckCircle2 className="w-2.5 h-2.5" /> Synced
+                  </span>
+                ) : (
+                  <span className="text-[10px] text-amber-600 font-medium">Manual</span>
+                )}
+              </div>
+              <div className="relative">
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  value={totalProductionKg}
+                  onChange={(e) => setTotalProductionKg(parseFloat(e.target.value) || 0)}
+                  placeholder="0.00"
+                  className="w-full h-9 px-3 text-xs font-bold text-slate-900 pr-7 bg-slate-50 border border-slate-200 rounded-lg focus:ring-1 focus:ring-primary"
+                />
+                <span className="absolute right-2.5 top-2.5 text-[10px] font-bold text-slate-400 pointer-events-none">
+                  kg
+                </span>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold text-purple-900 mb-1">
+                Print Fabric Waste Weight
+              </label>
+              <div className="relative">
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={printFabricWasteKg}
+                  onChange={(e) => setPrintFabricWasteKg(e.target.value)}
+                  placeholder="Enter wastage kg"
+                  className="w-full h-10 px-3 text-sm font-extrabold text-purple-950 pr-7 bg-purple-50/40 border border-purple-300 rounded-lg focus:ring-1 focus:ring-purple-500"
+                />
+                <span className="absolute right-2.5 top-2.5 text-xs font-bold text-purple-600 pointer-events-none">
+                  kg
+                </span>
+              </div>
+            </div>
+
+            <div className="p-2 rounded-lg bg-purple-50/40 border border-purple-100 flex items-center justify-between text-xs">
+              <span className="text-slate-500 text-[11px]">Calculated Scrap Ratio:</span>
+              <span className="font-extrabold text-purple-800 text-sm">
+                {calc.printFabricWastePct.toFixed(2)}%
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* COMBINED TOTAL SHIFT RECONCILIATION CARD */}
+        <div className="bg-rose-50/40 rounded-xl border border-rose-200/90 shadow-2xs overflow-hidden p-3.5 space-y-2.5">
+          <div className="flex items-center justify-between border-b border-rose-100 pb-2">
+            <div className="flex items-center gap-1.5">
+              <Trash2 className="w-4 h-4 text-rose-600" />
+              <span className="text-xs font-bold text-rose-950 uppercase tracking-wide">
+                Combined Shift Total Wastage
+              </span>
+            </div>
+            <span className="text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-rose-100 text-rose-800 border border-rose-200">
+              {calc.totalWastagePct.toFixed(2)}%
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="bg-white p-2.5 rounded-lg border border-rose-100">
+              <span className="text-[10px] uppercase font-bold text-slate-500 block">
+                Total Base Production
+              </span>
+              <span className="text-sm font-extrabold text-slate-900 font-mono">
+                {totalProductionKg.toLocaleString()} <span className="text-[10px] font-normal text-slate-400">kg</span>
+              </span>
+            </div>
+
+            <div className="bg-white p-2.5 rounded-lg border border-rose-100">
+              <span className="text-[10px] uppercase font-bold text-rose-700 block">
+                Total Scrap Weight
+              </span>
+              <span className="text-sm font-extrabold text-rose-800 font-mono">
+                {calc.totalWastageKg.toFixed(2)} <span className="text-[10px] font-normal text-slate-400">kg</span>
+              </span>
+            </div>
+          </div>
+
+          <p className="text-[11px] text-center font-bold text-rose-700 pt-0.5">
+            Shift Waste Level:{" "}
+            {calc.totalWastagePct <= 1.8
+              ? "Optimal (≤ 1.8%)"
+              : calc.totalWastagePct <= 3.0
+              ? "Moderate (1.8% – 3.0%)"
+              : "Warning: High Scrap (> 3.0%)"}
+          </p>
+        </div>
+
+        {/* MOBILE ACTION CONTROLS */}
+        <div className="pt-2 space-y-2">
+          <button
+            type="button"
+            onClick={() => handleSave("SUBMITTED", false)}
+            disabled={saving || loading}
+            className="w-full h-11 text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white rounded-xl shadow-xs flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
+          >
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileCheck className="h-4 w-4" />}
+            Submit Printing Wastage Report
+          </button>
+
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => handleSave("DRAFT", false)}
+              disabled={saving || loading}
+              className="h-10 text-xs font-semibold bg-white hover:bg-slate-50 text-slate-700 rounded-xl border border-slate-200 shadow-2xs flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50"
+            >
+              <CheckCircle2 className="h-3.5 w-3.5 text-slate-500" />
+              Save Draft
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setPrintModalOpen(true)}
+              className="h-10 text-xs font-semibold bg-white hover:bg-slate-50 text-slate-700 rounded-xl border border-slate-200 shadow-2xs flex items-center justify-center gap-1.5 transition-colors"
+            >
+              <Printer className="h-3.5 w-3.5 text-slate-500" />
+              Print Report
+            </button>
+          </div>
         </div>
       </div>
 
