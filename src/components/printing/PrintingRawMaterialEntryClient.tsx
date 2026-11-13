@@ -504,221 +504,477 @@ export function PrintingRawMaterialEntryClient() {
         </div>
       </div>
 
-      {/* Main Consumption Entries Table */}
-      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs">
-        <div className="px-5 py-4 border-b border-slate-200 bg-slate-50/70 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <Droplets className="w-5 h-5 text-primary" />
-            <h2 className="font-bold text-slate-900 text-sm md:text-base">
-              Printing Raw Material Entries
-            </h2>
-          </div>
+      {/* ========================================================================= */}
+      {/* DESKTOP VIEW: 10-Column Matrix Table (100% Preserved)                     */}
+      {/* ========================================================================= */}
+      <div className="hidden md:block">
+        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs">
+          <div className="px-5 py-4 border-b border-slate-200 bg-slate-50/70 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Droplets className="w-5 h-5 text-primary" />
+              <h2 className="font-bold text-slate-900 text-sm md:text-base">
+                Printing Raw Material Entries
+              </h2>
+            </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Quick Add from Master Chips */}
-            {masterMaterials.slice(0, 3).map((m) => (
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Quick Add from Master Chips */}
+              {masterMaterials.slice(0, 3).map((m) => (
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => addRow(m)}
+                  className="hidden sm:inline-flex items-center gap-1 text-[11px] font-semibold bg-white border border-slate-200 hover:border-slate-300 text-slate-700 px-2.5 py-1 rounded-md transition-colors"
+                >
+                  <Plus className="w-3 h-3 text-slate-400" />
+                  {m.name}
+                </button>
+              ))}
+
               <button
-                key={m.id}
                 type="button"
-                onClick={() => addRow(m)}
-                className="hidden sm:inline-flex items-center gap-1 text-[11px] font-semibold bg-white border border-slate-200 hover:border-slate-300 text-slate-700 px-2.5 py-1 rounded-md transition-colors"
+                onClick={() => addRow()}
+                className="inline-flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold px-3 py-1.5 rounded-lg shadow-xs transition-colors"
               >
-                <Plus className="w-3 h-3 text-slate-400" />
-                {m.name}
+                <Plus className="w-3.5 h-3.5" />
+                Add Raw Material
               </button>
-            ))}
-
-            <button
-              type="button"
-              onClick={() => addRow()}
-              className="inline-flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold px-3 py-1.5 rounded-lg shadow-xs transition-colors"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              Add Raw Material
-            </button>
+            </div>
           </div>
-        </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs text-slate-700">
-            <thead className="bg-slate-100/70 border-b border-slate-200 text-slate-600 font-bold uppercase tracking-wider">
-              <tr>
-                <th className="px-3 py-3 w-10 text-center">#</th>
-                <th className="px-3 py-3 min-w-[200px]">Raw Material (Inks / Solvents)</th>
-                <th className="px-3 py-3 w-28 text-center">Unit</th>
-                <th className="px-3 py-3 w-32 text-right">Consumed (L / Kg)</th>
-                <th className="px-3 py-3 w-24 text-center">Factor</th>
-                <th className="px-3 py-3 w-32 text-right bg-blue-50/30">Consumed (Kg)</th>
-                <th className="px-3 py-3 w-28 text-right bg-purple-50/30">Ratio (%)</th>
-                <th className="px-3 py-3 w-36 text-right bg-emerald-50/30">Mileage (m/kg)</th>
-                <th className="px-3 py-3 min-w-[150px]">Remarks</th>
-                <th className="px-3 py-3 w-12 text-center"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200">
-              {calculatedEntries.length === 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs text-slate-700">
+              <thead className="bg-slate-100/70 border-b border-slate-200 text-slate-600 font-bold uppercase tracking-wider">
                 <tr>
-                  <td colSpan={10} className="px-4 py-12 text-center text-slate-400">
-                    <Droplets className="w-8 h-8 mx-auto mb-2 text-slate-300" />
-                    No raw materials added yet. Click &quot;Add Raw Material&quot; to begin tracking ink & solvent consumption.
-                  </td>
+                  <th className="px-3 py-3 w-10 text-center">#</th>
+                  <th className="px-3 py-3 min-w-[200px]">Raw Material (Inks / Solvents)</th>
+                  <th className="px-3 py-3 w-28 text-center">Unit</th>
+                  <th className="px-3 py-3 w-32 text-right">Consumed (L / Kg)</th>
+                  <th className="px-3 py-3 w-24 text-center">Factor</th>
+                  <th className="px-3 py-3 w-32 text-right bg-blue-50/30">Consumed (Kg)</th>
+                  <th className="px-3 py-3 w-28 text-right bg-purple-50/30">Ratio (%)</th>
+                  <th className="px-3 py-3 w-36 text-right bg-emerald-50/30">Mileage (m/kg)</th>
+                  <th className="px-3 py-3 min-w-[150px]">Remarks</th>
+                  <th className="px-3 py-3 w-12 text-center"></th>
                 </tr>
-              ) : (
-                calculatedEntries.map((row, index) => {
-                  const isLitre = (row.unit || "LITRE").toUpperCase() === "LITRE";
+              </thead>
+              <tbody className="divide-y divide-slate-200">
+                {calculatedEntries.length === 0 ? (
+                  <tr>
+                    <td colSpan={10} className="px-4 py-12 text-center text-slate-400">
+                      <Droplets className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                      No raw materials added yet. Click &quot;Add Raw Material&quot; to begin tracking ink & solvent consumption.
+                    </td>
+                  </tr>
+                ) : (
+                  calculatedEntries.map((row, index) => {
+                    const isLitre = (row.unit || "LITRE").toUpperCase() === "LITRE";
 
-                  return (
-                    <tr key={index} className="hover:bg-slate-50/60 transition-colors">
-                      <td className="px-3 py-2 text-center font-bold text-slate-400">
-                        {index + 1}
-                      </td>
+                    return (
+                      <tr key={index} className="hover:bg-slate-50/60 transition-colors">
+                        <td className="px-3 py-2 text-center font-bold text-slate-400">
+                          {index + 1}
+                        </td>
 
-                      {/* Material Select / Input */}
-                      <td className="px-3 py-2">
-                        <div className="relative">
-                          <input
-                            type="text"
-                            list={`materials-list-${index}`}
-                            placeholder="Select or enter material name..."
-                            value={row.materialName}
-                            onChange={(e) => handleEntryChange(index, "materialName", e.target.value)}
-                            className="w-full px-2.5 py-1.5 text-xs font-semibold text-slate-900 border border-slate-200 rounded-md focus:ring-1 focus:ring-primary"
-                          />
-                          <datalist id={`materials-list-${index}`}>
-                            {masterMaterials.map((m) => (
-                              <option key={m.id} value={m.name}>
-                                {m.category} · {m.unit}
-                              </option>
-                            ))}
-                          </datalist>
-                        </div>
-                      </td>
+                        {/* Material Select / Input */}
+                        <td className="px-3 py-2">
+                          <div className="relative">
+                            <input
+                              type="text"
+                              list={`materials-list-${index}`}
+                              placeholder="Select or enter material name..."
+                              value={row.materialName}
+                              onChange={(e) => handleEntryChange(index, "materialName", e.target.value)}
+                              className="w-full px-2.5 py-1.5 text-xs font-semibold text-slate-900 border border-slate-200 rounded-md focus:ring-1 focus:ring-primary"
+                            />
+                            <datalist id={`materials-list-${index}`}>
+                              {masterMaterials.map((m) => (
+                                <option key={m.id} value={m.name}>
+                                  {m.category} · {m.unit}
+                                </option>
+                              ))}
+                            </datalist>
+                          </div>
+                        </td>
 
-                      {/* Unit Select */}
-                      <td className="px-3 py-2 text-center">
-                        <select
-                          value={row.unit || "LITRE"}
-                          onChange={(e) => handleEntryChange(index, "unit", e.target.value)}
-                          className="px-2 py-1 text-xs border border-slate-200 rounded-md bg-white font-mono"
-                        >
-                          <option value="LITRE">LITRE</option>
-                          <option value="KG">KG</option>
-                        </select>
-                      </td>
+                        {/* Unit Select */}
+                        <td className="px-3 py-2 text-center">
+                          <select
+                            value={row.unit || "LITRE"}
+                            onChange={(e) => handleEntryChange(index, "unit", e.target.value)}
+                            className="px-2 py-1 text-xs border border-slate-200 rounded-md bg-white font-mono"
+                          >
+                            <option value="LITRE">LITRE</option>
+                            <option value="KG">KG</option>
+                          </select>
+                        </td>
 
-                      {/* Consumed in original unit */}
-                      <td className="px-3 py-2 text-right">
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          placeholder="0.00"
-                          value={isLitre ? row.consumedLitre || "" : row.consumedKg || ""}
-                          onChange={(e) => {
-                            const val = Number(e.target.value) || 0;
-                            if (isLitre) {
-                              handleEntryChange(index, "consumedLitre", val);
-                            } else {
-                              handleEntryChange(index, "consumedKg", val);
-                            }
-                          }}
-                          className="w-full text-right px-2 py-1 text-xs font-mono font-bold text-blue-700 border border-slate-200 rounded-md focus:ring-1 focus:ring-primary"
-                        />
-                      </td>
-
-                      {/* Density Factor */}
-                      <td className="px-3 py-2 text-center">
-                        {isLitre ? (
+                        {/* Consumed in original unit */}
+                        <td className="px-3 py-2 text-right">
                           <input
                             type="number"
                             step="0.01"
-                            min="0.1"
-                            max="5"
-                            value={row.conversionFactor ?? 0.82}
-                            onChange={(e) =>
-                              handleEntryChange(index, "conversionFactor", Number(e.target.value) || 0.82)
-                            }
-                            className="w-16 text-center px-1 py-1 text-xs font-mono text-slate-600 border border-slate-200 rounded-md"
+                            min="0"
+                            placeholder="0.00"
+                            value={isLitre ? row.consumedLitre || "" : row.consumedKg || ""}
+                            onChange={(e) => {
+                              const val = Number(e.target.value) || 0;
+                              if (isLitre) {
+                                handleEntryChange(index, "consumedLitre", val);
+                              } else {
+                                handleEntryChange(index, "consumedKg", val);
+                              }
+                            }}
+                            className="w-full text-right px-2 py-1 text-xs font-mono font-bold text-blue-700 border border-slate-200 rounded-md focus:ring-1 focus:ring-primary"
                           />
-                        ) : (
-                          <span className="text-slate-400 font-mono text-xs">—</span>
-                        )}
-                      </td>
+                        </td>
 
-                      {/* Consumed (Kg) */}
-                      <td className="px-3 py-2 text-right bg-blue-50/20">
-                        <span className="font-mono text-xs font-bold text-emerald-700">
-                          {(Number(row.consumedKg) || 0).toFixed(2)} kg
-                        </span>
-                      </td>
+                        {/* Density Factor */}
+                        <td className="px-3 py-2 text-center">
+                          {isLitre ? (
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0.1"
+                              max="5"
+                              value={row.conversionFactor ?? 0.82}
+                              onChange={(e) =>
+                                handleEntryChange(index, "conversionFactor", Number(e.target.value) || 0.82)
+                              }
+                              className="w-16 text-center px-1 py-1 text-xs font-mono text-slate-600 border border-slate-200 rounded-md"
+                            />
+                          ) : (
+                            <span className="text-slate-400 font-mono text-xs">—</span>
+                          )}
+                        </td>
 
-                      {/* Ratio (%) */}
-                      <td className="px-3 py-2 text-right bg-purple-50/20">
-                        <span className="font-mono text-xs font-bold text-purple-700">
-                          {(Number(row.ratioPercent) || 0) > 0 ? `${Number(row.ratioPercent).toFixed(1)}%` : "—"}
-                        </span>
-                      </td>
+                        {/* Consumed (Kg) */}
+                        <td className="px-3 py-2 text-right bg-blue-50/20">
+                          <span className="font-mono text-xs font-bold text-emerald-700">
+                            {(Number(row.consumedKg) || 0).toFixed(2)} kg
+                          </span>
+                        </td>
 
-                      {/* Mileage (m/kg) */}
-                      <td className="px-3 py-2 text-right bg-emerald-50/20">
-                        <span className="font-mono text-xs font-extrabold text-blue-800">
-                          {(Number(row.mileage) || 0) > 0
-                            ? `${Number(row.mileage).toLocaleString()} m/kg`
-                            : "—"}
-                        </span>
-                      </td>
+                        {/* Ratio (%) */}
+                        <td className="px-3 py-2 text-right bg-purple-50/20">
+                          <span className="font-mono text-xs font-bold text-purple-700">
+                            {(Number(row.ratioPercent) || 0) > 0 ? `${Number(row.ratioPercent).toFixed(1)}%` : "—"}
+                          </span>
+                        </td>
 
-                      {/* Remarks */}
-                      <td className="px-3 py-2">
-                        <input
-                          type="text"
-                          placeholder="e.g. Viscosity 18s"
-                          value={row.remarks || ""}
-                          onChange={(e) => handleEntryChange(index, "remarks", e.target.value)}
-                          className="w-full px-2 py-1 text-xs border border-slate-200 rounded-md"
-                        />
-                      </td>
+                        {/* Mileage (m/kg) */}
+                        <td className="px-3 py-2 text-right bg-emerald-50/20">
+                          <span className="font-mono text-xs font-extrabold text-blue-800">
+                            {(Number(row.mileage) || 0) > 0
+                              ? `${Number(row.mileage).toLocaleString()} m/kg`
+                              : "—"}
+                          </span>
+                        </td>
 
-                      {/* Delete Action */}
-                      <td className="px-3 py-2 text-center">
-                        <button
-                          type="button"
-                          onClick={() => removeRow(index)}
-                          className="p-1 text-slate-400 hover:text-red-600 transition-colors"
-                          title="Remove material"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
+                        {/* Remarks */}
+                        <td className="px-3 py-2">
+                          <input
+                            type="text"
+                            placeholder="e.g. Viscosity 18s"
+                            value={row.remarks || ""}
+                            onChange={(e) => handleEntryChange(index, "remarks", e.target.value)}
+                            className="w-full px-2 py-1 text-xs border border-slate-200 rounded-md"
+                          />
+                        </td>
 
-              {/* Total Aggregate Row */}
-              {calculatedEntries.length > 0 && (
-                <tr className="bg-slate-100 font-bold border-t-2 border-slate-300">
-                  <td colSpan={3} className="px-3 py-3 text-right uppercase tracking-wider text-slate-800">
-                    Grand Totals:
-                  </td>
-                  <td className="px-3 py-3 text-right font-mono text-blue-700 text-xs font-extrabold">
-                    {totals.totalConsumedLitre.toFixed(2)} L
-                  </td>
-                  <td className="px-3 py-3 text-center text-xs font-mono text-slate-500">—</td>
-                  <td className="px-3 py-3 text-right font-mono text-emerald-800 text-sm font-black bg-blue-50/40">
-                    {totals.totalConsumedKg.toFixed(2)} kg
-                  </td>
-                  <td className="px-3 py-3 text-right font-mono text-purple-800 text-xs font-bold bg-purple-50/40">
-                    {totals.totalConsumedKg > 0 ? "100.0%" : "—"}
-                  </td>
-                  <td className="px-3 py-3 text-right font-mono text-blue-900 text-sm font-black bg-emerald-50/40">
-                    {totals.overallMileage.toLocaleString()} m/kg
-                  </td>
-                  <td colSpan={2}></td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                        {/* Delete Action */}
+                        <td className="px-3 py-2 text-center">
+                          <button
+                            type="button"
+                            onClick={() => removeRow(index)}
+                            className="p-1 text-slate-400 hover:text-red-600 transition-colors"
+                            title="Remove material"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+
+                {/* Total Aggregate Row */}
+                {calculatedEntries.length > 0 && (
+                  <tr className="bg-slate-100 font-bold border-t-2 border-slate-300">
+                    <td colSpan={3} className="px-3 py-3 text-right uppercase tracking-wider text-slate-800">
+                      Grand Totals:
+                    </td>
+                    <td className="px-3 py-3 text-right font-mono text-blue-700 text-xs font-extrabold">
+                      {totals.totalConsumedLitre.toFixed(2)} L
+                    </td>
+                    <td className="px-3 py-3 text-center text-xs font-mono text-slate-500">—</td>
+                    <td className="px-3 py-3 text-right font-mono text-emerald-800 text-sm font-black bg-blue-50/40">
+                      {totals.totalConsumedKg.toFixed(2)} kg
+                    </td>
+                    <td className="px-3 py-3 text-right font-mono text-purple-800 text-xs font-bold bg-purple-50/40">
+                      {totals.totalConsumedKg > 0 ? "100.0%" : "—"}
+                    </td>
+                    <td className="px-3 py-3 text-right font-mono text-blue-900 text-sm font-black bg-emerald-50/40">
+                      {totals.overallMileage.toLocaleString()} m/kg
+                    </td>
+                    <td colSpan={2}></td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* MOBILE VIEW: Touch-First Material Consumption Cards                       */}
+      {/* ========================================================================= */}
+      <div className="block md:hidden space-y-3">
+        {/* Quick Material Presets Bar */}
+        <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-xs space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+              <Droplets className="w-4 h-4 text-primary" />
+              {calculatedEntries.length} Materials Tracked
+            </span>
+            <button
+              type="button"
+              data-testid="mobile-add-material"
+              onClick={() => addRow()}
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-900 text-white text-xs font-bold shadow-xs active:scale-95"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Add Material
+            </button>
+          </div>
+
+          {/* Quick presets chips */}
+          {masterMaterials.length > 0 && (
+            <div className="flex items-center gap-1.5 overflow-x-auto pt-1 no-scrollbar">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">
+                Quick Add:
+              </span>
+              {masterMaterials.slice(0, 5).map((m) => (
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => addRow(m)}
+                  className="px-2 py-0.5 rounded-full text-[11px] font-semibold bg-slate-50 border border-slate-200 text-slate-700 whitespace-nowrap hover:bg-slate-100 active:scale-95 transition-all"
+                >
+                  + {m.name}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Entries List */}
+        {calculatedEntries.length === 0 ? (
+          <div className="p-8 text-center bg-white rounded-xl border border-slate-200 text-slate-400 text-xs">
+            <Droplets className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+            No raw materials added yet. Tap &quot;Add Material&quot; or select a quick preset above.
+          </div>
+        ) : (
+          calculatedEntries.map((row, index) => {
+            const isLitre = (row.unit || "LITRE").toUpperCase() === "LITRE";
+
+            return (
+              <div
+                key={index}
+                className="bg-white rounded-xl border border-slate-200 shadow-xs p-3.5 space-y-3"
+              >
+                {/* Header: Sequence & Material Name */}
+                <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-2.5">
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                    <span className="w-5 h-5 rounded-md bg-purple-100 text-purple-800 text-[11px] font-bold flex items-center justify-center shrink-0">
+                      {index + 1}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <input
+                        type="text"
+                        list={`mobile-mat-list-${index}`}
+                        placeholder="Material name (ink / solvent)..."
+                        value={row.materialName}
+                        onChange={(e) => handleEntryChange(index, "materialName", e.target.value)}
+                        className="w-full px-2 py-1 text-xs font-bold text-slate-900 border border-slate-200 rounded-md focus:ring-1 focus:ring-primary"
+                      />
+                      <datalist id={`mobile-mat-list-${index}`}>
+                        {masterMaterials.map((m) => (
+                          <option key={m.id} value={m.name}>
+                            {m.category} · {m.unit}
+                          </option>
+                        ))}
+                      </datalist>
+                    </div>
+                  </div>
+
+                  {/* Unit Selector */}
+                  <select
+                    value={row.unit || "LITRE"}
+                    onChange={(e) => handleEntryChange(index, "unit", e.target.value)}
+                    className="px-2 py-1 text-xs border border-slate-200 rounded-md bg-slate-50 font-bold text-slate-700 shrink-0"
+                  >
+                    <option value="LITRE">Litre</option>
+                    <option value="KG">Kg</option>
+                  </select>
+                </div>
+
+                {/* Input Fields Grid */}
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="text-[10px] font-bold text-blue-700 block mb-0.5">
+                      Consumed ({row.unit || "LITRE"})
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="0.00"
+                      value={isLitre ? row.consumedLitre || "" : row.consumedKg || ""}
+                      onChange={(e) => {
+                        const val = Number(e.target.value) || 0;
+                        if (isLitre) {
+                          handleEntryChange(index, "consumedLitre", val);
+                        } else {
+                          handleEntryChange(index, "consumedKg", val);
+                        }
+                      }}
+                      className="w-full px-2.5 py-1.5 text-xs font-mono font-bold text-blue-700 border border-blue-200 bg-blue-50/20 rounded-md focus:ring-1 focus:ring-primary"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-600 block mb-0.5">
+                      {isLitre ? "Density Factor (kg/L)" : "Unit Type"}
+                    </label>
+                    {isLitre ? (
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0.1"
+                        max="5"
+                        value={row.conversionFactor ?? 0.82}
+                        onChange={(e) =>
+                          handleEntryChange(index, "conversionFactor", Number(e.target.value) || 0.82)
+                        }
+                        className="w-full px-2.5 py-1.5 text-xs font-mono text-slate-700 border border-slate-200 rounded-md"
+                      />
+                    ) : (
+                      <div className="h-8 px-2.5 flex items-center bg-slate-50 border border-slate-200 rounded-md text-xs font-mono text-slate-500">
+                        Direct (1:1 kg)
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Live Computed Metrics Strip */}
+                <div className="grid grid-cols-3 gap-2 bg-slate-50/80 p-2 rounded-lg border border-slate-100 text-center">
+                  <div>
+                    <span className="text-[9px] uppercase font-bold text-emerald-700 block">Weight</span>
+                    <span className="text-xs font-extrabold text-emerald-950 font-mono">
+                      {(Number(row.consumedKg) || 0).toFixed(2)} kg
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[9px] uppercase font-bold text-purple-700 block">Recipe %</span>
+                    <span className="text-xs font-extrabold text-purple-950 font-mono">
+                      {(Number(row.ratioPercent) || 0) > 0 ? `${Number(row.ratioPercent).toFixed(1)}%` : "—"}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[9px] uppercase font-bold text-blue-700 block">Mileage</span>
+                    <span className="text-xs font-extrabold text-blue-950 font-mono truncate block">
+                      {(Number(row.mileage) || 0) > 0 ? `${Number(row.mileage).toLocaleString()} m/kg` : "—"}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Remarks & Delete Row */}
+                <div className="flex items-center gap-2 pt-1">
+                  <input
+                    type="text"
+                    placeholder="Batch notes / viscosity (e.g. 18s)..."
+                    value={row.remarks || ""}
+                    onChange={(e) => handleEntryChange(index, "remarks", e.target.value)}
+                    className="flex-1 px-2.5 py-1 text-xs border border-slate-200 rounded-md text-slate-600"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeRow(index)}
+                    className="p-1.5 text-slate-400 hover:text-rose-600 border border-slate-200 rounded-md"
+                    title="Delete item"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            );
+          })
+        )}
+
+        {/* Grand Total Footer Card */}
+        {calculatedEntries.length > 0 && (
+          <div className="bg-slate-900 text-white rounded-xl p-3.5 space-y-2">
+            <span className="text-[10px] uppercase font-extrabold tracking-wider text-slate-400 block">
+              Shift Consumption Summary
+            </span>
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="bg-slate-800/80 p-2 rounded-lg">
+                <span className="text-[9px] uppercase font-bold text-blue-400 block">Total Volume</span>
+                <span className="text-xs font-black font-mono">{totals.totalConsumedLitre.toFixed(1)} L</span>
+              </div>
+              <div className="bg-slate-800/80 p-2 rounded-lg">
+                <span className="text-[9px] uppercase font-bold text-emerald-400 block">Total Weight</span>
+                <span className="text-xs font-black font-mono">{totals.totalConsumedKg.toFixed(1)} kg</span>
+              </div>
+              <div className="bg-slate-800/80 p-2 rounded-lg">
+                <span className="text-[9px] uppercase font-bold text-purple-400 block">Avg Mileage</span>
+                <span className="text-xs font-black font-mono truncate block">{totals.overallMileage.toLocaleString()} m/kg</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Mobile Action Controls */}
+        <div className="pt-2 space-y-2">
+          <button
+            type="button"
+            onClick={() => addRow()}
+            className="w-full h-11 rounded-xl border border-dashed border-primary/50 text-primary hover:bg-primary/5 font-bold text-xs flex items-center justify-center gap-2"
+          >
+            <Plus className="h-4 w-4" />
+            + Add Another Material
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleSave("SUBMITTED")}
+            disabled={saving}
+            className="w-full h-11 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xs"
+          >
+            {saving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <FileCheck className="w-4 h-4" />}
+            Submit Raw Material Report
+          </button>
+
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => handleSave("DRAFT")}
+              disabled={saving}
+              className="h-10 rounded-xl border border-slate-200 text-slate-700 font-semibold text-xs flex items-center justify-center gap-1.5"
+            >
+              <CheckCircle2 className="h-4 w-4 text-slate-500" />
+              Save Draft
+            </button>
+            <button
+              type="button"
+              onClick={() => setPrintModalOpen(true)}
+              className="h-10 rounded-xl border border-slate-200 text-sky-700 font-semibold text-xs flex items-center justify-center gap-1.5"
+            >
+              <Printer className="h-4 w-4" />
+              Print Report
+            </button>
+          </div>
         </div>
       </div>
 
