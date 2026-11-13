@@ -683,10 +683,10 @@ export function ConvertexWastageClient() {
         </div>
       </div>
 
-      {/* Spreadsheet Table Container */}
+      {/* Spreadsheet Table Container (Desktop: hidden md:flex) */}
       <div
         ref={tableContainerRef}
-        className={`bg-white border border-slate-200 shadow-sm transition-all duration-200 flex flex-col ${
+        className={`hidden md:flex bg-white border border-slate-200 shadow-sm transition-all duration-200 flex-col ${
           isFullscreen
             ? "fixed inset-0 z-50 p-4 bg-white overflow-hidden"
             : "rounded-xl overflow-hidden"
@@ -1003,6 +1003,309 @@ export function ConvertexWastageClient() {
               </tr>
             </tfoot>
           </table>
+        </div>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* MOBILE TOUCH FEED (<md) - ZERO DESKTOP REGRESSION                        */}
+      {/* ========================================================================= */}
+      <div className="block md:hidden space-y-4">
+        {/* Mobile Toolbar */}
+        <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-2xs flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={handleAddRow}
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-primary text-white text-xs font-bold shadow-xs active:scale-95 transition-all"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              <span>Add Row</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleAdd5Rows}
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-slate-50 text-slate-700 text-xs font-semibold active:scale-95 transition-all"
+            >
+              <Plus className="h-3.5 w-3.5 text-slate-400" />
+              <span>+5</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleResetToBlank}
+              className="p-1.5 rounded-lg border border-slate-200 bg-slate-50 text-slate-600 hover:text-rose-600 active:scale-95 transition-all"
+              title="Reset blank"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {linkedProductionEntries.length > 0 && (
+              <button
+                type="button"
+                onClick={handleImportFromProduction}
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-primary/30 bg-primary/10 text-primary text-xs font-bold"
+              >
+                <ArrowDownToLine className="w-3.5 h-3.5" />
+                <span>Sync ({linkedProductionEntries.length})</span>
+              </button>
+            )}
+            <span className="text-xs font-bold font-mono text-rose-700 bg-rose-50 px-2.5 py-1 rounded-full border border-rose-200">
+              {totals.totalWastagePct.toFixed(2)}% Waste
+            </span>
+          </div>
+        </div>
+
+        {/* Mobile Cards List */}
+        <div className="space-y-3">
+          {entries.length === 0 ? (
+            <div className="bg-white rounded-xl border border-dashed border-slate-300 p-8 text-center text-slate-400 text-xs">
+              No wastage entries recorded. Tap &quot;Add Row&quot; or &quot;Sync&quot; from daily report.
+            </div>
+          ) : (
+            entries.map((entry, index) => (
+              <div
+                key={index}
+                className="bg-white border border-slate-200/90 rounded-xl shadow-2xs overflow-hidden"
+              >
+                {/* Card Header Strip */}
+                <div className="bg-slate-50/90 px-3.5 py-2.5 border-b border-slate-100 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="h-5 w-5 rounded-md bg-slate-900 text-white font-bold text-[10px] flex items-center justify-center">
+                      {entry.sequence}
+                    </span>
+                    <span className="text-xs font-mono font-bold text-slate-900">
+                      {entry.rollNumber ? entry.rollNumber : `Roll ${index + 1}`}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`text-xs font-black font-mono px-2 py-0.5 rounded-md border ${
+                        entry.totalWastePct <= 1.5
+                          ? "text-emerald-800 bg-emerald-50 border-emerald-200"
+                          : entry.totalWastePct <= 3.0
+                          ? "text-amber-800 bg-amber-50 border-amber-200"
+                          : "text-rose-800 bg-rose-50 border-rose-200"
+                      }`}
+                    >
+                      {entry.totalWastePct.toFixed(2)}% Scrap
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveRow(index)}
+                      className="p-1 text-slate-400 hover:text-rose-600 rounded active:scale-90 transition-all"
+                      title="Delete row"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="p-3.5 space-y-3 text-xs">
+                  {/* Quality & Roll No */}
+                  <div className="space-y-2">
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                        Quality
+                      </label>
+                      <UniversalQualityInput
+                        value={entry.quality}
+                        onChange={(newVal) => handleCellChange(index, "quality", newVal)}
+                        placeholder="Select quality..."
+                        compact={false}
+                        inputClassName="h-9 text-xs font-semibold"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">
+                        Roll Number
+                      </label>
+                      <input
+                        type="text"
+                        value={entry.rollNumber}
+                        onChange={(e) => handleCellChange(index, "rollNumber", e.target.value)}
+                        placeholder="e.g. D14332"
+                        className="w-full h-8 px-2.5 text-xs font-mono font-bold border border-slate-200 rounded-md focus:ring-1 focus:ring-primary"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Production Weights: Input Wt vs Finished Wt */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="bg-teal-50/50 p-2.5 rounded-lg border border-teal-200">
+                      <label className="block text-[10px] font-bold text-teal-800 uppercase mb-0.5">
+                        Production Input (Kg)
+                      </label>
+                      <input
+                        type="number"
+                        step="any"
+                        value={entry.productionKg || ""}
+                        onChange={(e) => handleCellChange(index, "productionKg", e.target.value)}
+                        placeholder="0.00"
+                        className="w-full h-8 px-2 font-mono font-black text-sm text-teal-900 bg-white border border-teal-300 rounded focus:ring-1 focus:ring-teal-500"
+                      />
+                    </div>
+                    <div className="bg-emerald-50/50 p-2.5 rounded-lg border border-emerald-200 flex flex-col justify-between">
+                      <span className="text-[10px] font-bold text-emerald-800 uppercase block">
+                        Net Output (Kg)
+                      </span>
+                      <span className="font-mono font-black text-base text-emerald-900">
+                        {entry.netProductionKg ? entry.netProductionKg.toFixed(1) : "0.0"}{" "}
+                        <span className="text-[10px] font-normal text-slate-500">kg</span>
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Breakdown Wastage Inputs */}
+                  <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100 space-y-2">
+                    <span className="text-[10px] font-bold uppercase text-slate-600 tracking-wider block">
+                      Wastage Breakdown Categories (Kg)
+                    </span>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      {/* Loom Waste */}
+                      <div className="bg-white p-2 rounded border border-slate-200">
+                        <div className="flex items-center justify-between text-[10px] text-slate-500 mb-0.5">
+                          <span>Loom Waste</span>
+                          <span className="font-mono text-slate-400">{entry.loomWastePct.toFixed(2)}%</span>
+                        </div>
+                        <input
+                          type="number"
+                          step="any"
+                          value={entry.loomWasteKg || ""}
+                          onChange={(e) => handleCellChange(index, "loomWasteKg", e.target.value)}
+                          placeholder="0.00"
+                          className="w-full h-7 text-xs font-mono font-bold text-slate-800 border-0 p-0 focus:ring-0"
+                        />
+                      </div>
+
+                      {/* Lam Waste */}
+                      <div className="bg-white p-2 rounded border border-slate-200">
+                        <div className="flex items-center justify-between text-[10px] text-slate-500 mb-0.5">
+                          <span>Lam Waste</span>
+                          <span className="font-mono text-slate-400">{entry.lamWastePct.toFixed(2)}%</span>
+                        </div>
+                        <input
+                          type="number"
+                          step="any"
+                          value={entry.lamWasteKg || ""}
+                          onChange={(e) => handleCellChange(index, "lamWasteKg", e.target.value)}
+                          placeholder="0.00"
+                          className="w-full h-7 text-xs font-mono font-bold text-slate-800 border-0 p-0 focus:ring-0"
+                        />
+                      </div>
+
+                      {/* Print Waste */}
+                      <div className="bg-white p-2 rounded border border-slate-200">
+                        <div className="flex items-center justify-between text-[10px] text-slate-500 mb-0.5">
+                          <span>Print Waste</span>
+                          <span className="font-mono text-slate-400">{entry.printWastePct.toFixed(2)}%</span>
+                        </div>
+                        <input
+                          type="number"
+                          step="any"
+                          value={entry.printWasteKg || ""}
+                          onChange={(e) => handleCellChange(index, "printWasteKg", e.target.value)}
+                          placeholder="0.00"
+                          className="w-full h-7 text-xs font-mono font-bold text-slate-800 border-0 p-0 focus:ring-0"
+                        />
+                      </div>
+
+                      {/* Machine Waste */}
+                      <div className="bg-white p-2 rounded border border-slate-200">
+                        <div className="flex items-center justify-between text-[10px] text-slate-500 mb-0.5">
+                          <span>Machine Waste</span>
+                          <span className="font-mono text-slate-400">{entry.machineWastePct.toFixed(2)}%</span>
+                        </div>
+                        <input
+                          type="number"
+                          step="any"
+                          value={entry.machineWasteKg || ""}
+                          onChange={(e) => handleCellChange(index, "machineWasteKg", e.target.value)}
+                          placeholder="0.00"
+                          className="w-full h-7 text-xs font-mono font-bold text-slate-800 border-0 p-0 focus:ring-0"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Cover Patch Wastage */}
+                    <div className="bg-purple-50/40 p-2 rounded border border-purple-200">
+                      <div className="flex items-center justify-between text-[10px] text-purple-700 mb-0.5">
+                        <span className="font-bold">Cover Patch Waste</span>
+                        <span className="font-mono">{entry.coverPatchWastePct.toFixed(2)}%</span>
+                      </div>
+                      <input
+                        type="number"
+                        step="any"
+                        value={entry.coverPatchWasteKg || ""}
+                        onChange={(e) => handleCellChange(index, "coverPatchWasteKg", e.target.value)}
+                        placeholder="0.00"
+                        className="w-full h-7 text-xs font-mono font-bold text-purple-900 bg-transparent border-0 p-0 focus:ring-0"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Total Roll Scrap Summary Strip */}
+                  <div className="p-2 rounded-lg bg-rose-50/50 border border-rose-200 flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-rose-800">Roll Total Wastage:</span>
+                    <span className="text-sm font-black font-mono text-rose-900">
+                      {entry.totalWasteKg ? entry.totalWasteKg.toFixed(2) : "0.00"} kg{" "}
+                      <span className="text-xs text-rose-600 font-semibold">
+                        ({entry.totalWastePct ? entry.totalWastePct.toFixed(2) : "0.00"}%)
+                      </span>
+                    </span>
+                  </div>
+
+                  {/* Remarks Input */}
+                  <div>
+                    <input
+                      type="text"
+                      value={entry.remarks || ""}
+                      onChange={(e) => handleCellChange(index, "remarks", e.target.value)}
+                      placeholder="Scrap rationale or defect notes..."
+                      className="w-full h-8 px-2.5 text-xs border border-slate-200 rounded-md focus:ring-1 focus:ring-primary"
+                    />
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Mobile Sticky Action Bar */}
+        <div className="sticky bottom-3 z-20 bg-slate-900 text-white rounded-2xl p-3 shadow-xl border border-slate-800 flex items-center justify-between gap-3">
+          <div className="leading-tight">
+            <span className="text-[10px] uppercase font-bold text-slate-400 block">Total Shift Scrap</span>
+            <div className="flex items-center gap-2">
+              <span className="text-base font-black font-mono text-rose-400">
+                {totals.totalWastageKg.toFixed(1)} <span className="text-xs font-normal">kg</span>
+              </span>
+              <span className="text-xs text-amber-300 font-bold font-mono">
+                ({totals.totalWastagePct.toFixed(2)}%)
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => setIsPrintModalOpen(true)}
+              className="h-9 px-3 rounded-xl border border-slate-700 bg-slate-800 text-slate-200 text-xs font-semibold flex items-center gap-1"
+            >
+              <Printer className="h-3.5 w-3.5" />
+              <span>Print</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => executeSave("SUBMITTED")}
+              disabled={saving}
+              className="h-9 px-4 rounded-xl bg-slate-100 hover:bg-white text-slate-900 text-xs font-bold shadow-xs flex items-center gap-1.5"
+            >
+              {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileCheck className="h-3.5 w-3.5" />}
+              <span>Submit</span>
+            </button>
+          </div>
         </div>
       </div>
 
