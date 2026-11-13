@@ -45,6 +45,8 @@ import {
   Film,
   Maximize2,
   Minimize2,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { toast } from "sonner";
 import { UniversalShiftSelector } from "@/components/production/UniversalShiftSelector";
@@ -78,6 +80,26 @@ export function LaminationReportClient() {
   // Modals & Viewport
   const [printModalOpen, setPrintModalOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Mobile accordion state
+  const [expandedRolls, setExpandedRolls] = useState<Set<number>>(new Set());
+
+  const toggleExpandRoll = (idx: number) => {
+    setExpandedRolls((prev) => {
+      const next = new Set(prev);
+      if (next.has(idx)) next.delete(idx);
+      else next.add(idx);
+      return next;
+    });
+  };
+
+  const expandAllRolls = () => {
+    setExpandedRolls(new Set(entries.map((_, i) => i)));
+  };
+
+  const collapseAllRolls = () => {
+    setExpandedRolls(new Set());
+  };
 
   // Fetch available rolls from Circular Loom Roll Stock
   const fetchAvailableRolls = useCallback(async () => {
@@ -357,7 +379,11 @@ export function LaminationReportClient() {
 
   return (
     <div className="space-y-5 font-sans pb-16">
-      {/* Header Banner */}
+      {/* =========================================================================
+          DESKTOP VIEW (100% Preserved - 0 Regression)
+          ========================================================================= */}
+      <div className="hidden md:block space-y-5">
+        {/* Header Banner */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-5">
         <div>
           <div className="flex items-center gap-2.5">
@@ -846,6 +872,493 @@ export function LaminationReportClient() {
               </tbody>
             </table>
           )}
+        </div>
+      </div>
+      </div>
+
+      {/* =========================================================================
+          MOBILE VIEW (Touch-First App Experience)
+          ========================================================================= */}
+      <div className="block md:hidden space-y-3">
+        {/* Mobile Header Card */}
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-2xs">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="p-2 rounded-xl bg-sky-50 text-sky-700 border border-sky-200/90 shadow-2xs shrink-0">
+                <Film className="h-5 w-5 text-sky-600" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <h1 className="text-base font-bold text-slate-900 tracking-tight leading-tight truncate">
+                    Lamination Report
+                  </h1>
+                  <Badge
+                    variant="outline"
+                    className={`text-[10px] px-1.5 py-0 ${
+                      status === "APPROVED"
+                        ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                        : status === "SUBMITTED"
+                        ? "bg-sky-50 text-sky-700 border-sky-200"
+                        : "bg-amber-50 text-amber-700 border-amber-200"
+                    }`}
+                  >
+                    {status}
+                  </Badge>
+                </div>
+                <p className="text-[11px] font-mono text-slate-400 font-medium truncate">
+                  {date} • {shiftName}
+                </p>
+              </div>
+            </div>
+
+            {/* Quick Actions */}
+            <div className="flex items-center gap-1.5 shrink-0">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => exportLaminationReportExcel(reportDataForPrint)}
+                disabled={entries.length === 0}
+                className="p-2 h-8 w-8 text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 rounded-lg border border-emerald-200 shadow-2xs transition-all cursor-pointer"
+                title="Export Excel"
+              >
+                <FileSpreadsheet className="h-4 w-4" />
+              </Button>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPrintModalOpen(true)}
+                disabled={entries.length === 0}
+                className="p-2 h-8 w-8 text-sky-700 hover:text-sky-800 bg-sky-50 hover:bg-sky-100 rounded-lg border border-sky-200 shadow-2xs transition-all cursor-pointer"
+                title="Print Report"
+              >
+                <Printer className="h-4 w-4" />
+              </Button>
+
+              <Button
+                size="sm"
+                onClick={() => handleSaveReport("SUBMITTED")}
+                disabled={saving || entries.length === 0}
+                className="h-8 px-2.5 text-xs font-bold text-white bg-sky-600 hover:bg-sky-700 rounded-lg shadow-2xs transition-all cursor-pointer disabled:opacity-50"
+              >
+                {saving ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <span>Submit</span>
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* Mobile Shift & Personnel Card */}
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-3 shadow-2xs space-y-2.5">
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1">
+                <Calendar className="h-2.5 w-2.5 text-slate-400" />
+                <span>Date:</span>
+              </label>
+              <Input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className="h-8 text-xs font-mono bg-slate-50 border-slate-200"
+              />
+            </div>
+            <div>
+              <UniversalShiftSelector
+                value={shiftName}
+                onChange={(val) => setShiftName(val)}
+                mode="byName"
+                label="Shift"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-1.5 pt-1 border-t border-slate-100">
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-0.5 truncate">
+                Operator
+              </label>
+              <UniversalPersonnelInput
+                type="operator"
+                section="LAMINATION"
+                value={operatorName}
+                onChange={(name) => setOperatorName(name)}
+                placeholder="Operator"
+                inputClassName="h-7 text-[11px]"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-0.5 truncate">
+                Supervisor
+              </label>
+              <UniversalPersonnelInput
+                type="supervisor"
+                value={supervisorName}
+                onChange={(name) => setSupervisorName(name)}
+                placeholder="Supervisor"
+                inputClassName="h-7 text-[11px]"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-0.5 truncate">
+                Helpers
+              </label>
+              <Input
+                type="number"
+                min="0"
+                placeholder="3"
+                value={helperCount || ""}
+                onChange={(e) => setHelperCount(Number(e.target.value) || 0)}
+                className="h-7 text-xs bg-slate-50 border-slate-200 font-mono"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Mobile 2x2 Bento KPI Cards */}
+        <div className="grid grid-cols-2 gap-2">
+          {/* Card 1: Production (Out) */}
+          <div className="bg-white border border-slate-200/80 rounded-xl p-3 shadow-2xs">
+            <div className="flex items-center justify-between text-sky-500 mb-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-sky-700">Production</span>
+              <span className="text-[10px] font-bold text-slate-400 font-mono">{entries.length} Rolls</span>
+            </div>
+            <div className="flex items-baseline gap-1">
+              <span className="text-xl font-black font-mono text-sky-700">
+                {totals.totalProductionMtrs.toLocaleString()}
+              </span>
+              <span className="text-[10px] font-bold text-sky-600">m</span>
+            </div>
+          </div>
+
+          {/* Card 2: Net Weight (Out) */}
+          <div className="bg-white border border-slate-200/80 rounded-xl p-3 shadow-2xs">
+            <div className="flex items-center justify-between text-emerald-500 mb-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Nett Weight</span>
+              <span className="text-[10px] font-bold text-slate-400 font-mono">{totals.totalNetWtBefore.toFixed(0)} In</span>
+            </div>
+            <div className="flex items-baseline gap-1">
+              <span className="text-xl font-black font-mono text-emerald-700">
+                {totals.totalNetWtAfter.toFixed(1)}
+              </span>
+              <span className="text-[10px] font-bold text-emerald-600">kg</span>
+            </div>
+          </div>
+
+          {/* Card 3: Avg Coating */}
+          <div className="bg-white border border-slate-200/80 rounded-xl p-3 shadow-2xs">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800">Avg Coating</span>
+              <span className="text-[10px] font-bold text-slate-400">g/m</span>
+            </div>
+            <div className="flex items-baseline gap-1">
+              <span className="text-xl font-black font-mono text-emerald-800">
+                {totals.avgCoating.toFixed(1)}
+              </span>
+              <span className="text-[10px] font-bold text-emerald-700">g/m</span>
+            </div>
+          </div>
+
+          {/* Card 4: Avg Wt After */}
+          <div className="bg-white border border-slate-200/80 rounded-xl p-3 shadow-2xs">
+            <div className="flex items-center justify-between text-purple-500 mb-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-purple-700">Avg Wt Out</span>
+              <span className="text-[10px] font-bold text-slate-400 font-mono">{totals.avgWtBefore.toFixed(1)} In</span>
+            </div>
+            <div className="flex items-baseline gap-1">
+              <span className="text-xl font-black font-mono text-purple-900">
+                {totals.avgWtAfter.toFixed(1)}
+              </span>
+              <span className="text-[10px] font-bold text-purple-700">g/m</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Entries Header Toolbar */}
+        <div className="flex items-center justify-between px-1">
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-bold text-slate-800">Roll Entries</span>
+            <span className="px-1.5 py-0.5 rounded-full bg-slate-100 text-[10px] font-bold font-mono text-slate-600">
+              {entries.length}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            {entries.length > 0 && (
+              <div className="flex items-center gap-1 text-[11px] font-bold text-sky-600">
+                <button type="button" onClick={expandAllRolls} className="hover:underline cursor-pointer">
+                  Expand All
+                </button>
+                <span>•</span>
+                <button type="button" onClick={collapseAllRolls} className="hover:underline cursor-pointer">
+                  Collapse All
+                </button>
+              </div>
+            )}
+            <Button
+              size="sm"
+              onClick={handleAddManualRow}
+              data-testid="mobile-add-row"
+              className="h-7 px-2.5 text-[11px] bg-sky-600 hover:bg-sky-700 text-white shadow-2xs rounded-lg cursor-pointer"
+            >
+              <Plus className="h-3 w-3 mr-1" />
+              <span>Add Roll</span>
+            </Button>
+          </div>
+        </div>
+
+        {/* Mobile Roll Entries Cards Feed */}
+        <div className="space-y-2.5">
+          {loading ? (
+            <div className="bg-white border border-slate-200 rounded-2xl p-8 text-center text-xs text-slate-500 flex flex-col items-center justify-center gap-2 shadow-2xs">
+              <Loader2 className="h-5 w-5 animate-spin text-sky-600" />
+              <span>Loading report entries...</span>
+            </div>
+          ) : entries.length === 0 ? (
+            <div className="bg-white border border-slate-200 rounded-2xl p-6 text-center space-y-2 shadow-2xs">
+              <div className="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mx-auto">
+                <Layers className="h-5 w-5" />
+              </div>
+              <p className="text-xs font-bold text-slate-700">No Production Entries Yet</p>
+              <p className="text-[11px] text-slate-400">
+                Tap &ldquo;Add Roll&rdquo; above to select a roll from Circular Loom stock.
+              </p>
+              <Button
+                size="sm"
+                onClick={handleAddManualRow}
+                className="mt-1 h-8 text-xs bg-sky-600 text-white cursor-pointer"
+              >
+                <Plus className="h-3.5 w-3.5 mr-1" />
+                Add Blank Row
+              </Button>
+            </div>
+          ) : (
+            entries.map((entry, index) => {
+              const isExpanded = expandedRolls.has(index);
+
+              return (
+                <div
+                  key={entry.id || `mobile-entry-${index}`}
+                  className="bg-white border border-slate-200/80 rounded-2xl shadow-2xs overflow-hidden transition-all"
+                >
+                  {/* Collapsed Card Header */}
+                  <div
+                    onClick={() => toggleExpandRoll(index)}
+                    className="p-3 cursor-pointer flex items-center justify-between gap-2 hover:bg-slate-50/80 transition-colors"
+                  >
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="px-1.5 py-0.5 text-xs font-mono font-bold rounded-md bg-slate-900 text-white shrink-0">
+                        #{entry.sequence}
+                      </span>
+                      <span className="px-1.5 py-0.5 text-xs font-mono font-bold rounded-md bg-slate-100 text-slate-800 border border-slate-200 truncate shrink-0">
+                        {entry.rollNumber || "Select Roll"}
+                      </span>
+                      {entry.loomNumber > 0 && (
+                        <span className="px-1.5 py-0.5 text-[10px] font-mono font-bold rounded-md bg-sky-50 text-sky-700 border border-sky-200 shrink-0">
+                          Loom #{entry.loomNumber}
+                        </span>
+                      )}
+                      <span className="text-[11px] font-bold text-slate-700 truncate">
+                        {entry.quality || "No Quality"}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <div className="text-right">
+                        <div className="text-xs font-mono font-black text-sky-700">
+                          {entry.productionMeter > 0 ? `${entry.productionMeter} m` : "0 m"}
+                        </div>
+                        {entry.coating !== 0 && (
+                          <div className="text-[9px] font-mono font-bold text-emerald-700">
+                            {entry.coating.toFixed(1)} g/m
+                          </div>
+                        )}
+                      </div>
+                      {isExpanded ? (
+                        <ChevronUp className="h-4 w-4 text-slate-400" />
+                      ) : (
+                        <ChevronDown className="h-4 w-4 text-slate-400" />
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Expanded Card Body */}
+                  {isExpanded && (
+                    <div className="p-3 pt-0 border-t border-slate-100 space-y-2.5 bg-slate-50/30">
+                      {/* Roll Selector & Quality */}
+                      <div className="pt-2 space-y-2">
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                            Roll ID (Circular Loom Stock)
+                          </label>
+                          <UniversalRollSelector
+                            value={entry.rollNumber}
+                            availableRolls={availableRolls}
+                            alreadySelectedRollNumbers={entries
+                              .map((e, i) => (i !== index ? e.rollNumber : ""))
+                              .filter(Boolean)}
+                            onChange={(rollNo, selectedRoll) =>
+                              handleRollSelect(index, rollNo, selectedRoll)
+                            }
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-2">
+                          <div className="col-span-2">
+                            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                              Quality
+                            </label>
+                            <UniversalQualityInput
+                              value={entry.quality}
+                              onChange={(val) => handleUpdateEntry(index, "quality", val)}
+                              options={allQualities}
+                              placeholder="Quality"
+                              compact={true}
+                              inputClassName="h-8 text-xs font-semibold"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                              Width (mm)
+                            </label>
+                            <Input
+                              type="text"
+                              value={entry.size}
+                              onChange={(e) => handleUpdateEntry(index, "size", e.target.value)}
+                              className="h-8 text-xs font-mono bg-white"
+                              placeholder="500"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Fabric In Stats (3-col) */}
+                      <div>
+                        <span className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                          1. Raw Fabric Input (Loom Stock)
+                        </span>
+                        <div className="grid grid-cols-3 gap-1.5 bg-white p-2 rounded-xl border border-slate-200/80 text-center">
+                          <div>
+                            <span className="block text-[9px] font-bold uppercase text-slate-400">Roll Mtr</span>
+                            <span className="text-xs font-mono font-bold text-slate-800">
+                              {entry.rollMeter > 0 ? `${entry.rollMeter} m` : "—"}
+                            </span>
+                          </div>
+                          <div className="border-x border-slate-100">
+                            <span className="block text-[9px] font-bold uppercase text-slate-400">Net Wt In</span>
+                            <span className="text-xs font-mono font-bold text-slate-800">
+                              {entry.netWeightBefore > 0 ? `${entry.netWeightBefore} kg` : "—"}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="block text-[9px] font-bold uppercase text-slate-400">Avg Wt In</span>
+                            <span className="text-xs font-mono font-bold text-slate-600">
+                              {entry.avgWeightBefore > 0 ? `${entry.avgWeightBefore.toFixed(1)} g/m` : "—"}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Laminated Output Inputs (3-col) */}
+                      <div>
+                        <span className="block text-[10px] font-bold text-sky-800 uppercase tracking-wider mb-1">
+                          2. Laminated Output (Floor Measurements) *
+                        </span>
+                        <div className="grid grid-cols-3 gap-1.5 bg-sky-50/50 p-2 rounded-xl border border-sky-200">
+                          <div>
+                            <label className="block text-[9px] font-bold uppercase text-sky-800 mb-0.5">Prod (M) *</label>
+                            <Input
+                              type="number"
+                              step="any"
+                              value={entry.productionMeter || ""}
+                              onChange={(e) =>
+                                handleUpdateEntry(index, "productionMeter", Number(e.target.value) || 0)
+                              }
+                              className="h-7 text-xs text-right font-bold text-sky-900 bg-white border-sky-300"
+                              placeholder="Meters"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[9px] font-bold uppercase text-sky-800 mb-0.5">Net Wt *</label>
+                            <Input
+                              type="number"
+                              step="any"
+                              value={entry.netWeightAfter || ""}
+                              onChange={(e) =>
+                                handleUpdateEntry(index, "netWeightAfter", Number(e.target.value) || 0)
+                              }
+                              className="h-7 text-xs text-right font-bold text-sky-900 bg-white border-sky-300"
+                              placeholder="Kg"
+                            />
+                          </div>
+                          <div className="text-center pt-0.5">
+                            <span className="block text-[9px] font-bold uppercase text-sky-800">Avg Out</span>
+                            <span className="text-xs font-mono font-black text-sky-900 block mt-1">
+                              {entry.avgWeightAfter > 0 ? `${entry.avgWeightAfter.toFixed(1)}` : "—"}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Coating Badge Banner */}
+                      <div className="flex items-center justify-between p-2 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900">
+                        <span className="text-xs font-bold">Coating Result:</span>
+                        <span className="text-xs font-mono font-black">
+                          {entry.coating !== 0 ? `${entry.coating.toFixed(1)} g/m` : "—"}
+                        </span>
+                      </div>
+
+                      {/* Remarks & Delete */}
+                      <div className="flex items-center gap-2 pt-1 border-t border-slate-100">
+                        <Input
+                          value={entry.remarks || ""}
+                          onChange={(e) => handleUpdateEntry(index, "remarks", e.target.value)}
+                          className="h-7 text-xs bg-white border-slate-200 flex-1"
+                          placeholder="Remarks / notes..."
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteRow(index)}
+                          className="p-1.5 text-rose-500 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 rounded-lg border border-rose-200 transition-colors"
+                          title="Delete entry"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Mobile Bottom Action Bar */}
+        <div className="space-y-2 pt-2">
+          <Button
+            type="button"
+            onClick={handleAddManualRow}
+            variant="outline"
+            className="w-full h-10 rounded-xl border border-dashed border-sky-300 bg-sky-50/70 hover:bg-sky-100 text-sky-800 text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-2xs"
+          >
+            <Plus className="h-4 w-4" />
+            <span>Add Another Roll Entry</span>
+          </Button>
+
+          <Button
+            type="button"
+            onClick={() => handleSaveReport("SUBMITTED")}
+            disabled={saving || entries.length === 0}
+            className="w-full h-10 text-xs font-bold rounded-xl bg-sky-600 hover:bg-sky-700 text-white shadow-xs transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
+          >
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+            <span>Submit Final Lamination Report</span>
+          </Button>
         </div>
       </div>
 
