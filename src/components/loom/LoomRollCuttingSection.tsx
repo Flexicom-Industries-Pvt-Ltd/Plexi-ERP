@@ -23,6 +23,8 @@ import {
   Minimize2,
   Camera,
   Image as ImageIcon,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import {
   LoomRollCuttingEntryItem,
@@ -150,6 +152,27 @@ export function LoomRollCuttingSection() {
   const [quickContractorPhone, setQuickContractorPhone] = useState("");
   const [quickContractorSaving, setQuickContractorSaving] = useState(false);
   const [targetEntryIndexForNewContractor, setTargetEntryIndexForNewContractor] = useState<number | null>(null);
+
+  // Mobile Accordion state for Roll Cards
+  const [expandedRolls, setExpandedRolls] = useState<Set<string>>(new Set());
+
+  const toggleExpandRoll = (key: string) => {
+    setExpandedRolls((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const expandAllRolls = () => {
+    const allKeys = new Set(entries.map((e, idx) => e.id || e.rollNumber || String(idx)));
+    setExpandedRolls(allKeys);
+  };
+
+  const collapseAllRolls = () => {
+    setExpandedRolls(new Set());
+  };
 
   const latestPayloadRef = useRef<any>(null);
   const lastSavedPayloadRef = useRef<string>("");
@@ -631,7 +654,9 @@ export function LoomRollCuttingSection() {
 
   return (
     <div className="space-y-6">
-      {/* Header Banner */}
+      {/* DESKTOP VIEW (100% PRESERVED) */}
+      <div className="hidden md:block space-y-6">
+        {/* Header Banner */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-5">
         <div>
           <div className="flex items-center gap-2.5">
@@ -1273,6 +1298,579 @@ export function LoomRollCuttingSection() {
               </option>
             ))}
           </datalist>
+        </div>
+      </div>
+      </div>
+
+      {/* MOBILE APP VIEW */}
+      <div className="block md:hidden space-y-3">
+        {/* Mobile Header Card */}
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-2xs space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="p-2 rounded-xl bg-sky-50 text-sky-600 border border-sky-200/60 shrink-0">
+                <Scissors className="h-5 w-5" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <h1 className="text-base font-extrabold text-slate-900 tracking-tight leading-snug">
+                    Roll Cutting Report
+                  </h1>
+                  <span
+                    className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full border ${
+                      reportStatus === "SUBMITTED" || reportStatus === "APPROVED"
+                        ? "bg-emerald-50 text-emerald-700 border-emerald-300"
+                        : "bg-slate-100 text-slate-700 border-slate-300"
+                    }`}
+                  >
+                    {reportStatus === "SUBMITTED" ? "✓ Submitted" : reportStatus === "APPROVED" ? "★ Approved" : "Draft"}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-500 font-medium truncate">
+                  Circular Loom Fabric Doffing
+                </p>
+              </div>
+            </div>
+
+            {/* Primary Add Roll Button */}
+            <button
+              data-testid="mobile-add-roll"
+              onClick={handleAddEntry}
+              className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-bold text-white bg-primary hover:bg-primary/90 rounded-xl transition-all shadow-xs shrink-0 cursor-pointer"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              <span>Add Roll</span>
+            </button>
+          </div>
+
+          {/* Auto-save & Secondary Action Toolbar */}
+          <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
+            {autoSaving ? (
+              <div className="flex items-center gap-1 text-[11px] text-amber-700 font-medium">
+                <div className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-ping" />
+                <span>Saving...</span>
+              </div>
+            ) : lastAutoSavedAt ? (
+              <div className="flex items-center gap-1 text-[11px] text-emerald-700 font-medium truncate max-w-[150px]">
+                <CheckCircle2 className="h-3 w-3 text-emerald-600 shrink-0" />
+                <span className="truncate">Saved {lastAutoSavedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+              </div>
+            ) : (
+              <span className="text-[11px] text-slate-400 font-medium">Auto-save on</span>
+            )}
+
+            <div className="flex items-center gap-1 shrink-0">
+              <button
+                onClick={() => setPrintModalOpen(true)}
+                className="p-1.5 text-slate-600 hover:text-slate-900 border border-slate-200 rounded-lg hover:bg-slate-50 shadow-2xs cursor-pointer"
+                title="Print Official Report"
+              >
+                <Printer className="h-3.5 w-3.5" />
+              </button>
+
+              <button
+                onClick={() => exportLoomRollCuttingExcel({ report: reportDataForPrint, entries, kpis })}
+                disabled={entries.length === 0}
+                className="p-1.5 text-emerald-700 hover:text-emerald-800 border border-slate-200 rounded-lg hover:bg-slate-50 shadow-2xs cursor-pointer disabled:opacity-50"
+                title="Export Excel"
+              >
+                <FileSpreadsheet className="h-3.5 w-3.5" />
+              </button>
+
+              <button
+                onClick={handleSubmitReport}
+                disabled={submitting || loading || entries.length === 0}
+                className="px-2.5 py-1 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-2xs transition-all cursor-pointer disabled:opacity-50"
+              >
+                <span>{submitting ? "..." : "Submit"}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Mobile Date, Shift & Supervisor Card */}
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-3 shadow-2xs space-y-2">
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1">
+                <Calendar className="h-2.5 w-2.5 text-slate-400" />
+                <span>Date:</span>
+              </label>
+              <div className="flex items-center gap-1">
+                <input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  className="w-full min-w-0 px-2 py-1 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-lg outline-none focus:bg-white"
+                />
+                <button
+                  type="button"
+                  onClick={() => setSelectedDate(new Date().toISOString().slice(0, 10))}
+                  className="px-1.5 py-1 text-[10px] font-bold text-slate-600 bg-slate-100 rounded-lg border border-slate-200 shrink-0 cursor-pointer"
+                >
+                  Today
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1">
+                <Clock className="h-2.5 w-2.5 text-slate-400" />
+                <span>Shift:</span>
+              </label>
+              <select
+                value={selectedShift}
+                onChange={(e) => setSelectedShift(e.target.value)}
+                className="w-full px-2 py-1 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-lg outline-none focus:bg-white truncate cursor-pointer"
+              >
+                {availableShifts.map((s) => (
+                  <option key={s.id} value={s.name}>
+                    {s.name}
+                  </option>
+                ))}
+                {!availableShifts.some((s) => s.name === selectedShift) && (
+                  <option value={selectedShift}>{selectedShift}</option>
+                )}
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-0.5 flex items-center gap-1">
+              <User className="h-2.5 w-2.5 text-slate-400" />
+              <span>Shift Supervisor:</span>
+            </label>
+            <UniversalPersonnelInput
+              value={supervisorName}
+              onChange={(val) => {
+                setSupervisorName(val);
+                triggerAutoSave();
+              }}
+              options={availableSupervisors}
+              placeholder="Select or enter supervisor..."
+              className="text-xs"
+            />
+          </div>
+        </div>
+
+        {/* Mobile 2x2 KPI Grid */}
+        <div className="grid grid-cols-2 gap-2">
+          <div className="bg-white border border-slate-200/80 rounded-xl p-2.5 shadow-2xs">
+            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Cut Rolls</div>
+            <div className="mt-0.5 flex items-baseline gap-1">
+              <span className="text-xl font-black font-mono text-slate-900">{kpis.totalRollsCount}</span>
+              <span className="text-[10px] font-medium text-slate-500">rolls</span>
+            </div>
+          </div>
+
+          <div className="bg-white border border-slate-200/80 rounded-xl p-2.5 shadow-2xs">
+            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Cut Length</div>
+            <div className="mt-0.5 flex items-baseline gap-1">
+              <span className="text-xl font-black font-mono text-sky-700">{kpis.totalMeters.toLocaleString()}</span>
+              <span className="text-[10px] font-medium text-slate-500">m</span>
+            </div>
+          </div>
+
+          <div className="bg-white border border-slate-200/80 rounded-xl p-2.5 shadow-2xs">
+            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Nett Fabric Wt</div>
+            <div className="mt-0.5 flex items-baseline gap-1">
+              <span className="text-xl font-black font-mono text-emerald-700">{kpis.totalNettWtKg.toFixed(1)}</span>
+              <span className="text-[10px] font-medium text-slate-500">kg</span>
+            </div>
+          </div>
+
+          <div className="bg-white border border-slate-200/80 rounded-xl p-2.5 shadow-2xs">
+            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Avg Weight / Meter</div>
+            <div className="mt-0.5 flex items-baseline gap-1">
+              <span className="text-xl font-black font-mono text-purple-700">{kpis.averageWeightPerMeter.toFixed(1)}</span>
+              <span className="text-[10px] font-medium text-slate-500">g/m</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Mobile Search & Count Bar */}
+        <div className="space-y-2">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Filter roll #, loom #, quality, contractor..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full pl-8 pr-7 py-2 text-xs bg-white border border-slate-200 rounded-xl outline-none focus:border-slate-800 shadow-2xs"
+            />
+            {search && (
+              <button
+                onClick={() => setSearch("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+
+          <div className="flex items-center justify-between text-xs text-slate-500 px-1 pt-0.5">
+            <span className="font-bold text-slate-800">
+              {entries.length} Roll(s) Logged
+            </span>
+            <div className="flex items-center gap-2 font-medium">
+              <button
+                onClick={expandAllRolls}
+                className="text-sky-600 hover:text-sky-800 cursor-pointer font-semibold"
+              >
+                Expand All
+              </button>
+              <span className="text-slate-300">•</span>
+              <button
+                onClick={collapseAllRolls}
+                className="text-slate-600 hover:text-slate-800 cursor-pointer font-semibold"
+              >
+                Collapse All
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Mobile Roll Cards Feed */}
+        <div className="space-y-2.5">
+          {loading ? (
+            <div className="bg-white border border-slate-200 rounded-2xl p-8 text-center text-xs text-slate-500 flex flex-col items-center justify-center gap-2 shadow-2xs">
+              <div className="h-5 w-5 border-2 border-slate-300 border-t-slate-800 rounded-full animate-spin" />
+              <span>Loading Roll Cutting Log...</span>
+            </div>
+          ) : entries.length === 0 ? (
+            <div className="bg-white border border-slate-200 rounded-2xl p-6 text-center space-y-2 shadow-2xs">
+              <div className="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mx-auto">
+                <Scissors className="h-5 w-5" />
+              </div>
+              <p className="text-xs font-bold text-slate-700">No Cut Rolls Recorded</p>
+              <p className="text-[11px] text-slate-400">
+                Tap &ldquo;+ Add Roll&rdquo; above to record a new finished fabric roll cut from circular looms.
+              </p>
+            </div>
+          ) : (
+            entries.map((entry, idx) => {
+              const cardKey = entry.id || entry.rollNumber || String(idx);
+              const isExpanded = expandedRolls.has(cardKey);
+
+              return (
+                <div
+                  key={cardKey}
+                  id={`roll-card-${cardKey}`}
+                  className="bg-white border border-slate-200/80 rounded-2xl shadow-2xs overflow-hidden transition-all"
+                >
+                  {/* Collapsed Header */}
+                  <div
+                    onClick={() => toggleExpandRoll(cardKey)}
+                    className="p-3 cursor-pointer flex items-center justify-between gap-2 transition-colors hover:bg-slate-50/80"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="px-2 py-1 text-xs font-mono font-bold rounded-lg border bg-slate-900 text-white border-slate-900 shrink-0">
+                        {entry.rollNumber || `#${entry.sequence}`}
+                      </span>
+
+                      <span className="px-1.5 py-0.5 text-xs font-mono font-bold rounded-md bg-sky-50 text-sky-700 border border-sky-200 shrink-0">
+                        Loom #{entry.loomNumber || "-"}
+                      </span>
+
+                      <div className="min-w-0">
+                        <div className="text-xs font-bold text-slate-800 truncate">
+                          {entry.qualityType || "No Quality"}
+                        </div>
+                        <div className="text-[10px] text-slate-500 font-medium truncate">
+                          {entry.contractor || "No Contractor"} • {entry.size ? `${entry.size}mm` : "-"}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <div className="text-right">
+                        <div className="text-xs font-mono font-black text-sky-700">
+                          {entry.meter > 0 ? `${entry.meter} m` : "0 m"}
+                        </div>
+                        <div className="text-[10px] text-emerald-600 font-mono font-bold">
+                          {Number(entry.nettWeightKg) > 0 ? `${Number(entry.nettWeightKg).toFixed(1)} kg` : "-"}
+                        </div>
+                      </div>
+                      {isExpanded ? (
+                        <ChevronUp className="h-4 w-4 text-slate-400" />
+                      ) : (
+                        <ChevronDown className="h-4 w-4 text-slate-400" />
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Expanded Body */}
+                  {isExpanded && (
+                    <div className="p-3 pt-0 border-t border-slate-100 space-y-3 bg-slate-50/30">
+                      {/* Row 1: Roll #, Loom # & Quality */}
+                      <div className="pt-2 grid grid-cols-3 gap-2">
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Roll #:</label>
+                          <input
+                            type="text"
+                            value={entry.rollNumber}
+                            onChange={(e) => handleUpdateEntry(idx, "rollNumber", e.target.value)}
+                            className="w-full text-xs font-mono font-bold px-2 py-1.5 rounded-lg border bg-white text-foreground focus:border-slate-800 outline-none"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Loom # (1-91):</label>
+                          <input
+                            type="number"
+                            min="1"
+                            max="91"
+                            value={entry.loomNumber || ""}
+                            onChange={(e) => handleUpdateEntry(idx, "loomNumber", Number(e.target.value))}
+                            className="w-full text-xs font-mono font-bold text-center px-2 py-1.5 rounded-lg border bg-sky-50 text-sky-800 border-sky-300 outline-none"
+                            placeholder="1-91"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Size (mm):</label>
+                          <input
+                            type="text"
+                            value={entry.size}
+                            onChange={(e) => handleUpdateEntry(idx, "size", e.target.value)}
+                            className="w-full text-xs text-center px-2 py-1.5 rounded-lg border bg-white outline-none"
+                            placeholder="mm"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Quality Selector */}
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Quality / Specification:</label>
+                        <UniversalQualityInput
+                          value={entry.qualityType}
+                          onChange={(newCode, matchedOpt) => {
+                            handleUpdateEntry(idx, "qualityType", newCode);
+                            if (matchedOpt?.size) {
+                              handleUpdateEntry(idx, "size", matchedOpt.size);
+                            } else if (matchedOpt?.reedSpaceCm) {
+                              handleUpdateEntry(idx, "size", String(matchedOpt.reedSpaceCm * 10));
+                            }
+                          }}
+                          options={availableQualities}
+                          placeholder="Select quality..."
+                          compact={true}
+                          inputClassName="h-8 text-xs font-bold bg-white"
+                        />
+                      </div>
+
+                      {/* Operator & Contractor Row */}
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Operator:</label>
+                          <select
+                            value={entry.supervisorSign || ""}
+                            onChange={(e) => handleUpdateEntry(idx, "supervisorSign", e.target.value)}
+                            className="w-full text-xs px-2 py-1.5 rounded-lg border bg-white outline-none font-medium truncate"
+                          >
+                            <option value="">-- Select Operator --</option>
+                            {availableOperators.map((o) => (
+                              <option key={o.id || o.name} value={o.name}>
+                                {o.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <div className="flex items-center justify-between mb-0.5">
+                            <label className="text-[10px] font-bold text-slate-500">Contractor:</label>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setTargetEntryIndexForNewContractor(idx);
+                                setQuickContractorModalOpen(true);
+                              }}
+                              className="text-[10px] font-bold text-primary hover:underline cursor-pointer"
+                            >
+                              + New
+                            </button>
+                          </div>
+                          <select
+                            value={entry.contractor || ""}
+                            onChange={(e) => handleUpdateEntry(idx, "contractor", e.target.value)}
+                            className="w-full text-xs px-2 py-1.5 rounded-lg border bg-white outline-none font-medium truncate"
+                          >
+                            <option value="">-- Contractor --</option>
+                            {availableContractors.map((c) => (
+                              <option key={c.id || c.name} value={c.name}>
+                                {c.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Meter Readings Block (3-col) */}
+                      <div className="p-2.5 bg-sky-50/70 border border-sky-200/70 rounded-xl space-y-1.5">
+                        <div className="text-[10px] font-bold uppercase tracking-wider text-sky-900">
+                          Meter Counter Readings
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                          <div>
+                            <label className="block text-[9px] font-medium text-slate-500 mb-0.5">Prev Reading:</label>
+                            <input
+                              type="number"
+                              value={entry.initialReading ?? ""}
+                              onChange={(e) => handleUpdateEntry(idx, "initialReading", e.target.value)}
+                              className="w-full text-xs font-mono font-bold text-right px-2 py-1 bg-white rounded-lg border border-sky-200 outline-none"
+                              placeholder="0"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[9px] font-medium text-slate-500 mb-0.5">Curr Reading:</label>
+                            <input
+                              type="number"
+                              value={entry.finalReading ?? ""}
+                              onChange={(e) => handleUpdateEntry(idx, "finalReading", e.target.value)}
+                              className="w-full text-xs font-mono font-bold text-right px-2 py-1 bg-white rounded-lg border border-sky-200 outline-none"
+                              placeholder="0"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[9px] font-medium text-slate-500 mb-0.5">Cut Length (m):</label>
+                            <div className="w-full text-xs font-mono font-black text-right px-2 py-1 bg-sky-100/90 text-sky-900 rounded-lg border border-sky-300">
+                              {entry.meter > 0 ? `${entry.meter} m` : "0 m"}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Weight Measurements Block (4-col) */}
+                      <div className="p-2.5 bg-emerald-50/70 border border-emerald-200/70 rounded-xl space-y-1.5">
+                        <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-900">
+                          Scale Weight Measurements
+                        </div>
+                        <div className="grid grid-cols-4 gap-1.5">
+                          <div>
+                            <label className="block text-[9px] font-medium text-slate-500 mb-0.5">Gross (kg):</label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={entry.grossWeightKg ?? ""}
+                              onChange={(e) => handleUpdateEntry(idx, "grossWeightKg", e.target.value)}
+                              className="w-full text-xs font-mono font-bold text-right px-1.5 py-1 bg-white rounded-lg border border-emerald-200 outline-none"
+                              placeholder="0"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[9px] font-medium text-slate-500 mb-0.5">Tare (kg):</label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={entry.tareWeightKg ?? ""}
+                              onChange={(e) => handleUpdateEntry(idx, "tareWeightKg", e.target.value)}
+                              className="w-full text-xs font-mono font-bold text-right px-1.5 py-1 bg-white rounded-lg border border-emerald-200 outline-none"
+                              placeholder="1.2"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[9px] font-medium text-slate-500 mb-0.5">Nett (kg):</label>
+                            <div className="w-full text-xs font-mono font-black text-right px-1 py-1 bg-emerald-100 text-emerald-900 rounded-lg border border-emerald-300 truncate">
+                              {Number(entry.nettWeightKg) > 0 ? Number(entry.nettWeightKg).toFixed(1) : "0"}
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-[9px] font-medium text-slate-500 mb-0.5">Avg (g/m):</label>
+                            <div className="w-full text-xs font-mono font-black text-right px-1 py-1 bg-purple-100 text-purple-900 rounded-lg border border-purple-300 truncate">
+                              {Number(entry.avgWeightPerMeter) > 0 ? Number(entry.avgWeightPerMeter).toFixed(0) : "0"}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Photo & Remarks Row */}
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setPhotoModalIndex(idx)}
+                          className={`px-2.5 py-1.5 text-xs font-semibold rounded-lg border transition-all inline-flex items-center gap-1.5 shrink-0 cursor-pointer ${
+                            entry.photoUrl
+                              ? "bg-emerald-50 text-emerald-700 border-emerald-300"
+                              : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                          }`}
+                        >
+                          {entry.photoUrl ? (
+                            <>
+                              <ImageIcon className="h-3.5 w-3.5 text-emerald-600" />
+                              <span>Photo (1)</span>
+                            </>
+                          ) : (
+                            <>
+                              <Camera className="h-3.5 w-3.5 text-slate-400" />
+                              <span>+ Photo</span>
+                            </>
+                          )}
+                        </button>
+
+                        <input
+                          type="text"
+                          value={entry.remarks || ""}
+                          onChange={(e) => handleUpdateEntry(idx, "remarks", e.target.value)}
+                          placeholder="Notes / inspection remarks..."
+                          className="flex-1 min-w-0 px-2.5 py-1.5 text-xs bg-white border border-slate-200 rounded-lg outline-none focus:border-slate-800"
+                        />
+                      </div>
+
+                      {/* Actions: Duplicate & Delete */}
+                      <div className="flex items-center justify-between pt-1 border-t border-slate-100">
+                        <button
+                          type="button"
+                          onClick={() => handleDuplicateEntry(idx)}
+                          className="px-2.5 py-1 text-xs font-semibold text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 rounded-lg transition-all inline-flex items-center gap-1 cursor-pointer"
+                        >
+                          <Copy className="h-3.5 w-3.5" />
+                          <span>Duplicate for Next Roll</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteEntry(idx)}
+                          className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-all cursor-pointer"
+                          title="Delete roll"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Mobile Bottom Action Buttons */}
+        <div className="pt-2 space-y-2">
+          <button
+            type="button"
+            onClick={handleAddEntry}
+            className="w-full py-2.5 px-3 rounded-xl border border-dashed border-sky-300 bg-sky-50/70 hover:bg-sky-100/70 text-sky-800 text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer"
+          >
+            <Plus className="h-4 w-4" />
+            <span>Add Another Roll Entry</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleSubmitReport}
+            disabled={submitting || loading || entries.length === 0}
+            className="w-full py-2.5 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs transition-all flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer"
+          >
+            <CheckCircle2 className="h-4 w-4" />
+            <span>{submitting ? "Submitting..." : "Submit Final Roll Cutting Report"}</span>
+          </button>
         </div>
       </div>
 
