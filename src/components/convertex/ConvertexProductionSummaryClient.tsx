@@ -391,7 +391,8 @@ export function ConvertexProductionSummaryClient() {
             </span>
           </div>
 
-          <div className="overflow-x-auto max-h-[600px]">
+          {/* Desktop Table View */}
+          <div className="hidden md:block overflow-x-auto max-h-[600px]">
             <table className="w-full text-left text-xs border-collapse min-w-[1400px]">
               <thead className="bg-slate-900 text-white font-semibold text-[11px] sticky top-0 z-10 uppercase tracking-wider">
                 <tr>
@@ -511,6 +512,91 @@ export function ConvertexProductionSummaryClient() {
                 </tr>
               </tfoot>
             </table>
+          </div>
+
+          {/* Mobile Cards Feed */}
+          <div className="block md:hidden p-3 space-y-3 bg-slate-50/50">
+            {qualities.length > 0 ? (
+              qualities.map((q, idx) => (
+                <div key={idx} className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-xs space-y-3">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-700 font-bold text-[10px] flex items-center justify-center">
+                        {idx + 1}
+                      </span>
+                      <span className="font-bold text-slate-900 text-sm">{q.quality}</span>
+                    </div>
+                    <span className="text-[11px] font-bold font-mono px-2 py-0.5 rounded bg-sky-50 text-sky-700 border border-sky-200">
+                      {q.rollsCount} Rolls ({q.totalRollMtr.toLocaleString()} m)
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="p-2 rounded-lg bg-slate-50 border border-slate-100">
+                      <div className="text-[10px] text-slate-500 font-semibold uppercase">Net Weight</div>
+                      <div className="font-bold font-mono text-slate-800 mt-0.5">{q.totalNetWt.toFixed(1)} kg</div>
+                      <div className="text-[10px] text-slate-400">Avg {q.avgGsm.toFixed(1)} g/m</div>
+                    </div>
+                    <div className="p-2 rounded-lg bg-emerald-50/50 border border-emerald-100">
+                      <div className="text-[10px] text-emerald-700 font-semibold uppercase">Production</div>
+                      <div className="font-bold font-mono text-emerald-900 mt-0.5">{q.productionPcs.toLocaleString()} pcs</div>
+                      <div className="text-[10px] text-teal-700 font-mono">{q.productionKg.toFixed(1)} kg</div>
+                    </div>
+                    <div className="p-2 rounded-lg bg-indigo-50/40 border border-indigo-100">
+                      <div className="text-[10px] text-indigo-700 font-semibold uppercase">Patches (OS/DS/Valve)</div>
+                      <div className="font-bold font-mono text-indigo-900 mt-0.5 text-[11px]">
+                        OS: {q.coverPatchOs} | DS: {q.coverPatchDs}
+                      </div>
+                      <div className="text-[10px] text-indigo-600 font-mono">Valve: {q.valvePatch}</div>
+                    </div>
+                    <div className="p-2 rounded-lg bg-red-50/40 border border-red-100">
+                      <div className="text-[10px] text-red-700 font-semibold uppercase">Waste Loss</div>
+                      <div className="font-bold font-mono text-red-800 mt-0.5">{q.totalWasteKg.toFixed(2)} kg</div>
+                      <div className="text-[10px] text-amber-700 font-semibold">{q.totalWastePct.toFixed(2)}% of prod</div>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+                    <span className="text-[11px] text-slate-500 font-medium">Net Bag Yield</span>
+                    <span className="font-bold font-mono text-emerald-800 text-sm">{q.netProductionKg.toFixed(1)} kg</span>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="py-8 text-center text-slate-400 text-xs">
+                No quality production data found for the selected filters.
+              </div>
+            )}
+
+            {/* Mobile Grand Totals Card */}
+            {qualities.length > 0 && (
+              <div className="bg-slate-900 text-white rounded-xl p-3.5 shadow-sm space-y-2 mt-3">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                  <span className="text-xs font-bold uppercase tracking-wider text-amber-400">Grand Totals</span>
+                  <span className="text-xs font-mono text-slate-300">{qualities.length} Qualities</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs pt-1">
+                  <div>
+                    <span className="text-[10px] text-slate-400 uppercase">Total Rolls</span>
+                    <div className="font-mono font-bold text-sky-300">{overall.totalRolls} ({overall.totalRollMtr.toLocaleString()} m)</div>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-400 uppercase">Total Net Wt</span>
+                    <div className="font-mono font-bold text-slate-200">{overall.totalNetWt.toFixed(1)} kg</div>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-400 uppercase">Production (Pcs / Kg)</span>
+                    <div className="font-mono font-bold text-emerald-400">{overall.totalProductionPcs.toLocaleString()} pcs</div>
+                    <div className="text-[10px] font-mono text-teal-300">{overall.totalProductionKg.toFixed(1)} kg</div>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-400 uppercase">Total Waste</span>
+                    <div className="font-mono font-bold text-rose-400">{overall.totalWastageKg.toFixed(2)} kg ({overall.totalWastagePct.toFixed(2)}%)</div>
+                    <div className="text-[10px] font-mono text-emerald-300 font-bold">Net: {overall.totalNetProductionKg.toFixed(1)} kg</div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
