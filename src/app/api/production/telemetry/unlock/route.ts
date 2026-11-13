@@ -11,11 +11,11 @@ export async function GET(request: NextRequest) {
   }
 
   const { searchParams } = new URL(request.url);
-  const module = searchParams.get("module");
+  const moduleParam = searchParams.get("module");
   const date = searchParams.get("date");
   const shiftId = searchParams.get("shiftId");
 
-  if (!module || !date || !shiftId) {
+  if (!moduleParam || !date || !shiftId) {
     return NextResponse.json(
       { error: "Missing required query parameters: module, date, shiftId" },
       { status: 400 }
@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
   try {
     const records = await db.telemetryTimeSlotUnlock.findMany({
       where: {
-        module,
+        module: moduleParam,
         date,
         shiftId,
       },
@@ -146,12 +146,12 @@ export async function DELETE(request: NextRequest) {
   }
 
   const { searchParams } = new URL(request.url);
-  const module = searchParams.get("module");
+  const moduleParam = searchParams.get("module");
   const date = searchParams.get("date");
   const shiftId = searchParams.get("shiftId");
   const timeSlot = searchParams.get("timeSlot");
 
-  if (!module || !date || !shiftId || !timeSlot) {
+  if (!moduleParam || !date || !shiftId || !timeSlot) {
     return NextResponse.json(
       { error: "Missing required query parameters: module, date, shiftId, timeSlot" },
       { status: 400 }
@@ -161,7 +161,7 @@ export async function DELETE(request: NextRequest) {
   try {
     await db.telemetryTimeSlotUnlock.deleteMany({
       where: {
-        module,
+        module: moduleParam,
         date,
         shiftId,
         timeSlot,
@@ -174,8 +174,8 @@ export async function DELETE(request: NextRequest) {
         module: Module.PRODUCTION,
         severity: "INFO",
         action: "RELOCK_TIME_SLOT",
-        payload: { entity: "TelemetryTimeSlotUnlock", entityId: `${module}-${date}-${shiftId}-${timeSlot}` },
-        meta: { module, date, shiftId, timeSlot },
+        payload: { entity: "TelemetryTimeSlotUnlock", entityId: `${moduleParam}-${date}-${shiftId}-${timeSlot}` },
+        meta: { module: moduleParam, date, shiftId, timeSlot },
       });
     } catch (logErr) {
       console.warn("Audit log event failed for relock:", logErr);

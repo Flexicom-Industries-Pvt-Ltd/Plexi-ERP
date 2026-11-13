@@ -60,6 +60,14 @@ export function PhotoEvidenceModal({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Clean up camera on unmount or tab switch
+  const stopCamera = useCallback(() => {
+    if (cameraStream) {
+      cameraStream.getTracks().forEach((track) => track.stop());
+      setCameraStream(null);
+    }
+  }, [cameraStream]);
+
   // Sync internal state when modal opens
   useEffect(() => {
     if (isOpen) {
@@ -70,15 +78,7 @@ export function PhotoEvidenceModal({
     } else {
       stopCamera();
     }
-  }, [isOpen, currentPhotoUrl, allowUpload, allowCapture]);
-
-  // Clean up camera on unmount or tab switch
-  const stopCamera = useCallback(() => {
-    if (cameraStream) {
-      cameraStream.getTracks().forEach((track) => track.stop());
-      setCameraStream(null);
-    }
-  }, [cameraStream]);
+  }, [isOpen, currentPhotoUrl, allowUpload, allowCapture, stopCamera]);
 
   useEffect(() => {
     if (activeTab !== "camera") {
