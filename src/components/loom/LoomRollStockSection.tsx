@@ -182,7 +182,11 @@ export function LoomRollStockSection() {
 
   return (
     <div className="space-y-6">
-      {/* 1. Header Banner & Main Actions */}
+      {/* =========================================================================
+          DESKTOP VIEW (100% Preserved - 0 Regression)
+          ========================================================================= */}
+      <div className="hidden md:block space-y-6">
+        {/* 1. Header Banner & Main Actions */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
         <div className="flex items-center gap-3">
           <div className="p-2.5 bg-sky-50 text-sky-700 border border-sky-200/90 rounded-xl shadow-xs">
@@ -686,6 +690,369 @@ export function LoomRollStockSection() {
               </tfoot>
             )}
           </table>
+        </div>
+      </div>
+      </div>
+
+      {/* =========================================================================
+          MOBILE VIEW (Touch-First App Experience)
+          ========================================================================= */}
+      <div className="block md:hidden space-y-3">
+        {/* Mobile Header Card */}
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-2xs">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="p-2 bg-sky-50 text-sky-700 border border-sky-200/90 rounded-xl shadow-2xs shrink-0">
+                <Layers className="h-5 w-5 text-sky-600" />
+              </div>
+              <div className="min-w-0">
+                <h1 className="text-base font-bold text-slate-900 tracking-tight leading-tight truncate">
+                  Roll Stock
+                </h1>
+                <p className="text-[11px] text-slate-400 font-medium truncate">
+                  Loom Fabric Floor Stock
+                </p>
+              </div>
+            </div>
+
+            {/* Quick Actions */}
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                type="button"
+                onClick={fetchStockData}
+                disabled={loading}
+                className="p-1.5 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg border border-slate-200 shadow-2xs transition-all cursor-pointer disabled:opacity-50"
+                title="Refresh Stock"
+              >
+                <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => exportLoomRollStockExcel({ rolls, summary, filterLabel })}
+                disabled={rolls.length === 0}
+                className="p-1.5 text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 rounded-lg border border-emerald-200 shadow-2xs transition-all cursor-pointer disabled:opacity-50"
+                title="Export Excel"
+              >
+                <FileSpreadsheet className="h-4 w-4" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setPrintModalOpen(true)}
+                disabled={rolls.length === 0}
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold text-white bg-sky-600 hover:bg-sky-700 rounded-lg shadow-2xs transition-all cursor-pointer disabled:opacity-50"
+                title="Print Stock Sheet"
+              >
+                <Printer className="h-3.5 w-3.5" />
+                <span>Print</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Mobile 2x2 Bento KPI Cards */}
+        <div className="grid grid-cols-2 gap-2">
+          {/* Card 1: Rolls in Stock */}
+          <div className="bg-white border border-slate-200/80 rounded-xl p-3 shadow-2xs">
+            <div className="flex items-center justify-between text-slate-400 mb-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Total Rolls</span>
+              <Package className="h-3.5 w-3.5 text-slate-500" />
+            </div>
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-xl font-black font-mono text-slate-900">
+                {summary.totalRolls.toLocaleString()}
+              </span>
+              <span className="text-[10px] font-bold text-slate-500">Rolls</span>
+            </div>
+          </div>
+
+          {/* Card 2: Total Length (Meters) */}
+          <div className="bg-white border border-slate-200/80 rounded-xl p-3 shadow-2xs">
+            <div className="flex items-center justify-between text-sky-500 mb-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-sky-700">Total Length</span>
+              <TrendingUp className="h-3.5 w-3.5 text-sky-600" />
+            </div>
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-xl font-black font-mono text-sky-700">
+                {summary.totalMeters.toLocaleString()}
+              </span>
+              <span className="text-[10px] font-bold text-sky-600">m</span>
+            </div>
+          </div>
+
+          {/* Card 3: Total Nett Weight */}
+          <div className="bg-white border border-slate-200/80 rounded-xl p-3 shadow-2xs">
+            <div className="flex items-center justify-between text-emerald-500 mb-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Nett Weight</span>
+              <Tag className="h-3.5 w-3.5 text-emerald-600" />
+            </div>
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-xl font-black font-mono text-emerald-700">
+                {summary.totalNettWeightKg.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+              </span>
+              <span className="text-[10px] font-bold text-emerald-600">kg</span>
+            </div>
+          </div>
+
+          {/* Card 4: Qualities in Stock */}
+          <div className="bg-white border border-slate-200/80 rounded-xl p-3 shadow-2xs">
+            <div className="flex items-center justify-between text-purple-500 mb-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-purple-700">Qualities</span>
+              <SlidersHorizontal className="h-3.5 w-3.5 text-purple-600" />
+            </div>
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-xl font-black font-mono text-purple-900">
+                {summary.uniqueQualitiesCount}
+              </span>
+              <span className="text-[10px] font-bold text-purple-600">Kinds</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Mobile Search & Filter Card */}
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-3 shadow-2xs space-y-2.5">
+          {/* Search Input */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search roll #, quality, loom #..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full pl-8 pr-7 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-sky-500 focus:bg-white text-slate-900 placeholder:text-slate-400 transition-all"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+
+          {/* Filter Dropdowns Grid */}
+          <div className="grid grid-cols-3 gap-1.5">
+            <select
+              value={selectedQuality}
+              onChange={(e) => setSelectedQuality(e.target.value)}
+              className="w-full px-2 py-1.5 text-[11px] bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:outline-hidden font-medium truncate"
+            >
+              <option value="ALL">All Qualities</option>
+              {availableQualities.map((q) => (
+                <option key={q.code} value={q.code}>
+                  {q.code}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={selectedLoom}
+              onChange={(e) => setSelectedLoom(e.target.value)}
+              className="w-full px-2 py-1.5 text-[11px] bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:outline-hidden font-medium"
+            >
+              <option value="ALL">All Looms</option>
+              {availableLooms.map((loomNo) => (
+                <option key={loomNo} value={String(loomNo)}>
+                  Loom #{loomNo}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={selectedShift}
+              onChange={(e) => setSelectedShift(e.target.value)}
+              className="w-full px-2 py-1.5 text-[11px] bg-slate-50 border border-slate-200 rounded-lg text-slate-900 focus:outline-hidden font-medium"
+            >
+              <option value="ALL">All Shifts</option>
+              <option value="DAY">Day</option>
+              <option value="NIGHT">Night</option>
+            </select>
+          </div>
+
+          {/* Date Presets Row & Reset */}
+          <div className="flex items-center justify-between gap-1 pt-1.5 border-t border-slate-100 text-xs">
+            <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
+              {(["ALL", "TODAY", "7DAYS", "30DAYS"] as const).map((preset) => (
+                <button
+                  key={preset}
+                  type="button"
+                  onClick={() => {
+                    setDatePreset(preset);
+                    setDateFrom("");
+                    setDateTo("");
+                  }}
+                  className={`px-2 py-1 rounded-md text-[10px] font-bold transition-all shrink-0 cursor-pointer ${
+                    datePreset === preset && !dateFrom && !dateTo
+                      ? "bg-sky-600 text-white shadow-2xs"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  }`}
+                >
+                  {preset === "ALL"
+                    ? "All Time"
+                    : preset === "TODAY"
+                    ? "Today"
+                    : preset === "7DAYS"
+                    ? "7 Days"
+                    : "30 Days"}
+                </button>
+              ))}
+            </div>
+
+            {hasActiveFilters && (
+              <button
+                type="button"
+                onClick={handleResetFilters}
+                className="text-[11px] font-bold text-rose-600 hover:text-rose-700 inline-flex items-center gap-0.5 cursor-pointer shrink-0"
+              >
+                <RotateCcw className="h-3 w-3" />
+                <span>Reset</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Mobile Inventory Header */}
+        <div className="flex items-center justify-between px-1">
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-bold text-slate-800">Floor Stock</span>
+            <span className="px-1.5 py-0.5 rounded-full bg-slate-100 text-[10px] font-bold font-mono text-slate-600">
+              {rolls.length} rolls
+            </span>
+          </div>
+          <span className="text-[10px] text-slate-400 font-medium truncate max-w-[180px]">
+            {filterLabel}
+          </span>
+        </div>
+
+        {/* Mobile Roll Cards Feed */}
+        <div className="space-y-2.5">
+          {loading ? (
+            <div className="bg-white border border-slate-200 rounded-2xl p-8 text-center text-xs text-slate-500 flex flex-col items-center justify-center gap-2 shadow-2xs">
+              <RefreshCw className="h-5 w-5 animate-spin text-slate-500" />
+              <span>Loading live roll stock inventory...</span>
+            </div>
+          ) : rolls.length === 0 ? (
+            <div className="bg-white border border-slate-200 rounded-2xl p-6 text-center space-y-2 shadow-2xs">
+              <div className="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mx-auto">
+                <Package className="h-5 w-5" />
+              </div>
+              <p className="text-xs font-bold text-slate-700">No rolls found in stock</p>
+              <p className="text-[11px] text-slate-400">
+                Adjust search, date, or quality filters to view rolls.
+              </p>
+              {hasActiveFilters && (
+                <button
+                  type="button"
+                  onClick={handleResetFilters}
+                  className="mt-1 px-3 py-1.5 text-xs font-bold rounded-lg bg-sky-600 text-white cursor-pointer"
+                >
+                  Clear Filters
+                </button>
+              )}
+            </div>
+          ) : (
+            rolls.map((r, idx) => (
+              <div
+                key={r.id || idx}
+                className="bg-white border border-slate-200/80 rounded-2xl p-3 shadow-2xs space-y-2 transition-all"
+              >
+                {/* Top Row: Roll Number, Loom Badge, Copy & Photo */}
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="px-2 py-0.5 text-xs font-mono font-bold rounded-lg bg-slate-900 text-white shrink-0">
+                      {r.rollNumber || "—"}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleCopyRoll(r.rollNumber)}
+                      className="p-1 text-slate-400 hover:text-slate-700 transition-colors"
+                      title="Copy Roll #"
+                    >
+                      {copiedRoll === r.rollNumber ? (
+                        <Check className="h-3 w-3 text-emerald-600" />
+                      ) : (
+                        <Copy className="h-3 w-3" />
+                      )}
+                    </button>
+                    <span className="px-1.5 py-0.5 text-[11px] font-mono font-bold rounded-md bg-sky-50 text-sky-700 border border-sky-200 shrink-0">
+                      Loom #{r.loomNumber}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-1 shrink-0">
+                    {r.photoUrl && (
+                      <button
+                        type="button"
+                        onClick={() => setPreviewPhotoUrl(r.photoUrl || null)}
+                        className="px-2 py-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg border border-emerald-200 transition-colors flex items-center gap-1 shadow-2xs"
+                      >
+                        <Camera className="h-3 w-3" />
+                        <span>Photo</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Middle Row: Quality & Size */}
+                <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-100">
+                  <div className="min-w-0 truncate">
+                    <RecipeQualityBadge value={r.qualityType} />
+                  </div>
+                  <span className="text-[11px] font-mono font-semibold text-slate-600 shrink-0">
+                    {r.size ? `${r.size} mm` : "—"}
+                  </span>
+                </div>
+
+                {/* Metrics 3-Col Touch Grid */}
+                <div className="grid grid-cols-3 gap-1.5 bg-slate-50/80 p-2 rounded-xl border border-slate-100">
+                  <div className="text-center">
+                    <span className="block text-[9px] font-bold uppercase tracking-wider text-slate-400">Length</span>
+                    <span className="text-xs font-black font-mono text-slate-900">
+                      {r.meter !== undefined && r.meter !== null ? Number(r.meter).toLocaleString() : "0"}
+                      <span className="text-[10px] font-normal text-slate-400 ml-0.5">m</span>
+                    </span>
+                  </div>
+
+                  <div className="text-center border-x border-slate-200/60">
+                    <span className="block text-[9px] font-bold uppercase tracking-wider text-emerald-600">Nett Wt</span>
+                    <span className="text-xs font-black font-mono text-emerald-700">
+                      {r.nettWeightKg !== undefined && r.nettWeightKg !== null ? Number(r.nettWeightKg).toFixed(1) : "0.0"}
+                      <span className="text-[10px] font-normal text-emerald-600 ml-0.5">kg</span>
+                    </span>
+                  </div>
+
+                  <div className="text-center">
+                    <span className="block text-[9px] font-bold uppercase tracking-wider text-purple-600">Linear Mass</span>
+                    <span className="text-xs font-black font-mono text-purple-700">
+                      {r.avgWeightPerMeter !== undefined && r.avgWeightPerMeter !== null ? Number(r.avgWeightPerMeter).toFixed(1) : "0.0"}
+                      <span className="text-[9px] font-normal text-purple-500 ml-0.5">g/m</span>
+                    </span>
+                  </div>
+                </div>
+
+                {/* Footer Meta Row */}
+                <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1 font-medium">
+                  <div className="flex items-center gap-1 truncate">
+                    <Calendar className="h-2.5 w-2.5 text-slate-400 shrink-0" />
+                    <span>{r.date || "—"}</span>
+                    <span>•</span>
+                    <span>{r.shiftName || "—"}</span>
+                  </div>
+                  <div className="text-slate-600 font-semibold truncate max-w-[140px]">
+                    {r.contractor || "In-House"}
+                  </div>
+                </div>
+                {r.remarks && (
+                  <div className="text-[10px] text-slate-500 italic bg-slate-50 px-2 py-1 rounded border border-slate-100 truncate">
+                    &ldquo;{r.remarks}&rdquo;
+                  </div>
+                )}
+              </div>
+            ))
+          )}
         </div>
       </div>
 
