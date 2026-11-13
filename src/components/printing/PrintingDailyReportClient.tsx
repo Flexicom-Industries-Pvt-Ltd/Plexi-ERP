@@ -24,6 +24,8 @@ import {
   Loader2,
   HelpCircle,
   FileText,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -89,6 +91,23 @@ export function PrintingDailyReportClient() {
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
   const [isPrintModalOpen, setIsPrintModalOpen] = useState<boolean>(false);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+  const [expandedRows, setExpandedRows] = useState<Record<number, boolean>>({ 0: true });
+
+  const toggleExpandRow = (idx: number) => {
+    setExpandedRows((prev) => ({ ...prev, [idx]: !prev[idx] }));
+  };
+
+  const expandAllRows = () => {
+    const all: Record<number, boolean> = {};
+    calculatedRows.forEach((_, idx) => {
+      all[idx] = true;
+    });
+    setExpandedRows(all);
+  };
+
+  const collapseAllRows = () => {
+    setExpandedRows({});
+  };
 
   // Available roll autocomplete suggestions (from circular loom roll cutting)
   const [availableRolls, setAvailableRolls] = useState<AvailablePrintingRoll[]>([]);
@@ -637,361 +656,801 @@ export function PrintingDailyReportClient() {
         </div>
       </div>
 
-      {/* Spreadsheet Table Container (Only this container expands in fullscreen!) */}
-      <div
-        ref={tableContainerRef}
-        className={`bg-white border border-slate-200 shadow-sm transition-all duration-200 flex flex-col ${
-          isFullscreen
-            ? "fixed inset-0 z-50 p-4 bg-white overflow-hidden"
-            : "rounded-2xl overflow-hidden"
-        }`}
-      >
-        {/* Table Toolbar with Top-Left Fullscreen Expand/Collapse */}
-        <div className="p-3 bg-slate-50/90 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 shrink-0">
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setIsFullscreen(!isFullscreen)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold shadow-xs transition-colors"
-              title={isFullscreen ? "Collapse to standard view (Esc)" : "Expand sheet to fullscreen"}
-            >
-              {isFullscreen ? (
-                <>
-                  <Minimize2 className="h-4 w-4 text-primary" />
-                  <span>Collapse Sheet</span>
-                </>
-              ) : (
-                <>
-                  <Maximize2 className="h-4 w-4 text-primary" />
-                  <span>Expand Sheet</span>
-                </>
-              )}
-            </button>
+      {/* ========================================================================= */}
+      {/* DESKTOP VIEW: 15-Column Spreadsheet (100% Preserved)                      */}
+      {/* ========================================================================= */}
+      <div className="hidden md:block">
+        <div
+          ref={tableContainerRef}
+          className={`bg-white border border-slate-200 shadow-sm transition-all duration-200 flex flex-col ${
+            isFullscreen
+              ? "fixed inset-0 z-50 p-4 bg-white overflow-hidden"
+              : "rounded-2xl overflow-hidden"
+          }`}
+        >
+          {/* Table Toolbar with Top-Left Fullscreen Expand/Collapse */}
+          <div className="p-3 bg-slate-50/90 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 shrink-0">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setIsFullscreen(!isFullscreen)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold shadow-xs transition-colors"
+                title={isFullscreen ? "Collapse to standard view (Esc)" : "Expand sheet to fullscreen"}
+              >
+                {isFullscreen ? (
+                  <>
+                    <Minimize2 className="h-4 w-4 text-primary" />
+                    <span>Collapse Sheet</span>
+                  </>
+                ) : (
+                  <>
+                    <Maximize2 className="h-4 w-4 text-primary" />
+                    <span>Expand Sheet</span>
+                  </>
+                )}
+              </button>
 
-            <button
-              onClick={handleAddRow}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-white text-xs font-bold shadow-xs transition-colors"
-            >
-              <Plus className="h-4 w-4" />
-              Add Row
-            </button>
+              <button
+                onClick={handleAddRow}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-white text-xs font-bold shadow-xs transition-colors"
+              >
+                <Plus className="h-4 w-4" />
+                Add Row
+              </button>
 
-            <button
-              onClick={handleResetToBlank}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-slate-600 text-xs font-semibold shadow-xs transition-colors"
-              title="Reset sheet to 5 empty blank rows"
-            >
-              <RotateCcw className="h-3.5 w-3.5 text-slate-500" />
-              Clear / Reset Blank
-            </button>
+              <button
+                onClick={handleResetToBlank}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-slate-600 text-xs font-semibold shadow-xs transition-colors"
+                title="Reset sheet to 5 empty blank rows"
+              >
+                <RotateCcw className="h-3.5 w-3.5 text-slate-500" />
+                Clear / Reset Blank
+              </button>
+            </div>
+
+            <div className="flex items-center gap-3 text-xs text-slate-500">
+              <span className="font-semibold text-slate-700">{entries.length} Rows</span>
+              <span>•</span>
+              <span className="text-[11px] text-slate-400">Avg. GSM = (Net Wt / Prod Mtr) × 1000</span>
+            </div>
           </div>
 
-          <div className="flex items-center gap-3 text-xs text-slate-500">
-            <span className="font-semibold text-slate-700">{entries.length} Rows</span>
-            <span>•</span>
-            <span className="text-[11px] text-slate-400">Avg. GSM = (Net Wt / Prod Mtr) × 1000</span>
-          </div>
-        </div>
+          {/* Scrollable Table */}
+          <div className="flex-1 overflow-x-auto overflow-y-auto">
+            <table className="w-full text-left text-xs border-collapse min-w-[1380px]">
+              <thead className="sticky top-0 z-20 bg-slate-100 border-b border-slate-300 shadow-xs">
+                <tr className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+                  <th className="py-2.5 px-2 w-12 text-center border-r border-slate-200">#</th>
+                  <th className="py-2.5 px-3 w-48 border-r border-slate-200">Company Name</th>
+                  <th className="py-2.5 px-3 w-32 border-r border-slate-200">Unit Name</th>
+                  <th className="py-2.5 px-3 w-28 border-r border-slate-200">Grade</th>
+                  <th className="py-2.5 px-3 w-36 text-right border-r border-slate-200">Target (m)</th>
+                  <th className="py-2.5 px-3 w-36 border-r border-slate-200">Drum Size / Cut</th>
+                  <th className="py-2.5 px-3 w-36 border-r border-slate-200">Quality</th>
+                  <th className="py-2.5 px-3 w-32 border-r border-slate-200">Roll No.</th>
+                  <th className="py-2.5 px-3 w-28 border-r border-slate-200">Loom No.</th>
+                  <th className="py-2.5 px-3 w-32 text-right border-r border-slate-200">Prod (m)</th>
+                  <th className="py-2.5 px-3 w-28 text-right border-r border-slate-200">Net Wt (kg)</th>
+                  <th className="py-2.5 px-3 w-28 text-right border-r border-slate-200 bg-blue-50/60 text-blue-900">Avg (g/m)</th>
+                  <th className="py-2.5 px-3 w-32 text-right border-r border-slate-200 bg-emerald-50/60 text-emerald-900">Print (m)</th>
+                  <th className="py-2.5 px-3 w-44 border-r border-slate-200">Remarks</th>
+                  <th className="py-2.5 px-2 w-12 text-center"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200 bg-white">
+                {calculatedRows.map((row, idx) => (
+                  <tr
+                    key={row.id || idx}
+                    className={`hover:bg-slate-50/80 transition-colors ${
+                      idx % 2 === 1 ? "bg-slate-50/30" : "bg-white"
+                    }`}
+                  >
+                    {/* Sequence */}
+                    <td className="py-2 px-2 text-center font-bold text-slate-400 text-xs border-r border-slate-200">
+                      {idx + 1}
+                    </td>
 
-        {/* Scrollable Table */}
-        <div className="flex-1 overflow-x-auto overflow-y-auto">
-          <table className="w-full text-left text-xs border-collapse min-w-[1380px]">
-            <thead className="sticky top-0 z-20 bg-slate-100 border-b border-slate-300 shadow-xs">
-              <tr className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">
-                <th className="py-2.5 px-2 w-12 text-center border-r border-slate-200">#</th>
-                <th className="py-2.5 px-3 w-48 border-r border-slate-200">Company Name</th>
-                <th className="py-2.5 px-3 w-32 border-r border-slate-200">Unit Name</th>
-                <th className="py-2.5 px-3 w-28 border-r border-slate-200">Grade</th>
-                <th className="py-2.5 px-3 w-36 text-right border-r border-slate-200">Target (m)</th>
-                <th className="py-2.5 px-3 w-36 border-r border-slate-200">Drum Size / Cut</th>
-                <th className="py-2.5 px-3 w-36 border-r border-slate-200">Quality</th>
-                <th className="py-2.5 px-3 w-32 border-r border-slate-200">Roll No.</th>
-                <th className="py-2.5 px-3 w-28 border-r border-slate-200">Loom No.</th>
-                <th className="py-2.5 px-3 w-32 text-right border-r border-slate-200">Prod (m)</th>
-                <th className="py-2.5 px-3 w-28 text-right border-r border-slate-200">Net Wt (kg)</th>
-                <th className="py-2.5 px-3 w-28 text-right border-r border-slate-200 bg-blue-50/60 text-blue-900">Avg (g/m)</th>
-                <th className="py-2.5 px-3 w-32 text-right border-r border-slate-200 bg-emerald-50/60 text-emerald-900">Print (m)</th>
-                <th className="py-2.5 px-3 w-44 border-r border-slate-200">Remarks</th>
-                <th className="py-2.5 px-2 w-12 text-center"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200 bg-white">
-              {calculatedRows.map((row, idx) => (
-                <tr
-                  key={row.id || idx}
-                  className={`hover:bg-slate-50/80 transition-colors ${
-                    idx % 2 === 1 ? "bg-slate-50/30" : "bg-white"
-                  }`}
-                >
-                  {/* Sequence */}
-                  <td className="py-2 px-2 text-center font-bold text-slate-400 text-xs border-r border-slate-200">
-                    {idx + 1}
-                  </td>
+                    {/* Company Name (Searchable Typing Dropdown with Auto-Save) */}
+                    <td className="py-1 px-2 border-r border-slate-200 relative">
+                      <input
+                        type="text"
+                        placeholder="Type or select company..."
+                        value={row.companyName || ""}
+                        onChange={(e) => {
+                          handleFieldChange(idx, "companyName", e.target.value);
+                          setActiveCompanySearchRow(idx);
+                          fetchPartySuggestions(e.target.value);
+                        }}
+                        onFocus={() => {
+                          setActiveCompanySearchRow(idx);
+                          fetchPartySuggestions(row.companyName || "");
+                        }}
+                        onBlur={() => {
+                          setTimeout(() => {
+                            setActiveCompanySearchRow(null);
+                            handleAutoSavePartyToDataCentre(row);
+                          }, 250);
+                        }}
+                        className="w-full px-2 py-1 border border-slate-300 rounded font-semibold text-slate-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-xs"
+                      />
 
-                  {/* Company Name (Searchable Typing Dropdown with Auto-Save) */}
-                  <td className="py-1 px-2 border-r border-slate-200 relative">
-                    <input
-                      type="text"
-                      placeholder="Type or select company..."
-                      value={row.companyName || ""}
-                      onChange={(e) => {
-                        handleFieldChange(idx, "companyName", e.target.value);
-                        setActiveCompanySearchRow(idx);
-                        fetchPartySuggestions(e.target.value);
-                      }}
-                      onFocus={() => {
-                        setActiveCompanySearchRow(idx);
-                        fetchPartySuggestions(row.companyName || "");
-                      }}
-                      onBlur={() => {
-                        // Delay closing so click on suggestion registers
-                        setTimeout(() => {
-                          setActiveCompanySearchRow(null);
-                          // Auto-save new party to Data Centre on blur
-                          handleAutoSavePartyToDataCentre(row);
-                        }, 250);
-                      }}
-                      className="w-full px-2 py-1 border border-slate-300 rounded font-semibold text-slate-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-xs"
-                    />
-
-                    {/* Company Suggestions Dropdown */}
-                    {activeCompanySearchRow === idx && partySuggestions.length > 0 && (
-                      <div className="absolute left-2 top-full mt-1 z-30 w-72 bg-white rounded-lg shadow-xl border border-slate-200 py-1 max-h-56 overflow-y-auto">
-                        <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
-                          <span>Data Centre Parties</span>
-                          <Building className="h-3 w-3" />
-                        </div>
-                        {partySuggestions.map((party) => (
-                          <div
-                            key={party.id}
-                            onMouseDown={() => handleSelectParty(idx, party)}
-                            className="px-3 py-1.5 hover:bg-primary/10 cursor-pointer text-xs flex flex-col gap-0.5 border-b border-slate-50 last:border-0"
-                          >
-                            <span className="font-bold text-slate-800">{party.companyName}</span>
-                            <div className="text-[10px] text-slate-500 flex items-center gap-1.5">
-                              {party.unitName && <span>Unit: {party.unitName}</span>}
-                              {party.grade && <span>• Grade: {party.grade}</span>}
-                              {party.drumSize && <span>• Drum: {party.drumSize}</span>}
-                            </div>
+                      {/* Company Suggestions Dropdown */}
+                      {activeCompanySearchRow === idx && partySuggestions.length > 0 && (
+                        <div className="absolute left-2 top-full mt-1 z-30 w-72 bg-white rounded-lg shadow-xl border border-slate-200 py-1 max-h-56 overflow-y-auto">
+                          <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                            <span>Data Centre Parties</span>
+                            <Building className="h-3 w-3" />
                           </div>
-                        ))}
-                      </div>
-                    )}
-                  </td>
-
-                  {/* Unit Name */}
-                  <td className="py-1 px-2 border-r border-slate-200">
-                    <input
-                      type="text"
-                      placeholder="e.g. Ropar"
-                      value={row.unitName || ""}
-                      onChange={(e) => handleFieldChange(idx, "unitName", e.target.value)}
-                      onBlur={() => handleAutoSavePartyToDataCentre(row)}
-                      className="w-full px-2 py-1 border border-slate-300 rounded text-slate-800 focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-xs"
-                    />
-                  </td>
-
-                  {/* Grade */}
-                  <td className="py-1 px-2 border-r border-slate-200">
-                    <input
-                      type="text"
-                      placeholder="e.g. PPC"
-                      value={row.grade || ""}
-                      onChange={(e) => handleFieldChange(idx, "grade", e.target.value)}
-                      onBlur={() => handleAutoSavePartyToDataCentre(row)}
-                      className="w-full px-2 py-1 border border-slate-300 rounded text-slate-800 focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-xs"
-                    />
-                  </td>
-
-                  {/* Target Production (in metre) */}
-                  <td className="py-1 px-2 border-r border-slate-200">
-                    <input
-                      type="number"
-                      step="any"
-                      placeholder="0"
-                      value={row.targetProductionMtrs ?? ""}
-                      onChange={(e) => handleFieldChange(idx, "targetProductionMtrs", e.target.value)}
-                      onBlur={() => handleAutoSavePartyToDataCentre(row)}
-                      className="w-full px-2 py-1 border border-slate-300 rounded font-mono text-right text-blue-700 font-bold focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-xs"
-                    />
-                  </td>
-
-                  {/* Drum Size / Cut Length */}
-                  <td className="py-1 px-2 border-r border-slate-200">
-                    <input
-                      type="text"
-                      placeholder="e.g. 20mm"
-                      value={row.drumSize || ""}
-                      onChange={(e) => handleFieldChange(idx, "drumSize", e.target.value)}
-                      onBlur={() => handleAutoSavePartyToDataCentre(row)}
-                      className="w-full px-2 py-1 border border-slate-300 rounded font-mono text-slate-800 focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-xs"
-                    />
-                  </td>
-
-                  {/* Quality */}
-                  <td className="py-1 px-2 border-r border-slate-200 min-w-[200px]">
-                    <UniversalQualityInput
-                      value={row.quality || ""}
-                      onChange={(val) => handleFieldChange(idx, "quality", val)}
-                      placeholder="— Quality —"
-                      compact={true}
-                      inputClassName="h-7 text-xs font-medium"
-                    />
-                  </td>
-
-                  {/* Roll No. (Autocomplete from Loom Roll Cutting) */}
-                  <td className="py-1 px-2 border-r border-slate-200 relative">
-                    <input
-                      type="text"
-                      placeholder="e.g. D14332"
-                      value={row.rollNumber || ""}
-                      onChange={(e) => {
-                        handleFieldChange(idx, "rollNumber", e.target.value);
-                        setActiveRollSearchRow(idx);
-                        fetchAvailableRolls(e.target.value);
-                      }}
-                      onFocus={() => {
-                        setActiveRollSearchRow(idx);
-                        fetchAvailableRolls(row.rollNumber || "");
-                      }}
-                      onBlur={() => {
-                        setTimeout(() => setActiveRollSearchRow(null), 250);
-                      }}
-                      className="w-full px-2 py-1 border border-slate-300 rounded font-mono font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-xs"
-                    />
-
-                    {/* Roll Suggestions Dropdown */}
-                    {activeRollSearchRow === idx && availableRolls.length > 0 && (
-                      <div className="absolute left-2 top-full mt-1 z-30 w-72 bg-white rounded-lg shadow-xl border border-slate-200 py-1 max-h-56 overflow-y-auto">
-                        <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
-                          <span>Loom Rolls Available</span>
-                          <Sparkles className="h-3 w-3 text-amber-500" />
+                          {partySuggestions.map((party) => (
+                            <div
+                              key={party.id}
+                              onMouseDown={() => handleSelectParty(idx, party)}
+                              className="px-3 py-1.5 hover:bg-primary/10 cursor-pointer text-xs flex flex-col gap-0.5 border-b border-slate-50 last:border-0"
+                            >
+                              <span className="font-bold text-slate-800">{party.companyName}</span>
+                              <div className="text-[10px] text-slate-500 flex items-center gap-1.5">
+                                {party.unitName && <span>Unit: {party.unitName}</span>}
+                                {party.grade && <span>• Grade: {party.grade}</span>}
+                                {party.drumSize && <span>• Drum: {party.drumSize}</span>}
+                              </div>
+                            </div>
+                          ))}
                         </div>
-                        {availableRolls.map((roll) => (
-                          <div
-                            key={roll.id}
-                            onMouseDown={() => handleSelectRoll(idx, roll)}
-                            className="px-3 py-1.5 hover:bg-primary/10 cursor-pointer text-xs flex flex-col gap-0.5 border-b border-slate-50 last:border-0"
-                          >
-                            <div className="flex items-center justify-between font-bold text-slate-800">
-                              <span>{roll.rollNumber}</span>
-                              <span className="text-[10px] font-mono text-blue-600">Loom #{roll.loomNumber}</span>
-                            </div>
-                            <div className="text-[10px] text-slate-500 flex items-center justify-between">
-                              <span className="truncate max-w-[120px]">{roll.qualityType}</span>
-                              <span className="font-mono">{roll.meter}m • {roll.nettWeightKg}kg</span>
-                            </div>
+                      )}
+                    </td>
+
+                    {/* Unit Name */}
+                    <td className="py-1 px-2 border-r border-slate-200">
+                      <input
+                        type="text"
+                        placeholder="e.g. Ropar"
+                        value={row.unitName || ""}
+                        onChange={(e) => handleFieldChange(idx, "unitName", e.target.value)}
+                        onBlur={() => handleAutoSavePartyToDataCentre(row)}
+                        className="w-full px-2 py-1 border border-slate-300 rounded text-slate-800 focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-xs"
+                      />
+                    </td>
+
+                    {/* Grade */}
+                    <td className="py-1 px-2 border-r border-slate-200">
+                      <input
+                        type="text"
+                        placeholder="e.g. PPC"
+                        value={row.grade || ""}
+                        onChange={(e) => handleFieldChange(idx, "grade", e.target.value)}
+                        onBlur={() => handleAutoSavePartyToDataCentre(row)}
+                        className="w-full px-2 py-1 border border-slate-300 rounded text-slate-800 focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-xs"
+                      />
+                    </td>
+
+                    {/* Target Production (in metre) */}
+                    <td className="py-1 px-2 border-r border-slate-200">
+                      <input
+                        type="number"
+                        step="any"
+                        placeholder="0"
+                        value={row.targetProductionMtrs ?? ""}
+                        onChange={(e) => handleFieldChange(idx, "targetProductionMtrs", e.target.value)}
+                        onBlur={() => handleAutoSavePartyToDataCentre(row)}
+                        className="w-full px-2 py-1 border border-slate-300 rounded font-mono text-right text-blue-700 font-bold focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-xs"
+                      />
+                    </td>
+
+                    {/* Drum Size / Cut Length */}
+                    <td className="py-1 px-2 border-r border-slate-200">
+                      <input
+                        type="text"
+                        placeholder="e.g. 20mm"
+                        value={row.drumSize || ""}
+                        onChange={(e) => handleFieldChange(idx, "drumSize", e.target.value)}
+                        onBlur={() => handleAutoSavePartyToDataCentre(row)}
+                        className="w-full px-2 py-1 border border-slate-300 rounded font-mono text-slate-800 focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-xs"
+                      />
+                    </td>
+
+                    {/* Quality */}
+                    <td className="py-1 px-2 border-r border-slate-200 min-w-[200px]">
+                      <UniversalQualityInput
+                        value={row.quality || ""}
+                        onChange={(val) => handleFieldChange(idx, "quality", val)}
+                        placeholder="— Quality —"
+                        compact={true}
+                        inputClassName="h-7 text-xs font-medium"
+                      />
+                    </td>
+
+                    {/* Roll No. (Autocomplete from Loom Roll Cutting) */}
+                    <td className="py-1 px-2 border-r border-slate-200 relative">
+                      <input
+                        type="text"
+                        placeholder="e.g. D14332"
+                        value={row.rollNumber || ""}
+                        onChange={(e) => {
+                          handleFieldChange(idx, "rollNumber", e.target.value);
+                          setActiveRollSearchRow(idx);
+                          fetchAvailableRolls(e.target.value);
+                        }}
+                        onFocus={() => {
+                          setActiveRollSearchRow(idx);
+                          fetchAvailableRolls(row.rollNumber || "");
+                        }}
+                        onBlur={() => {
+                          setTimeout(() => setActiveRollSearchRow(null), 250);
+                        }}
+                        className="w-full px-2 py-1 border border-slate-300 rounded font-mono font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-xs"
+                      />
+
+                      {/* Roll Suggestions Dropdown */}
+                      {activeRollSearchRow === idx && availableRolls.length > 0 && (
+                        <div className="absolute left-2 top-full mt-1 z-30 w-72 bg-white rounded-lg shadow-xl border border-slate-200 py-1 max-h-56 overflow-y-auto">
+                          <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                            <span>Loom Rolls Available</span>
+                            <Sparkles className="h-3 w-3 text-amber-500" />
                           </div>
-                        ))}
-                      </div>
-                    )}
-                  </td>
+                          {availableRolls.map((roll) => (
+                            <div
+                              key={roll.id}
+                              onMouseDown={() => handleSelectRoll(idx, roll)}
+                              className="px-3 py-1.5 hover:bg-primary/10 cursor-pointer text-xs flex flex-col gap-0.5 border-b border-slate-50 last:border-0"
+                            >
+                              <div className="flex items-center justify-between font-bold text-slate-800">
+                                <span>{roll.rollNumber}</span>
+                                <span className="text-[10px] font-mono text-blue-600">Loom #{roll.loomNumber}</span>
+                              </div>
+                              <div className="text-[10px] text-slate-500 flex items-center justify-between">
+                                <span className="truncate max-w-[120px]">{roll.qualityType}</span>
+                                <span className="font-mono">{roll.meter}m • {roll.nettWeightKg}kg</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </td>
 
-                  {/* Loom No */}
-                  <td className="py-1 px-2 border-r border-slate-200">
-                    <input
-                      type="text"
-                      placeholder="e.g. 42 S1"
-                      value={row.loomNumber || ""}
-                      onChange={(e) => handleFieldChange(idx, "loomNumber", e.target.value)}
-                      className="w-full px-2 py-1 border border-slate-300 rounded font-mono text-slate-800 focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-xs"
-                    />
-                  </td>
+                    {/* Loom No */}
+                    <td className="py-1 px-2 border-r border-slate-200">
+                      <input
+                        type="text"
+                        placeholder="e.g. 42 S1"
+                        value={row.loomNumber || ""}
+                        onChange={(e) => handleFieldChange(idx, "loomNumber", e.target.value)}
+                        className="w-full px-2 py-1 border border-slate-300 rounded font-mono text-slate-800 focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-xs"
+                      />
+                    </td>
 
-                  {/* Production in Metre */}
-                  <td className="py-1 px-2 border-r border-slate-200">
-                    <input
-                      type="number"
-                      step="any"
-                      placeholder="0"
-                      value={row.productionMeter}
-                      onChange={(e) => handleFieldChange(idx, "productionMeter", e.target.value)}
-                      className="w-full px-2 py-1 border border-slate-300 rounded font-mono font-bold text-right text-slate-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-xs"
-                    />
-                  </td>
+                    {/* Production in Metre */}
+                    <td className="py-1 px-2 border-r border-slate-200">
+                      <input
+                        type="number"
+                        step="any"
+                        placeholder="0"
+                        value={row.productionMeter}
+                        onChange={(e) => handleFieldChange(idx, "productionMeter", e.target.value)}
+                        className="w-full px-2 py-1 border border-slate-300 rounded font-mono font-bold text-right text-slate-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-xs"
+                      />
+                    </td>
 
-                  {/* Net Wt. (kg) */}
-                  <td className="py-1 px-2 border-r border-slate-200">
-                    <input
-                      type="number"
-                      step="any"
-                      placeholder="0.0"
-                      value={row.netWeight}
-                      onChange={(e) => handleFieldChange(idx, "netWeight", e.target.value)}
-                      className="w-full px-2 py-1 border border-slate-300 rounded font-mono text-right text-slate-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-xs"
-                    />
-                  </td>
+                    {/* Net Wt. (kg) */}
+                    <td className="py-1 px-2 border-r border-slate-200">
+                      <input
+                        type="number"
+                        step="any"
+                        placeholder="0.0"
+                        value={row.netWeight}
+                        onChange={(e) => handleFieldChange(idx, "netWeight", e.target.value)}
+                        className="w-full px-2 py-1 border border-slate-300 rounded font-mono text-right text-slate-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-xs"
+                      />
+                    </td>
 
-                  {/* Avg (g/m) Auto-Calculated */}
-                  <td className="py-2 px-3 border-r border-slate-200 text-right font-mono font-bold text-blue-700 bg-blue-50/40">
-                    {Number(row.avgWeight) > 0 ? Number(row.avgWeight).toFixed(1) : "—"}
-                  </td>
+                    {/* Avg (g/m) Auto-Calculated */}
+                    <td className="py-2 px-3 border-r border-slate-200 text-right font-mono font-bold text-blue-700 bg-blue-50/40">
+                      {Number(row.avgWeight) > 0 ? Number(row.avgWeight).toFixed(1) : "—"}
+                    </td>
 
-                  {/* Print in Metre */}
-                  <td className="py-1 px-2 border-r border-slate-200 bg-emerald-50/30">
-                    <input
-                      type="number"
-                      step="any"
-                      placeholder="0"
-                      value={row.printMeter}
-                      onChange={(e) => handleFieldChange(idx, "printMeter", e.target.value)}
-                      className="w-full px-2 py-1 border border-emerald-300 rounded font-mono font-bold text-right text-emerald-800 focus:bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 text-xs"
-                    />
-                  </td>
+                    {/* Print in Metre */}
+                    <td className="py-1 px-2 border-r border-slate-200 bg-emerald-50/30">
+                      <input
+                        type="number"
+                        step="any"
+                        placeholder="0"
+                        value={row.printMeter}
+                        onChange={(e) => handleFieldChange(idx, "printMeter", e.target.value)}
+                        className="w-full px-2 py-1 border border-emerald-300 rounded font-mono font-bold text-right text-emerald-800 focus:bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 text-xs"
+                      />
+                    </td>
 
-                  {/* Remarks */}
-                  <td className="py-1 px-2 border-r border-slate-200">
-                    <input
-                      type="text"
-                      placeholder="Notes..."
-                      value={row.remarks || ""}
-                      onChange={(e) => handleFieldChange(idx, "remarks", e.target.value)}
-                      className="w-full px-2 py-1 border border-slate-300 rounded text-slate-600 focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-xs"
-                    />
-                  </td>
+                    {/* Remarks */}
+                    <td className="py-1 px-2 border-r border-slate-200">
+                      <input
+                        type="text"
+                        placeholder="Notes..."
+                        value={row.remarks || ""}
+                        onChange={(e) => handleFieldChange(idx, "remarks", e.target.value)}
+                        className="w-full px-2 py-1 border border-slate-300 rounded text-slate-600 focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-xs"
+                      />
+                    </td>
 
-                  {/* Delete Row Action */}
-                  <td className="py-1 px-2 text-center">
-                    <button
-                      onClick={() => handleRemoveRow(idx)}
-                      className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors"
-                      title="Delete row"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
+                    {/* Delete Row Action */}
+                    <td className="py-1 px-2 text-center">
+                      <button
+                        onClick={() => handleRemoveRow(idx)}
+                        className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors"
+                        title="Delete row"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+
+              {/* Totals Summary Row */}
+              <tfoot className="sticky bottom-0 z-20 bg-slate-100 border-t-2 border-slate-400 shadow-md">
+                <tr className="font-bold text-slate-900 text-xs">
+                  <td className="py-2.5 px-2 text-center font-black">Σ</td>
+                  <td colSpan={3} className="py-2.5 px-3 uppercase tracking-wider text-slate-800 font-extrabold">
+                    Total Summary
+                  </td>
+                  <td className="py-2.5 px-3 text-right font-mono text-blue-700 font-black">
+                    {totals.totalTargetMtrs.toLocaleString()}
+                  </td>
+                  <td colSpan={4}></td>
+                  <td className="py-2.5 px-3 text-right font-mono text-sky-800 font-black">
+                    {totals.totalProductionMtrs.toLocaleString()}
+                  </td>
+                  <td className="py-2.5 px-3 text-right font-mono text-slate-900 font-bold">
+                    {totals.totalNetWt.toFixed(1)}
+                  </td>
+                  <td className="py-2.5 px-3 text-right font-mono text-blue-800 font-black bg-blue-100/70">
+                    {totals.avgWeightGsm.toFixed(1)}
+                  </td>
+                  <td className="py-2.5 px-3 text-right font-mono text-emerald-800 font-black bg-emerald-100/70">
+                    {totals.totalPrintMtrs.toLocaleString()}
+                  </td>
+                  <td colSpan={2} className="py-2.5 px-3 text-slate-600 text-[11px]">
+                    Eff: <strong className="text-emerald-700">{totals.efficiencyPercent.toFixed(1)}%</strong>
                   </td>
                 </tr>
-              ))}
-            </tbody>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      </div>
 
-            {/* Totals Summary Row */}
-            <tfoot className="sticky bottom-0 z-20 bg-slate-100 border-t-2 border-slate-400 shadow-md">
-              <tr className="font-bold text-slate-900 text-xs">
-                <td className="py-2.5 px-2 text-center font-black">Σ</td>
-                <td colSpan={3} className="py-2.5 px-3 uppercase tracking-wider text-slate-800 font-extrabold">
-                  Total Summary
-                </td>
-                <td className="py-2.5 px-3 text-right font-mono text-blue-700 font-black">
-                  {totals.totalTargetMtrs.toLocaleString()}
-                </td>
-                <td colSpan={4}></td>
-                <td className="py-2.5 px-3 text-right font-mono text-sky-800 font-black">
-                  {totals.totalProductionMtrs.toLocaleString()}
-                </td>
-                <td className="py-2.5 px-3 text-right font-mono text-slate-900 font-bold">
-                  {totals.totalNetWt.toFixed(1)}
-                </td>
-                <td className="py-2.5 px-3 text-right font-mono text-blue-800 font-black bg-blue-100/70">
-                  {totals.avgWeightGsm.toFixed(1)}
-                </td>
-                <td className="py-2.5 px-3 text-right font-mono text-emerald-800 font-black bg-emerald-100/70">
-                  {totals.totalPrintMtrs.toLocaleString()}
-                </td>
-                <td colSpan={2} className="py-2.5 px-3 text-slate-600 text-[11px]">
-                  Eff: <strong className="text-emerald-700">{totals.efficiencyPercent.toFixed(1)}%</strong>
-                </td>
-              </tr>
-            </tfoot>
-          </table>
+      {/* ========================================================================= */}
+      {/* MOBILE VIEW: Touch-First Collapsible Roll Cards Feed                      */}
+      {/* ========================================================================= */}
+      <div className="block md:hidden space-y-3">
+        {/* Mobile Toolbar */}
+        <div className="flex items-center justify-between bg-white p-3 rounded-xl border border-slate-200 shadow-xs">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-slate-800">
+              {calculatedRows.length} Roll Entries
+            </span>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={expandAllRows}
+                className="text-[10px] font-semibold text-sky-600 bg-sky-50 px-2 py-0.5 rounded border border-sky-200"
+              >
+                Expand
+              </button>
+              <button
+                type="button"
+                onClick={collapseAllRows}
+                className="text-[10px] font-semibold text-slate-600 bg-slate-50 px-2 py-0.5 rounded border border-slate-200"
+              >
+                Collapse
+              </button>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            data-testid="mobile-add-row"
+            onClick={handleAddRow}
+            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-primary text-white text-xs font-bold shadow-xs active:scale-95 transition-all"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Add Entry
+          </button>
+        </div>
+
+        {/* Mobile Cards List */}
+        <div className="space-y-3">
+          {calculatedRows.map((row, idx) => {
+            const isExpanded = !!expandedRows[idx];
+            const hasPrint = Number(row.printMeter) > 0;
+
+            return (
+              <div
+                key={row.id || idx}
+                className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden transition-all"
+              >
+                {/* Header Strip (Accordion Toggle) */}
+                <div
+                  onClick={() => toggleExpandRow(idx)}
+                  className="p-3 bg-slate-50/80 border-b border-slate-100 flex items-center justify-between cursor-pointer select-none active:bg-slate-100"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span className="w-6 h-6 rounded-md bg-purple-100 text-purple-800 text-xs font-black flex items-center justify-center shrink-0">
+                      {idx + 1}
+                    </span>
+                    <div className="min-w-0">
+                      <h4 className="text-xs font-bold text-slate-900 truncate">
+                        {row.companyName || "Party Pending"}
+                      </h4>
+                      <p className="text-[10px] text-slate-500 truncate">
+                        {row.rollNumber ? `Roll #${row.rollNumber}` : "No Roll"} • {row.quality || "Quality Pending"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span
+                      className={`text-xs font-bold px-2 py-0.5 rounded-md font-mono ${
+                        hasPrint
+                          ? "bg-emerald-100 text-emerald-800"
+                          : "bg-slate-100 text-slate-600"
+                      }`}
+                    >
+                      {Number(row.printMeter) || 0} m
+                    </span>
+                    <button
+                      type="button"
+                      className="text-slate-400 p-0.5"
+                      aria-label="Toggle details"
+                    >
+                      {isExpanded ? (
+                        <ChevronUp className="h-4 w-4" />
+                      ) : (
+                        <ChevronDown className="h-4 w-4" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Collapsed Summary Metrics Strip */}
+                {!isExpanded && (
+                  <div className="px-3 py-2 bg-white flex items-center justify-between text-[11px] text-slate-600 border-b border-slate-50">
+                    <span>
+                      Target: <strong className="text-blue-700">{row.targetProductionMtrs || 0}m</strong>
+                    </span>
+                    <span>
+                      Fabric: <strong className="text-sky-700">{row.productionMeter || 0}m</strong>
+                    </span>
+                    <span>
+                      Avg: <strong className="text-blue-600">{Number(row.avgWeight) > 0 ? Number(row.avgWeight).toFixed(1) : "—"}</strong>
+                    </span>
+                  </div>
+                )}
+
+                {/* Expanded Form Body */}
+                {isExpanded && (
+                  <div className="p-3.5 space-y-3.5">
+                    {/* SECTION 1: Company & Order */}
+                    <div className="space-y-2">
+                      <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block">
+                        1. Order & Party Specifications
+                      </span>
+
+                      {/* Company Name */}
+                      <div className="relative">
+                        <label className="text-[10px] font-bold text-slate-600 block mb-0.5">
+                          Company Name
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Type or select company..."
+                          value={row.companyName || ""}
+                          onChange={(e) => {
+                            handleFieldChange(idx, "companyName", e.target.value);
+                            setActiveCompanySearchRow(idx);
+                            fetchPartySuggestions(e.target.value);
+                          }}
+                          onFocus={() => {
+                            setActiveCompanySearchRow(idx);
+                            fetchPartySuggestions(row.companyName || "");
+                          }}
+                          onBlur={() => {
+                            setTimeout(() => {
+                              setActiveCompanySearchRow(null);
+                              handleAutoSavePartyToDataCentre(row);
+                            }, 250);
+                          }}
+                          className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-semibold text-slate-900 focus:bg-white focus:ring-1 focus:ring-primary text-xs"
+                        />
+
+                        {/* Dropdown */}
+                        {activeCompanySearchRow === idx && partySuggestions.length > 0 && (
+                          <div className="absolute left-0 top-full mt-1 z-30 w-full bg-white rounded-lg shadow-xl border border-slate-200 py-1 max-h-52 overflow-y-auto">
+                            {partySuggestions.map((party) => (
+                              <div
+                                key={party.id}
+                                onMouseDown={() => handleSelectParty(idx, party)}
+                                className="px-3 py-1.5 hover:bg-primary/10 cursor-pointer text-xs border-b border-slate-50 last:border-0"
+                              >
+                                <span className="font-bold text-slate-800">{party.companyName}</span>
+                                <div className="text-[10px] text-slate-500">
+                                  {party.unitName && `${party.unitName} • `}
+                                  {party.grade && `${party.grade} • `}
+                                  {party.drumSize && party.drumSize}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Unit & Grade */}
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-600 block mb-0.5">
+                            Unit Name
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g. Ropar"
+                            value={row.unitName || ""}
+                            onChange={(e) => handleFieldChange(idx, "unitName", e.target.value)}
+                            onBlur={() => handleAutoSavePartyToDataCentre(row)}
+                            className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-slate-800 text-xs"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-600 block mb-0.5">
+                            Grade
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g. PPC"
+                            value={row.grade || ""}
+                            onChange={(e) => handleFieldChange(idx, "grade", e.target.value)}
+                            onBlur={() => handleAutoSavePartyToDataCentre(row)}
+                            className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-slate-800 text-xs"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Target Prod & Drum Size */}
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-[10px] font-bold text-blue-700 block mb-0.5">
+                            Target Production (m)
+                          </label>
+                          <input
+                            type="number"
+                            step="any"
+                            placeholder="0"
+                            value={row.targetProductionMtrs ?? ""}
+                            onChange={(e) => handleFieldChange(idx, "targetProductionMtrs", e.target.value)}
+                            onBlur={() => handleAutoSavePartyToDataCentre(row)}
+                            className="w-full px-2.5 py-1.5 border border-blue-200 bg-blue-50/20 rounded-lg font-mono text-blue-800 font-bold text-xs"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-600 block mb-0.5">
+                            Drum Size / Cut
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g. 20mm"
+                            value={row.drumSize || ""}
+                            onChange={(e) => handleFieldChange(idx, "drumSize", e.target.value)}
+                            onBlur={() => handleAutoSavePartyToDataCentre(row)}
+                            className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-mono text-slate-800 text-xs"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* SECTION 2: Loom Roll & Fabric Input */}
+                    <div className="space-y-2 pt-2 border-t border-slate-100">
+                      <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block">
+                        2. Loom Roll & Fabric Selection
+                      </span>
+
+                      {/* Roll Number Autocomplete */}
+                      <div className="relative">
+                        <label className="text-[10px] font-bold text-slate-600 block mb-0.5">
+                          Loom Roll Number
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Type roll no. (e.g. D14332)"
+                          value={row.rollNumber || ""}
+                          onChange={(e) => {
+                            handleFieldChange(idx, "rollNumber", e.target.value);
+                            setActiveRollSearchRow(idx);
+                            fetchAvailableRolls(e.target.value);
+                          }}
+                          onFocus={() => {
+                            setActiveRollSearchRow(idx);
+                            fetchAvailableRolls(row.rollNumber || "");
+                          }}
+                          onBlur={() => {
+                            setTimeout(() => setActiveRollSearchRow(null), 250);
+                          }}
+                          className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-mono font-bold text-slate-900 text-xs"
+                        />
+
+                        {/* Dropdown */}
+                        {activeRollSearchRow === idx && availableRolls.length > 0 && (
+                          <div className="absolute left-0 top-full mt-1 z-30 w-full bg-white rounded-lg shadow-xl border border-slate-200 py-1 max-h-52 overflow-y-auto">
+                            {availableRolls.map((roll) => (
+                              <div
+                                key={roll.id}
+                                onMouseDown={() => handleSelectRoll(idx, roll)}
+                                className="px-3 py-1.5 hover:bg-primary/10 cursor-pointer text-xs border-b border-slate-50 last:border-0"
+                              >
+                                <div className="flex items-center justify-between font-bold text-slate-800">
+                                  <span>{roll.rollNumber}</span>
+                                  <span className="text-[10px] font-mono text-blue-600">Loom #{roll.loomNumber}</span>
+                                </div>
+                                <div className="text-[10px] text-slate-500 flex items-center justify-between">
+                                  <span>{roll.qualityType}</span>
+                                  <span className="font-mono">{roll.meter}m • {roll.nettWeightKg}kg</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Loom No & Quality */}
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-600 block mb-0.5">
+                            Loom Number
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g. 42 S1"
+                            value={row.loomNumber || ""}
+                            onChange={(e) => handleFieldChange(idx, "loomNumber", e.target.value)}
+                            className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-mono text-slate-800 text-xs"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-600 block mb-0.5">
+                            Quality
+                          </label>
+                          <UniversalQualityInput
+                            value={row.quality || ""}
+                            onChange={(val) => handleFieldChange(idx, "quality", val)}
+                            placeholder="Quality"
+                            compact={true}
+                            inputClassName="h-8 text-xs font-medium"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* SECTION 3: Production & Print Readings */}
+                    <div className="space-y-2 pt-2 border-t border-slate-100">
+                      <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block">
+                        3. Production & Print Output
+                      </span>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-[10px] font-bold text-sky-800 block mb-0.5">
+                            Fabric Prod (m)
+                          </label>
+                          <input
+                            type="number"
+                            step="any"
+                            placeholder="0"
+                            value={row.productionMeter}
+                            onChange={(e) => handleFieldChange(idx, "productionMeter", e.target.value)}
+                            className="w-full px-2.5 py-1.5 border border-sky-200 bg-sky-50/20 rounded-lg font-mono font-bold text-sky-900 text-xs"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-700 block mb-0.5">
+                            Net Weight (kg)
+                          </label>
+                          <input
+                            type="number"
+                            step="any"
+                            placeholder="0.0"
+                            value={row.netWeight}
+                            onChange={(e) => handleFieldChange(idx, "netWeight", e.target.value)}
+                            className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-mono font-bold text-slate-900 text-xs"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Print Meters & GSM */}
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-[10px] font-bold text-emerald-800 block mb-0.5">
+                            Print in Metre (Output)
+                          </label>
+                          <input
+                            type="number"
+                            step="any"
+                            placeholder="0"
+                            value={row.printMeter}
+                            onChange={(e) => handleFieldChange(idx, "printMeter", e.target.value)}
+                            className="w-full px-2.5 py-1.5 border border-emerald-300 bg-emerald-50/40 rounded-lg font-mono font-bold text-emerald-900 text-xs"
+                          />
+                        </div>
+                        <div className="bg-blue-50/60 p-2 rounded-lg border border-blue-100 flex flex-col justify-center">
+                          <span className="text-[9px] uppercase font-bold text-blue-700 block">
+                            Calculated GSM
+                          </span>
+                          <span className="text-sm font-extrabold text-blue-900 font-mono">
+                            {Number(row.avgWeight) > 0 ? `${Number(row.avgWeight).toFixed(1)} g/m` : "—"}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Remarks & Delete Row */}
+                    <div className="pt-2 border-t border-slate-100 flex items-center gap-2">
+                      <input
+                        type="text"
+                        placeholder="Remarks / batch notes..."
+                        value={row.remarks || ""}
+                        onChange={(e) => handleFieldChange(idx, "remarks", e.target.value)}
+                        className="flex-1 px-2.5 py-1.5 border border-slate-200 rounded-lg text-slate-600 text-xs"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveRow(idx)}
+                        className="p-1.5 rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50"
+                        title="Delete entry"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Mobile Action Controls */}
+        <div className="pt-2 space-y-2">
+          <button
+            type="button"
+            onClick={handleAddRow}
+            className="w-full h-11 rounded-xl border border-dashed border-primary/50 text-primary hover:bg-primary/5 font-bold text-xs flex items-center justify-center gap-2"
+          >
+            <Plus className="h-4 w-4" />
+            + Add Another Roll Entry
+          </button>
+
+          <button
+            type="button"
+            onClick={() => saveReport("SUBMITTED", false)}
+            disabled={isAutoSaving}
+            className="w-full h-11 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xs"
+          >
+            <Check className="h-4 w-4 text-emerald-400" />
+            Submit Final Printing Report
+          </button>
+
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => saveReport("DRAFT", false)}
+              disabled={isAutoSaving}
+              className="h-10 rounded-xl border border-slate-200 text-slate-700 font-semibold text-xs flex items-center justify-center gap-1.5"
+            >
+              <FileText className="h-4 w-4 text-slate-500" />
+              Save Draft
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsPrintModalOpen(true)}
+              className="h-10 rounded-xl border border-slate-200 text-sky-700 font-semibold text-xs flex items-center justify-center gap-1.5"
+            >
+              <Printer className="h-4 w-4" />
+              Print Sheet
+            </button>
+          </div>
         </div>
       </div>
 
