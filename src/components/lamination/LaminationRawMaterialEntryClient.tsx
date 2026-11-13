@@ -62,6 +62,7 @@ export function LaminationRawMaterialEntryClient() {
   // Print Modal
   const [isPrintModalOpen, setIsPrintModalOpen] = useState<boolean>(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [mobileTab, setMobileTab] = useState<"reconcile" | "manual" | "machine" | "diff">("reconcile");
 
   // Close fullscreen on Escape
   useEffect(() => {
@@ -472,308 +473,666 @@ export function LaminationRawMaterialEntryClient() {
         </div>
       </div>
 
-      {/* Table / Grid Toolbar */}
-      <div className="p-3 bg-white rounded-lg border border-slate-200 shadow-2xs flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2.5">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setIsFullscreen(!isFullscreen)}
-            className="h-8 text-xs border-slate-300 hover:bg-slate-100 flex items-center gap-1.5 cursor-pointer active:scale-95"
-            title={isFullscreen ? "Collapse back to normal view (Esc)" : "Expand view to fullscreen"}
-          >
-            {isFullscreen ? (
-              <>
-                <Minimize2 className="h-3.5 w-3.5 text-sky-600" />
-                <span>Collapse</span>
-              </>
-            ) : (
-              <>
-                <Maximize2 className="h-3.5 w-3.5 text-sky-600" />
-                <span>Expand</span>
-              </>
-            )}
-          </Button>
-          <span className="h-2 w-2 rounded-full bg-purple-600"></span>
-          <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-            Raw Material Reconciliation Matrix (Recipe Target vs Machine Actuals)
-          </h3>
-        </div>
-
-        <div className="flex items-center gap-3 text-xs text-slate-500">
-          <span>Net Variance: <strong className={totals.diffTotalKg >= 0 ? "text-emerald-600" : "text-amber-600"}>{netDiffSign} kg</strong></span>
-        </div>
-      </div>
-
-      {/* 3-Section Bento Grid: Manual - Machine = Diff */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-start">
-        {/* CARD 1: MANUAL USAGE (Theoretical Recipe) */}
-        <div className="lg:col-span-4 bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden flex flex-col">
-          <div className="bg-sky-50/70 border-b border-sky-100 p-3 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="h-2 w-2 rounded-full bg-sky-600"></span>
-              <h3 className="text-xs font-bold text-sky-950 uppercase tracking-wider">
-                1. Manual Input
-              </h3>
-            </div>
-            <span className="text-[11px] text-sky-700 font-semibold">
-              Recipe Target
-            </span>
+      {/* ========================================================================= */}
+      {/* DESKTOP VIEW: Bento Grid Matrix (100% Preserved)                           */}
+      {/* ========================================================================= */}
+      <div className="hidden md:block space-y-5">
+        {/* Table / Grid Toolbar */}
+        <div className="p-3 bg-white rounded-lg border border-slate-200 shadow-2xs flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsFullscreen(!isFullscreen)}
+              className="h-8 text-xs border-slate-300 hover:bg-slate-100 flex items-center gap-1.5 cursor-pointer active:scale-95"
+              title={isFullscreen ? "Collapse back to normal view (Esc)" : "Expand view to fullscreen"}
+            >
+              {isFullscreen ? (
+                <>
+                  <Minimize2 className="h-3.5 w-3.5 text-sky-600" />
+                  <span>Collapse</span>
+                </>
+              ) : (
+                <>
+                  <Maximize2 className="h-3.5 w-3.5 text-sky-600" />
+                  <span>Expand</span>
+                </>
+              )}
+            </Button>
+            <span className="h-2 w-2 rounded-full bg-purple-600"></span>
+            <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+              Raw Material Reconciliation Matrix (Recipe Target vs Machine Actuals)
+            </h3>
           </div>
 
-          <div className="p-3 bg-sky-50/30 border-b border-slate-100">
-            <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wide mb-1">
-              Total Usage (kg)
-            </label>
-            <div className="relative">
-              <Input
-                type="number"
-                step="0.1"
-                min="0"
-                placeholder="Enter Total Usage (e.g. 1000)"
-                value={manualTotalInput}
-                onChange={(e) => handleManualTotalChange(e.target.value)}
-                className="h-10 text-sm font-bold bg-white text-slate-900 border-sky-200 focus-visible:ring-sky-500 pr-12"
-              />
-              <span className="absolute right-3 top-2.5 text-xs font-bold text-slate-400">
-                kg
+          <div className="flex items-center gap-3 text-xs text-slate-500">
+            <span>Net Variance: <strong className={totals.diffTotalKg >= 0 ? "text-emerald-600" : "text-amber-600"}>{netDiffSign} kg</strong></span>
+          </div>
+        </div>
+
+        {/* 3-Section Bento Grid: Manual - Machine = Diff */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-start">
+          {/* CARD 1: MANUAL USAGE (Theoretical Recipe) */}
+          <div className="lg:col-span-4 bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+            <div className="bg-sky-50/70 border-b border-sky-100 p-3 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-sky-600"></span>
+                <h3 className="text-xs font-bold text-sky-950 uppercase tracking-wider">
+                  1. Manual Input
+                </h3>
+              </div>
+              <span className="text-[11px] text-sky-700 font-semibold">
+                Recipe Target
               </span>
             </div>
-            <p className="text-[10px] text-slate-500 mt-1">
-              Entering total will auto-calculate material quantities by percentage.
-            </p>
-          </div>
 
-          {/* Rows for Manual */}
-          <div className="p-2 space-y-1.5 flex-1">
-            {entries.length === 0 ? (
-              <p className="text-xs text-slate-400 text-center py-6">
-                No materials configured in Data Centre.
+            <div className="p-3 bg-sky-50/30 border-b border-slate-100">
+              <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wide mb-1">
+                Total Usage (kg)
+              </label>
+              <div className="relative">
+                <Input
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  placeholder="Enter Total Usage (e.g. 1000)"
+                  value={manualTotalInput}
+                  onChange={(e) => handleManualTotalChange(e.target.value)}
+                  className="h-10 text-sm font-bold bg-white text-slate-900 border-sky-200 focus-visible:ring-sky-500 pr-12"
+                />
+                <span className="absolute right-3 top-2.5 text-xs font-bold text-slate-400">
+                  kg
+                </span>
+              </div>
+              <p className="text-[10px] text-slate-500 mt-1">
+                Entering total will auto-calculate material quantities by percentage.
               </p>
-            ) : (
-              entries.map((entry, idx) => (
-                <div
-                  key={idx}
-                  className="flex items-center justify-between p-2 rounded bg-slate-50/80 border border-slate-100 text-xs"
-                >
-                  <div className="min-w-0 pr-2">
-                    <p className="font-semibold text-slate-900 truncate">
-                      {entry.materialName}
-                    </p>
-                    <span className="text-[10px] font-mono text-sky-700 font-bold">
-                      {Number(entry.percentage).toFixed(1)}%
-                    </span>
+            </div>
+
+            {/* Rows for Manual */}
+            <div className="p-2 space-y-1.5 flex-1">
+              {entries.length === 0 ? (
+                <p className="text-xs text-slate-400 text-center py-6">
+                  No materials configured in Data Centre.
+                </p>
+              ) : (
+                entries.map((entry, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-center justify-between p-2 rounded bg-slate-50/80 border border-slate-100 text-xs"
+                  >
+                    <div className="min-w-0 pr-2">
+                      <p className="font-semibold text-slate-900 truncate">
+                        {entry.materialName}
+                      </p>
+                      <span className="text-[10px] font-mono text-sky-700 font-bold">
+                        {Number(entry.percentage).toFixed(1)}%
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <span className="font-bold text-slate-900 text-sm">
+                        {Number(entry.manualKg).toLocaleString(undefined, {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                      </span>
+                      <span className="text-[10px] text-slate-500 ml-1">kg</span>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <span className="font-bold text-slate-900 text-sm">
-                      {Number(entry.manualKg).toLocaleString(undefined, {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}
-                    </span>
-                    <span className="text-[10px] text-slate-500 ml-1">kg</span>
-                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Footer Total for Manual */}
+            <div className="p-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs">
+              <span className="font-bold text-slate-700 uppercase tracking-wide">
+                Total Manual Target:
+              </span>
+              <div className="text-right">
+                <span className="font-extrabold text-sky-800 text-sm">
+                  {totals.manualTotalKg.toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </span>
+                <span className="text-[11px] font-medium text-slate-500 ml-1">kg</span>
+                <div className="text-[10px] text-slate-500">
+                  Recipe: {totals.totalPercentage}%
                 </div>
-              ))
-            )}
+              </div>
+            </div>
           </div>
 
-          {/* Footer Total for Manual */}
-          <div className="p-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs">
-            <span className="font-bold text-slate-700 uppercase tracking-wide">
-              Total Manual Target:
-            </span>
-            <div className="text-right">
-              <span className="font-extrabold text-sky-800 text-sm">
-                {totals.manualTotalKg.toLocaleString(undefined, {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}
+          {/* CARD 2: MACHINE USAGE (Actual Meter / Hopper Reading) */}
+          <div className="lg:col-span-4 bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+            <div className="bg-purple-50/70 border-b border-purple-100 p-3 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-purple-600"></span>
+                <h3 className="text-xs font-bold text-purple-950 uppercase tracking-wider">
+                  2. Machine Input
+                </h3>
+              </div>
+              <span className="text-[11px] text-purple-700 font-semibold">
+                Actual Meter / Hopper
               </span>
-              <span className="text-[11px] font-medium text-slate-500 ml-1">kg</span>
-              <div className="text-[10px] text-slate-500">
-                Recipe: {totals.totalPercentage}%
+            </div>
+
+            <div className="p-3 bg-purple-50/30 border-b border-slate-100">
+              <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wide mb-1">
+                Machine Total (kg)
+              </label>
+              <div className="relative">
+                <Input
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  placeholder="Distribute Total or Type Rows"
+                  value={machineTotalInput}
+                  onChange={(e) => handleMachineTotalChange(e.target.value)}
+                  className="h-10 text-sm font-bold bg-white text-slate-900 border-purple-200 focus-visible:ring-purple-500 pr-12"
+                />
+                <span className="absolute right-3 top-2.5 text-xs font-bold text-slate-400">
+                  kg
+                </span>
+              </div>
+              <p className="text-[10px] text-slate-500 mt-1">
+                Enter total to auto-fill by %, then adjust individual rows if machine varied.
+              </p>
+            </div>
+
+            {/* Rows for Machine (Fully Editable) */}
+            <div className="p-2 space-y-1.5 flex-1">
+              {entries.length === 0 ? (
+                <p className="text-xs text-slate-400 text-center py-6">
+                  No materials configured.
+                </p>
+              ) : (
+                entries.map((entry, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-center justify-between p-1.5 rounded bg-slate-50/80 border border-slate-100 text-xs gap-2"
+                  >
+                    <div className="min-w-0 flex-1 pr-1">
+                      <p className="font-semibold text-slate-900 truncate">
+                        {entry.materialName}
+                      </p>
+                      <span className="text-[10px] text-purple-700 font-mono">
+                        Ref: {entry.percentage}%
+                      </span>
+                    </div>
+                    <div className="w-28 relative">
+                      <Input
+                        type="number"
+                        step="0.1"
+                        min="0"
+                        value={entry.machineKg === 0 && !machineTotalInput ? "" : entry.machineKg}
+                        onChange={(e) => handleMachineRowChange(idx, e.target.value)}
+                        placeholder="0.00"
+                        className="h-8 text-right font-bold text-slate-900 text-xs pr-6 bg-white border-purple-200 focus-visible:ring-purple-500"
+                      />
+                      <span className="absolute right-2 top-2 text-[10px] font-bold text-slate-400 pointer-events-none">
+                        kg
+                      </span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Footer Total for Machine */}
+            <div className="p-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs">
+              <span className="font-bold text-slate-700 uppercase tracking-wide">
+                Total Machine Actual:
+              </span>
+              <div className="text-right">
+                <span className="font-extrabold text-purple-800 text-sm">
+                  {totals.machineTotalKg.toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </span>
+                <span className="text-[11px] font-medium text-slate-500 ml-1">kg</span>
+              </div>
+            </div>
+          </div>
+
+          {/* CARD 3: DIFFERENCE SUMMARY (Manual - Machine) */}
+          <div className="lg:col-span-4 bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+            <div className="bg-emerald-50/70 border-b border-emerald-100 p-3 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-emerald-600"></span>
+                <h3 className="text-xs font-bold text-emerald-950 uppercase tracking-wider">
+                  3. Diff (Manual − Machine)
+                </h3>
+              </div>
+              <span className="text-[11px] text-emerald-700 font-semibold">
+                Variance
+              </span>
+            </div>
+
+            <div className="p-3 bg-emerald-50/30 border-b border-slate-100">
+              <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wide mb-1">
+                Net Shift Difference
+              </label>
+              <div className={`h-10 px-3 rounded-md border flex items-center justify-between font-bold text-sm ${netDiffColor}`}>
+                <span>{netDiffSign} kg</span>
+                <Badge variant="outline" className="text-[10px] uppercase font-bold border-current">
+                  {totals.diffTotalKg > 0 ? "Material Saved" : totals.diffTotalKg < 0 ? "Excess Used" : "Balanced"}
+                </Badge>
+              </div>
+              <p className="text-[10px] text-slate-500 mt-1">
+                Machine input is subtracted from manual target as configured.
+              </p>
+            </div>
+
+            {/* Rows for Difference */}
+            <div className="p-2 space-y-1.5 flex-1">
+              {entries.length === 0 ? (
+                <p className="text-xs text-slate-400 text-center py-6">
+                  No materials.
+                </p>
+              ) : (
+                entries.map((entry, idx) => {
+                  const diffVal = Number(entry.diffKg.toFixed(2));
+                  const sign = diffVal > 0 ? `+${diffVal}` : `${diffVal}`;
+                  const rowClass =
+                    diffVal > 0
+                      ? "text-emerald-700 bg-emerald-50/60 border-emerald-100"
+                      : diffVal < 0
+                      ? "text-amber-700 bg-amber-50/60 border-amber-100"
+                      : "text-slate-700 bg-slate-50/60 border-slate-100";
+
+                  return (
+                    <div
+                      key={idx}
+                      className={`flex items-center justify-between p-2 rounded border text-xs ${rowClass}`}
+                    >
+                      <div className="min-w-0 pr-2">
+                        <p className="font-semibold truncate">
+                          {entry.materialName}
+                        </p>
+                        <span className="text-[10px] opacity-75 font-mono">
+                          Target: {entry.manualKg}kg | Machine: {entry.machineKg}kg
+                        </span>
+                      </div>
+                      <div className="text-right">
+                        <span className="font-extrabold text-sm">{sign}</span>
+                        <span className="text-[10px] ml-1">kg</span>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Footer Total for Difference */}
+            <div className="p-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs">
+              <span className="font-bold text-slate-700 uppercase tracking-wide">
+                Net Balance / Variance:
+              </span>
+              <div className="text-right">
+                <span className={`font-extrabold text-sm ${totals.diffTotalKg > 0 ? "text-emerald-700" : totals.diffTotalKg < 0 ? "text-amber-700" : "text-slate-800"}`}>
+                  {netDiffSign}
+                </span>
+                <span className="text-[11px] font-medium text-slate-500 ml-1">kg</span>
+                <div className="text-[10px] text-slate-500">
+                  Variance: {totals.variancePercentage}%
+                </div>
               </div>
             </div>
           </div>
         </div>
+      </div>
 
-        {/* CARD 2: MACHINE USAGE (Actual Meter / Hopper Reading) */}
-        <div className="lg:col-span-4 bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden flex flex-col">
-          <div className="bg-purple-50/70 border-b border-purple-100 p-3 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="h-2 w-2 rounded-full bg-purple-600"></span>
-              <h3 className="text-xs font-bold text-purple-950 uppercase tracking-wider">
-                2. Machine Input
-              </h3>
+      {/* ========================================================================= */}
+      {/* MOBILE VIEW: Touch-First Reconciliation & Tabbed Experience               */}
+      {/* ========================================================================= */}
+      <div className="block md:hidden space-y-4">
+        {/* Mobile Bento KPI Summary */}
+        <div className="grid grid-cols-3 gap-2">
+          <div className="bg-sky-50 border border-sky-100 rounded-xl p-2.5 text-center">
+            <span className="text-[10px] uppercase font-bold text-sky-700 tracking-wider block">Target</span>
+            <div className="text-base font-extrabold text-sky-950 mt-0.5">
+              {totals.manualTotalKg.toLocaleString(undefined, { maximumFractionDigits: 1 })}
             </div>
-            <span className="text-[11px] text-purple-700 font-semibold">
-              Actual Meter / Hopper
+            <span className="text-[9px] text-sky-600 font-medium">kg ({totals.totalPercentage}%)</span>
+          </div>
+
+          <div className="bg-purple-50 border border-purple-100 rounded-xl p-2.5 text-center">
+            <span className="text-[10px] uppercase font-bold text-purple-700 tracking-wider block">Machine</span>
+            <div className="text-base font-extrabold text-purple-950 mt-0.5">
+              {totals.machineTotalKg.toLocaleString(undefined, { maximumFractionDigits: 1 })}
+            </div>
+            <span className="text-[9px] text-purple-600 font-medium">kg</span>
+          </div>
+
+          <div className={`rounded-xl p-2.5 text-center border ${
+            totals.diffTotalKg > 0
+              ? "bg-emerald-50 border-emerald-200 text-emerald-950"
+              : totals.diffTotalKg < 0
+              ? "bg-amber-50 border-amber-200 text-amber-950"
+              : "bg-slate-50 border-slate-200 text-slate-800"
+          }`}>
+            <span className="text-[10px] uppercase font-bold tracking-wider block opacity-75">Variance</span>
+            <div className="text-base font-extrabold mt-0.5">
+              {netDiffSign}
+            </div>
+            <span className="text-[9px] font-semibold">
+              {totals.diffTotalKg > 0 ? "Saved" : totals.diffTotalKg < 0 ? "Excess" : "Balanced"}
             </span>
-          </div>
-
-          <div className="p-3 bg-purple-50/30 border-b border-slate-100">
-            <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wide mb-1">
-              Machine Total (kg)
-            </label>
-            <div className="relative">
-              <Input
-                type="number"
-                step="0.1"
-                min="0"
-                placeholder="Distribute Total or Type Rows"
-                value={machineTotalInput}
-                onChange={(e) => handleMachineTotalChange(e.target.value)}
-                className="h-10 text-sm font-bold bg-white text-slate-900 border-purple-200 focus-visible:ring-purple-500 pr-12"
-              />
-              <span className="absolute right-3 top-2.5 text-xs font-bold text-slate-400">
-                kg
-              </span>
-            </div>
-            <p className="text-[10px] text-slate-500 mt-1">
-              Enter total to auto-fill by %, then adjust individual rows if machine varied.
-            </p>
-          </div>
-
-          {/* Rows for Machine (Fully Editable) */}
-          <div className="p-2 space-y-1.5 flex-1">
-            {entries.length === 0 ? (
-              <p className="text-xs text-slate-400 text-center py-6">
-                No materials configured.
-              </p>
-            ) : (
-              entries.map((entry, idx) => (
-                <div
-                  key={idx}
-                  className="flex items-center justify-between p-1.5 rounded bg-slate-50/80 border border-slate-100 text-xs gap-2"
-                >
-                  <div className="min-w-0 flex-1 pr-1">
-                    <p className="font-semibold text-slate-900 truncate">
-                      {entry.materialName}
-                    </p>
-                    <span className="text-[10px] text-purple-700 font-mono">
-                      Ref: {entry.percentage}%
-                    </span>
-                  </div>
-                  <div className="w-28 relative">
-                    <Input
-                      type="number"
-                      step="0.1"
-                      min="0"
-                      value={entry.machineKg === 0 && !machineTotalInput ? "" : entry.machineKg}
-                      onChange={(e) => handleMachineRowChange(idx, e.target.value)}
-                      placeholder="0.00"
-                      className="h-8 text-right font-bold text-slate-900 text-xs pr-6 bg-white border-purple-200 focus-visible:ring-purple-500"
-                    />
-                    <span className="absolute right-2 top-2 text-[10px] font-bold text-slate-400 pointer-events-none">
-                      kg
-                    </span>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-
-          {/* Footer Total for Machine */}
-          <div className="p-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs">
-            <span className="font-bold text-slate-700 uppercase tracking-wide">
-              Total Machine Actual:
-            </span>
-            <div className="text-right">
-              <span className="font-extrabold text-purple-800 text-sm">
-                {totals.machineTotalKg.toLocaleString(undefined, {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}
-              </span>
-              <span className="text-[11px] font-medium text-slate-500 ml-1">kg</span>
-            </div>
           </div>
         </div>
 
-        {/* CARD 3: DIFFERENCE SUMMARY (Manual - Machine) */}
-        <div className="lg:col-span-4 bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden flex flex-col">
-          <div className="bg-emerald-50/70 border-b border-emerald-100 p-3 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="h-2 w-2 rounded-full bg-emerald-600"></span>
-              <h3 className="text-xs font-bold text-emerald-950 uppercase tracking-wider">
-                3. Diff (Manual − Machine)
-              </h3>
-            </div>
-            <span className="text-[11px] text-emerald-700 font-semibold">
-              Variance
-            </span>
-          </div>
+        {/* Mobile Batch Totals Control Card */}
+        <Card className="border-slate-200 shadow-xs">
+          <CardContent className="p-3.5 space-y-3">
+            <div className="grid grid-cols-2 gap-2.5">
+              <div>
+                <label className="block text-[11px] font-bold text-sky-900 mb-1 flex items-center gap-1">
+                  <span className="h-2 w-2 rounded-full bg-sky-600 inline-block"></span>
+                  Recipe Batch (kg)
+                </label>
+                <div className="relative">
+                  <Input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    placeholder="e.g. 1000"
+                    value={manualTotalInput}
+                    onChange={(e) => handleManualTotalChange(e.target.value)}
+                    className="h-9 text-xs font-bold bg-sky-50/40 border-sky-200 pr-7"
+                  />
+                  <span className="absolute right-2 top-2 text-[10px] font-bold text-slate-400">kg</span>
+                </div>
+              </div>
 
-          <div className="p-3 bg-emerald-50/30 border-b border-slate-100">
-            <label className="block text-[11px] font-bold text-slate-700 uppercase tracking-wide mb-1">
-              Net Shift Difference
-            </label>
-            <div className={`h-10 px-3 rounded-md border flex items-center justify-between font-bold text-sm ${netDiffColor}`}>
-              <span>{netDiffSign} kg</span>
-              <Badge variant="outline" className="text-[10px] uppercase font-bold border-current">
-                {totals.diffTotalKg > 0 ? "Material Saved" : totals.diffTotalKg < 0 ? "Excess Used" : "Balanced"}
-              </Badge>
+              <div>
+                <label className="block text-[11px] font-bold text-purple-900 mb-1 flex items-center gap-1">
+                  <span className="h-2 w-2 rounded-full bg-purple-600 inline-block"></span>
+                  Machine Total (kg)
+                </label>
+                <div className="relative">
+                  <Input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    placeholder="Auto-distribute"
+                    value={machineTotalInput}
+                    onChange={(e) => handleMachineTotalChange(e.target.value)}
+                    className="h-9 text-xs font-bold bg-purple-50/40 border-purple-200 pr-7"
+                  />
+                  <span className="absolute right-2 top-2 text-[10px] font-bold text-slate-400">kg</span>
+                </div>
+              </div>
             </div>
-            <p className="text-[10px] text-slate-500 mt-1">
-              Machine input is subtracted from manual target as configured.
+            <p className="text-[10px] text-slate-500 italic">
+              Entering batch total calculates recipe targets. Machine total auto-distributes or enter hopper actuals directly below.
             </p>
-          </div>
+          </CardContent>
+        </Card>
 
-          {/* Rows for Difference */}
-          <div className="p-2 space-y-1.5 flex-1">
+        {/* Mobile Segmented Tab Selector */}
+        <div className="flex bg-slate-100 p-1 rounded-xl text-xs font-medium text-slate-600 gap-1">
+          <button
+            type="button"
+            onClick={() => setMobileTab("reconcile")}
+            className={`flex-1 py-1.5 px-2 rounded-lg text-center transition-all ${
+              mobileTab === "reconcile"
+                ? "bg-white text-slate-900 font-bold shadow-2xs"
+                : "hover:text-slate-900"
+            }`}
+          >
+            Reconcile
+          </button>
+          <button
+            type="button"
+            onClick={() => setMobileTab("manual")}
+            className={`flex-1 py-1.5 px-2 rounded-lg text-center transition-all ${
+              mobileTab === "manual"
+                ? "bg-white text-sky-900 font-bold shadow-2xs"
+                : "hover:text-slate-900"
+            }`}
+          >
+            Target ({totals.manualTotalKg.toFixed(0)})
+          </button>
+          <button
+            type="button"
+            onClick={() => setMobileTab("machine")}
+            className={`flex-1 py-1.5 px-2 rounded-lg text-center transition-all ${
+              mobileTab === "machine"
+                ? "bg-white text-purple-900 font-bold shadow-2xs"
+                : "hover:text-slate-900"
+            }`}
+          >
+            Actual ({totals.machineTotalKg.toFixed(0)})
+          </button>
+          <button
+            type="button"
+            onClick={() => setMobileTab("diff")}
+            className={`flex-1 py-1.5 px-2 rounded-lg text-center transition-all ${
+              mobileTab === "diff"
+                ? "bg-white text-emerald-900 font-bold shadow-2xs"
+                : "hover:text-slate-900"
+            }`}
+          >
+            Variance
+          </button>
+        </div>
+
+        {/* Tab 1: Reconcile (Per-Material Combined Touch Cards) */}
+        {mobileTab === "reconcile" && (
+          <div className="space-y-3">
             {entries.length === 0 ? (
-              <p className="text-xs text-slate-400 text-center py-6">
-                No materials.
-              </p>
+              <div className="p-8 text-center bg-white rounded-xl border border-slate-200 text-slate-400 text-xs">
+                No raw materials configured.
+              </div>
             ) : (
               entries.map((entry, idx) => {
                 const diffVal = Number(entry.diffKg.toFixed(2));
                 const sign = diffVal > 0 ? `+${diffVal}` : `${diffVal}`;
-                const rowClass =
+                const diffColor =
                   diffVal > 0
-                    ? "text-emerald-700 bg-emerald-50/60 border-emerald-100"
+                    ? "text-emerald-700 bg-emerald-50 border-emerald-200"
                     : diffVal < 0
-                    ? "text-amber-700 bg-amber-50/60 border-amber-100"
-                    : "text-slate-700 bg-slate-50/60 border-slate-100";
+                    ? "text-amber-700 bg-amber-50 border-amber-200"
+                    : "text-slate-700 bg-slate-50 border-slate-200";
 
                 return (
-                  <div
-                    key={idx}
-                    className={`flex items-center justify-between p-2 rounded border text-xs ${rowClass}`}
-                  >
-                    <div className="min-w-0 pr-2">
-                      <p className="font-semibold truncate">
-                        {entry.materialName}
-                      </p>
-                      <span className="text-[10px] opacity-75 font-mono">
-                        Target: {entry.manualKg}kg | Machine: {entry.machineKg}kg
-                      </span>
+                  <Card key={idx} className="border-slate-200 shadow-2xs overflow-hidden">
+                    <div className="bg-slate-50/80 px-3.5 py-2 border-b border-slate-100 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="w-5 h-5 rounded-md bg-purple-100 text-purple-700 text-[10px] font-bold flex items-center justify-center">
+                          {idx + 1}
+                        </span>
+                        <h4 className="font-bold text-xs text-slate-900">
+                          {entry.materialName}
+                        </h4>
+                      </div>
+                      <Badge variant="outline" className="text-[10px] font-mono text-purple-700 border-purple-200 bg-purple-50/50">
+                        Recipe: {entry.percentage}%
+                      </Badge>
                     </div>
-                    <div className="text-right">
-                      <span className="font-extrabold text-sm">{sign}</span>
-                      <span className="text-[10px] ml-1">kg</span>
-                    </div>
-                  </div>
+
+                    <CardContent className="p-3 space-y-2.5">
+                      <div className="grid grid-cols-3 gap-2 items-center">
+                        {/* Target */}
+                        <div className="bg-sky-50/60 p-2 rounded-lg border border-sky-100">
+                          <span className="text-[9px] uppercase font-bold text-sky-700 block">Target</span>
+                          <span className="text-xs font-extrabold text-sky-950">
+                            {Number(entry.manualKg).toFixed(1)} <span className="text-[9px] font-normal text-slate-500">kg</span>
+                          </span>
+                        </div>
+
+                        {/* Machine Input */}
+                        <div>
+                          <label className="text-[9px] uppercase font-bold text-purple-700 block mb-0.5">Machine Actual</label>
+                          <div className="relative">
+                            <Input
+                              type="number"
+                              step="0.1"
+                              min="0"
+                              value={entry.machineKg === 0 && !machineTotalInput ? "" : entry.machineKg}
+                              onChange={(e) => handleMachineRowChange(idx, e.target.value)}
+                              placeholder="0.0"
+                              className="h-8 text-right font-bold text-xs pr-6 border-purple-200 bg-purple-50/20 focus-visible:ring-purple-500"
+                            />
+                            <span className="absolute right-1.5 top-2 text-[9px] font-bold text-slate-400 pointer-events-none">kg</span>
+                          </div>
+                        </div>
+
+                        {/* Variance */}
+                        <div className={`p-2 rounded-lg border text-right ${diffColor}`}>
+                          <span className="text-[9px] uppercase font-bold block opacity-75">Variance</span>
+                          <span className="text-xs font-extrabold">
+                            {sign} <span className="text-[9px] font-normal">kg</span>
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Material Note / Remark */}
+                      <Input
+                        placeholder="Material remarks (lot, grade, hopper note)..."
+                        value={entry.remarks || ""}
+                        onChange={(e) => handleRemarksChange(idx, e.target.value)}
+                        className="h-7 text-[11px] bg-slate-50/50 border-slate-200"
+                      />
+                    </CardContent>
+                  </Card>
                 );
               })
             )}
           </div>
+        )}
 
-          {/* Footer Total for Difference */}
-          <div className="p-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs">
-            <span className="font-bold text-slate-700 uppercase tracking-wide">
-              Net Balance / Variance:
-            </span>
-            <div className="text-right">
-              <span className={`font-extrabold text-sm ${totals.diffTotalKg > 0 ? "text-emerald-700" : totals.diffTotalKg < 0 ? "text-amber-700" : "text-slate-800"}`}>
-                {netDiffSign}
-              </span>
-              <span className="text-[11px] font-medium text-slate-500 ml-1">kg</span>
-              <div className="text-[10px] text-slate-500">
-                Variance: {totals.variancePercentage}%
+        {/* Tab 2: Manual Recipe Breakdown */}
+        {mobileTab === "manual" && (
+          <div className="space-y-2.5">
+            <div className="bg-sky-50 border border-sky-200 rounded-xl p-3 flex items-center justify-between text-xs">
+              <div>
+                <span className="text-[10px] uppercase font-bold text-sky-700 block">Batch Recipe Total</span>
+                <span className="text-sm font-extrabold text-sky-950">{totals.manualTotalKg.toFixed(2)} kg</span>
               </div>
+              <Badge variant="outline" className="bg-sky-100 text-sky-800 border-sky-300 font-bold">
+                Formula: {totals.totalPercentage}%
+              </Badge>
             </div>
+
+            {entries.map((entry, idx) => (
+              <div key={idx} className="bg-white p-3 rounded-xl border border-slate-200 flex items-center justify-between text-xs">
+                <div>
+                  <h4 className="font-semibold text-slate-900">{entry.materialName}</h4>
+                  <span className="text-[10px] text-sky-700 font-bold">{entry.percentage}% of recipe</span>
+                </div>
+                <div className="text-right">
+                  <span className="text-sm font-bold text-slate-900">{Number(entry.manualKg).toFixed(2)}</span>
+                  <span className="text-[10px] text-slate-500 ml-1">kg</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Tab 3: Machine Hopper Readings */}
+        {mobileTab === "machine" && (
+          <div className="space-y-2.5">
+            <div className="bg-purple-50 border border-purple-200 rounded-xl p-3 flex items-center justify-between text-xs">
+              <div>
+                <span className="text-[10px] uppercase font-bold text-purple-700 block">Total Hopper Actual</span>
+                <span className="text-sm font-extrabold text-purple-950">{totals.machineTotalKg.toFixed(2)} kg</span>
+              </div>
+              <span className="text-[10px] text-purple-700 font-medium">Meter Sum</span>
+            </div>
+
+            {entries.map((entry, idx) => (
+              <div key={idx} className="bg-white p-3 rounded-xl border border-slate-200 flex items-center justify-between text-xs gap-3">
+                <div className="flex-1 min-w-0">
+                  <h4 className="font-semibold text-slate-900 truncate">{entry.materialName}</h4>
+                  <span className="text-[10px] text-purple-700">Ref: {entry.percentage}%</span>
+                </div>
+                <div className="w-28 relative">
+                  <Input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    value={entry.machineKg === 0 && !machineTotalInput ? "" : entry.machineKg}
+                    onChange={(e) => handleMachineRowChange(idx, e.target.value)}
+                    placeholder="0.00"
+                    className="h-8 text-right font-bold text-slate-900 text-xs pr-6 bg-purple-50/20 border-purple-200"
+                  />
+                  <span className="absolute right-2 top-2 text-[10px] font-bold text-slate-400 pointer-events-none">kg</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Tab 4: Variance Details */}
+        {mobileTab === "diff" && (
+          <div className="space-y-2.5">
+            <div className={`p-3 rounded-xl border flex items-center justify-between text-xs ${netDiffColor}`}>
+              <div>
+                <span className="text-[10px] uppercase font-bold block opacity-75">Net Shift Difference</span>
+                <span className="text-base font-extrabold">{netDiffSign} kg</span>
+              </div>
+              <Badge variant="outline" className="border-current uppercase font-bold text-[10px]">
+                {totals.diffTotalKg > 0 ? "Saved" : totals.diffTotalKg < 0 ? "Excess Used" : "Balanced"}
+              </Badge>
+            </div>
+
+            {entries.map((entry, idx) => {
+              const diffVal = Number(entry.diffKg.toFixed(2));
+              const sign = diffVal > 0 ? `+${diffVal}` : `${diffVal}`;
+              return (
+                <div key={idx} className="bg-white p-3 rounded-xl border border-slate-200 flex items-center justify-between text-xs">
+                  <div>
+                    <h4 className="font-semibold text-slate-900">{entry.materialName}</h4>
+                    <span className="text-[10px] text-slate-500">
+                      Target: {entry.manualKg} kg | Actual: {entry.machineKg} kg
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <span className={`text-sm font-extrabold ${diffVal > 0 ? "text-emerald-700" : diffVal < 0 ? "text-amber-700" : "text-slate-800"}`}>
+                      {sign}
+                    </span>
+                    <span className="text-[10px] text-slate-500 ml-1">kg</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Mobile Action Controls */}
+        <div className="pt-2 space-y-2">
+          <Button
+            onClick={() => handleSave("SUBMITTED")}
+            disabled={isPending || isLoading || entries.length === 0}
+            className="w-full h-11 text-xs font-bold bg-sky-600 hover:bg-sky-700 text-white shadow-xs rounded-xl flex items-center justify-center gap-2"
+          >
+            {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+            Submit Lamination RM Report
+          </Button>
+
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              variant="outline"
+              onClick={() => handleSave("DRAFT")}
+              disabled={isPending || isLoading}
+              className="h-10 text-xs font-semibold border-slate-200 rounded-xl"
+            >
+              {isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1.5" /> : <Save className="h-4 w-4 mr-1.5" />}
+              Save Draft
+            </Button>
+
+            <Button
+              variant="outline"
+              onClick={() => setIsPrintModalOpen(true)}
+              disabled={entries.length === 0}
+              className="h-10 text-xs font-semibold border-slate-200 rounded-xl text-sky-700"
+            >
+              <Printer className="h-4 w-4 mr-1.5" />
+              Print
+            </Button>
           </div>
         </div>
       </div>
