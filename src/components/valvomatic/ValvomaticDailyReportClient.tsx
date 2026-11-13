@@ -708,7 +708,7 @@ export function ValvomaticDailyReportClient() {
       </div>
 
       {/* Main Interactive Spreadsheet Grid */}
-      <div className="bg-white border border-slate-200 rounded-xl shadow-xs overflow-hidden">
+      <div className="hidden md:block bg-white border border-slate-200 rounded-xl shadow-xs overflow-hidden">
         <div className="p-3 bg-slate-50/80 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
@@ -1147,6 +1147,369 @@ export function ValvomaticDailyReportClient() {
             placeholder="Add any specific observations for this shift (machine speed, temperature, maintenance alerts)..."
             className="w-full text-xs p-2 border border-slate-300 rounded-lg focus:outline-hidden focus:ring-1 focus:ring-primary bg-white"
           />
+        </div>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* MOBILE TOUCH FEED (<md) - ZERO DESKTOP REGRESSION                        */}
+      {/* ========================================================================= */}
+      <div className="block md:hidden space-y-4">
+        {/* Mobile Toolbar */}
+        <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-2xs flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={handleAddRow}
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-primary text-white text-xs font-bold shadow-xs active:scale-95 transition-all"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              <span>Add Row</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleAdd5Rows}
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-slate-50 text-slate-700 text-xs font-semibold active:scale-95 transition-all"
+            >
+              <Plus className="h-3.5 w-3.5 text-slate-400" />
+              <span>+5</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleResetToBlank}
+              className="p-1.5 rounded-lg border border-slate-200 bg-slate-50 text-slate-600 hover:text-rose-600 active:scale-95 transition-all"
+              title="Reset blank"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+            </button>
+          </div>
+          <span className="text-xs font-bold font-mono text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
+            {totals.totalProductionPcs.toLocaleString()} pcs
+          </span>
+        </div>
+
+        {/* Mobile Cards List */}
+        <div className="space-y-3">
+          {entries.length === 0 ? (
+            <div className="bg-white rounded-xl border border-dashed border-slate-300 p-8 text-center text-slate-400 text-xs">
+              No entries in this report. Tap &quot;Add Row&quot; to begin.
+            </div>
+          ) : (
+            entries.map((entry, index) => (
+              <div
+                key={index}
+                className="bg-white border border-slate-200/90 rounded-xl shadow-2xs overflow-hidden"
+              >
+                {/* Card Header Strip */}
+                <div className="bg-slate-50/90 px-3.5 py-2 border-b border-slate-100 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="h-5 w-5 rounded-md bg-slate-900 text-white font-bold text-[10px] flex items-center justify-center">
+                      {entry.sequence}
+                    </span>
+                    <span className="text-xs font-mono font-bold text-slate-900">
+                      {entry.rollNumber ? entry.rollNumber : `Row ${index + 1}`}
+                    </span>
+                    {entry.loomNumber && (
+                      <span className="text-[10px] text-sky-700 bg-sky-50 px-1.5 py-0.5 rounded border border-sky-200 font-mono">
+                        Loom #{entry.loomNumber}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {entry.productionPcs > 0 && (
+                      <span className="text-xs font-black font-mono text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                        {entry.productionPcs.toLocaleString()} pcs
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteRow(index)}
+                      className="p-1 text-slate-400 hover:text-rose-600 rounded active:scale-90 transition-all"
+                      title="Delete row"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="p-3.5 space-y-3 text-xs">
+                  {/* Quality & Company */}
+                  <div className="space-y-2">
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                        Quality
+                      </label>
+                      <UniversalQualityInput
+                        value={entry.quality || entry.partyName || ""}
+                        onChange={(newVal) => {
+                          handleCellChange(index, "quality", newVal);
+                          handleCellChange(index, "partyName", newVal);
+                        }}
+                        placeholder="Select quality..."
+                        compact={false}
+                        inputClassName="h-9 text-xs font-semibold"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">
+                          Company Name
+                        </label>
+                        <input
+                          type="text"
+                          value={entry.companyName || ""}
+                          onChange={(e) => handleCellChange(index, "companyName", e.target.value)}
+                          placeholder="e.g. Flexicom"
+                          className="w-full h-8 px-2.5 text-xs border border-slate-200 rounded-md focus:ring-1 focus:ring-primary"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">
+                          Unit / Grade
+                        </label>
+                        <div className="grid grid-cols-2 gap-1">
+                          <input
+                            type="text"
+                            value={entry.unitName || ""}
+                            onChange={(e) => handleCellChange(index, "unitName", e.target.value)}
+                            placeholder="Unit"
+                            className="w-full h-8 px-2 text-xs border border-slate-200 rounded-md focus:ring-1 focus:ring-primary"
+                          />
+                          <input
+                            type="text"
+                            value={entry.grade || ""}
+                            onChange={(e) => handleCellChange(index, "grade", e.target.value)}
+                            placeholder="Grade"
+                            className="w-full h-8 px-2 text-xs border border-slate-200 rounded-md focus:ring-1 focus:ring-primary"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Roll No & Loom Details */}
+                  <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100 space-y-2">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
+                          Roll Number
+                        </label>
+                        <input
+                          type="text"
+                          value={entry.rollNumber}
+                          onChange={(e) => handleCellChange(index, "rollNumber", e.target.value)}
+                          placeholder="e.g. V-1021"
+                          className="w-full h-8 px-2.5 text-xs font-mono font-bold border border-slate-200 rounded-md bg-white focus:ring-1 focus:ring-primary"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
+                          Loom Number
+                        </label>
+                        <input
+                          type="text"
+                          value={entry.loomNumber || ""}
+                          onChange={(e) => handleCellChange(index, "loomNumber", e.target.value)}
+                          placeholder="e.g. 15"
+                          className="w-full h-8 px-2.5 text-xs font-mono border border-slate-200 rounded-md bg-white focus:ring-1 focus:ring-primary"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2 text-center pt-1">
+                      <div>
+                        <span className="text-[9px] uppercase font-bold text-slate-400 block">Roll Mtr</span>
+                        <input
+                          type="number"
+                          step="any"
+                          value={entry.rollMtr || ""}
+                          onChange={(e) => handleCellChange(index, "rollMtr", parseFloat(e.target.value) || 0)}
+                          placeholder="0"
+                          className="w-full h-7 text-center font-mono font-bold text-xs border border-slate-200 rounded bg-white"
+                        />
+                      </div>
+                      <div>
+                        <span className="text-[9px] uppercase font-bold text-slate-400 block">Net Wt (Kg)</span>
+                        <input
+                          type="number"
+                          step="any"
+                          value={entry.netWeight || ""}
+                          onChange={(e) => handleCellChange(index, "netWeight", parseFloat(e.target.value) || 0)}
+                          placeholder="0"
+                          className="w-full h-7 text-center font-mono font-bold text-xs border border-slate-200 rounded bg-white"
+                        />
+                      </div>
+                      <div>
+                        <span className="text-[9px] uppercase font-bold text-slate-400 block">Avg (g/m)</span>
+                        <div className="h-7 flex items-center justify-center font-mono font-bold text-sky-800 bg-sky-50 rounded border border-sky-200 text-xs">
+                          {entry.avgWeight ? entry.avgWeight.toFixed(1) : "—"}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Meter Readings & Patches */}
+                  <div className="p-2.5 rounded-lg bg-indigo-50/30 border border-indigo-100 space-y-2">
+                    <span className="text-[10px] font-bold uppercase text-indigo-900 tracking-wider block">
+                      Meter Readings &amp; Patches
+                    </span>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <span className="text-[10px] text-slate-500 block">Opening Reading</span>
+                        <input
+                          type="number"
+                          step="any"
+                          value={entry.openingMeterReading || ""}
+                          onChange={(e) => handleCellChange(index, "openingMeterReading", parseFloat(e.target.value) || 0)}
+                          placeholder="0"
+                          className="w-full h-7 px-2 text-xs font-mono border border-slate-200 rounded bg-white"
+                        />
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-500 block">Closing Reading</span>
+                        <input
+                          type="number"
+                          step="any"
+                          value={entry.closingMeterReading || ""}
+                          onChange={(e) => handleCellChange(index, "closingMeterReading", parseFloat(e.target.value) || 0)}
+                          placeholder="0"
+                          className="w-full h-7 px-2 text-xs font-mono border border-slate-200 rounded bg-white"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2 text-center pt-1">
+                      <div>
+                        <span className="text-[9px] uppercase font-bold text-indigo-700 block">Cover OS</span>
+                        <input
+                          type="number"
+                          step="any"
+                          value={entry.coverPatchOs || ""}
+                          onChange={(e) => handleCellChange(index, "coverPatchOs", parseFloat(e.target.value) || 0)}
+                          placeholder="0"
+                          className="w-full h-7 text-center font-mono font-bold text-xs border border-indigo-200 rounded bg-white text-indigo-800"
+                        />
+                      </div>
+                      <div>
+                        <span className="text-[9px] uppercase font-bold text-indigo-700 block">Cover DS</span>
+                        <input
+                          type="number"
+                          step="any"
+                          value={entry.coverPatchDs || ""}
+                          onChange={(e) => handleCellChange(index, "coverPatchDs", parseFloat(e.target.value) || 0)}
+                          placeholder="0"
+                          className="w-full h-7 text-center font-mono font-bold text-xs border border-indigo-200 rounded bg-white text-indigo-800"
+                        />
+                      </div>
+                      <div>
+                        <span className="text-[9px] uppercase font-bold text-indigo-800 block">Valve</span>
+                        <input
+                          type="number"
+                          step="any"
+                          value={entry.valvePatch || ""}
+                          onChange={(e) => handleCellChange(index, "valvePatch", parseFloat(e.target.value) || 0)}
+                          placeholder="0"
+                          className="w-full h-7 text-center font-mono font-bold text-xs border border-indigo-200 rounded bg-white text-indigo-900"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Production Output Highlights */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="bg-emerald-50/50 p-2.5 rounded-lg border border-emerald-200">
+                      <label className="block text-[10px] font-bold text-emerald-800 uppercase mb-0.5">
+                        Production (Pcs)
+                      </label>
+                      <input
+                        type="number"
+                        value={entry.productionPcs || ""}
+                        onChange={(e) => handleCellChange(index, "productionPcs", parseInt(e.target.value, 10) || 0)}
+                        placeholder="0"
+                        className="w-full h-8 px-2 font-mono font-black text-sm text-emerald-900 bg-white border border-emerald-300 rounded focus:ring-1 focus:ring-emerald-500"
+                      />
+                    </div>
+                    <div className="bg-teal-50/50 p-2.5 rounded-lg border border-teal-200">
+                      <label className="block text-[10px] font-bold text-teal-800 uppercase mb-0.5">
+                        Production (Kg)
+                      </label>
+                      <input
+                        type="number"
+                        step="any"
+                        value={entry.productionKg || ""}
+                        onChange={(e) => handleCellChange(index, "productionKg", parseFloat(e.target.value) || 0)}
+                        placeholder="0.00"
+                        className="w-full h-8 px-2 font-mono font-black text-sm text-teal-900 bg-white border border-teal-300 rounded focus:ring-1 focus:ring-teal-500"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Remarks Input */}
+                  <div>
+                    <input
+                      type="text"
+                      value={entry.remarks || ""}
+                      onChange={(e) => handleCellChange(index, "remarks", e.target.value)}
+                      placeholder="Row remarks or notes..."
+                      className="w-full h-8 px-2.5 text-xs border border-slate-200 rounded-md focus:ring-1 focus:ring-primary"
+                    />
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Mobile Remarks Card */}
+        <div className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-2xs">
+          <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+            Shift Observations / Downtime / Maintenance Notes
+          </label>
+          <textarea
+            rows={2}
+            value={remarks}
+            onChange={(e) => {
+              isDirtyRef.current = true;
+              setRemarks(e.target.value);
+            }}
+            placeholder="Add any specific observations for this shift..."
+            className="w-full text-xs p-2.5 border border-slate-200 rounded-lg focus:outline-hidden focus:ring-1 focus:ring-primary bg-white"
+          />
+        </div>
+
+        {/* Mobile Sticky Actions Bar */}
+        <div className="sticky bottom-3 z-20 bg-slate-900 text-white rounded-2xl p-3 shadow-xl border border-slate-800 flex items-center justify-between gap-3">
+          <div className="leading-tight">
+            <span className="text-[10px] uppercase font-bold text-slate-400 block">Total Shift Output</span>
+            <div className="flex items-center gap-2">
+              <span className="text-base font-black font-mono text-emerald-400">
+                {totals.totalProductionPcs.toLocaleString()} <span className="text-xs font-normal">pcs</span>
+              </span>
+              <span className="text-xs text-slate-400 font-mono">
+                ({totals.totalProductionKg.toFixed(1)} kg)
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => saveReport("DRAFT")}
+              disabled={saving}
+              className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold active:scale-95 transition-all flex items-center gap-1.5 border border-slate-700"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${saving ? "animate-spin" : ""}`} />
+              <span>Draft</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => saveReport("SUBMITTED")}
+              disabled={saving}
+              className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold active:scale-95 transition-all flex items-center gap-1.5 shadow-lg shadow-emerald-950/40"
+            >
+              <FileCheck className="h-3.5 w-3.5" />
+              <span>Submit</span>
+            </button>
+          </div>
         </div>
       </div>
 
