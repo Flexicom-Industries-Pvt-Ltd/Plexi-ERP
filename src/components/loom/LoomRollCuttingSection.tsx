@@ -42,6 +42,8 @@ import { exportLoomRollCuttingExcel } from "@/lib/loom/loom-roll-cutting-export"
 import dynamic from "next/dynamic";
 import { UniversalQualityInput } from "@/components/ui/UniversalQualityInput";
 import { UniversalPersonnelInput } from "@/components/ui/UniversalPersonnelInput";
+import { useProductionRealtime } from "@/hooks/useProductionRealtime";
+import { RealtimeSyncBadge } from "@/components/production/RealtimeSyncBadge";
 
 const LoomRollCuttingPrintModal = dynamic(
   () => import("./LoomRollCuttingPrintModal").then((m) => m.LoomRollCuttingPrintModal),
@@ -241,6 +243,16 @@ export function LoomRollCuttingSection() {
     fetchData();
   }, [fetchData]);
 
+  const realtime = useProductionRealtime({
+    module: "loom",
+    sheet: "roll-cutting",
+    date: selectedDate,
+    shift: selectedShift,
+    onSync: () => {
+      fetchData();
+    },
+  });
+
   // Immediate or debounced auto-save function
   const triggerAutoSave = useCallback(async (isImmediate: boolean = false, keepalive: boolean = false) => {
     if (!latestPayloadRef.current || isInitialMountRef.current) return;
@@ -262,6 +274,7 @@ export function LoomRollCuttingSection() {
       if (res.ok) {
         lastSavedPayloadRef.current = serialized;
         setLastAutoSavedAt(new Date());
+        realtime.broadcastSync({ action: "SAVE", date: selectedDate, shift: selectedShift });
       }
     } catch (err) {
       console.error("Roll cutting auto-save error:", err);
@@ -270,7 +283,7 @@ export function LoomRollCuttingSection() {
         setAutoSaving(false);
       }
     }
-  }, []);
+  }, [realtime, selectedDate, selectedShift]);
 
   // Sync latestPayloadRef and debounce auto-save (500ms)
   useEffect(() => {
@@ -629,6 +642,7 @@ export function LoomRollCuttingSection() {
       setReportStatus("SUBMITTED");
       lastSavedPayloadRef.current = JSON.stringify(payload);
       setLastAutoSavedAt(new Date());
+      realtime.broadcastSync({ action: "SUBMIT", date: selectedDate, shift: selectedShift });
       toast.success("Daily Roll Cutting Report submitted and synced to Roll Stock!");
     } catch (err: any) {
       toast.error(err.message || "Failed to submit report");
@@ -680,6 +694,14 @@ export function LoomRollCuttingSection() {
 
         {/* Global Action Buttons & Auto-Save Status */}
         <div className="flex flex-wrap items-center gap-2">
+          <RealtimeSyncBadge
+            isConnected={realtime.isConnected}
+            lastUpdatedBy={realtime.lastUpdatedBy}
+            lastUpdatedAt={realtime.lastUpdatedAt}
+            lastAction={realtime.lastAction}
+            isSelfUpdate={realtime.isSelfUpdate}
+          />
+
           {autoSaving ? (
             <div className="flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400 font-medium px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/20">
               <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />

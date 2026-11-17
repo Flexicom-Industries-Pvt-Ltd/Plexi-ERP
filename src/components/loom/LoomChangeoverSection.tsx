@@ -27,6 +27,8 @@ import {
 import { exportLoomChangeoverExcel } from "@/lib/loom/loom-changeover-export";
 import { printLoomChangeover } from "@/lib/loom/print-loom-changeover";
 import { UniversalQualityInput } from "@/components/ui/UniversalQualityInput";
+import { useProductionRealtime } from "@/hooks/useProductionRealtime";
+import { RealtimeSyncBadge } from "@/components/production/RealtimeSyncBadge";
 
 interface AvailableQuality {
   code: string;
@@ -118,6 +120,14 @@ export function LoomChangeoverSection() {
     fetchData();
   }, [fetchData]);
 
+  const realtime = useProductionRealtime({
+    module: "loom",
+    sheet: "changeover",
+    onSync: () => {
+      fetchData();
+    },
+  });
+
   // Handle Quick Schedule Submit
   const handleCreateSchedule = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -147,6 +157,7 @@ export function LoomChangeoverSection() {
       setScheduleModalOpen(false);
       setNewScheduleTo("");
       setNewScheduleRemarks("");
+      realtime.broadcastSync({ action: "SCHEDULE", metadata: { loomNumber: newScheduleLoom } });
       fetchData();
     } catch (err: any) {
       toast.error(err?.message || "Failed to schedule changeover");
@@ -209,6 +220,14 @@ export function LoomChangeoverSection() {
 
           {/* Action Buttons */}
           <div className="flex flex-wrap items-center gap-2">
+            <RealtimeSyncBadge
+              isConnected={realtime.isConnected}
+              lastUpdatedBy={realtime.lastUpdatedBy}
+              lastUpdatedAt={realtime.lastUpdatedAt}
+              lastAction={realtime.lastAction}
+              isSelfUpdate={realtime.isSelfUpdate}
+            />
+
             <button
               onClick={() => setScheduleModalOpen(true)}
               className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-primary hover:bg-primary/90 rounded-lg transition-all shadow-xs cursor-pointer"

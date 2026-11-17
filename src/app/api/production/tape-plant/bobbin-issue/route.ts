@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireTapePlantApiPermission } from "@/lib/tape-plant/permissions";
+import { emitProductionSync } from "@/lib/realtime/production-bus";
 import {
   BOBBIN_WEIGHT_KG,
   CRATE_WEIGHT_KG,
@@ -366,6 +367,31 @@ export async function POST(request: NextRequest) {
         createdAt: created.createdAt.toISOString(),
       },
     });
+
+    emitProductionSync({
+      module: "tape-plant",
+      sheet: "bobbin-issue",
+      action: "ISSUE",
+      date: created.date,
+      shift: created.shiftId,
+      user: {
+        name: authResult.session?.user?.name || "Floor Admin",
+        email: authResult.session?.user?.email || undefined,
+        role: (authResult.session?.user as any)?.roleName || (authResult.session?.user as any)?.role || "Staff",
+      },
+    });
+    emitProductionSync({
+      module: "tape-plant",
+      sheet: "bobbin-stock",
+      action: "ISSUE",
+      date: created.date,
+      shift: created.shiftId,
+      user: {
+        name: authResult.session?.user?.name || "Floor Admin",
+        email: authResult.session?.user?.email || undefined,
+        role: (authResult.session?.user as any)?.roleName || (authResult.session?.user as any)?.role || "Staff",
+      },
+    });
   } catch (error: any) {
     console.error("Error creating bobbin issue:", error);
     return NextResponse.json(
@@ -400,6 +426,31 @@ export async function DELETE(request: NextRequest) {
     await db.tapePlantBobbinIssue.update({
       where: { id },
       data: { status: "CANCELLED" },
+    });
+
+    emitProductionSync({
+      module: "tape-plant",
+      sheet: "bobbin-issue",
+      action: "CANCEL",
+      date: existing.date,
+      shift: existing.shiftId,
+      user: {
+        name: authResult.session?.user?.name || "Floor Admin",
+        email: authResult.session?.user?.email || undefined,
+        role: (authResult.session?.user as any)?.roleName || (authResult.session?.user as any)?.role || "Staff",
+      },
+    });
+    emitProductionSync({
+      module: "tape-plant",
+      sheet: "bobbin-stock",
+      action: "CANCEL",
+      date: existing.date,
+      shift: existing.shiftId,
+      user: {
+        name: authResult.session?.user?.name || "Floor Admin",
+        email: authResult.session?.user?.email || undefined,
+        role: (authResult.session?.user as any)?.roleName || (authResult.session?.user as any)?.role || "Staff",
+      },
     });
 
     return NextResponse.json({

@@ -37,6 +37,8 @@ import { exportConvertexReportExcel } from "@/lib/convertex/convertex-export";
 import { UniversalQualityInput } from "@/components/ui/UniversalQualityInput";
 import { UniversalPersonnelInput } from "@/components/ui/UniversalPersonnelInput";
 import { UniversalShiftSelector } from "@/components/production/UniversalShiftSelector";
+import { useProductionRealtime } from "@/hooks/useProductionRealtime";
+import { RealtimeSyncBadge } from "@/components/production/RealtimeSyncBadge";
 
 const ConvertexReportPrintModal = dynamic(
   () => import("./ConvertexReportPrintModal").then((m) => m.ConvertexReportPrintModal),
@@ -239,6 +241,16 @@ export function ConvertexDailyReportClient() {
     fetchReportData();
   }, [fetchReportData]);
 
+  const realtime = useProductionRealtime({
+    module: "convertex",
+    sheet: "daily-report",
+    date,
+    shift: shiftName,
+    onSync: () => {
+      fetchReportData();
+    },
+  });
+
   // Handle cell edits with live recalculation and dirty flagging
   const handleCellChange = (index: number, field: keyof ConvertexReportItem, value: any) => {
     isDirtyRef.current = true;
@@ -426,6 +438,12 @@ export function ConvertexDailyReportClient() {
         setLastSavedAt(format(new Date(), "hh:mm:ss a"));
         isDirtyRef.current = false;
 
+        realtime.broadcastSync({
+          action: newStatus === "SUBMITTED" ? "SUBMIT" : "SAVE",
+          date: current.date,
+          shift: current.shiftName,
+        });
+
         if (!silent) {
           toast.success(
             newStatus === "SUBMITTED"
@@ -548,6 +566,14 @@ export function ConvertexDailyReportClient() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
+            <RealtimeSyncBadge
+              isConnected={realtime.isConnected}
+              lastUpdatedBy={realtime.lastUpdatedBy}
+              lastUpdatedAt={realtime.lastUpdatedAt}
+              lastAction={realtime.lastAction}
+              isSelfUpdate={realtime.isSelfUpdate}
+            />
+
             <button
               onClick={() => fetchReportData()}
               disabled={loading}

@@ -26,6 +26,8 @@ import { SpreadsheetTable, ColumnDef } from "./SpreadsheetTable";
 import { OperatorSelect } from "./OperatorSelect";
 import { PhotoEvidenceModal } from "./PhotoEvidenceModal";
 import { useProductionShifts } from "@/hooks/useProductionShifts";
+import { useProductionRealtime } from "@/hooks/useProductionRealtime";
+import { RealtimeSyncBadge } from "@/components/production/RealtimeSyncBadge";
 import {
   generateShiftTimeSlots,
   isTimeSlotLocked,
@@ -266,6 +268,55 @@ export function ProcessDriveParameterSection({
       });
   }, [date, shiftId, shiftIntervals]);
 
+  const realtime = useProductionRealtime({
+    module: "tape-plant",
+    sheet: "drive-parameter",
+    date,
+    shift: shiftId,
+    onSync: () => {
+      if (!date || !shiftId) return;
+      fetch(`/api/production/tape-plant/drive-parameters?date=${date}&shiftId=${shiftId}&_t=${Date.now()}`)
+        .then((r) => (r.ok ? r.json() : []))
+        .then((data: any[]) => {
+          if (data && data.length > 0) {
+            const opName = data[0]?.operatorName || "";
+            const opId = data[0]?.operatorId || "";
+            setOperatorName(opName);
+            setOperatorId(opId);
+            const mapped: DriveParameterReading[] = data.map((d) => ({
+              id: d.id,
+              time: d.time || "",
+              photoUrl: d.photoUrl || undefined,
+              operatorName: d.operatorName || opName,
+              operatorId: d.operatorId || opId,
+              extruderRpm: d.extruderRpm ?? "",
+              meltPumpRpm: d.meltPumpRpm ?? "",
+              takeUpMpm: d.takeUpMpm ?? "",
+              nipRollMpm: d.nipRollMpm ?? "",
+              isuMpm: d.isuMpm ?? "",
+              pauMpm: d.pauMpm ?? "",
+              stretchingMpm: d.stretchingMpm ?? "",
+              annealingMpm: d.annealingMpm ?? "",
+              stretchingRatio: d.stretchingRatio ?? "",
+              meltPressureP1: d.meltPressureP1 ?? "",
+              meltPressureP2: d.meltPressureP2 ?? "",
+              meltPressureP3: d.meltPressureP3 ?? "",
+              waterBath: d.waterBath ?? "",
+              colour: d.colour ?? "",
+              denier: d.denier ?? "",
+              tapeWidth: d.tapeWidth ?? "",
+              strength: d.strength ?? "",
+              eloPercent: d.eloPercent ?? "",
+              spacerWidth: d.spacerWidth ?? "",
+              numberOfTape: d.numberOfTape ?? "",
+            }));
+            setRecords(mapped);
+          }
+        })
+        .catch(() => {});
+    },
+  });
+
   // Debounced Auto-Save
   useEffect(() => {
     if (!isInitialLoadedRef.current || !date || !shiftId) return;
@@ -295,6 +346,7 @@ export function ProcessDriveParameterSection({
         if (res.ok) {
           lastSavedPayloadRef.current = serialized;
           setLastAutoSavedAt(new Date());
+          realtime.broadcastSync({ action: "SAVE", date, shift: shiftId });
         }
       } catch (err) {
         console.error("Auto-save error:", err);
@@ -330,6 +382,7 @@ export function ProcessDriveParameterSection({
 
       lastSavedPayloadRef.current = JSON.stringify(payload);
       setLastAutoSavedAt(new Date());
+      realtime.broadcastSync({ action: "SAVE", date, shift: shiftId });
       toast.success("Process drive parameters saved");
     } catch (err: any) {
       toast.error(err.message || "Failed to save parameters");
@@ -784,6 +837,14 @@ export function ProcessDriveParameterSection({
           </div>
 
           {/* Desktop Auto-save Status Indicator */}
+          <RealtimeSyncBadge
+            isConnected={realtime.isConnected}
+            lastUpdatedBy={realtime.lastUpdatedBy}
+            lastUpdatedAt={realtime.lastUpdatedAt}
+            lastAction={realtime.lastAction}
+            isSelfUpdate={realtime.isSelfUpdate}
+          />
+
           {autoSaving ? (
             <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 text-slate-600 border border-slate-200 text-xs font-medium rounded-lg h-8">
               <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />

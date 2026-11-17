@@ -45,6 +45,8 @@ import { LoomReadingPrintPreviewModal } from "./LoomReadingPrintPreviewModal";
 import { UniversalQualityInput } from "@/components/ui/UniversalQualityInput";
 import { PhotoEvidenceModal } from "@/components/tape-plant/PhotoEvidenceModal";
 import { isTimeSlotLocked } from "@/lib/tape-plant/telemetry-time-slots";
+import { useProductionRealtime } from "@/hooks/useProductionRealtime";
+import { RealtimeSyncBadge } from "@/components/production/RealtimeSyncBadge";
 
 interface AvailableShift {
   id: string;
@@ -327,6 +329,16 @@ export function LoomReadingSheetSection() {
     fetchSheetData(selectedDate, selectedShift);
   }, [selectedDate, selectedShift, fetchSheetData]);
 
+  const realtime = useProductionRealtime({
+    module: "loom",
+    sheet: "reading-sheet",
+    date: selectedDate,
+    shift: selectedShift,
+    onSync: () => {
+      fetchSheetData(selectedDate, selectedShift);
+    },
+  });
+
   // Immediate or debounced auto-save function with in-flight queuing
   const isSavingRef = useRef(false);
   const pendingSaveRef = useRef<string | null>(null);
@@ -358,6 +370,7 @@ export function LoomReadingSheetSection() {
       if (res.ok) {
         lastSavedPayloadRef.current = serialized;
         setLastAutoSavedAt(new Date());
+        realtime.broadcastSync({ action: "SAVE", date: selectedDate, shift: selectedShift });
       }
     } catch (err) {
       console.error("Auto-save error:", err);
@@ -371,7 +384,7 @@ export function LoomReadingSheetSection() {
         triggerAutoSaveRef.current?.(false);
       }
     }
-  }, []);
+  }, [realtime, selectedDate, selectedShift]);
   useEffect(() => {
     triggerAutoSaveRef.current = triggerAutoSave;
   }, [triggerAutoSave]);
@@ -731,6 +744,12 @@ export function LoomReadingSheetSection() {
       lastSavedPayloadRef.current = JSON.stringify(payload);
       setLastAutoSavedAt(new Date());
 
+      realtime.broadcastSync({
+        action: targetStatus === "SUBMITTED" ? "SUBMIT" : "SAVE",
+        date: selectedDate,
+        shift: selectedShift,
+      });
+
       if (targetStatus === "SUBMITTED") {
         showNotification(
           `Sheet submitted successfully: ${liveTotals.totalShiftMeters.toLocaleString()} m across ${liveTotals.runningLooms} running looms (Avg Eff: ${liveTotals.averageEfficiency}%).`
@@ -987,6 +1006,14 @@ export function LoomReadingSheetSection() {
 
           {/* Action Buttons */}
           <div className="flex flex-wrap items-center gap-2">
+            <RealtimeSyncBadge
+              isConnected={realtime.isConnected}
+              lastUpdatedBy={realtime.lastUpdatedBy}
+              lastUpdatedAt={realtime.lastUpdatedAt}
+              lastAction={realtime.lastAction}
+              isSelfUpdate={realtime.isSelfUpdate}
+            />
+
             {/* Real-time Auto-Save Status Pill */}
             {autoSaving ? (
               <div className="flex items-center gap-1.5 text-xs text-amber-700 bg-amber-50 px-2.5 py-1.5 rounded-xl border border-amber-200 animate-pulse font-medium shadow-2xs">

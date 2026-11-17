@@ -7,6 +7,7 @@ import {
   PrintingReportItem,
 } from "@/lib/printing/printing-types";
 import { logEvent } from "@/lib/logging";
+import { emitProductionSync } from "@/lib/realtime/production-bus";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -290,6 +291,19 @@ export async function POST(request: NextRequest) {
       statusCode: 200,
     }).catch(() => {});
 
+    emitProductionSync({
+      module: "printing",
+      sheet: "production-report",
+      action: status === "SUBMITTED" ? "SUBMIT" : "SAVE",
+      date,
+      shift: shiftName,
+      user: {
+        name: authResult.session?.user?.name || "Printing Operator",
+        email: authResult.session?.user?.email || undefined,
+        role: (authResult.session?.user as any)?.roleName || (authResult.session?.user as any)?.role || "Staff",
+      },
+    });
+
     return NextResponse.json({
       success: true,
       message: `Printing Daily Production Report saved successfully`,
@@ -348,6 +362,19 @@ export async function DELETE(request: NextRequest) {
       url: "/api/production/printing/reports",
       statusCode: 200,
     }).catch(() => {});
+
+    emitProductionSync({
+      module: "printing",
+      sheet: "production-report",
+      action: "DELETE",
+      date: report.date,
+      shift: report.shiftName,
+      user: {
+        name: authResult.session?.user?.name || "Printing Operator",
+        email: authResult.session?.user?.email || undefined,
+        role: (authResult.session?.user as any)?.roleName || (authResult.session?.user as any)?.role || "Staff",
+      },
+    });
 
     return NextResponse.json({
       success: true,

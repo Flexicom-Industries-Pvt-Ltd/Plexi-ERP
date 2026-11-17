@@ -35,6 +35,8 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { exportProductionSummaryExcel } from "@/lib/lamination/production-summary-export";
+import { useProductionRealtime } from "@/hooks/useProductionRealtime";
+import { RealtimeSyncBadge } from "@/components/production/RealtimeSyncBadge";
 import dynamic from "next/dynamic";
 
 const ProductionSummaryPrintModal = dynamic(
@@ -131,6 +133,14 @@ export function LaminationProductionSummaryClient() {
     fetchSummary();
   }, [dateFrom, dateTo, shiftFilter, contractorFilter]);
 
+  const realtime = useProductionRealtime({
+    module: "lamination",
+    sheet: "summary",
+    onSync: () => {
+      fetchSummary();
+    },
+  });
+
   const handleExportExcel = () => {
     exportProductionSummaryExcel(
       summaryData.overall,
@@ -164,6 +174,14 @@ export function LaminationProductionSummaryClient() {
 
         {/* Global Action Buttons */}
         <div className="flex flex-wrap items-center gap-2">
+          <RealtimeSyncBadge
+            isConnected={realtime.isConnected}
+            lastUpdatedBy={realtime.lastUpdatedBy}
+            lastUpdatedAt={realtime.lastUpdatedAt}
+            lastAction={realtime.lastAction}
+            isSelfUpdate={realtime.isSelfUpdate}
+          />
+
           <Button
             variant="outline"
             size="sm"

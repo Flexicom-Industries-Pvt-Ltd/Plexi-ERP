@@ -8,6 +8,7 @@ import {
 } from "@/lib/valvomatic/valvomatic-types";
 import { logEvent } from "@/lib/logging";
 import { withResourceLock } from "@/lib/concurrency-lock";
+import { emitProductionSync } from "@/lib/realtime/production-bus";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -307,6 +308,20 @@ export async function POST(request: NextRequest) {
       statusCode: 200,
     }).catch(() => {});
 
+    emitProductionSync({
+      module: "valvomatic",
+      sheet: "daily-report",
+      action: status === "SUBMITTED" ? "SUBMIT" : "SAVE",
+      date,
+      shift: shiftName,
+      user: {
+        id: authResult.session.user.id,
+        name: authResult.session.user.name || "Operator",
+        email: authResult.session.user.email,
+        role: authResult.session.user.role,
+      },
+    });
+
     return NextResponse.json({
       success: true,
       report: savedReport,
@@ -348,6 +363,20 @@ export async function DELETE(request: NextRequest) {
       url: `/api/production/valvomatic/reports?id=${id}`,
       statusCode: 200,
     }).catch(() => {});
+
+    emitProductionSync({
+      module: "valvomatic",
+      sheet: "daily-report",
+      action: "DELETE",
+      date: deleted.date,
+      shift: deleted.shiftName,
+      user: {
+        id: authResult.session.user.id,
+        name: authResult.session.user.name || "Operator",
+        email: authResult.session.user.email,
+        role: authResult.session.user.role,
+      },
+    });
 
     return NextResponse.json({ success: true, message: "Report deleted successfully" });
   } catch (error: any) {

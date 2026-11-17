@@ -36,6 +36,8 @@ import { exportValvomaticWastageReportExcel } from "@/lib/valvomatic/valvomatic-
 import { UniversalQualityInput } from "@/components/ui/UniversalQualityInput";
 import { UniversalPersonnelInput } from "@/components/ui/UniversalPersonnelInput";
 import { UniversalShiftSelector } from "@/components/production/UniversalShiftSelector";
+import { useProductionRealtime } from "@/hooks/useProductionRealtime";
+import { RealtimeSyncBadge } from "@/components/production/RealtimeSyncBadge";
 
 const ValvomaticWastagePrintModal = dynamic(
   () => import("./ValvomaticWastagePrintModal").then((m) => m.ValvomaticWastagePrintModal),
@@ -216,6 +218,16 @@ export function ValvomaticWastageClient() {
     fetchWastageData();
   }, [fetchWastageData]);
 
+  const realtime = useProductionRealtime({
+    module: "valvomatic",
+    sheet: "wastage",
+    date,
+    shift: shiftName,
+    onSync: () => {
+      fetchWastageData();
+    },
+  });
+
   // Cell edit
   const handleCellChange = (
     index: number,
@@ -371,6 +383,12 @@ export function ValvomaticWastageClient() {
       setLastSavedAt(format(new Date(), "hh:mm a"));
       isDirtyRef.current = false;
 
+      realtime.broadcastSync({
+        action: finalStatus === "SUBMITTED" ? "SUBMIT" : "SAVE",
+        date: currentData.date,
+        shift: currentData.shiftName,
+      });
+
       if (!isSilent) {
         toast.success(
           finalStatus === "SUBMITTED"
@@ -492,6 +510,13 @@ export function ValvomaticWastageClient() {
 
           {/* Action Buttons Strip */}
           <div className="flex flex-wrap items-center gap-2">
+            <RealtimeSyncBadge
+              isConnected={realtime.isConnected}
+              lastUpdatedBy={realtime.lastUpdatedBy}
+              lastUpdatedAt={realtime.lastUpdatedAt}
+              lastAction={realtime.lastAction}
+              isSelfUpdate={realtime.isSelfUpdate}
+            />
 
             {/* Sync Rolls from Daily Production */}
             <button
