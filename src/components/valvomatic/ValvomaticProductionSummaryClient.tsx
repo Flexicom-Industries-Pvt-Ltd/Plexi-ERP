@@ -396,222 +396,384 @@ export function ValvomaticProductionSummaryClient() {
 
         {/* Tab 1: Qualities Breakdown */}
         {activeTab === "qualities" && (
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-left text-xs whitespace-nowrap">
-              <thead className="bg-slate-100 text-slate-700 text-[11px] uppercase font-bold tracking-wider border-b border-slate-300">
-                <tr>
-                  <th className="p-2.5 border-r border-slate-200 text-center w-10">#</th>
-                  <th className="p-2.5 border-r border-slate-200 min-w-[200px] bg-amber-50/80 text-amber-950 font-black">
-                    Quality Name
-                  </th>
-                  <th className="p-2.5 border-r border-slate-200 text-center min-w-[80px]">Rolls</th>
-                  <th className="p-2.5 border-r border-slate-200 text-right min-w-[120px] bg-emerald-50 text-emerald-900 font-black">
-                    Bags (Pcs)
-                  </th>
-                  <th className="p-2.5 border-r border-slate-200 text-right min-w-[110px] bg-teal-50 text-teal-900 font-black">
-                    Gross (Kg)
-                  </th>
-                  <th className="p-2.5 border-r border-slate-200 text-right min-w-[100px]">Total Mtrs</th>
-                  <th className="p-2.5 border-r border-slate-200 text-right min-w-[100px]">Net Wt (Kg)</th>
-                  <th className="p-2.5 border-r border-slate-200 text-right min-w-[90px]">Avg GSM</th>
-                  <th className="p-2.5 border-r border-slate-200 text-right min-w-[90px] text-indigo-700">Cover OS</th>
-                  <th className="p-2.5 border-r border-slate-200 text-right min-w-[90px] text-indigo-700">Cover DS</th>
-                  <th className="p-2.5 border-r border-slate-200 text-right min-w-[90px] text-purple-700">Valve</th>
-                  <th className="p-2.5 border-r border-slate-200 text-right min-w-[100px] bg-rose-50 text-rose-900 font-bold">
-                    Scrap (Kg)
-                  </th>
-                  <th className="p-2.5 border-r border-slate-200 text-right min-w-[90px] bg-amber-50 text-amber-900 font-bold">
-                    Scrap %
-                  </th>
-                  <th className="p-2.5 text-right min-w-[120px] bg-emerald-50 text-emerald-900 font-black">
-                    Net Good (Kg)
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200 bg-white">
-                {loading ? (
-                  <tr>
-                    <td colSpan={14} className="p-12 text-center text-slate-400">
-                      <RefreshCw className="h-6 w-6 animate-spin mx-auto mb-2 text-primary" />
-                      Loading quality summary...
-                    </td>
-                  </tr>
-                ) : summaryData && summaryData.qualities.length > 0 ? (
-                  summaryData.qualities.map((q, idx) => (
-                    <tr key={idx} className="hover:bg-slate-50 transition-colors">
-                      <td className="p-2 border-r border-slate-200 text-center font-bold text-slate-500 bg-slate-50/50">
-                        {idx + 1}
-                      </td>
-                      <td className="p-2 border-r border-slate-200 font-bold text-slate-900 bg-amber-50/30">
-                        {q.quality}
-                      </td>
-                      <td className="p-2 border-r border-slate-200 text-center font-mono font-bold text-sky-700">
-                        {q.rollsCount}
-                      </td>
-                      <td className="p-2 border-r border-slate-200 text-right font-mono font-black text-emerald-700 bg-emerald-50/30">
-                        {q.productionPcs.toLocaleString()}
-                      </td>
-                      <td className="p-2 border-r border-slate-200 text-right font-mono font-black text-teal-700 bg-teal-50/30">
-                        {q.productionKg.toFixed(1)}
-                      </td>
-                      <td className="p-2 border-r border-slate-200 text-right font-mono text-slate-700">
-                        {q.totalRollMtr.toLocaleString()}
-                      </td>
-                      <td className="p-2 border-r border-slate-200 text-right font-mono text-slate-700">
-                        {q.totalNetWt.toFixed(1)}
-                      </td>
-                      <td className="p-2 border-r border-slate-200 text-right font-mono text-sky-800">
-                        {q.avgGsm.toFixed(1)}
-                      </td>
-                      <td className="p-2 border-r border-slate-200 text-right font-mono text-indigo-700">
-                        {q.coverPatchOs}
-                      </td>
-                      <td className="p-2 border-r border-slate-200 text-right font-mono text-indigo-700">
-                        {q.coverPatchDs}
-                      </td>
-                      <td className="p-2 border-r border-slate-200 text-right font-mono text-purple-700 font-semibold">
-                        {q.valvePatch}
-                      </td>
-                      <td className="p-2 border-r border-slate-200 text-right font-mono font-bold text-rose-700 bg-rose-50/30">
-                        {q.totalWasteKg.toFixed(2)}
-                      </td>
-                      <td className="p-2 border-r border-slate-200 text-right font-mono text-amber-700 bg-amber-50/30">
-                        {q.totalWastePct.toFixed(2)}%
-                      </td>
-                      <td className="p-2 text-right font-mono font-black text-emerald-800 bg-emerald-50/30">
-                        {q.netProductionKg.toFixed(1)}
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={14} className="p-12 text-center text-slate-400 italic">
-                      No quality production data found for the selected criteria.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-              {summaryData && summaryData.qualities.length > 0 && (
-                <tfoot className="bg-slate-100 font-black text-slate-900 border-t-2 border-slate-400 text-xs">
-                  <tr>
-                    <td className="p-2 border-r border-slate-300 text-center">Σ</td>
-                    <td className="p-2 border-r border-slate-300 uppercase">Grand Totals</td>
-                    <td className="p-2 border-r border-slate-300 text-center font-mono text-sky-800">
-                      {summaryData.overall.totalRolls}
-                    </td>
-                    <td className="p-2 border-r border-slate-300 text-right font-mono text-emerald-800 bg-emerald-100">
-                      {summaryData.overall.totalProductionPcs.toLocaleString()}
-                    </td>
-                    <td className="p-2 border-r border-slate-300 text-right font-mono text-teal-800 bg-teal-100">
-                      {summaryData.overall.totalProductionKg.toFixed(1)}
-                    </td>
-                    <td className="p-2 border-r border-slate-300 text-right font-mono">
-                      {summaryData.overall.totalRollMtr.toLocaleString()}
-                    </td>
-                    <td className="p-2 border-r border-slate-300 text-right font-mono">
-                      {summaryData.overall.totalNetWt.toFixed(1)}
-                    </td>
-                    <td className="p-2 border-r border-slate-300 text-right font-mono text-sky-800">
-                      {summaryData.overall.avgGsm.toFixed(1)}
-                    </td>
-                    <td className="p-2 border-r border-slate-300 text-right font-mono text-indigo-800">
-                      {summaryData.overall.totalCoverPatchOs}
-                    </td>
-                    <td className="p-2 border-r border-slate-300 text-right font-mono text-indigo-800">
-                      {summaryData.overall.totalCoverPatchDs}
-                    </td>
-                    <td className="p-2 border-r border-slate-300 text-right font-mono text-purple-800">
-                      {summaryData.overall.totalValvePatch}
-                    </td>
-                    <td className="p-2 border-r border-slate-300 text-right font-mono text-rose-800 bg-rose-100">
-                      {summaryData.overall.totalWastageKg.toFixed(2)}
-                    </td>
-                    <td className="p-2 border-r border-slate-300 text-right font-mono text-amber-800 bg-amber-100">
-                      {summaryData.overall.totalWastagePct.toFixed(2)}%
-                    </td>
-                    <td className="p-2 text-right font-mono text-emerald-800 bg-emerald-100">
-                      {summaryData.overall.totalNetProductionKg.toFixed(1)}
-                    </td>
-                  </tr>
-                </tfoot>
-              )}
-            </table>
-          </div>
-        )}
-
-        {/* Tab 2: Scrap Stream Diagnostics */}
-        {activeTab === "wastage" && (
-          <div className="p-5">
-            <div className="max-w-4xl border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
-              <table className="w-full border-collapse text-left text-xs">
+          <>
+            {/* Desktop Table View */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full border-collapse text-left text-xs whitespace-nowrap">
                 <thead className="bg-slate-100 text-slate-700 text-[11px] uppercase font-bold tracking-wider border-b border-slate-300">
                   <tr>
-                    <th className="p-3 border-r border-slate-200 text-center w-12">#</th>
-                    <th className="p-3 border-r border-slate-200">Scrap Category</th>
-                    <th className="p-3 border-r border-slate-200 text-right">Waste (Kg)</th>
-                    <th className="p-3 border-r border-slate-200 text-right">Share of Scrap (%)</th>
-                    <th className="p-3 text-right">% of Output</th>
+                    <th className="p-2.5 border-r border-slate-200 text-center w-10">#</th>
+                    <th className="p-2.5 border-r border-slate-200 min-w-[200px] bg-amber-50/80 text-amber-950 font-black">
+                      Quality Name
+                    </th>
+                    <th className="p-2.5 border-r border-slate-200 text-center min-w-[80px]">Rolls</th>
+                    <th className="p-2.5 border-r border-slate-200 text-right min-w-[120px] bg-emerald-50 text-emerald-900 font-black">
+                      Bags (Pcs)
+                    </th>
+                    <th className="p-2.5 border-r border-slate-200 text-right min-w-[110px] bg-teal-50 text-teal-900 font-black">
+                      Gross (Kg)
+                    </th>
+                    <th className="p-2.5 border-r border-slate-200 text-right min-w-[100px]">Total Mtrs</th>
+                    <th className="p-2.5 border-r border-slate-200 text-right min-w-[100px]">Net Wt (Kg)</th>
+                    <th className="p-2.5 border-r border-slate-200 text-right min-w-[90px]">Avg GSM</th>
+                    <th className="p-2.5 border-r border-slate-200 text-right min-w-[90px] text-indigo-700">Cover OS</th>
+                    <th className="p-2.5 border-r border-slate-200 text-right min-w-[90px] text-indigo-700">Cover DS</th>
+                    <th className="p-2.5 border-r border-slate-200 text-right min-w-[90px] text-purple-700">Valve</th>
+                    <th className="p-2.5 border-r border-slate-200 text-right min-w-[100px] bg-rose-50 text-rose-900 font-bold">
+                      Scrap (Kg)
+                    </th>
+                    <th className="p-2.5 border-r border-slate-200 text-right min-w-[90px] bg-amber-50 text-amber-900 font-bold">
+                      Scrap %
+                    </th>
+                    <th className="p-2.5 text-right min-w-[120px] bg-emerald-50 text-emerald-900 font-black">
+                      Net Good (Kg)
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 bg-white">
-                  {wasteStreams.map((ws, i) => {
-                    const pctOfOutput =
-                      summaryData && summaryData.overall.totalProductionKg > 0
-                        ? (ws.kg / summaryData.overall.totalProductionKg) * 100
-                        : 0;
-
-                    return (
-                      <tr key={i} className="hover:bg-slate-50 transition-colors">
-                        <td className="p-3 border-r border-slate-200 text-center font-bold text-slate-500">
-                          {i + 1}
+                  {loading ? (
+                    <tr>
+                      <td colSpan={14} className="p-12 text-center text-slate-400">
+                        <RefreshCw className="h-6 w-6 animate-spin mx-auto mb-2 text-primary" />
+                        Loading quality summary...
+                      </td>
+                    </tr>
+                  ) : summaryData && summaryData.qualities.length > 0 ? (
+                    summaryData.qualities.map((q, idx) => (
+                      <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                        <td className="p-2 border-r border-slate-200 text-center font-bold text-slate-500 bg-slate-50/50">
+                          {idx + 1}
                         </td>
-                        <td className="p-3 border-r border-slate-200">
-                          <div className="font-bold text-slate-900">{ws.label}</div>
-                          <div className="text-[11px] text-slate-500 mt-0.5">{ws.desc}</div>
+                        <td className="p-2 border-r border-slate-200 font-bold text-slate-900 bg-amber-50/30">
+                          {q.quality}
                         </td>
-                        <td className="p-3 border-r border-slate-200 text-right font-mono font-bold text-rose-700 text-sm">
-                          {ws.kg.toFixed(2)} kg
+                        <td className="p-2 border-r border-slate-200 text-center font-mono font-bold text-sky-700">
+                          {q.rollsCount}
                         </td>
-                        <td className="p-3 border-r border-slate-200 text-right">
-                          <div className="font-mono font-bold text-purple-700">
-                            {ws.share.toFixed(1)}%
-                          </div>
-                          <div className="w-24 bg-slate-100 h-1.5 rounded-full ml-auto mt-1 overflow-hidden">
-                            <div
-                              className="bg-purple-600 h-full rounded-full"
-                              style={{ width: `${Math.min(100, ws.share)}%` }}
-                            />
-                          </div>
+                        <td className="p-2 border-r border-slate-200 text-right font-mono font-black text-emerald-700 bg-emerald-50/30">
+                          {q.productionPcs.toLocaleString()}
                         </td>
-                        <td className="p-3 text-right font-mono text-slate-700 font-semibold">
-                          {pctOfOutput.toFixed(2)}%
+                        <td className="p-2 border-r border-slate-200 text-right font-mono font-black text-teal-700 bg-teal-50/30">
+                          {q.productionKg.toFixed(1)}
+                        </td>
+                        <td className="p-2 border-r border-slate-200 text-right font-mono text-slate-700">
+                          {q.totalRollMtr.toLocaleString()}
+                        </td>
+                        <td className="p-2 border-r border-slate-200 text-right font-mono text-slate-700">
+                          {q.totalNetWt.toFixed(1)}
+                        </td>
+                        <td className="p-2 border-r border-slate-200 text-right font-mono text-sky-800">
+                          {q.avgGsm.toFixed(1)}
+                        </td>
+                        <td className="p-2 border-r border-slate-200 text-right font-mono text-indigo-700">
+                          {q.coverPatchOs}
+                        </td>
+                        <td className="p-2 border-r border-slate-200 text-right font-mono text-indigo-700">
+                          {q.coverPatchDs}
+                        </td>
+                        <td className="p-2 border-r border-slate-200 text-right font-mono text-purple-700 font-semibold">
+                          {q.valvePatch}
+                        </td>
+                        <td className="p-2 border-r border-slate-200 text-right font-mono font-bold text-rose-700 bg-rose-50/30">
+                          {q.totalWasteKg.toFixed(2)}
+                        </td>
+                        <td className="p-2 border-r border-slate-200 text-right font-mono text-amber-700 bg-amber-50/30">
+                          {q.totalWastePct.toFixed(2)}%
+                        </td>
+                        <td className="p-2 text-right font-mono font-black text-emerald-800 bg-emerald-50/30">
+                          {q.netProductionKg.toFixed(1)}
                         </td>
                       </tr>
-                    );
-                  })}
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={14} className="p-12 text-center text-slate-400 italic">
+                        No quality production data found for the selected criteria.
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
-                {summaryData && (
+                {summaryData && summaryData.qualities.length > 0 && (
                   <tfoot className="bg-slate-100 font-black text-slate-900 border-t-2 border-slate-400 text-xs">
                     <tr>
-                      <td className="p-3 border-r border-slate-300 text-center">Σ</td>
-                      <td className="p-3 border-r border-slate-300 uppercase">
-                        Total Scrap Recorded
+                      <td className="p-2 border-r border-slate-300 text-center">Σ</td>
+                      <td className="p-2 border-r border-slate-300 uppercase">Grand Totals</td>
+                      <td className="p-2 border-r border-slate-300 text-center font-mono text-sky-800">
+                        {summaryData.overall.totalRolls}
                       </td>
-                      <td className="p-3 border-r border-slate-300 text-right font-mono text-rose-800 bg-rose-100 text-sm">
-                        {summaryData.overall.totalWastageKg.toFixed(2)} kg
+                      <td className="p-2 border-r border-slate-300 text-right font-mono text-emerald-800 bg-emerald-100">
+                        {summaryData.overall.totalProductionPcs.toLocaleString()}
                       </td>
-                      <td className="p-3 border-r border-slate-300 text-right font-mono text-purple-800 bg-purple-100">
-                        100.0%
+                      <td className="p-2 border-r border-slate-300 text-right font-mono text-teal-800 bg-teal-100">
+                        {summaryData.overall.totalProductionKg.toFixed(1)}
                       </td>
-                      <td className="p-3 text-right font-mono text-amber-800 bg-amber-100">
+                      <td className="p-2 border-r border-slate-300 text-right font-mono">
+                        {summaryData.overall.totalRollMtr.toLocaleString()}
+                      </td>
+                      <td className="p-2 border-r border-slate-300 text-right font-mono">
+                        {summaryData.overall.totalNetWt.toFixed(1)}
+                      </td>
+                      <td className="p-2 border-r border-slate-300 text-right font-mono text-sky-800">
+                        {summaryData.overall.avgGsm.toFixed(1)}
+                      </td>
+                      <td className="p-2 border-r border-slate-300 text-right font-mono text-indigo-800">
+                        {summaryData.overall.totalCoverPatchOs}
+                      </td>
+                      <td className="p-2 border-r border-slate-300 text-right font-mono text-indigo-800">
+                        {summaryData.overall.totalCoverPatchDs}
+                      </td>
+                      <td className="p-2 border-r border-slate-300 text-right font-mono text-purple-800">
+                        {summaryData.overall.totalValvePatch}
+                      </td>
+                      <td className="p-2 border-r border-slate-300 text-right font-mono text-rose-800 bg-rose-100">
+                        {summaryData.overall.totalWastageKg.toFixed(2)}
+                      </td>
+                      <td className="p-2 border-r border-slate-300 text-right font-mono text-amber-800 bg-amber-100">
                         {summaryData.overall.totalWastagePct.toFixed(2)}%
+                      </td>
+                      <td className="p-2 text-right font-mono text-emerald-800 bg-emerald-100">
+                        {summaryData.overall.totalNetProductionKg.toFixed(1)}
                       </td>
                     </tr>
                   </tfoot>
                 )}
               </table>
             </div>
-          </div>
+
+            {/* Mobile Quality Cards View */}
+            <div className="block md:hidden p-3 space-y-3 bg-slate-50/50">
+              {loading ? (
+                <div className="p-8 text-center text-slate-400 text-xs">
+                  <RefreshCw className="h-5 w-5 animate-spin mx-auto mb-2 text-primary" />
+                  Loading quality summary...
+                </div>
+              ) : summaryData && summaryData.qualities.length > 0 ? (
+                summaryData.qualities.map((q, idx) => (
+                  <div key={idx} className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-xs space-y-3">
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-700 font-bold text-[10px] flex items-center justify-center">
+                          {idx + 1}
+                        </span>
+                        <span className="font-bold text-slate-900 text-sm">{q.quality}</span>
+                      </div>
+                      <span className="text-[11px] font-bold font-mono px-2 py-0.5 rounded bg-sky-50 text-sky-700 border border-sky-200">
+                        {q.rollsCount} Rolls ({q.totalRollMtr.toLocaleString()} m)
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div className="p-2 rounded-lg bg-emerald-50/50 border border-emerald-100">
+                        <div className="text-[10px] text-emerald-700 font-semibold uppercase">Production (Bags)</div>
+                        <div className="font-bold font-mono text-emerald-900 mt-0.5">{q.productionPcs.toLocaleString()} pcs</div>
+                        <div className="text-[10px] text-teal-700 font-mono">{q.productionKg.toFixed(1)} kg gross</div>
+                      </div>
+                      <div className="p-2 rounded-lg bg-slate-50 border border-slate-100">
+                        <div className="text-[10px] text-slate-500 font-semibold uppercase">Net Weight</div>
+                        <div className="font-bold font-mono text-slate-800 mt-0.5">{q.totalNetWt.toFixed(1)} kg</div>
+                        <div className="text-[10px] text-slate-400">Avg {q.avgGsm.toFixed(1)} GSM</div>
+                      </div>
+                      <div className="p-2 rounded-lg bg-indigo-50/40 border border-indigo-100">
+                        <div className="text-[10px] text-indigo-700 font-semibold uppercase">Patches (OS/DS/Valve)</div>
+                        <div className="font-bold font-mono text-indigo-900 mt-0.5 text-[11px]">
+                          OS: {q.coverPatchOs} | DS: {q.coverPatchDs}
+                        </div>
+                        <div className="text-[10px] text-purple-700 font-mono font-semibold">Valve: {q.valvePatch}</div>
+                      </div>
+                      <div className="p-2 rounded-lg bg-rose-50/40 border border-red-100">
+                        <div className="text-[10px] text-rose-700 font-semibold uppercase">Scrap Loss</div>
+                        <div className="font-bold font-mono text-rose-800 mt-0.5">{q.totalWasteKg.toFixed(2)} kg</div>
+                        <div className="text-[10px] text-amber-700 font-semibold">{q.totalWastePct.toFixed(2)}% of prod</div>
+                      </div>
+                    </div>
+
+                    <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+                      <span className="text-[11px] text-slate-500 font-medium">Net Good Output</span>
+                      <span className="font-bold font-mono text-emerald-800 text-sm">{q.netProductionKg.toFixed(1)} kg</span>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="p-8 text-center text-slate-400 text-xs italic">
+                  No quality production data found for the selected criteria.
+                </div>
+              )}
+
+              {/* Mobile Grand Totals Card */}
+              {summaryData && summaryData.qualities.length > 0 && (
+                <div className="bg-slate-900 text-white rounded-xl p-3.5 shadow-sm space-y-2 mt-3">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                    <span className="text-xs font-bold uppercase tracking-wider text-amber-400">Grand Totals</span>
+                    <span className="text-xs font-mono text-slate-300">{summaryData.qualities.length} Qualities</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs pt-1">
+                    <div>
+                      <span className="text-[10px] text-slate-400 uppercase">Total Rolls</span>
+                      <div className="font-mono font-bold text-sky-300">
+                        {summaryData.overall.totalRolls} ({summaryData.overall.totalRollMtr.toLocaleString()} m)
+                      </div>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-400 uppercase">Bags / Gross Wt</span>
+                      <div className="font-mono font-bold text-emerald-400">
+                        {summaryData.overall.totalProductionPcs.toLocaleString()} pcs
+                      </div>
+                      <div className="text-[10px] font-mono text-teal-300">{summaryData.overall.totalProductionKg.toFixed(1)} kg</div>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-400 uppercase">Cover &amp; Valve Patches</span>
+                      <div className="font-mono font-bold text-indigo-300">
+                        OS: {summaryData.overall.totalCoverPatchOs} | DS: {summaryData.overall.totalCoverPatchDs}
+                      </div>
+                      <div className="text-[10px] font-mono text-purple-300">Valve: {summaryData.overall.totalValvePatch}</div>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-400 uppercase">Total Scrap &amp; Net</span>
+                      <div className="font-mono font-bold text-rose-400">
+                        {summaryData.overall.totalWastageKg.toFixed(2)} kg ({summaryData.overall.totalWastagePct.toFixed(2)}%)
+                      </div>
+                      <div className="text-[10px] font-mono text-emerald-300 font-bold">
+                        Net: {summaryData.overall.totalNetProductionKg.toFixed(1)} kg
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
+        {/* Tab 2: Scrap Stream Diagnostics */}
+        {activeTab === "wastage" && (
+          <>
+            {/* Desktop Table View */}
+            <div className="hidden md:block p-5">
+              <div className="max-w-4xl border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
+                <table className="w-full border-collapse text-left text-xs">
+                  <thead className="bg-slate-100 text-slate-700 text-[11px] uppercase font-bold tracking-wider border-b border-slate-300">
+                    <tr>
+                      <th className="p-3 border-r border-slate-200 text-center w-12">#</th>
+                      <th className="p-3 border-r border-slate-200">Scrap Category</th>
+                      <th className="p-3 border-r border-slate-200 text-right">Waste (Kg)</th>
+                      <th className="p-3 border-r border-slate-200 text-right">Share of Scrap (%)</th>
+                      <th className="p-3 text-right">% of Output</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200 bg-white">
+                    {wasteStreams.map((ws, i) => {
+                      const pctOfOutput =
+                        summaryData && summaryData.overall.totalProductionKg > 0
+                          ? (ws.kg / summaryData.overall.totalProductionKg) * 100
+                          : 0;
+
+                      return (
+                        <tr key={i} className="hover:bg-slate-50 transition-colors">
+                          <td className="p-3 border-r border-slate-200 text-center font-bold text-slate-500">
+                            {i + 1}
+                          </td>
+                          <td className="p-3 border-r border-slate-200">
+                            <div className="font-bold text-slate-900">{ws.label}</div>
+                            <div className="text-[11px] text-slate-500 mt-0.5">{ws.desc}</div>
+                          </td>
+                          <td className="p-3 border-r border-slate-200 text-right font-mono font-bold text-rose-700 text-sm">
+                            {ws.kg.toFixed(2)} kg
+                          </td>
+                          <td className="p-3 border-r border-slate-200 text-right">
+                            <div className="font-mono font-bold text-purple-700">
+                              {ws.share.toFixed(1)}%
+                            </div>
+                            <div className="w-24 bg-slate-100 h-1.5 rounded-full ml-auto mt-1 overflow-hidden">
+                              <div
+                                className="bg-purple-600 h-full rounded-full"
+                                style={{ width: `${Math.min(100, ws.share)}%` }}
+                              />
+                            </div>
+                          </td>
+                          <td className="p-3 text-right font-mono text-slate-700 font-semibold">
+                            {pctOfOutput.toFixed(2)}%
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  {summaryData && (
+                    <tfoot className="bg-slate-100 font-black text-slate-900 border-t-2 border-slate-400 text-xs">
+                      <tr>
+                        <td className="p-3 border-r border-slate-300 text-center">Σ</td>
+                        <td className="p-3 border-r border-slate-300 uppercase">
+                          Total Scrap Recorded
+                        </td>
+                        <td className="p-3 border-r border-slate-300 text-right font-mono text-rose-800 bg-rose-100 text-sm">
+                          {summaryData.overall.totalWastageKg.toFixed(2)} kg
+                        </td>
+                        <td className="p-3 border-r border-slate-300 text-right font-mono text-purple-800 bg-purple-100">
+                          100.0%
+                        </td>
+                        <td className="p-3 text-right font-mono text-amber-800 bg-amber-100">
+                          {summaryData.overall.totalWastagePct.toFixed(2)}%
+                        </td>
+                      </tr>
+                    </tfoot>
+                  )}
+                </table>
+              </div>
+            </div>
+
+            {/* Mobile Scrap Diagnostics Feed */}
+            <div className="block md:hidden p-3 space-y-3">
+              {wasteStreams.map((ws, i) => {
+                const pctOfOutput =
+                  summaryData && summaryData.overall.totalProductionKg > 0
+                    ? (ws.kg / summaryData.overall.totalProductionKg) * 100
+                    : 0;
+
+                return (
+                  <div key={i} className="bg-white border border-slate-200 rounded-xl p-3.5 shadow-2xs space-y-2">
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                      <span className="font-bold text-slate-900 text-sm">{ws.label}</span>
+                      <span className="font-mono font-bold text-rose-700 text-xs">
+                        {ws.kg.toFixed(2)} kg
+                      </span>
+                    </div>
+                    <div className="text-[11px] text-slate-500">{ws.desc}</div>
+                    <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+                      <div>
+                        <span className="text-[10px] text-slate-400 uppercase block">Share of Scrap</span>
+                        <span className="font-mono font-bold text-purple-700">{ws.share.toFixed(1)}%</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-[10px] text-slate-400 uppercase block">% of Output</span>
+                        <span className="font-mono font-bold text-slate-700">{pctOfOutput.toFixed(2)}%</span>
+                      </div>
+                    </div>
+                    <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden mt-1">
+                      <div
+                        className="bg-purple-600 h-full rounded-full"
+                        style={{ width: `${Math.min(100, ws.share)}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+
+              {summaryData && (
+                <div className="bg-slate-900 text-white rounded-xl p-3.5 shadow-sm space-y-2 mt-2">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                    <span className="text-xs font-bold uppercase tracking-wider text-rose-400">Total Scrap Recorded</span>
+                    <span className="font-mono font-bold text-rose-300 text-sm">
+                      {summaryData.overall.totalWastageKg.toFixed(2)} kg
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs pt-1">
+                    <span className="text-slate-400">Overall Scrap % of Output:</span>
+                    <span className="font-mono font-bold text-amber-300">
+                      {summaryData.overall.totalWastagePct.toFixed(2)}%
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </>
         )}
       </div>
 

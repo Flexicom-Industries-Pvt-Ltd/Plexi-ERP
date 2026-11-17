@@ -80,6 +80,31 @@ export function computeCrateStockCount(netProductionKg: number | string | undefi
 }
 
 /**
+ * Formats a crate stock number as discrete whole crates and loose bobbins.
+ * E.g., 702.82 crates -> "702 crates (+ 7 bobbins)" or "702 cr + 7 bobbins"
+ */
+export function formatDiscreteCrates(
+  crateCount: number | string | undefined | null,
+  bobbinsPerCrate: number = BOBBINS_PER_CRATE,
+  short: boolean = false
+): string {
+  const val = Number(crateCount) || 0;
+  if (val <= 0) return short ? "0 cr" : "0 crates";
+
+  const wholeCrates = Math.floor(val);
+  const looseFraction = val - wholeCrates;
+  const looseBobbins = Math.round(looseFraction * bobbinsPerCrate);
+
+  const crUnit = short ? "cr" : wholeCrates === 1 ? "crate" : "crates";
+  const bobUnit = short ? "bob" : looseBobbins === 1 ? "bobbin" : "bobbins";
+
+  if (looseBobbins > 0) {
+    return `${wholeCrates.toLocaleString()} ${crUnit} + ${looseBobbins} ${bobUnit}`;
+  }
+  return `${wholeCrates.toLocaleString()} ${crUnit}`;
+}
+
+/**
  * Aggregates summary totals from list of BobbinStockItems.
  */
 export function computeBobbinStockTotals(items: BobbinStockItem[]): BobbinStockTotals {

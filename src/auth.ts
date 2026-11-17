@@ -68,12 +68,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         }
 
         // Return user object without the password
+        const roleName = user.role?.name || "USER";
+        const normalizedRole = roleName.toUpperCase().replace(/[\s_-]+/g, "");
         return {
           id: user.id,
           email: user.email,
           name: user.name,
-          role: user.role?.name || "USER",
+          role: roleName,
           permissions: user.role?.permissions || [],
+          canUploadPhoto: Boolean(user.role?.canUploadPhoto),
+          canCapturePhoto: user.role?.canCapturePhoto !== undefined ? Boolean(user.role?.canCapturePhoto) : true,
+          canUnlockTimeSlots: Boolean(user.role?.canUnlockTimeSlots),
         };
       }
     })
@@ -84,14 +89,57 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.role = user.role;
         token.id = user.id;
         token.permissions = user.permissions;
+        token.canUploadPhoto = (user as any).canUploadPhoto;
+        token.canCapturePhoto = (user as any).canCapturePhoto;
+        token.canUnlockTimeSlots = (user as any).canUnlockTimeSlots;
       }
       return token;
     },
     async session({ session, token }) {
       if (session.user) {
-        session.user.role = token.role as string;
+        session.user.role = (token.role as string) || "USER";
         session.user.id = token.id as string;
-        session.user.permissions = token.permissions as any[];
+        session.user.permissions = (token.permissions as any[]) || [];
+
+        let canUpload = Boolean(token.canUploadPhoto);
+        let canCapture = token.canCapturePhoto !== undefined ? Boolean(token.canCapturePhoto) : true;
+        let canUnlock = Boolean(token.canUnlockTimeSlots);
+
+        // Query live role and photo/time-slot permissions directly from DB on every session query
+        if (token.id) {
+          try {
+            const userWithRole = await db.user.findUnique({
+              where: { id: token.id as string },
+              select: {
+                role: {
+                  select: {
+                    name: true,
+                    canUploadPhoto: true,
+                    canCapturePhoto: true,
+                    canUnlockTimeSlots: true,
+                    permissions: true,
+                  },
+                },
+              },
+            });
+
+            if (userWithRole?.role) {
+              session.user.role = userWithRole.role.name;
+              canUpload = Boolean(userWithRole.role.canUploadPhoto);
+              canCapture = userWithRole.role.canCapturePhoto !== undefined ? Boolean(userWithRole.role.canCapturePhoto) : true;
+              canUnlock = Boolean(userWithRole.role.canUnlockTimeSlots);
+              if (userWithRole.role.permissions) {
+                session.user.permissions = userWithRole.role.permissions as any[];
+              }
+            }
+          } catch (e) {
+            console.warn("Could not query live role in session callback:", e);
+          }
+        }
+
+        (session.user as any).canUploadPhoto = canUpload;
+        (session.user as any).canCapturePhoto = canCapture;
+        (session.user as any).canUnlockTimeSlots = canUnlock;
       }
       return session;
     }

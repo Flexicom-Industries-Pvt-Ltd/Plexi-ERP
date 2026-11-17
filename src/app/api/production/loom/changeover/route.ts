@@ -310,6 +310,57 @@ export async function POST(request: NextRequest) {
         update: dataToUpsert,
       });
 
+      // BUG-018: Auto-sync persistent machine mapping when changeover is COMPLETED
+      if (dataToUpsert.status === "COMPLETED" && dataToUpsert.nextQualityCode) {
+        try {
+          const targetQuality = dataToUpsert.nextQualityCode.trim();
+          const otherMappings = await db.loomMachineMapping.findMany({
+            where: {
+              loomNumbers: { has: loomNumber },
+              qualityCode: { not: targetQuality },
+            },
+          });
+          for (const om of otherMappings) {
+            const updatedLooms = om.loomNumbers.filter((n) => n !== loomNumber);
+            await db.loomMachineMapping.update({
+              where: { id: om.id },
+              data: { loomNumbers: updatedLooms, totalLooms: updatedLooms.length },
+            });
+          }
+
+          const targetMapping = await db.loomMachineMapping.findUnique({
+            where: { qualityCode: targetQuality },
+          });
+          if (targetMapping) {
+            const updatedLooms = Array.from(new Set([...(targetMapping.loomNumbers || []), loomNumber])).sort((a, b) => a - b);
+            await db.loomMachineMapping.update({
+              where: { id: targetMapping.id },
+              data: { loomNumbers: updatedLooms, totalLooms: updatedLooms.length, isActive: true },
+            });
+          } else {
+            const recipe = await db.tapePlantRecipe.findFirst({
+              where: { code: { equals: targetQuality, mode: "insensitive" } },
+            });
+            await db.loomMachineMapping.create({
+              data: {
+                qualityCode: targetQuality,
+                tapePlantRecipeId: recipe?.id || null,
+                colorGroup: recipe?.colorGroup || "Standard",
+                colour: recipe?.colour || "White",
+                denier: recipe?.denier ?? null,
+                tapeWidth: recipe?.tapeWidth ?? null,
+                bobbinMarking: recipe?.bobbinMarking || "Changeover",
+                loomNumbers: [loomNumber],
+                totalLooms: 1,
+                isActive: true,
+              },
+            });
+          }
+        } catch (syncErr) {
+          console.error(`Failed to auto-sync Loom #${loomNumber} to quality ${dataToUpsert.nextQualityCode}:`, syncErr);
+        }
+      }
+
       updatedResults.push(record);
     }
 

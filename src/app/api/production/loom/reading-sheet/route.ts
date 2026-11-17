@@ -166,6 +166,8 @@ export async function GET(request: NextRequest) {
               efficiencyPct: eff.efficiencyPct,
               status: (existing.status as any) || "RUNNING",
               remarks: existing.remarks || "",
+              photoUrl: existing.photoUrl || null,
+              intervalPhotos: (existing.intervalPhotos as any) || null,
             });
           }
         } else {
@@ -196,6 +198,8 @@ export async function GET(request: NextRequest) {
             efficiencyPct: 0,
             status: alloc ? "RUNNING" : "IDLE",
             remarks: "",
+            photoUrl: null,
+            intervalPhotos: null,
           });
         }
       }
@@ -230,13 +234,23 @@ export async function GET(request: NextRequest) {
           efficiencyPct: 0,
           status: alloc ? "RUNNING" : "IDLE",
           remarks: "",
+          photoUrl: null,
+          intervalPhotos: null,
         });
       }
     }
 
-    // 3. Compute interval KPI summaries
-    const timeSlots = existingSheet?.timeSlots?.length ? existingSheet.timeSlots : DEFAULT_TIME_SLOTS;
-    const initialTimeSlot = existingSheet?.initialTimeSlot || DEFAULT_INITIAL_SLOT;
+    // 3. Compute interval KPI summaries (Dynamic Day vs Night shift intervals)
+    const isNightShift = candidateShiftNames.some(
+      (n) => n.toUpperCase().includes("NIGHT") || n.toUpperCase().includes("SHIFT B")
+    );
+    const dynamicInitialSlot = isNightShift ? "20:00" : "08:00";
+    const dynamicTimeSlots = isNightShift
+      ? ["22:00", "00:00", "02:00", "04:00", "06:00", "08:00"]
+      : ["10:00", "12:00", "14:00", "16:00", "18:00", "20:00"];
+
+    const timeSlots = existingSheet?.timeSlots?.length ? existingSheet.timeSlots : dynamicTimeSlots;
+    const initialTimeSlot = existingSheet?.initialTimeSlot || dynamicInitialSlot;
 
     let totalShiftMeters = 0;
     let runningLoomsCount = 0;
@@ -488,6 +502,8 @@ export async function POST(request: NextRequest) {
           efficiencyPct,
           status: e.status || "RUNNING",
           remarks: e.remarks?.trim() || null,
+          photoUrl: e.photoUrl?.trim() || null,
+          intervalPhotos: e.intervalPhotos || null,
         };
       });
 
@@ -508,6 +524,14 @@ export async function POST(request: NextRequest) {
         });
 
         const targetShiftName = existingSheet?.shiftName || shiftName;
+
+        const isNight = candidateShiftNames.some(
+          (n) => n.toUpperCase().includes("NIGHT") || n.toUpperCase().includes("SHIFT B")
+        );
+        const resolvedInitialTimeSlot = body.initialTimeSlot || (isNight ? "20:00" : "08:00");
+        const resolvedTimeSlots = body.timeSlots || (isNight
+          ? ["22:00", "00:00", "02:00", "04:00", "06:00", "08:00"]
+          : ["10:00", "12:00", "14:00", "16:00", "18:00", "20:00"]);
 
         // Upsert sheet record directly
         const sheet = await db.loomReadingSheet.upsert({
@@ -530,6 +554,8 @@ export async function POST(request: NextRequest) {
           totalBreakdownMins,
           remarks,
           status,
+          timeSlots: resolvedTimeSlots,
+          initialTimeSlot: resolvedInitialTimeSlot,
         },
         create: {
           date,
@@ -546,6 +572,8 @@ export async function POST(request: NextRequest) {
           totalBreakdownMins,
           remarks,
           status,
+          timeSlots: resolvedTimeSlots,
+          initialTimeSlot: resolvedInitialTimeSlot,
         },
       });
 
@@ -584,6 +612,8 @@ export async function POST(request: NextRequest) {
             efficiencyPct: item.efficiencyPct,
             status: item.status,
             remarks: item.remarks,
+            photoUrl: item.photoUrl,
+            intervalPhotos: item.intervalPhotos || undefined,
           })),
         });
 

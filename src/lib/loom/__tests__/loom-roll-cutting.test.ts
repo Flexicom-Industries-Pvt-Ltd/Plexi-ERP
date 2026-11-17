@@ -56,15 +56,17 @@ describe("Daily Loom Roll Cutting Utilities", () => {
   });
 
   describe("generateNextRollNumber", () => {
-    it("increments sequential prefix roll numbers correctly", () => {
+    it("increments sequential prefix and factory barcode roll numbers correctly", () => {
+      expect(generateNextRollNumber("ROL-202611-00001")).toBe("ROL-202611-00002");
+      expect(generateNextRollNumber("ROL-202611-00099")).toBe("ROL-202611-00100");
       expect(generateNextRollNumber("CT-14376")).toBe("CT-14377");
       expect(generateNextRollNumber("DT-14377")).toBe("DT-14378");
       expect(generateNextRollNumber("ROLL-100")).toBe("ROLL-101");
     });
 
-    it("provides fallback roll format if empty string passed", () => {
-      const roll = generateNextRollNumber("");
-      expect(roll).toMatch(/^[A-Z]{2}-\d+$/);
+    it("provides standard ROL-YYYYMM-00001 roll format if empty string passed", () => {
+      const roll = generateNextRollNumber("", "2026-11-12");
+      expect(roll).toBe("ROL-202611-00001");
     });
   });
 

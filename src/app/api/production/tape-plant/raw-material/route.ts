@@ -23,7 +23,13 @@ export async function GET(request: NextRequest) {
       where: { date, shiftId },
     });
 
-    return NextResponse.json(records);
+    return NextResponse.json(records, {
+      headers: {
+        "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
+        Pragma: "no-cache",
+        Expires: "0",
+      },
+    });
   } catch (error) {
     console.error("Error fetching Tape Plant raw materials:", error);
     return NextResponse.json({ error: "Failed to fetch raw materials" }, { status: 500 });
@@ -64,6 +70,7 @@ export async function POST(request: NextRequest) {
               shiftId,
               operatorName: r.operatorName || operatorName || null,
               operatorId: r.operatorId || operatorId || null,
+              photoUrl: r.photoUrl || null,
               material: String(r.material).trim(),
               grade: r.grade ? String(r.grade).trim() : null,
               openingStock: opening,
