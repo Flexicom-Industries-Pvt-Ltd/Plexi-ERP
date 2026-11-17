@@ -1346,23 +1346,23 @@ export function LoomRollCuttingSection() {
           {/* Auto-save & Secondary Action Toolbar */}
           <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
             {autoSaving ? (
-              <div className="flex items-center gap-1 text-[11px] text-amber-700 font-medium">
-                <div className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-ping" />
+              <div className="flex items-center gap-1.5 text-xs text-amber-700 font-semibold">
+                <div className="h-2 w-2 rounded-full bg-amber-500 animate-ping" />
                 <span>Saving...</span>
               </div>
             ) : lastAutoSavedAt ? (
-              <div className="flex items-center gap-1 text-[11px] text-emerald-700 font-medium truncate max-w-[150px]">
-                <CheckCircle2 className="h-3 w-3 text-emerald-600 shrink-0" />
+              <div className="flex items-center gap-1.5 text-xs text-emerald-700 font-semibold truncate max-w-[150px]">
+                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
                 <span className="truncate">Saved {lastAutoSavedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
               </div>
             ) : (
-              <span className="text-[11px] text-slate-400 font-medium">Auto-save on</span>
+              <span className="text-xs text-slate-400 font-semibold">Auto-save on</span>
             )}
 
-            <div className="flex items-center gap-1 shrink-0">
+            <div className="flex items-center gap-1.5 shrink-0">
               <button
                 onClick={() => setPrintModalOpen(true)}
-                className="p-1.5 text-slate-600 hover:text-slate-900 border border-slate-200 rounded-lg hover:bg-slate-50 shadow-2xs cursor-pointer"
+                className="!min-h-0 h-8 w-8 text-slate-600 hover:text-slate-900 border border-slate-200 rounded-xl hover:bg-slate-50 shadow-2xs flex items-center justify-center cursor-pointer transition-colors"
                 title="Print Official Report"
               >
                 <Printer className="h-3.5 w-3.5" />
@@ -1371,7 +1371,7 @@ export function LoomRollCuttingSection() {
               <button
                 onClick={() => exportLoomRollCuttingExcel({ report: reportDataForPrint, entries, kpis })}
                 disabled={entries.length === 0}
-                className="p-1.5 text-emerald-700 hover:text-emerald-800 border border-slate-200 rounded-lg hover:bg-slate-50 shadow-2xs cursor-pointer disabled:opacity-50"
+                className="!min-h-0 h-8 w-8 text-emerald-700 hover:text-emerald-800 border border-slate-200 rounded-xl hover:bg-slate-50 shadow-2xs flex items-center justify-center cursor-pointer disabled:opacity-50 transition-colors"
                 title="Export Excel"
               >
                 <FileSpreadsheet className="h-3.5 w-3.5" />
@@ -1380,7 +1380,7 @@ export function LoomRollCuttingSection() {
               <button
                 onClick={handleSubmitReport}
                 disabled={submitting || loading || entries.length === 0}
-                className="px-2.5 py-1 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-2xs transition-all cursor-pointer disabled:opacity-50"
+                className="!min-h-0 h-8 px-3 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
               >
                 <span>{submitting ? "..." : "Submit"}</span>
               </button>
@@ -1389,39 +1389,41 @@ export function LoomRollCuttingSection() {
         </div>
 
         {/* Mobile Date, Shift & Supervisor Card */}
-        <div className="bg-white border border-slate-200/80 rounded-2xl p-3 shadow-2xs space-y-2">
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-3 shadow-2xs space-y-2.5">
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1">
-                <Calendar className="h-2.5 w-2.5 text-slate-400" />
-                <span>Date:</span>
-              </label>
-              <div className="flex items-center gap-1">
-                <input
-                  type="date"
-                  value={selectedDate}
-                  onChange={(e) => setSelectedDate(e.target.value)}
-                  className="w-full min-w-0 px-2 py-1 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-lg outline-none focus:bg-white"
-                />
+              <div className="h-5 flex items-center justify-between mb-1">
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                  <Calendar className="h-2.5 w-2.5 text-slate-400" />
+                  <span>Date:</span>
+                </label>
                 <button
                   type="button"
                   onClick={() => setSelectedDate(new Date().toISOString().slice(0, 10))}
-                  className="px-1.5 py-1 text-[10px] font-bold text-slate-600 bg-slate-100 rounded-lg border border-slate-200 shrink-0 cursor-pointer"
+                  className="!min-h-0 text-[10px] font-bold text-primary hover:underline cursor-pointer"
                 >
                   Today
                 </button>
               </div>
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="w-full !min-h-0 h-9 px-2.5 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl outline-none focus:bg-white focus:border-slate-800 transition-colors"
+              />
             </div>
 
             <div>
-              <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1">
-                <Clock className="h-2.5 w-2.5 text-slate-400" />
-                <span>Shift:</span>
-              </label>
+              <div className="h-5 flex items-center justify-between mb-1">
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                  <Clock className="h-2.5 w-2.5 text-slate-400" />
+                  <span>Shift:</span>
+                </label>
+              </div>
               <select
                 value={selectedShift}
                 onChange={(e) => setSelectedShift(e.target.value)}
-                className="w-full px-2 py-1 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-lg outline-none focus:bg-white truncate cursor-pointer"
+                className="w-full !min-h-0 h-9 px-2.5 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl outline-none focus:bg-white focus:border-slate-800 transition-colors truncate cursor-pointer"
               >
                 {availableShifts.map((s) => (
                   <option key={s.id} value={s.name}>
@@ -1436,7 +1438,7 @@ export function LoomRollCuttingSection() {
           </div>
 
           <div>
-            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-0.5 flex items-center gap-1">
+            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1">
               <User className="h-2.5 w-2.5 text-slate-400" />
               <span>Shift Supervisor:</span>
             </label>
@@ -1448,7 +1450,7 @@ export function LoomRollCuttingSection() {
               }}
               options={availableSupervisors}
               placeholder="Select or enter supervisor..."
-              className="text-xs"
+              inputClassName="!min-h-0 !h-9 rounded-xl bg-slate-50 border-slate-200 text-xs font-semibold focus:bg-white"
             />
           </div>
         </div>
@@ -1562,79 +1564,84 @@ export function LoomRollCuttingSection() {
                   {/* Collapsed Header */}
                   <div
                     onClick={() => toggleExpandRoll(cardKey)}
-                    className="p-3 cursor-pointer flex items-center justify-between gap-2 transition-colors hover:bg-slate-50/80"
+                    className="p-3 cursor-pointer space-y-2 transition-colors hover:bg-slate-50/80"
                   >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="px-2 py-1 text-xs font-mono font-bold rounded-lg border bg-slate-900 text-white border-slate-900 shrink-0">
-                        {entry.rollNumber || `#${entry.sequence}`}
-                      </span>
+                    {/* Line 1: Roll # & Loom # badges, Cut Length & Weight, Chevron */}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <span className="px-2 py-0.5 text-xs font-mono font-bold rounded-lg bg-slate-900 text-white border border-slate-900 shadow-2xs">
+                          {entry.rollNumber || `#${entry.sequence}`}
+                        </span>
 
-                      <span className="px-1.5 py-0.5 text-xs font-mono font-bold rounded-md bg-sky-50 text-sky-700 border border-sky-200 shrink-0">
-                        Loom #{entry.loomNumber || "-"}
-                      </span>
+                        <span className="px-1.5 py-0.5 text-xs font-mono font-bold rounded-md bg-sky-50 text-sky-700 border border-sky-200">
+                          Loom #{entry.loomNumber || "-"}
+                        </span>
+                      </div>
 
-                      <div className="min-w-0">
-                        <div className="text-xs font-bold text-slate-800 truncate">
-                          {entry.qualityType || "No Quality"}
+                      <div className="flex items-center gap-2 shrink-0">
+                        <div className="flex items-center gap-1.5 text-xs font-mono">
+                          <span className="font-black text-sky-700">
+                            {entry.meter > 0 ? `${entry.meter} m` : "0 m"}
+                          </span>
+                          <span className="text-slate-300">•</span>
+                          <span className="font-bold text-emerald-600">
+                            {Number(entry.nettWeightKg) > 0 ? `${Number(entry.nettWeightKg).toFixed(1)} kg` : "0.0 kg"}
+                          </span>
                         </div>
-                        <div className="text-[10px] text-slate-500 font-medium truncate">
-                          {entry.contractor || "No Contractor"} • {entry.size ? `${entry.size}mm` : "-"}
-                        </div>
+                        {isExpanded ? (
+                          <ChevronUp className="h-4 w-4 text-slate-400 shrink-0" />
+                        ) : (
+                          <ChevronDown className="h-4 w-4 text-slate-400 shrink-0" />
+                        )}
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 shrink-0">
-                      <div className="text-right">
-                        <div className="text-xs font-mono font-black text-sky-700">
-                          {entry.meter > 0 ? `${entry.meter} m` : "0 m"}
-                        </div>
-                        <div className="text-[10px] text-emerald-600 font-mono font-bold">
-                          {Number(entry.nettWeightKg) > 0 ? `${Number(entry.nettWeightKg).toFixed(1)} kg` : "-"}
-                        </div>
+                    {/* Line 2: Quality spec full-width & Contractor / Size on right */}
+                    <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-100/80 text-xs">
+                      <div className="font-bold text-slate-800 truncate" title={entry.qualityType || "No Quality"}>
+                        {entry.qualityType || "No Quality"}
                       </div>
-                      {isExpanded ? (
-                        <ChevronUp className="h-4 w-4 text-slate-400" />
-                      ) : (
-                        <ChevronDown className="h-4 w-4 text-slate-400" />
-                      )}
+                      <div className="text-[11px] text-slate-500 font-medium shrink-0 truncate">
+                        {entry.contractor || "No Contractor"}{entry.size ? ` • ${entry.size}mm` : ""}
+                      </div>
                     </div>
                   </div>
 
                   {/* Expanded Body */}
                   {isExpanded && (
                     <div className="p-3 pt-0 border-t border-slate-100 space-y-3 bg-slate-50/30">
-                      {/* Row 1: Roll #, Loom # & Quality */}
-                      <div className="pt-2 grid grid-cols-3 gap-2">
-                        <div>
-                          <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Roll #:</label>
+                      {/* Row 1: Roll # (col-span-3), Loom # & Size */}
+                      <div className="pt-2 grid grid-cols-5 gap-2">
+                        <div className="col-span-3">
+                          <label className="block text-[10px] font-bold text-slate-500 mb-1">Roll #:</label>
                           <input
                             type="text"
                             value={entry.rollNumber}
                             onChange={(e) => handleUpdateEntry(idx, "rollNumber", e.target.value)}
-                            className="w-full text-xs font-mono font-bold px-2 py-1.5 rounded-lg border bg-white text-foreground focus:border-slate-800 outline-none"
+                            className="w-full !min-h-0 h-9 text-xs font-mono font-bold px-2.5 rounded-xl border border-slate-200 bg-white text-foreground focus:border-slate-800 outline-none"
                           />
                         </div>
 
-                        <div>
-                          <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Loom # (1-91):</label>
+                        <div className="col-span-1">
+                          <label className="block text-[10px] font-bold text-slate-500 mb-1 truncate" title="Loom # (1-91)">Loom #:</label>
                           <input
                             type="number"
                             min="1"
                             max="91"
                             value={entry.loomNumber || ""}
                             onChange={(e) => handleUpdateEntry(idx, "loomNumber", Number(e.target.value))}
-                            className="w-full text-xs font-mono font-bold text-center px-2 py-1.5 rounded-lg border bg-sky-50 text-sky-800 border-sky-300 outline-none"
+                            className="w-full !min-h-0 h-9 text-xs font-mono font-bold text-center px-1 rounded-xl border bg-sky-50 text-sky-800 border-sky-300 outline-none"
                             placeholder="1-91"
                           />
                         </div>
 
-                        <div>
-                          <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Size (mm):</label>
+                        <div className="col-span-1">
+                          <label className="block text-[10px] font-bold text-slate-500 mb-1 truncate" title="Size (mm)">Size:</label>
                           <input
                             type="text"
                             value={entry.size}
                             onChange={(e) => handleUpdateEntry(idx, "size", e.target.value)}
-                            className="w-full text-xs text-center px-2 py-1.5 rounded-lg border bg-white outline-none"
+                            className="w-full !min-h-0 h-9 text-xs font-mono text-center px-1 rounded-xl border border-slate-200 bg-white outline-none"
                             placeholder="mm"
                           />
                         </div>
@@ -1642,7 +1649,7 @@ export function LoomRollCuttingSection() {
 
                       {/* Quality Selector */}
                       <div>
-                        <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Quality / Specification:</label>
+                        <label className="block text-[10px] font-bold text-slate-500 mb-1">Quality / Specification:</label>
                         <UniversalQualityInput
                           value={entry.qualityType}
                           onChange={(newCode, matchedOpt) => {
@@ -1655,19 +1662,21 @@ export function LoomRollCuttingSection() {
                           }}
                           options={availableQualities}
                           placeholder="Select quality..."
-                          compact={true}
-                          inputClassName="h-8 text-xs font-bold bg-white"
+                          compact={false}
+                          inputClassName="!min-h-0 !h-9 text-xs font-bold bg-white rounded-xl border-slate-200"
                         />
                       </div>
 
                       {/* Operator & Contractor Row */}
                       <div className="grid grid-cols-2 gap-2">
                         <div>
-                          <label className="block text-[10px] font-bold text-slate-500 mb-0.5">Operator:</label>
+                          <div className="h-5 flex items-center justify-between mb-1">
+                            <label className="text-[10px] font-bold text-slate-500">Operator:</label>
+                          </div>
                           <select
                             value={entry.supervisorSign || ""}
                             onChange={(e) => handleUpdateEntry(idx, "supervisorSign", e.target.value)}
-                            className="w-full text-xs px-2 py-1.5 rounded-lg border bg-white outline-none font-medium truncate"
+                            className="w-full !min-h-0 h-9 text-xs px-2.5 rounded-xl border border-slate-200 bg-white outline-none font-medium truncate cursor-pointer focus:border-slate-800"
                           >
                             <option value="">-- Select Operator --</option>
                             {availableOperators.map((o) => (
@@ -1679,7 +1688,7 @@ export function LoomRollCuttingSection() {
                         </div>
 
                         <div>
-                          <div className="flex items-center justify-between mb-0.5">
+                          <div className="h-5 flex items-center justify-between mb-1">
                             <label className="text-[10px] font-bold text-slate-500">Contractor:</label>
                             <button
                               type="button"
@@ -1687,7 +1696,7 @@ export function LoomRollCuttingSection() {
                                 setTargetEntryIndexForNewContractor(idx);
                                 setQuickContractorModalOpen(true);
                               }}
-                              className="text-[10px] font-bold text-primary hover:underline cursor-pointer"
+                              className="!min-h-0 text-[10px] font-bold text-primary hover:underline cursor-pointer"
                             >
                               + New
                             </button>
@@ -1695,7 +1704,7 @@ export function LoomRollCuttingSection() {
                           <select
                             value={entry.contractor || ""}
                             onChange={(e) => handleUpdateEntry(idx, "contractor", e.target.value)}
-                            className="w-full text-xs px-2 py-1.5 rounded-lg border bg-white outline-none font-medium truncate"
+                            className="w-full !min-h-0 h-9 text-xs px-2.5 rounded-xl border border-slate-200 bg-white outline-none font-medium truncate cursor-pointer focus:border-slate-800"
                           >
                             <option value="">-- Contractor --</option>
                             {availableContractors.map((c) => (
@@ -1708,36 +1717,36 @@ export function LoomRollCuttingSection() {
                       </div>
 
                       {/* Meter Readings Block (3-col) */}
-                      <div className="p-2.5 bg-sky-50/70 border border-sky-200/70 rounded-xl space-y-1.5">
+                      <div className="p-3 bg-sky-50/70 border border-sky-200/70 rounded-2xl space-y-2">
                         <div className="text-[10px] font-bold uppercase tracking-wider text-sky-900">
                           Meter Counter Readings
                         </div>
                         <div className="grid grid-cols-3 gap-2">
                           <div>
-                            <label className="block text-[9px] font-medium text-slate-500 mb-0.5">Prev Reading:</label>
+                            <label className="block text-[9px] font-bold text-slate-500 mb-1">Prev Reading:</label>
                             <input
                               type="number"
                               value={entry.initialReading ?? ""}
                               onChange={(e) => handleUpdateEntry(idx, "initialReading", e.target.value)}
-                              className="w-full text-xs font-mono font-bold text-right px-2 py-1 bg-white rounded-lg border border-sky-200 outline-none"
+                              className="w-full !min-h-0 h-9 text-xs font-mono font-bold text-right px-2.5 bg-white rounded-xl border border-sky-200 outline-none focus:border-sky-500"
                               placeholder="0"
                             />
                           </div>
 
                           <div>
-                            <label className="block text-[9px] font-medium text-slate-500 mb-0.5">Curr Reading:</label>
+                            <label className="block text-[9px] font-bold text-slate-500 mb-1">Curr Reading:</label>
                             <input
                               type="number"
                               value={entry.finalReading ?? ""}
                               onChange={(e) => handleUpdateEntry(idx, "finalReading", e.target.value)}
-                              className="w-full text-xs font-mono font-bold text-right px-2 py-1 bg-white rounded-lg border border-sky-200 outline-none"
+                              className="w-full !min-h-0 h-9 text-xs font-mono font-bold text-right px-2.5 bg-white rounded-xl border border-sky-200 outline-none focus:border-sky-500"
                               placeholder="0"
                             />
                           </div>
 
                           <div>
-                            <label className="block text-[9px] font-medium text-slate-500 mb-0.5">Cut Length (m):</label>
-                            <div className="w-full text-xs font-mono font-black text-right px-2 py-1 bg-sky-100/90 text-sky-900 rounded-lg border border-sky-300">
+                            <label className="block text-[9px] font-bold text-slate-500 mb-1">Cut Length:</label>
+                            <div className="w-full !min-h-0 h-9 text-xs font-mono font-black text-right px-2.5 bg-sky-100 text-sky-900 rounded-xl border border-sky-300 flex items-center justify-end">
                               {entry.meter > 0 ? `${entry.meter} m` : "0 m"}
                             </div>
                           </div>
@@ -1745,45 +1754,45 @@ export function LoomRollCuttingSection() {
                       </div>
 
                       {/* Weight Measurements Block (4-col) */}
-                      <div className="p-2.5 bg-emerald-50/70 border border-emerald-200/70 rounded-xl space-y-1.5">
+                      <div className="p-3 bg-emerald-50/70 border border-emerald-200/70 rounded-2xl space-y-2">
                         <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-900">
                           Scale Weight Measurements
                         </div>
                         <div className="grid grid-cols-4 gap-1.5">
                           <div>
-                            <label className="block text-[9px] font-medium text-slate-500 mb-0.5">Gross (kg):</label>
+                            <label className="block text-[9px] font-bold text-slate-500 mb-1">Gross (kg):</label>
                             <input
                               type="number"
                               step="0.01"
                               value={entry.grossWeightKg ?? ""}
                               onChange={(e) => handleUpdateEntry(idx, "grossWeightKg", e.target.value)}
-                              className="w-full text-xs font-mono font-bold text-right px-1.5 py-1 bg-white rounded-lg border border-emerald-200 outline-none"
+                              className="w-full !min-h-0 h-9 text-xs font-mono font-bold text-right px-2 bg-white rounded-xl border border-emerald-200 outline-none focus:border-emerald-500"
                               placeholder="0"
                             />
                           </div>
 
                           <div>
-                            <label className="block text-[9px] font-medium text-slate-500 mb-0.5">Tare (kg):</label>
+                            <label className="block text-[9px] font-bold text-slate-500 mb-1">Tare (kg):</label>
                             <input
                               type="number"
                               step="0.01"
                               value={entry.tareWeightKg ?? ""}
                               onChange={(e) => handleUpdateEntry(idx, "tareWeightKg", e.target.value)}
-                              className="w-full text-xs font-mono font-bold text-right px-1.5 py-1 bg-white rounded-lg border border-emerald-200 outline-none"
+                              className="w-full !min-h-0 h-9 text-xs font-mono font-bold text-right px-2 bg-white rounded-xl border border-emerald-200 outline-none focus:border-emerald-500"
                               placeholder="1.2"
                             />
                           </div>
 
                           <div>
-                            <label className="block text-[9px] font-medium text-slate-500 mb-0.5">Nett (kg):</label>
-                            <div className="w-full text-xs font-mono font-black text-right px-1 py-1 bg-emerald-100 text-emerald-900 rounded-lg border border-emerald-300 truncate">
+                            <label className="block text-[9px] font-bold text-slate-500 mb-1">Nett (kg):</label>
+                            <div className="w-full !min-h-0 h-9 text-xs font-mono font-black text-right px-2 bg-emerald-100 text-emerald-900 rounded-xl border border-emerald-300 flex items-center justify-end truncate">
                               {Number(entry.nettWeightKg) > 0 ? Number(entry.nettWeightKg).toFixed(1) : "0"}
                             </div>
                           </div>
 
                           <div>
-                            <label className="block text-[9px] font-medium text-slate-500 mb-0.5">Avg (g/m):</label>
-                            <div className="w-full text-xs font-mono font-black text-right px-1 py-1 bg-purple-100 text-purple-900 rounded-lg border border-purple-300 truncate">
+                            <label className="block text-[9px] font-bold text-slate-500 mb-1">Avg (g/m):</label>
+                            <div className="w-full !min-h-0 h-9 text-xs font-mono font-black text-right px-2 bg-purple-100 text-purple-900 rounded-xl border border-purple-300 flex items-center justify-end truncate">
                               {Number(entry.avgWeightPerMeter) > 0 ? Number(entry.avgWeightPerMeter).toFixed(0) : "0"}
                             </div>
                           </div>
@@ -1795,10 +1804,10 @@ export function LoomRollCuttingSection() {
                         <button
                           type="button"
                           onClick={() => setPhotoModalIndex(idx)}
-                          className={`px-2.5 py-1.5 text-xs font-semibold rounded-lg border transition-all inline-flex items-center gap-1.5 shrink-0 cursor-pointer ${
+                          className={`!min-h-0 h-9 px-3 text-xs font-semibold rounded-xl border transition-all inline-flex items-center gap-1.5 shrink-0 cursor-pointer ${
                             entry.photoUrl
                               ? "bg-emerald-50 text-emerald-700 border-emerald-300"
-                              : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                              : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50 shadow-2xs"
                           }`}
                         >
                           {entry.photoUrl ? (
@@ -1819,16 +1828,16 @@ export function LoomRollCuttingSection() {
                           value={entry.remarks || ""}
                           onChange={(e) => handleUpdateEntry(idx, "remarks", e.target.value)}
                           placeholder="Notes / inspection remarks..."
-                          className="flex-1 min-w-0 px-2.5 py-1.5 text-xs bg-white border border-slate-200 rounded-lg outline-none focus:border-slate-800"
+                          className="flex-1 min-w-0 !min-h-0 h-9 px-3 text-xs bg-white border border-slate-200 rounded-xl outline-none focus:border-slate-800 transition-colors"
                         />
                       </div>
 
                       {/* Actions: Duplicate & Delete */}
-                      <div className="flex items-center justify-between pt-1 border-t border-slate-100">
+                      <div className="flex items-center justify-between pt-2 border-t border-slate-100">
                         <button
                           type="button"
                           onClick={() => handleDuplicateEntry(idx)}
-                          className="px-2.5 py-1 text-xs font-semibold text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 rounded-lg transition-all inline-flex items-center gap-1 cursor-pointer"
+                          className="!min-h-0 h-8 px-3 text-xs font-semibold text-sky-700 bg-sky-50 hover:bg-sky-100 border border-sky-200 rounded-xl transition-all inline-flex items-center gap-1.5 cursor-pointer shadow-2xs"
                         >
                           <Copy className="h-3.5 w-3.5" />
                           <span>Duplicate for Next Roll</span>
@@ -1837,7 +1846,7 @@ export function LoomRollCuttingSection() {
                         <button
                           type="button"
                           onClick={() => handleDeleteEntry(idx)}
-                          className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-all cursor-pointer"
+                          className="!min-h-0 h-8 w-8 text-rose-500 hover:text-rose-700 hover:bg-rose-50 border border-transparent hover:border-rose-200 rounded-xl transition-all flex items-center justify-center cursor-pointer"
                           title="Delete roll"
                         >
                           <Trash2 className="h-4 w-4" />
