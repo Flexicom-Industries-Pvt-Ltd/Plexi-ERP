@@ -117,7 +117,7 @@ describe("Tape Plant Print & PDF Report Engine", () => {
 
     expect(html).toContain("<!DOCTYPE html>");
     expect(html).toContain("Flexicom Industries Pvt. Ltd.");
-    expect(html).toContain("Comprehensive Production, Wastage & Efficiency Audit");
+    expect(html).toContain("COMPREHENSIVE PRODUCTION, WASTAGE & EFFICIENCY AUDIT");
     expect(html).toContain("size: A4 landscape;");
     expect(html).toContain("margin: 8mm;");
     expect(html).toContain("Shift A (06:00 - 14:00)");
@@ -134,7 +134,7 @@ describe("Tape Plant Print & PDF Report Engine", () => {
       mode: "shift",
     });
 
-    expect(html).toContain("Tape Plant Production Shift-Wise Analysis");
+    expect(html).toContain("TAPE PLANT PRODUCTION SHIFT-WISE ANALYSIS");
     expect(html).toContain("Production & Performance Breakdown (Shift-Wise)");
     expect(html).toContain("Rajesh Kumar");
   });
