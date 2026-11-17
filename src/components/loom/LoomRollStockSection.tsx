@@ -33,6 +33,8 @@ import {
 import { exportLoomRollStockExcel } from "@/lib/loom/loom-roll-stock-export";
 import { LoomRollStockPrintModal } from "./LoomRollStockPrintModal";
 import { RecipeQualityBadge } from "../tape-plant/RecipeQualityBadge";
+import { useProductionRealtime } from "@/hooks/useProductionRealtime";
+import { RealtimeSyncBadge } from "@/components/production/RealtimeSyncBadge";
 
 export function LoomRollStockSection() {
   const [loading, setLoading] = useState(true);
@@ -139,6 +141,14 @@ export function LoomRollStockSection() {
     fetchStockData();
   }, [fetchStockData]);
 
+  const realtime = useProductionRealtime({
+    module: "loom",
+    sheet: "roll-stock",
+    onSync: () => {
+      fetchStockData();
+    },
+  });
+
   // Copy roll number to clipboard
   const handleCopyRoll = (rollNo: string) => {
     navigator.clipboard.writeText(rollNo);
@@ -201,6 +211,14 @@ export function LoomRollStockSection() {
 
         {/* Action Buttons */}
         <div className="flex items-center flex-wrap gap-2.5">
+          <RealtimeSyncBadge
+            isConnected={realtime.isConnected}
+            lastUpdatedBy={realtime.lastUpdatedBy}
+            lastUpdatedAt={realtime.lastUpdatedAt}
+            lastAction={realtime.lastAction}
+            isSelfUpdate={realtime.isSelfUpdate}
+          />
+
           <button
             onClick={() => exportLoomRollStockExcel({ rolls, summary, filterLabel })}
             disabled={rolls.length === 0}

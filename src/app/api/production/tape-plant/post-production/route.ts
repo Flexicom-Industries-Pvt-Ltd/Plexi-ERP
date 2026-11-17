@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireTapePlantApiPermission } from "@/lib/tape-plant/permissions";
+import { emitProductionSync } from "@/lib/realtime/production-bus";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -367,6 +368,19 @@ export async function POST(request: NextRequest) {
         results.push(record);
       }
 
+      emitProductionSync({
+        module: "tape-plant",
+        sheet: "post-production",
+        action: status === "SUBMITTED" ? "SUBMIT" : "SAVE",
+        date,
+        shift: shiftId,
+        user: {
+          name: authResult.session?.user?.name || "Floor Admin",
+          email: authResult.session?.user?.email || undefined,
+          role: (authResult.session?.user as any)?.roleName || (authResult.session?.user as any)?.role || "Staff",
+        },
+      });
+
       return NextResponse.json({ success: true, count: results.length, records: results });
     }
 
@@ -461,6 +475,19 @@ export async function POST(request: NextRequest) {
         netProductionKg: totalNet,
         entries: processedEntries,
         status: status || "SAVED",
+      },
+    });
+
+    emitProductionSync({
+      module: "tape-plant",
+      sheet: "post-production",
+      action: status === "SUBMITTED" ? "SUBMIT" : "SAVE",
+      date,
+      shift: shiftId,
+      user: {
+        name: authResult.session?.user?.name || "Floor Admin",
+        email: authResult.session?.user?.email || undefined,
+        role: (authResult.session?.user as any)?.roleName || (authResult.session?.user as any)?.role || "Staff",
       },
     });
 

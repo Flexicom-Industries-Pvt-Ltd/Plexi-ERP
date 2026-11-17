@@ -22,6 +22,8 @@ import {
 } from "lucide-react";
 import { PrintingProductionSummaryResult } from "@/lib/printing/printing-types";
 import dynamic from "next/dynamic";
+import { useProductionRealtime } from "@/hooks/useProductionRealtime";
+import { RealtimeSyncBadge } from "@/components/production/RealtimeSyncBadge";
 
 const PrintingSummaryPrintModal = dynamic(
   () => import("./PrintingSummaryPrintModal").then((m) => m.PrintingSummaryPrintModal),
@@ -69,6 +71,14 @@ export function PrintingProductionSummaryClient() {
     fetchSummary();
   }, [fetchSummary]);
 
+  const realtime = useProductionRealtime({
+    module: "printing",
+    sheet: "summary",
+    onSync: () => {
+      fetchSummary();
+    },
+  });
+
   // Quick range helpers
   const setQuickRange = (days: number) => {
     const end = new Date();
@@ -115,6 +125,14 @@ export function PrintingProductionSummaryClient() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
+            <RealtimeSyncBadge
+              isConnected={realtime.isConnected}
+              lastUpdatedBy={realtime.lastUpdatedBy}
+              lastUpdatedAt={realtime.lastUpdatedAt}
+              lastAction={realtime.lastAction}
+              isSelfUpdate={realtime.isSelfUpdate}
+            />
+
             <button
               onClick={() => fetchSummary()}
               disabled={loading}
