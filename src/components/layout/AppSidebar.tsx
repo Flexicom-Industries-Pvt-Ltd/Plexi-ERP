@@ -18,6 +18,7 @@ import {
   Printer,
   Scissors,
   UserCheck,
+  X,
 } from "lucide-react";
 
 import {
@@ -32,6 +33,7 @@ import {
   SidebarMenuSubButton,
   SidebarMenuSubItem,
   SidebarRail,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -139,12 +141,21 @@ export function AppSidebar({ user, allowedModules, ...props }: AppSidebarProps) 
   const [settingsOpen, setSettingsOpen] = useState(pathname.startsWith("/dashboard/settings"));
   const [dataCentreOpen, setDataCentreOpen] = useState(pathname.startsWith("/dashboard/data-centre"));
 
+  const { isMobile, setOpenMobile } = useSidebar();
+
   const [currentSearch, setCurrentSearch] = useState("");
   useEffect(() => {
     if (typeof window !== "undefined") {
       setCurrentSearch(window.location.search);
     }
   }, [pathname]);
+
+  // Automatically close mobile sidebar when navigating to a new route/tab
+  useEffect(() => {
+    if (isMobile) {
+      setOpenMobile(false);
+    }
+  }, [pathname, currentSearch, isMobile, setOpenMobile]);
 
   const activeTabInUrl = (currentSearch ? new URLSearchParams(currentSearch).get("tab") : null) || "planning";
 
@@ -174,8 +185,8 @@ export function AppSidebar({ user, allowedModules, ...props }: AppSidebarProps) 
 
   return (
     <Sidebar className="border-r border-border/50 bg-slate-50 shadow-sm transition-all duration-300 font-sans" variant="inset" collapsible="icon">
-      <SidebarHeader className="h-[72px] flex items-center px-4 border-b border-border/50 bg-white overflow-hidden transition-all duration-300">
-        <Link href="/dashboard" className="flex items-center gap-3 font-semibold w-full">
+      <SidebarHeader className="h-[72px] flex items-center justify-between px-4 border-b border-border/50 bg-white overflow-hidden transition-all duration-300">
+        <Link href="/dashboard" className="flex items-center gap-3 font-semibold min-w-0">
           <div className="flex shrink-0 items-center justify-center rounded-lg hover:opacity-80 transition-opacity bg-white p-1 shadow-sm border border-slate-100">
             <Image src="/logo.png" alt="Flexicom Logo" width={40} height={40} className="h-10 w-10 object-contain" />
           </div>
@@ -184,6 +195,17 @@ export function AppSidebar({ user, allowedModules, ...props }: AppSidebarProps) 
             <span className="text-[10px] text-primary uppercase tracking-[0.2em] font-bold">ERP System</span>
           </div>
         </Link>
+        {isMobile && (
+          <button
+            type="button"
+            onClick={() => setOpenMobile(false)}
+            className="h-9 w-9 rounded-xl flex items-center justify-center text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors cursor-pointer shrink-0 ml-2"
+            title="Close Sidebar"
+            aria-label="Close Sidebar"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        )}
       </SidebarHeader>
       <SidebarContent className="px-2 py-4">
         <SidebarMenu>
