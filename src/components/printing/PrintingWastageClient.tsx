@@ -23,6 +23,8 @@ import {
 } from "@/lib/printing/printing-types";
 import dynamic from "next/dynamic";
 import { UniversalPersonnelInput } from "@/components/ui/UniversalPersonnelInput";
+import { useProductionRealtime } from "@/hooks/useProductionRealtime";
+import { RealtimeSyncBadge } from "@/components/production/RealtimeSyncBadge";
 
 const PrintingWastagePrintModal = dynamic(
   () => import("./PrintingWastagePrintModal").then((m) => m.PrintingWastagePrintModal),
@@ -113,6 +115,16 @@ export function PrintingWastageClient() {
     loadReport();
   }, [loadReport]);
 
+  const realtime = useProductionRealtime({
+    module: "printing",
+    sheet: "wastage",
+    date,
+    shift: shiftName,
+    onSync: () => {
+      loadReport();
+    },
+  });
+
   // Live calculations
   const calc = useMemo(() => {
     return calculatePrintingWastage(
@@ -173,6 +185,11 @@ export function PrintingWastageClient() {
 
         setStatus(newStatus);
         setLastSavedAt(format(new Date(), "hh:mm:ss a"));
+        realtime.broadcastSync({
+          action: newStatus === "SUBMITTED" ? "SUBMIT" : "SAVE",
+          date,
+          shift: shiftName,
+        });
 
         if (!silent) {
           toast.success(
@@ -312,6 +329,14 @@ export function PrintingWastageClient() {
 
         {/* Global Action Buttons */}
         <div className="flex flex-wrap items-center gap-2">
+          <RealtimeSyncBadge
+            isConnected={realtime.isConnected}
+            lastUpdatedBy={realtime.lastUpdatedBy}
+            lastUpdatedAt={realtime.lastUpdatedAt}
+            lastAction={realtime.lastAction}
+            isSelfUpdate={realtime.isSelfUpdate}
+          />
+
           <button
             type="button"
             onClick={() => setPrintModalOpen(true)}

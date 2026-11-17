@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireTapePlantApiPermission } from "@/lib/tape-plant/permissions";
+import { emitProductionSync } from "@/lib/realtime/production-bus";
 
 export const dynamic = "force-dynamic";
 
@@ -99,6 +100,19 @@ export async function POST(request: NextRequest) {
     const updated = await db.tapePlantDriveParameter.findMany({
       where: { date, shiftId },
       orderBy: { time: "asc" },
+    });
+
+    emitProductionSync({
+      module: "tape-plant",
+      sheet: "drive-parameter",
+      action: "SAVE",
+      date,
+      shift: shiftId,
+      user: {
+        name: authResult.session?.user?.name || "Floor Admin",
+        email: authResult.session?.user?.email || undefined,
+        role: (authResult.session?.user as any)?.roleName || (authResult.session?.user as any)?.role || "Staff",
+      },
     });
 
     return NextResponse.json(updated);

@@ -31,6 +31,8 @@ import {
 } from "@/lib/printing/printing-types";
 import dynamic from "next/dynamic";
 import { UniversalPersonnelInput } from "@/components/ui/UniversalPersonnelInput";
+import { useProductionRealtime } from "@/hooks/useProductionRealtime";
+import { RealtimeSyncBadge } from "@/components/production/RealtimeSyncBadge";
 
 const PrintingRawMaterialPrintModal = dynamic(
   () => import("./PrintingRawMaterialPrintModal").then((m) => m.PrintingRawMaterialPrintModal),
@@ -139,6 +141,16 @@ export function PrintingRawMaterialEntryClient() {
     loadReport();
   }, [loadReport]);
 
+  const realtime = useProductionRealtime({
+    module: "printing",
+    sheet: "raw-materials",
+    date,
+    shift: shiftName,
+    onSync: () => {
+      loadReport();
+    },
+  });
+
   // Handle row change
   const handleEntryChange = (index: number, field: keyof PrintingRawMaterialEntryItem, value: any) => {
     setEntries((prev) => {
@@ -242,6 +254,11 @@ export function PrintingRawMaterialEntryClient() {
 
         setStatus(newStatus);
         setLastSavedAt(format(new Date(), "hh:mm:ss a"));
+        realtime.broadcastSync({
+          action: newStatus === "SUBMITTED" ? "SUBMIT" : "SAVE",
+          date,
+          shift: shiftName,
+        });
 
         if (!silent) {
           toast.success(
@@ -349,6 +366,14 @@ export function PrintingRawMaterialEntryClient() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
+            <RealtimeSyncBadge
+              isConnected={realtime.isConnected}
+              lastUpdatedBy={realtime.lastUpdatedBy}
+              lastUpdatedAt={realtime.lastUpdatedAt}
+              lastAction={realtime.lastAction}
+              isSelfUpdate={realtime.isSelfUpdate}
+            />
+
             <button
               onClick={() => loadReport()}
               disabled={loading}
