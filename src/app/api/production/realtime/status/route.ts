@@ -5,6 +5,10 @@ import {
   getLatestSheetState,
   ProductionSyncEvent,
 } from "@/lib/realtime/production-bus";
+import {
+  getLatestDatabaseSheetUpdate,
+  invalidateSyncCache,
+} from "@/lib/realtime/db-sync";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,32 +17,78 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const moduleParam = searchParams.get("module");
   const sheetParam = searchParams.get("sheet") || undefined;
+  const dateParam = searchParams.get("date") || undefined;
+  const shiftParam = searchParams.get("shift") || undefined;
   const sinceParam = searchParams.get("since");
 
   if (!moduleParam) {
     return NextResponse.json({ error: "module parameter is required" }, { status: 400 });
   }
 
-  const latest = getLatestSheetState(moduleParam, sheetParam);
-  if (!latest) {
-    return NextResponse.json({ hasUpdate: false, latest: null });
+  // 1. Authoritative Neon PostgreSQL Database check (cross-serverless shared truth)
+  const dbUpdate = await getLatestDatabaseSheetUpdate(
+    moduleParam,
+    sheetParam,
+    dateParam,
+    shiftParam
+  );
+
+  // 2. In-memory state check (immediate fallback if DB row not created yet)
+  const memoryUpdate = getLatestSheetState(moduleParam, sheetParam);
+
+  // Resolve whichever has the newest timestamp
+  let latestEvent: ProductionSyncEvent | null = null;
+  let latestTimestamp = 0;
+
+  if (dbUpdate && dbUpdate.timestamp > latestTimestamp) {
+    latestTimestamp = dbUpdate.timestamp;
+    latestEvent = {
+      module: moduleParam,
+      sheet: sheetParam || "default",
+      action: dbUpdate.action,
+      date: dateParam,
+      shift: shiftParam,
+      user: dbUpdate.user,
+      timestamp: dbUpdate.timestamp,
+    };
+  }
+
+  if (memoryUpdate && memoryUpdate.timestamp > latestTimestamp) {
+    latestTimestamp = memoryUpdate.timestamp;
+    latestEvent = memoryUpdate;
+  }
+
+  const noCacheHeaders = {
+    "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+    Pragma: "no-cache",
+    Expires: "0",
+  };
+
+  if (!latestEvent) {
+    return NextResponse.json({ hasUpdate: false, latest: null }, { headers: noCacheHeaders });
   }
 
   if (sinceParam) {
     const sinceTime = parseInt(sinceParam, 10);
-    const hasUpdate = !isNaN(sinceTime) && latest.timestamp > sinceTime;
-    return NextResponse.json({
-      hasUpdate,
-      latest: hasUpdate ? latest : null,
-      timestamp: latest.timestamp,
-    });
+    const hasUpdate = !isNaN(sinceTime) && latestTimestamp > sinceTime;
+    return NextResponse.json(
+      {
+        hasUpdate,
+        latest: hasUpdate ? latestEvent : null,
+        timestamp: latestTimestamp,
+      },
+      { headers: noCacheHeaders }
+    );
   }
 
-  return NextResponse.json({
-    hasUpdate: true,
-    latest,
-    timestamp: latest.timestamp,
-  });
+  return NextResponse.json(
+    {
+      hasUpdate: true,
+      latest: latestEvent,
+      timestamp: latestTimestamp,
+    },
+    { headers: noCacheHeaders }
+  );
 }
 
 export async function POST(request: Request) {
@@ -66,6 +116,7 @@ export async function POST(request: Request) {
       timestamp: Date.now(),
     };
 
+    invalidateSyncCache(mod, sheet);
     emitProductionSync(event);
 
     return NextResponse.json({ success: true, event });
