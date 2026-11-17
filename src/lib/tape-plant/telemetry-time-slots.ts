@@ -136,3 +136,42 @@ export function canUserOverrideLock(
 
   return false;
 }
+
+export interface ShiftTimeWindow {
+  id: string;
+  startTime?: string | null;
+  endTime?: string | null;
+  isNightShift?: boolean;
+}
+
+/**
+ * Resolves the appropriate database Shift ID for a given time slot string (e.g. "08:00", "22:00").
+ * Used when telemetry readings span across multiple shifts (e.g. in "ALL" / 24h mode)
+ * so that each record satisfies the Shift foreign key constraint in the database.
+ */
+export function resolveShiftIdForTime(
+  timeStr: string,
+  shifts: ShiftTimeWindow[],
+  fallbackShiftId: string
+): string {
+  if (!timeStr || !shifts || shifts.length === 0) return fallbackShiftId;
+  const [hourStr] = timeStr.trim().split(":");
+  const hour = parseInt(hourStr, 10);
+  if (isNaN(hour)) return fallbackShiftId;
+
+  for (const s of shifts) {
+    const startH = s.startTime ? parseInt(s.startTime.split(":")[0], 10) : 8;
+    const endH = s.endTime ? parseInt(s.endTime.split(":")[0], 10) : 20;
+
+    if (startH <= endH) {
+      // Same-day shift e.g. 08:00 to 20:00
+      if (hour >= startH && hour < endH) return s.id;
+    } else {
+      // Overnight shift e.g. 20:00 to 08:00
+      if (hour >= startH || hour < endH) return s.id;
+    }
+  }
+
+  return fallbackShiftId;
+}
+

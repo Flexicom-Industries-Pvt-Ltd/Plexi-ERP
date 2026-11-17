@@ -73,6 +73,109 @@ interface ProcessDriveParameterSectionProps {
   shiftName: string;
 }
 
+function mergeDriveReadings(data: any[], intervals: string[]): DriveParameterReading[] {
+  const dataByTime = new Map<string, any>();
+  const extraItems: any[] = [];
+
+  for (const d of data) {
+    const t = (d.time || "").trim();
+    if (intervals.includes(t) && !dataByTime.has(t)) {
+      dataByTime.set(t, d);
+    } else {
+      extraItems.push(d);
+    }
+  }
+
+  const result: DriveParameterReading[] = intervals.map((time) => {
+    const d = dataByTime.get(time);
+    if (d) {
+      return {
+        id: d.id,
+        time,
+        photoUrl: d.photoUrl || undefined,
+        operatorName: d.operatorName || "",
+        operatorId: d.operatorId || "",
+        extruderRpm: d.extruderRpm ?? "",
+        meltPumpRpm: d.meltPumpRpm ?? "",
+        takeUpMpm: d.takeUpMpm ?? "",
+        nipRollMpm: d.nipRollMpm ?? "",
+        isuMpm: d.isuMpm ?? "",
+        pauMpm: d.pauMpm ?? "",
+        stretchingMpm: d.stretchingMpm ?? "",
+        annealingMpm: d.annealingMpm ?? "",
+        stretchingRatio: d.stretchingRatio ?? "",
+        meltPressureP1: d.meltPressureP1 ?? "",
+        meltPressureP2: d.meltPressureP2 ?? "",
+        meltPressureP3: d.meltPressureP3 ?? "",
+        waterBath: d.waterBath ?? "",
+        colour: d.colour ?? "",
+        denier: d.denier ?? "",
+        tapeWidth: d.tapeWidth ?? "",
+        strength: d.strength ?? "",
+        eloPercent: d.eloPercent ?? "",
+        spacerWidth: d.spacerWidth ?? "",
+        numberOfTape: d.numberOfTape ?? "",
+      };
+    }
+    return {
+      time,
+      photoUrl: undefined,
+      extruderRpm: "",
+      meltPumpRpm: "",
+      takeUpMpm: "",
+      nipRollMpm: "",
+      isuMpm: "",
+      pauMpm: "",
+      stretchingMpm: "",
+      annealingMpm: "",
+      stretchingRatio: "",
+      meltPressureP1: "",
+      meltPressureP2: "",
+      meltPressureP3: "",
+      waterBath: "",
+      colour: "",
+      denier: "",
+      tapeWidth: "",
+      strength: "",
+      eloPercent: "",
+      spacerWidth: "",
+      numberOfTape: "",
+    };
+  });
+
+  for (const d of extraItems) {
+    result.push({
+      id: d.id,
+      time: d.time || "",
+      photoUrl: d.photoUrl || undefined,
+      operatorName: d.operatorName || "",
+      operatorId: d.operatorId || "",
+      extruderRpm: d.extruderRpm ?? "",
+      meltPumpRpm: d.meltPumpRpm ?? "",
+      takeUpMpm: d.takeUpMpm ?? "",
+      nipRollMpm: d.nipRollMpm ?? "",
+      isuMpm: d.isuMpm ?? "",
+      pauMpm: d.pauMpm ?? "",
+      stretchingMpm: d.stretchingMpm ?? "",
+      annealingMpm: d.annealingMpm ?? "",
+      stretchingRatio: d.stretchingRatio ?? "",
+      meltPressureP1: d.meltPressureP1 ?? "",
+      meltPressureP2: d.meltPressureP2 ?? "",
+      meltPressureP3: d.meltPressureP3 ?? "",
+      waterBath: d.waterBath ?? "",
+      colour: d.colour ?? "",
+      denier: d.denier ?? "",
+      tapeWidth: d.tapeWidth ?? "",
+      strength: d.strength ?? "",
+      eloPercent: d.eloPercent ?? "",
+      spacerWidth: d.spacerWidth ?? "",
+      numberOfTape: d.numberOfTape ?? "",
+    });
+  }
+
+  return result;
+}
+
 export function ProcessDriveParameterSection({
   date,
   shiftId,
@@ -180,86 +283,22 @@ export function ProcessDriveParameterSection({
     // Reset supervisor unlocks on shift/date change
     setUnlockedSlots(new Set());
 
-    fetch(`/api/production/tape-plant/drive-parameters?date=${date}&shiftId=${shiftId}`)
+    fetch(`/api/production/tape-plant/drive-parameters?date=${date}&shiftId=${shiftId}&_t=${Date.now()}`)
       .then((r) => (r.ok ? r.json() : []))
       .then((data: any[]) => {
-        if (data && data.length > 0) {
-          const opName = data[0]?.operatorName || "";
-          const opId = data[0]?.operatorId || "";
-          setOperatorName(opName);
-          setOperatorId(opId);
-          const mapped: DriveParameterReading[] = data.map((d) => ({
-            id: d.id,
-            time: d.time || "",
-            photoUrl: d.photoUrl || undefined,
-            operatorName: d.operatorName || opName,
-            operatorId: d.operatorId || opId,
-            extruderRpm: d.extruderRpm ?? "",
-            meltPumpRpm: d.meltPumpRpm ?? "",
-            takeUpMpm: d.takeUpMpm ?? "",
-            nipRollMpm: d.nipRollMpm ?? "",
-            isuMpm: d.isuMpm ?? "",
-            pauMpm: d.pauMpm ?? "",
-            stretchingMpm: d.stretchingMpm ?? "",
-            annealingMpm: d.annealingMpm ?? "",
-            stretchingRatio: d.stretchingRatio ?? "",
-            meltPressureP1: d.meltPressureP1 ?? "",
-            meltPressureP2: d.meltPressureP2 ?? "",
-            meltPressureP3: d.meltPressureP3 ?? "",
-            waterBath: d.waterBath ?? "",
-            colour: d.colour ?? "",
-            denier: d.denier ?? "",
-            tapeWidth: d.tapeWidth ?? "",
-            strength: d.strength ?? "",
-            eloPercent: d.eloPercent ?? "",
-            spacerWidth: d.spacerWidth ?? "",
-            numberOfTape: d.numberOfTape ?? "",
-          }));
-          setRecords(mapped);
-          lastSavedPayloadRef.current = JSON.stringify({
-            date,
-            shiftId,
-            operatorName: opName,
-            operatorId: opId,
-            records: mapped,
-          });
-        } else {
-          setOperatorName("");
-          setOperatorId("");
-          // Initialize with dynamically derived shift intervals
-          const initial: DriveParameterReading[] = shiftIntervals.map((time) => ({
-            time,
-            photoUrl: undefined,
-            extruderRpm: "",
-            meltPumpRpm: "",
-            takeUpMpm: "",
-            nipRollMpm: "",
-            isuMpm: "",
-            pauMpm: "",
-            stretchingMpm: "",
-            annealingMpm: "",
-            stretchingRatio: "",
-            meltPressureP1: "",
-            meltPressureP2: "",
-            meltPressureP3: "",
-            waterBath: "",
-            colour: "",
-            denier: "",
-            tapeWidth: "",
-            strength: "",
-            eloPercent: "",
-            spacerWidth: "",
-            numberOfTape: "",
-          }));
-          setRecords(initial);
-          lastSavedPayloadRef.current = JSON.stringify({
-            date,
-            shiftId,
-            operatorName: "",
-            operatorId: "",
-            records: initial,
-          });
-        }
+        const opName = (data && data[0]?.operatorName) || "";
+        const opId = (data && data[0]?.operatorId) || "";
+        setOperatorName(opName);
+        setOperatorId(opId);
+        const mapped = mergeDriveReadings(data || [], shiftIntervals);
+        setRecords(mapped);
+        lastSavedPayloadRef.current = JSON.stringify({
+          date,
+          shiftId,
+          operatorName: opName,
+          operatorId: opId,
+          records: mapped,
+        });
       })
       .catch(() => toast.error("Failed to load drive parameters"))
       .finally(() => {
@@ -274,42 +313,12 @@ export function ProcessDriveParameterSection({
     date,
     shift: shiftId,
     onSync: () => {
-      if (!date || !shiftId) return;
+      if (!date || !shiftId || autoSaving) return;
       fetch(`/api/production/tape-plant/drive-parameters?date=${date}&shiftId=${shiftId}&_t=${Date.now()}`)
         .then((r) => (r.ok ? r.json() : []))
         .then((data: any[]) => {
           if (data && data.length > 0) {
-            const opName = data[0]?.operatorName || "";
-            const opId = data[0]?.operatorId || "";
-            setOperatorName(opName);
-            setOperatorId(opId);
-            const mapped: DriveParameterReading[] = data.map((d) => ({
-              id: d.id,
-              time: d.time || "",
-              photoUrl: d.photoUrl || undefined,
-              operatorName: d.operatorName || opName,
-              operatorId: d.operatorId || opId,
-              extruderRpm: d.extruderRpm ?? "",
-              meltPumpRpm: d.meltPumpRpm ?? "",
-              takeUpMpm: d.takeUpMpm ?? "",
-              nipRollMpm: d.nipRollMpm ?? "",
-              isuMpm: d.isuMpm ?? "",
-              pauMpm: d.pauMpm ?? "",
-              stretchingMpm: d.stretchingMpm ?? "",
-              annealingMpm: d.annealingMpm ?? "",
-              stretchingRatio: d.stretchingRatio ?? "",
-              meltPressureP1: d.meltPressureP1 ?? "",
-              meltPressureP2: d.meltPressureP2 ?? "",
-              meltPressureP3: d.meltPressureP3 ?? "",
-              waterBath: d.waterBath ?? "",
-              colour: d.colour ?? "",
-              denier: d.denier ?? "",
-              tapeWidth: d.tapeWidth ?? "",
-              strength: d.strength ?? "",
-              eloPercent: d.eloPercent ?? "",
-              spacerWidth: d.spacerWidth ?? "",
-              numberOfTape: d.numberOfTape ?? "",
-            }));
+            const mapped = mergeDriveReadings(data, shiftIntervals);
             setRecords(mapped);
           }
         })
@@ -417,6 +426,7 @@ export function ProcessDriveParameterSection({
     rawVal: string,
     isNumber = true
   ) => {
+    realtime.markLocalEdit();
     const val = isNumber && rawVal !== "" ? (isNaN(Number(rawVal)) ? rawVal : Number(rawVal)) : rawVal;
     setRecords((prev) => {
       const next = [...prev];
@@ -426,6 +436,7 @@ export function ProcessDriveParameterSection({
   };
 
   const handleDeleteReading = (idx: number) => {
+    realtime.markLocalEdit();
     setRecords((prev) => prev.filter((_, i) => i !== idx));
     setExpandedSlots((prev) => {
       const next = new Set<number>();
@@ -438,6 +449,7 @@ export function ProcessDriveParameterSection({
   };
 
   const handleAddReading = () => {
+    realtime.markLocalEdit();
     const now = new Date();
     const timeStr = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
     const newIdx = records.length;
@@ -473,6 +485,7 @@ export function ProcessDriveParameterSection({
 
   const handleCopyPrevious = (idx: number) => {
     if (idx <= 0) return;
+    realtime.markLocalEdit();
     const prev = records[idx - 1];
     const updated = [...records];
     updated[idx] = {
@@ -1315,7 +1328,10 @@ export function ProcessDriveParameterSection({
           title="Extruder Line & Process Drive Parameter Spreadsheet"
           columns={driveColumns}
           data={records}
-          onChange={setRecords}
+          onChange={(newRecords) => {
+            realtime.markLocalEdit();
+            setRecords(newRecords);
+          }}
           allowAddRow={true}
           onAddRow={handleAddReading}
           allowDeleteRow={true}
