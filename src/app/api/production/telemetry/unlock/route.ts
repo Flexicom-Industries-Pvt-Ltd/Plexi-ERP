@@ -23,11 +23,12 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    const isAll = shiftId.toUpperCase() === "ALL";
     const records = await db.telemetryTimeSlotUnlock.findMany({
       where: {
         module: moduleParam,
         date,
-        shiftId,
+        ...(isAll ? {} : { shiftId }),
       },
       select: {
         id: true,
@@ -159,12 +160,13 @@ export async function DELETE(request: NextRequest) {
   }
 
   try {
+    const isAll = shiftId.toUpperCase() === "ALL";
     await db.telemetryTimeSlotUnlock.deleteMany({
       where: {
         module: moduleParam,
         date,
-        shiftId,
         timeSlot,
+        ...(isAll ? {} : { shiftId }),
       },
     });
 
