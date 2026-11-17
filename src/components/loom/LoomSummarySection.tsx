@@ -32,6 +32,8 @@ import { printLoomSummary } from "@/lib/loom/print-loom-summary";
 import { RecipeQualityBadge } from "../tape-plant/RecipeQualityBadge";
 import { RecipeLoomSummaryItem, LoomMachineSummaryItem } from "@/lib/loom/loom-summary-types";
 import { UniversalQualityInput } from "@/components/ui/UniversalQualityInput";
+import { useProductionRealtime } from "@/hooks/useProductionRealtime";
+import { RealtimeSyncBadge } from "@/components/production/RealtimeSyncBadge";
 
 // Color group styling helper for changeover and matrix cards
 export const COLOR_GROUP_STYLES: Record<string, { bg: string; text: string; border: string; dot: string }> = {
@@ -136,6 +138,14 @@ export function LoomSummarySection() {
   useEffect(() => {
     fetchSummary();
   }, [fetchSummary]);
+
+  const realtime = useProductionRealtime({
+    module: "loom",
+    sheet: "summary",
+    onSync: () => {
+      fetchSummary();
+    },
+  });
 
   const recipeList: RecipeLoomSummaryItem[] = data?.recipeSummaries || [];
   const rawLoomList: LoomMachineSummaryItem[] = data?.loomSummaries || [];
@@ -445,6 +455,14 @@ export function LoomSummarySection() {
 
         {/* Actions Strip */}
         <div className="flex flex-wrap items-center gap-2">
+          <RealtimeSyncBadge
+            isConnected={realtime.isConnected}
+            lastUpdatedBy={realtime.lastUpdatedBy}
+            lastUpdatedAt={realtime.lastUpdatedAt}
+            lastAction={realtime.lastAction}
+            isSelfUpdate={realtime.isSelfUpdate}
+          />
+
           {/* Primary Action Button */}
           <button
             type="button"

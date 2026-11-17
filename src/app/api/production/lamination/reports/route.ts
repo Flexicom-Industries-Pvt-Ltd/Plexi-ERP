@@ -7,6 +7,7 @@ import {
   LaminationProductionEntryData,
 } from "@/lib/lamination/lamination-types";
 import { logEvent } from "@/lib/logging";
+import { emitProductionSync } from "@/lib/realtime/production-bus";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -231,6 +232,19 @@ export async function POST(request: NextRequest) {
       statusCode: 200,
     }).catch(console.error);
 
+    emitProductionSync({
+      module: "lamination",
+      sheet: "production-report",
+      action: status === "SUBMITTED" ? "SUBMIT" : "SAVE",
+      date,
+      shift: shiftName,
+      user: {
+        name: authResult.session?.user?.name || "Lamination Floor",
+        email: authResult.session?.user?.email || undefined,
+        role: (authResult.session?.user as any)?.roleName || (authResult.session?.user as any)?.role || "Staff",
+      },
+    });
+
     return NextResponse.json({ success: true, report: savedReport });
   } catch (error: any) {
     console.error("POST /api/production/lamination/reports error:", error);
@@ -277,6 +291,19 @@ export async function DELETE(request: NextRequest) {
       url: `/api/production/lamination/reports?id=${id}`,
       statusCode: 200,
     }).catch(console.error);
+
+    emitProductionSync({
+      module: "lamination",
+      sheet: "production-report",
+      action: "DELETE",
+      date: existing.date,
+      shift: existing.shiftName,
+      user: {
+        name: authResult.session?.user?.name || "Lamination Floor",
+        email: authResult.session?.user?.email || undefined,
+        role: (authResult.session?.user as any)?.roleName || (authResult.session?.user as any)?.role || "Staff",
+      },
+    });
 
     return NextResponse.json({ success: true, message: "Report deleted successfully" });
   } catch (error: any) {

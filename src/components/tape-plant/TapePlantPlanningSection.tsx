@@ -24,6 +24,8 @@ import { generateTapePlantPlanningExcel } from "@/lib/tape-plant/planning-export
 import { parseRecipeQuality } from "@/lib/tape-plant/recipe-format";
 import { QualityCombobox } from "./QualityCombobox";
 import { useProductionShifts } from "@/hooks/useProductionShifts";
+import { useProductionRealtime } from "@/hooks/useProductionRealtime";
+import { RealtimeSyncBadge } from "@/components/production/RealtimeSyncBadge";
 
 const PlanningPrintPreviewModal = dynamic(
   () => import("./PlanningPrintPreviewModal").then((m) => m.PlanningPrintPreviewModal),
@@ -302,6 +304,52 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName, shifts }: T
       });
   }, [date, shiftId]);
 
+  const realtime = useProductionRealtime({
+    module: "tape-plant",
+    sheet: "planning",
+    date,
+    shift: shiftId,
+    onSync: () => {
+      if (!date || !shiftId) return;
+      fetch(`/api/production/tape-plant/planning?date=${date}&shiftId=${shiftId}&_t=${Date.now()}`, {
+        cache: "no-store",
+      })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => {
+          if (data && Array.isArray(data.plans) && data.plans.length > 0) {
+            const loaded = data.plans.map((p: any) => ({
+              id: p.id,
+              shiftId: p.shiftId || undefined,
+              shiftName: p.shiftName || (p.shift?.name) || undefined,
+              recipeQuality: p.recipeQuality || "",
+              tapeType: p.tapeType || "PP",
+              denier: p.denier ?? "",
+              tapeWidth: p.tapeWidth ?? "",
+              strength: p.strength ?? "",
+              eloPercent: p.eloPercent ?? "",
+              bobbinMarking: p.bobbinMarking || "",
+              colour: p.colour || "",
+              spacerSize: p.spacerSize || "",
+              requiredAsh: p.requiredAsh ?? "",
+              ashPercent: p.ashPercent ?? "",
+              plannedQtyKg: p.plannedQtyKg ? p.plannedQtyKg : "",
+              omega: p.omega || "",
+              vistPercent: p.vistPercent ?? "",
+              remarks: p.remarks || "",
+              materials: p.materials || [],
+              isDayNight: Boolean(p.isDayNight),
+              status: p.status || "DRAFT",
+            }));
+            setRecipePlans(loaded);
+            if (data.plans[0]?.status) {
+              setStatus(data.plans[0].status === "SUBMITTED" ? "SUBMITTED" : "SAVED");
+            }
+          }
+        })
+        .catch(() => {});
+    },
+  });
+
   // Active plan helper
   const currentPlan = recipePlans[activeRecipeIndex] || recipePlans[0] || createEmptyRecipePlan(1);
 
@@ -480,6 +528,7 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName, shifts }: T
           const resData = await res.json();
           lastSavedPayloadRef.current = serialized;
           setLastAutoSavedAt(new Date());
+          realtime.broadcastSync({ action: "SAVE", date, shift: shiftId });
           if (Array.isArray(resData.plans)) {
             // Only update recipePlans state if IDs actually changed (e.g. newly minted DB IDs)
             // This prevents disruptive input re-renders, focus loss, and keystroke drops while typing
@@ -568,6 +617,11 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName, shifts }: T
       const resData = await res.json();
       lastSavedPayloadRef.current = JSON.stringify(payload);
       setLastAutoSavedAt(new Date());
+      realtime.broadcastSync({
+        action: submitStatus === "SUBMITTED" ? "SUBMIT" : "SAVE",
+        date,
+        shift: shiftId,
+      });
 
       if (Array.isArray(resData.plans)) {
         setRecipePlans(
@@ -913,6 +967,14 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName, shifts }: T
 
         {/* Desktop Header Controls */}
         <div className="hidden sm:flex sm:flex-wrap items-center gap-2 w-auto">
+          <RealtimeSyncBadge
+            isConnected={realtime.isConnected}
+            lastUpdatedBy={realtime.lastUpdatedBy}
+            lastUpdatedAt={realtime.lastUpdatedAt}
+            lastAction={realtime.lastAction}
+            isSelfUpdate={realtime.isSelfUpdate}
+          />
+
           {/* Auto-save indicator */}
           {autoSaving ? (
             <div className="inline-flex items-center justify-center gap-1.5 px-2.5 py-1 bg-slate-50 text-slate-600 border border-slate-200 text-xs font-medium rounded-lg h-8.5">

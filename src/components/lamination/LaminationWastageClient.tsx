@@ -31,6 +31,8 @@ import dynamic from "next/dynamic";
 import { exportWastageReportExcel } from "@/lib/lamination/wastage-export";
 import { UniversalPersonnelInput } from "@/components/ui/UniversalPersonnelInput";
 import { UniversalShiftSelector } from "@/components/production/UniversalShiftSelector";
+import { useProductionRealtime } from "@/hooks/useProductionRealtime";
+import { RealtimeSyncBadge } from "@/components/production/RealtimeSyncBadge";
 
 const WastagePrintModal = dynamic(
   () => import("./WastagePrintModal").then((m) => m.WastagePrintModal),
@@ -156,6 +158,16 @@ export function LaminationWastageClient() {
     fetchReport();
   }, [date, shiftName]);
 
+  const realtime = useProductionRealtime({
+    module: "lamination",
+    sheet: "wastage",
+    date,
+    shift: shiftName,
+    onSync: () => {
+      fetchReport();
+    },
+  });
+
   // Real-time calculation
   const calculated = useMemo(() => {
     return calculateWastage(
@@ -192,6 +204,11 @@ export function LaminationWastageClient() {
         const data = await res.json();
         if (data.success) {
           setStatus(finalStatus);
+          realtime.broadcastSync({
+            action: finalStatus === "SUBMITTED" ? "SUBMIT" : "SAVE",
+            date,
+            shift: shiftName,
+          });
           toast.success(
             finalStatus === "SUBMITTED"
               ? "Lamination Wastage report submitted successfully"
@@ -249,6 +266,14 @@ export function LaminationWastageClient() {
 
         {/* Global Action Buttons */}
         <div className="flex flex-wrap items-center gap-2">
+          <RealtimeSyncBadge
+            isConnected={realtime.isConnected}
+            lastUpdatedBy={realtime.lastUpdatedBy}
+            lastUpdatedAt={realtime.lastUpdatedAt}
+            lastAction={realtime.lastAction}
+            isSelfUpdate={realtime.isSelfUpdate}
+          />
+
           <Button
             variant="outline"
             size="sm"

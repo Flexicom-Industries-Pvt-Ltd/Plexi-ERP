@@ -33,6 +33,8 @@ import {
   RawMaterialEntryItem,
 } from "@/lib/lamination/lamination-raw-material-types";
 import dynamic from "next/dynamic";
+import { useProductionRealtime } from "@/hooks/useProductionRealtime";
+import { RealtimeSyncBadge } from "@/components/production/RealtimeSyncBadge";
 import { exportRawMaterialReportExcel } from "@/lib/lamination/raw-material-export";
 import { UniversalPersonnelInput } from "@/components/ui/UniversalPersonnelInput";
 import { UniversalShiftSelector } from "@/components/production/UniversalShiftSelector";
@@ -132,6 +134,16 @@ export function LaminationRawMaterialEntryClient() {
   useEffect(() => {
     fetchReport();
   }, [date, shiftName]);
+
+  const realtime = useProductionRealtime({
+    module: "lamination",
+    sheet: "raw-materials",
+    date,
+    shift: shiftName,
+    onSync: () => {
+      fetchReport();
+    },
+  });
 
   // Handle Manual Total Input Change
   const handleManualTotalChange = (valStr: string) => {
@@ -290,6 +302,11 @@ export function LaminationRawMaterialEntryClient() {
         const data = await res.json();
         if (data.success) {
           setStatus(finalStatus);
+          realtime.broadcastSync({
+            action: finalStatus === "SUBMITTED" ? "SUBMIT" : "SAVE",
+            date,
+            shift: shiftName,
+          });
           toast.success(
             finalStatus === "SUBMITTED"
               ? "Lamination Raw Material report submitted successfully"
@@ -362,6 +379,14 @@ export function LaminationRawMaterialEntryClient() {
 
         {/* Global Action Buttons */}
         <div className="flex flex-wrap items-center gap-2">
+          <RealtimeSyncBadge
+            isConnected={realtime.isConnected}
+            lastUpdatedBy={realtime.lastUpdatedBy}
+            lastUpdatedAt={realtime.lastUpdatedAt}
+            lastAction={realtime.lastAction}
+            isSelfUpdate={realtime.isSelfUpdate}
+          />
+
           <Button
             variant="outline"
             size="sm"
