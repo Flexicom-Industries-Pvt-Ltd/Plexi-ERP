@@ -27,6 +27,8 @@ import { SpreadsheetTable, ColumnDef } from "./SpreadsheetTable";
 import { OperatorSelect } from "./OperatorSelect";
 import { PhotoEvidenceModal } from "./PhotoEvidenceModal";
 import { useProductionShifts } from "@/hooks/useProductionShifts";
+import { useProductionRealtime } from "@/hooks/useProductionRealtime";
+import { RealtimeSyncBadge } from "@/components/production/RealtimeSyncBadge";
 import {
   generateShiftTimeSlots,
   isTimeSlotLocked,
@@ -273,6 +275,54 @@ export function ProcessTemperatureSection({
       });
   }, [date, shiftId, shiftIntervals]);
 
+  const realtime = useProductionRealtime({
+    module: "tape-plant",
+    sheet: "temperature",
+    date,
+    shift: shiftId,
+    onSync: () => {
+      if (!date || !shiftId) return;
+      fetch(`/api/production/tape-plant/temperature?date=${date}&shiftId=${shiftId}&_t=${Date.now()}`)
+        .then((r) => (r.ok ? r.json() : []))
+        .then((data: any[]) => {
+          if (data && data.length > 0) {
+            const mapped: TemperatureReading[] = data.map((d) => ({
+              id: d.id,
+              time: d.time || "",
+              photoUrl: d.photoUrl || undefined,
+              b1: d.b1 ?? "",
+              b2: d.b2 ?? "",
+              b3: d.b3 ?? "",
+              b4: d.b4 ?? "",
+              b5: d.b5 ?? "",
+              b6: d.b6 ?? "",
+              b7: d.b7 ?? "",
+              screenChanger: d.screenChanger ?? "",
+              ad1: d.ad1 ?? "",
+              ad2: d.ad2 ?? "",
+              meltPump: d.meltPump ?? "",
+              d1: d.d1 ?? "",
+              d2: d.d2 ?? "",
+              d3: d.d3 ?? "",
+              dieBottom: d.dieBottom ?? "",
+              feedBlock: d.feedBlock ?? "",
+              holdingTank: d.holdingTank ?? "",
+              d4: d.d4 ?? "",
+              d5: d.d5 ?? "",
+              d6: d.d6 ?? "",
+              d7: d.d7 ?? "",
+              meltTemp: d.meltTemp ?? "",
+              h1: d.h1 ?? "",
+              h2: d.h2 ?? "",
+              hotAirTemp: d.hotAirTemp ?? "",
+            }));
+            setReadings(mapped);
+          }
+        })
+        .catch(() => {});
+    },
+  });
+
   // Debounced Auto-Save
   useEffect(() => {
     if (!isInitialLoadedRef.current || !date || !shiftId) return;
@@ -302,6 +352,7 @@ export function ProcessTemperatureSection({
         if (res.ok) {
           lastSavedPayloadRef.current = serialized;
           setLastAutoSavedAt(new Date());
+          realtime.broadcastSync({ action: "SAVE", date, shift: shiftId });
         }
       } catch (err) {
         console.error("Auto-save error:", err);
@@ -337,6 +388,7 @@ export function ProcessTemperatureSection({
 
       lastSavedPayloadRef.current = JSON.stringify(payload);
       setLastAutoSavedAt(new Date());
+      realtime.broadcastSync({ action: "SAVE", date, shift: shiftId });
       toast.success("Process temperature readings saved");
     } catch (err: any) {
       toast.error(err.message || "Failed to save readings");
@@ -866,6 +918,14 @@ export function ProcessTemperatureSection({
           </div>
 
           {/* Desktop Auto-save Status Indicator */}
+          <RealtimeSyncBadge
+            isConnected={realtime.isConnected}
+            lastUpdatedBy={realtime.lastUpdatedBy}
+            lastUpdatedAt={realtime.lastUpdatedAt}
+            lastAction={realtime.lastAction}
+            isSelfUpdate={realtime.isSelfUpdate}
+          />
+
           {autoSaving ? (
             <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 text-slate-600 border border-slate-200 text-xs font-medium rounded-lg h-8">
               <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />

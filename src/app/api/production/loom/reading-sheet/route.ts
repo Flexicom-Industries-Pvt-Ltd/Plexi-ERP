@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { requireLoomApiPermission } from "@/lib/loom/permissions";
 import { logAudit } from "@/lib/audit-logger";
 import { withResourceLock } from "@/lib/concurrency-lock";
+import { emitProductionSync } from "@/lib/realtime/production-bus";
 import {
   LoomReadingEntryItem,
   IntervalKpiSummary,
@@ -753,6 +754,19 @@ export async function POST(request: NextRequest) {
         },
       });
 
+      emitProductionSync({
+        module: "loom",
+        sheet: "reading-sheet",
+        action: "SAVE",
+        date,
+        shift: shiftName,
+        user: {
+          name: authResult.session?.user?.name || authResult.session?.user?.email || "Operator",
+          email: authResult.session?.user?.email || undefined,
+          role: (authResult.session?.user as any)?.roleName || (authResult.session?.user as any)?.role || "Staff",
+        },
+      });
+
       return NextResponse.json({
         success: true,
         sheetId: savedSheet.id,
@@ -828,6 +842,19 @@ export async function POST(request: NextRequest) {
         },
       });
 
+      emitProductionSync({
+        module: "loom",
+        sheet: "reading-sheet",
+        action: "UPDATE",
+        date,
+        shift: shiftName,
+        user: {
+          name: authResult.session?.user?.name || authResult.session?.user?.email || "Operator",
+          email: authResult.session?.user?.email || undefined,
+          role: (authResult.session?.user as any)?.roleName || (authResult.session?.user as any)?.role || "Staff",
+        },
+      });
+
       return NextResponse.json({
         success: true,
         message: `Assigned operator to looms #${start} - #${end}`,
@@ -856,6 +883,19 @@ export async function POST(request: NextRequest) {
           },
         });
       }
+
+      emitProductionSync({
+        module: "loom",
+        sheet: "reading-sheet",
+        action: "CLEAR",
+        date,
+        shift: shiftName,
+        user: {
+          name: authResult.session?.user?.name || authResult.session?.user?.email || "Operator",
+          email: authResult.session?.user?.email || undefined,
+          role: (authResult.session?.user as any)?.roleName || (authResult.session?.user as any)?.role || "Staff",
+        },
+      });
 
       return NextResponse.json({
         success: true,

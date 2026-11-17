@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireLoomApiPermission } from "@/lib/loom/permissions";
 import { logAudit } from "@/lib/audit-logger";
+import { emitProductionSync } from "@/lib/realtime/production-bus";
 import {
   LoomRollCuttingEntryItem,
   computeRollMeters,
@@ -657,6 +658,20 @@ export async function POST(request: NextRequest) {
         newValues: {
           details: `Saved Daily Loom Roll Cutting Report for ${date} (${targetShiftName}): ${processedEntries.length} rolls, ${reportTotalMeters.toLocaleString()}m, ${reportTotalNett.toFixed(2)}kg nett weight, avg ${averageWeightPerMeter} g/m.`,
         },
+      });
+
+      emitProductionSync({
+        module: "loom",
+        sheet: "roll-cutting",
+        action: status === "SUBMITTED" ? "SUBMIT" : "SAVE",
+        date,
+        shift: targetShiftName,
+        user: {
+          name: authResult.session?.user?.name || supervisorName || "Operator",
+          email: authResult.session?.user?.email,
+          role: (authResult.session?.user as any)?.roleName || (authResult.session?.user as any)?.role || "Supervisor",
+        },
+        timestamp: Date.now(),
       });
 
       return NextResponse.json({

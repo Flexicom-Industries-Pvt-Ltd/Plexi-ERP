@@ -36,6 +36,8 @@ import { exportValvomaticReportExcel } from "@/lib/valvomatic/valvomatic-export"
 import { UniversalQualityInput } from "@/components/ui/UniversalQualityInput";
 import { UniversalPersonnelInput } from "@/components/ui/UniversalPersonnelInput";
 import { UniversalShiftSelector } from "@/components/production/UniversalShiftSelector";
+import { useProductionRealtime } from "@/hooks/useProductionRealtime";
+import { RealtimeSyncBadge } from "@/components/production/RealtimeSyncBadge";
 
 const ValvomaticReportPrintModal = dynamic(
   () => import("./ValvomaticReportPrintModal").then((m) => m.ValvomaticReportPrintModal),
@@ -238,6 +240,16 @@ export function ValvomaticDailyReportClient() {
     fetchReportData();
   }, [fetchReportData]);
 
+  const realtime = useProductionRealtime({
+    module: "valvomatic",
+    sheet: "daily-report",
+    date,
+    shift: shiftName,
+    onSync: () => {
+      fetchReportData();
+    },
+  });
+
   // Handle cell edits with live recalculation and dirty flagging
   const handleCellChange = (index: number, field: keyof ValvomaticReportItem, value: any) => {
     isDirtyRef.current = true;
@@ -370,6 +382,12 @@ export function ValvomaticDailyReportClient() {
 
       setLastSavedAt(format(new Date(), "hh:mm:ss a"));
       isDirtyRef.current = false;
+
+      realtime.broadcastSync({
+        action: finalStatus === "SUBMITTED" ? "SUBMIT" : "SAVE",
+        date: currentData.date,
+        shift: currentData.shiftName,
+      });
 
       if (!isSilent) {
         toast.success(
@@ -531,6 +549,13 @@ export function ValvomaticDailyReportClient() {
 
           {/* Action Buttons Strip */}
           <div className="flex flex-wrap items-center gap-2">
+            <RealtimeSyncBadge
+              isConnected={realtime.isConnected}
+              lastUpdatedBy={realtime.lastUpdatedBy}
+              lastUpdatedAt={realtime.lastUpdatedAt}
+              lastAction={realtime.lastAction}
+              isSelfUpdate={realtime.isSelfUpdate}
+            />
 
             <button
               onClick={() => saveReport("DRAFT")}

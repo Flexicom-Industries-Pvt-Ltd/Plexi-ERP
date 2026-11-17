@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireLoomApiPermission } from "@/lib/loom/permissions";
 import { logAudit } from "@/lib/audit-logger";
+import { emitProductionSync } from "@/lib/realtime/production-bus";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -256,6 +257,19 @@ export async function POST(request: NextRequest) {
         },
       });
 
+      emitProductionSync({
+        module: "loom",
+        sheet: "changeover",
+        action: "SCHEDULE",
+        date: targetDate,
+        shift: targetShiftName,
+        user: {
+          name: authResult.session?.user?.name || "Floor Admin",
+          email: authResult.session?.user?.email || undefined,
+          role: (authResult.session?.user as any)?.roleName || (authResult.session?.user as any)?.role || "Staff",
+        },
+      });
+
       return NextResponse.json({ success: true, record: upserted });
     }
 
@@ -375,6 +389,17 @@ export async function POST(request: NextRequest) {
         loomNumbers: updatedResults.map((r) => r.loomNumber),
       },
       durationMs,
+    });
+
+    emitProductionSync({
+      module: "loom",
+      sheet: "changeover",
+      action: "UPDATE",
+      user: {
+        name: authResult.session?.user?.name || "Floor Admin",
+        email: authResult.session?.user?.email || undefined,
+        role: (authResult.session?.user as any)?.roleName || (authResult.session?.user as any)?.role || "Staff",
+      },
     });
 
     return NextResponse.json({

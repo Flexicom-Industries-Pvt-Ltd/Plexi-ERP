@@ -18,6 +18,8 @@ const LaminationReportPrintModal = dynamic(
   { ssr: false }
 );
 import { exportLaminationReportExcel } from "@/lib/lamination/lamination-report-export";
+import { useProductionRealtime } from "@/hooks/useProductionRealtime";
+import { RealtimeSyncBadge } from "@/components/production/RealtimeSyncBadge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -191,6 +193,18 @@ export function LaminationReportClient() {
     }
   }, [date, shiftName, fetchReport]);
 
+  const realtime = useProductionRealtime({
+    module: "lamination",
+    sheet: "production-report",
+    date,
+    shift: shiftName,
+    onSync: () => {
+      if (date && shiftName) {
+        fetchReport(date, shiftName);
+      }
+    },
+  });
+
   // Combined set of master qualities + any dynamically entered in active sheet
   const allQualities = useMemo(() => {
     const set = new Set<string>(availableQualities);
@@ -331,6 +345,11 @@ export function LaminationReportClient() {
 
       setReportId(json.report.id);
       setStatus(newStatus);
+      realtime.broadcastSync({
+        action: newStatus === "SUBMITTED" ? "SUBMIT" : "SAVE",
+        date,
+        shift: shiftName,
+      });
       toast.success(
         newStatus === "SUBMITTED"
           ? "Lamination Production Report submitted successfully!"
@@ -412,6 +431,14 @@ export function LaminationReportClient() {
 
         {/* Global Action Buttons */}
         <div className="flex flex-wrap items-center gap-2">
+          <RealtimeSyncBadge
+            isConnected={realtime.isConnected}
+            lastUpdatedBy={realtime.lastUpdatedBy}
+            lastUpdatedAt={realtime.lastUpdatedAt}
+            lastAction={realtime.lastAction}
+            isSelfUpdate={realtime.isSelfUpdate}
+          />
+
           <Button
             variant="outline"
             size="sm"

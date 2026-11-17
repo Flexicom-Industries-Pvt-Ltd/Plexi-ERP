@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { requirePrintingApiPermission } from "@/lib/printing/permissions";
 import { calculatePrintingWastage } from "@/lib/printing/printing-types";
 import { logEvent } from "@/lib/logging";
+import { emitProductionSync } from "@/lib/realtime/production-bus";
 import { Module } from "@/generated/prisma";
 
 export const dynamic = "force-dynamic";
@@ -198,6 +199,19 @@ export async function POST(request: NextRequest) {
         totalProductionKg: prodKg,
         totalWastageKg: calc.totalWastageKg,
         totalWastagePct: calc.totalWastagePct,
+      },
+    });
+
+    emitProductionSync({
+      module: "printing",
+      sheet: "wastage",
+      action: status === "SUBMITTED" ? "SUBMIT" : "SAVE",
+      date,
+      shift: shiftName,
+      user: {
+        name: authResult.session?.user?.name || "Printing Operator",
+        email: authResult.session?.user?.email || undefined,
+        role: (authResult.session?.user as any)?.roleName || (authResult.session?.user as any)?.role || "Staff",
       },
     });
 

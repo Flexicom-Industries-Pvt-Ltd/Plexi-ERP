@@ -33,6 +33,8 @@ const BobbinStockPrintPreviewModal = dynamic(
 );
 import { BobbinIssueModal } from "./BobbinIssueModal";
 import { BobbinIssueSlipModal } from "./BobbinIssueSlipModal";
+import { useProductionRealtime } from "@/hooks/useProductionRealtime";
+import { RealtimeSyncBadge } from "@/components/production/RealtimeSyncBadge";
 import { BobbinIssueSlipData } from "@/lib/tape-plant/print-bobbin-issue-slip";
 import {
   BobbinStockItem,
@@ -198,6 +200,14 @@ export function BobbinStockSummarySection({
   useEffect(() => {
     fetchBobbinStock();
   }, [fetchBobbinStock]);
+
+  const realtime = useProductionRealtime({
+    module: "tape-plant",
+    sheet: "bobbin-stock",
+    onSync: () => {
+      fetchBobbinStock();
+    },
+  });
 
   const handleResetFilters = () => {
     setDateFilterMode("all");
@@ -395,6 +405,14 @@ export function BobbinStockSummarySection({
 
             {/* Global Actions */}
             <div className="flex flex-wrap items-center gap-2">
+              <RealtimeSyncBadge
+                isConnected={realtime.isConnected}
+                lastUpdatedBy={realtime.lastUpdatedBy}
+                lastUpdatedAt={realtime.lastUpdatedAt}
+                lastAction={realtime.lastAction}
+                isSelfUpdate={realtime.isSelfUpdate}
+              />
+
               {/* Quick Issue Button */}
               <button
                 type="button"

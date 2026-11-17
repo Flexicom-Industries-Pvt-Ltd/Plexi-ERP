@@ -21,6 +21,8 @@ import {
 import { RecipeQualityBadge } from "./RecipeQualityBadge";
 import { OperatorSelect } from "./OperatorSelect";
 import dynamic from "next/dynamic";
+import { useProductionRealtime } from "@/hooks/useProductionRealtime";
+import { RealtimeSyncBadge } from "@/components/production/RealtimeSyncBadge";
 
 const PostProductionPrintPreviewModal = dynamic(
   () => import("./PostProductionPrintPreviewModal").then((m) => m.PostProductionPrintPreviewModal),
@@ -127,6 +129,16 @@ export function PostProductionSection({ date, shiftId, shiftName }: PostProducti
     fetchPostProductionData();
   }, [fetchPostProductionData]);
 
+  const realtime = useProductionRealtime({
+    module: "tape-plant",
+    sheet: "post-production",
+    date,
+    shift: shiftId,
+    onSync: () => {
+      fetchPostProductionData();
+    },
+  });
+
   // Debounced Auto-Save
   useEffect(() => {
     if (!isInitialLoadedRef.current || !date || !shiftId || entries.length === 0) return;
@@ -154,6 +166,7 @@ export function PostProductionSection({ date, shiftId, shiftName }: PostProducti
         if (res.ok) {
           lastSavedPayloadRef.current = serialized;
           setLastAutoSavedAt(new Date());
+          realtime.broadcastSync({ action: "SAVE", date, shift: shiftId });
         }
       } catch (err) {
         console.error("Auto-save error:", err);
@@ -244,6 +257,11 @@ export function PostProductionSection({ date, shiftId, shiftName }: PostProducti
 
       lastSavedPayloadRef.current = JSON.stringify(payload);
       setLastAutoSavedAt(new Date());
+      realtime.broadcastSync({
+        action: submitStatus === "SUBMITTED" ? "SUBMIT" : "SAVE",
+        date,
+        shift: shiftId,
+      });
       setStatus(submitStatus);
       toast.success(
         submitStatus === "SUBMITTED"
@@ -307,6 +325,14 @@ export function PostProductionSection({ date, shiftId, shiftName }: PostProducti
           </div>
 
           {/* Desktop Auto-save Status Indicator */}
+          <RealtimeSyncBadge
+            isConnected={realtime.isConnected}
+            lastUpdatedBy={realtime.lastUpdatedBy}
+            lastUpdatedAt={realtime.lastUpdatedAt}
+            lastAction={realtime.lastAction}
+            isSelfUpdate={realtime.isSelfUpdate}
+          />
+
           {autoSaving ? (
             <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 text-slate-600 border border-slate-200 text-xs font-medium rounded-lg h-8">
               <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
