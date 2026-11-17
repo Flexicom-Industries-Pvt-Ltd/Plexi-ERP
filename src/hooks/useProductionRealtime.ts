@@ -37,7 +37,7 @@ export function useProductionRealtime({
   onSync,
   enabled = true,
 }: UseProductionRealtimeOptions): UseProductionRealtimeResult {
-  const [isConnected, setIsConnected] = useState(false);
+  const [isConnected, setIsConnected] = useState(true);
   const [lastUpdatedBy, setLastUpdatedBy] = useState<ProductionSyncUser | null>(null);
   const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
   const [lastAction, setLastAction] = useState<string | null>(null);
@@ -75,13 +75,13 @@ export function useProductionRealtime({
       .catch(() => {});
   }, [currentUser]);
 
+  // Unique tab identifier generated in memory to distinguish separate tabs/devices
   const clientIdRef = useRef<string>("");
   if (!clientIdRef.current && typeof window !== "undefined") {
-    clientIdRef.current = "client_" + Math.random().toString(36).substring(2, 9);
+    clientIdRef.current = "client_" + Math.random().toString(36).substring(2, 9) + "_" + Date.now();
   }
 
   const broadcastChannelRef = useRef<BroadcastChannel | null>(null);
-  const eventSourceRef = useRef<EventSource | null>(null);
   const lastEventTimestampRef = useRef<number>(0);
   const onSyncRef = useRef(onSync);
   onSyncRef.current = onSync;
@@ -107,22 +107,21 @@ export function useProductionRealtime({
       }
       lastEventTimestampRef.current = event.timestamp;
 
-      const userEmail = activeUser.email || currentUser?.email;
-      const isFromSelf =
-        (sourceClientId && sourceClientId === clientIdRef.current) ||
-        (userEmail && event.user?.email === userEmail);
+      // Only the originating browser tab skips re-fetching.
+      // Other devices/tabs (even under the same user account) must trigger onSync to see fresh data!
+      const isFromSelf = Boolean(sourceClientId && sourceClientId === clientIdRef.current);
 
-      setIsSelfUpdate(Boolean(isFromSelf));
+      setIsSelfUpdate(isFromSelf);
       setLastUpdatedBy(event.user);
       setLastUpdatedAt(new Date(event.timestamp));
       setLastAction(event.action || "UPDATE");
 
-      // Notify consumer to quietly re-fetch if update came from someone else
+      // Notify consumer component to quietly re-fetch if update came from another tab or device
       if (!isFromSelf) {
         onSyncRef.current?.(event);
       }
     },
-    [mod, sheet, date, activeUser.email, currentUser?.email]
+    [mod, sheet, date]
   );
 
   // 1. Same-Browser Native BroadcastChannel (Multi-tab sync with 0 latency & 0 network overhead)
@@ -150,101 +149,98 @@ export function useProductionRealtime({
     }
   }, [enabled, handleIncomingEvent]);
 
-  // 2. Server-Sent Events (SSE) Stream
+  // 2. High-Performance PostgreSQL-Backed Adaptive Heartbeat Polling
+  // Guaranteed cross-serverless synchronization (runs every 2.5s on active tab, 30s when backgrounded)
   useEffect(() => {
     if (!enabled || typeof window === "undefined") return;
 
-    let retryTimeout: NodeJS.Timeout | null = null;
-    let fallbackInterval: NodeJS.Timeout | null = null;
-    let sseActive = true;
+    let isDisposed = false;
+    let timerId: NodeJS.Timeout | null = null;
 
-    const connectSSE = () => {
+    const checkDatabaseSync = async () => {
+      if (isDisposed) return;
+
       try {
-        const url = `/api/production/realtime/stream?module=${encodeURIComponent(mod)}&sheet=${encodeURIComponent(sheet)}`;
-        const es = new EventSource(url);
-        eventSourceRef.current = es;
+        const params = new URLSearchParams({
+          module: mod,
+          sheet,
+          _t: Date.now().toString(),
+        });
+        if (date) params.set("date", date);
+        if (shift) params.set("shift", shift);
+        if (lastEventTimestampRef.current > 0) {
+          params.set("since", lastEventTimestampRef.current.toString());
+        }
 
-        es.onopen = () => {
+        const res = await fetch(`/api/production/realtime/status?${params.toString()}`, {
+          method: "GET",
+          cache: "no-store",
+          headers: {
+            "Cache-Control": "no-cache",
+            Pragma: "no-cache",
+          },
+        });
+
+        if (res.ok && !isDisposed) {
           setIsConnected(true);
-          if (fallbackInterval) {
-            clearInterval(fallbackInterval);
-            fallbackInterval = null;
-          }
-        };
-
-        es.addEventListener("sync", (e: MessageEvent) => {
-          try {
-            const eventData = JSON.parse(e.data) as ProductionSyncEvent;
-            handleIncomingEvent(eventData);
-          } catch {
-            // ignore malformed JSON
-          }
-        });
-
-        es.addEventListener("init", (e: MessageEvent) => {
-          try {
-            const initData = JSON.parse(e.data);
-            if (initData && initData.timestamp && initData.user) {
-              setLastUpdatedBy(initData.user);
-              setLastUpdatedAt(new Date(initData.timestamp));
-              lastEventTimestampRef.current = initData.timestamp;
+          const data = await res.json();
+          if (data.hasUpdate && data.latest) {
+            handleIncomingEvent(data.latest);
+          } else if (data.timestamp && data.timestamp > lastEventTimestampRef.current) {
+            // Sync up initial timestamp
+            lastEventTimestampRef.current = data.timestamp;
+            if (data.latest?.user) {
+              setLastUpdatedBy(data.latest.user);
+              setLastUpdatedAt(new Date(data.timestamp));
             }
-          } catch {
-            // ignore
           }
-        });
-
-        es.onerror = () => {
-          setIsConnected(false);
-          es.close();
-          eventSourceRef.current = null;
-
-          // Start lightweight fallback polling (every 15s) while SSE reconnects
-          if (!fallbackInterval && sseActive) {
-            fallbackInterval = setInterval(async () => {
-              try {
-                const res = await fetch(
-                  `/api/production/realtime/status?module=${encodeURIComponent(mod)}&sheet=${encodeURIComponent(sheet)}&since=${lastEventTimestampRef.current}`
-                );
-                if (res.ok) {
-                  const data = await res.json();
-                  if (data.hasUpdate && data.latest) {
-                    handleIncomingEvent(data.latest);
-                  }
-                }
-              } catch {
-                // ignore network error
-              }
-            }, 15000);
-          }
-
-          // Retry SSE in 6 seconds
-          if (sseActive) {
-            retryTimeout = setTimeout(connectSSE, 6000);
-          }
-        };
-      } catch (err) {
-        console.warn("SSE connection error", err);
+        }
+      } catch {
+        // Silently tolerate transient network drop; preserve UI smoothness
+        if (!isDisposed) setIsConnected(false);
+      } finally {
+        if (!isDisposed) {
+          // Schedule next check: 2500ms when tab is focused and visible; 30000ms when tab is hidden
+          const nextInterval =
+            typeof document !== "undefined" && document.visibilityState === "hidden"
+              ? 30000
+              : 2500;
+          timerId = setTimeout(checkDatabaseSync, nextInterval);
+        }
       }
     };
 
-    connectSSE();
+    // Immediate initial sync check
+    checkDatabaseSync();
+
+    // Trigger instant check when user switches back to this tab
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        if (timerId) clearTimeout(timerId);
+        checkDatabaseSync();
+      }
+    };
+
+    const handleFocus = () => {
+      if (timerId) clearTimeout(timerId);
+      checkDatabaseSync();
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("focus", handleFocus);
 
     return () => {
-      sseActive = false;
-      if (retryTimeout) clearTimeout(retryTimeout);
-      if (fallbackInterval) clearInterval(fallbackInterval);
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close();
-        eventSourceRef.current = null;
-      }
-      setIsConnected(false);
+      isDisposed = true;
+      if (timerId) clearTimeout(timerId);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("focus", handleFocus);
     };
-  }, [enabled, mod, sheet, handleIncomingEvent]);
+  }, [enabled, mod, sheet, date, shift, handleIncomingEvent]);
 
   // 3. Broadcast helper for components after a successful save
   const broadcastSync = useCallback(
     async (params?: { action?: string; date?: string; shift?: string; metadata?: Record<string, any> }) => {
+      const eventTimestamp = Date.now();
       const event: ProductionSyncEvent = {
         module: mod,
         sheet,
@@ -257,13 +253,13 @@ export function useProductionRealtime({
           email: activeUser.email || currentUser?.email || undefined,
           role: activeUser.role || currentUser?.role || "Staff",
         },
-        timestamp: Date.now(),
+        timestamp: eventTimestamp,
       };
 
-      lastEventTimestampRef.current = event.timestamp;
+      lastEventTimestampRef.current = eventTimestamp;
       setIsSelfUpdate(true);
       setLastUpdatedBy(event.user);
-      setLastUpdatedAt(new Date(event.timestamp));
+      setLastUpdatedAt(new Date(eventTimestamp));
       setLastAction(event.action);
 
       // Local cross-tab broadcast (0 latency)
@@ -276,19 +272,19 @@ export function useProductionRealtime({
         // ignore
       }
 
-      // Server broadcast
+      // Server broadcast to notify all serverless containers and invalidate sync cache
       try {
         await fetch("/api/production/realtime/status", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(event),
+          body: JSON.stringify({ ...event, clientId: clientIdRef.current }),
           keepalive: true,
         });
       } catch (err) {
         console.warn("Failed to notify server of production sync event", err);
       }
     },
-    [mod, sheet, date, shift, currentUser]
+    [mod, sheet, date, shift, activeUser, currentUser]
   );
 
   return {
