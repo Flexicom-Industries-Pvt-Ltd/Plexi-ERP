@@ -135,7 +135,9 @@ export function PostProductionSection({ date, shiftId, shiftName }: PostProducti
     date,
     shift: shiftId,
     onSync: () => {
-      fetchPostProductionData();
+      if (!autoSaving) {
+        fetchPostProductionData();
+      }
     },
   });
 
@@ -179,6 +181,7 @@ export function PostProductionSection({ date, shiftId, shiftName }: PostProducti
   }, [entries, operatorName, operatorId, date, shiftId, status]);
 
   const updateEntryField = (index: number, field: keyof RecipePostProductionEntry, value: any) => {
+    realtime.markLocalEdit();
     setEntries((prev) => {
       const copy = [...prev];
       const item = { ...copy[index], [field]: value };

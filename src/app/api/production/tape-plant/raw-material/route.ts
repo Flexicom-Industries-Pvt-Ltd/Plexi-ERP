@@ -20,8 +20,9 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    const isAll = shiftId.toUpperCase() === "ALL";
     const records = await db.tapePlantRawMaterial.findMany({
-      where: { date, shiftId },
+      where: isAll ? { date } : { date, shiftId },
     });
 
     return NextResponse.json(records, {
@@ -51,10 +52,27 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Date, Shift, and Records array are required" }, { status: 400 });
     }
 
+    const isAll = shiftId.toUpperCase() === "ALL";
+
+    // Resolve active shift to satisfy foreign key constraint when shiftId is ALL
+    const defaultShift = await db.shift.findFirst({
+      where: { isActive: true },
+      orderBy: { startTime: "asc" },
+      select: { id: true },
+    });
+    const fallbackShiftId = defaultShift?.id || "shift_day";
+    const targetShiftId = isAll ? fallbackShiftId : shiftId;
+
     await db.$transaction(async (tx: any) => {
-      await tx.tapePlantRawMaterial.deleteMany({
-        where: { date, shiftId },
-      });
+      if (isAll) {
+        await tx.tapePlantRawMaterial.deleteMany({
+          where: { date },
+        });
+      } else {
+        await tx.tapePlantRawMaterial.deleteMany({
+          where: { date, shiftId },
+        });
+      }
 
       if (records.length > 0) {
         const validRecords = records
@@ -68,7 +86,7 @@ export async function POST(request: NextRequest) {
 
             return {
               date,
-              shiftId,
+              shiftId: targetShiftId,
               operatorName: r.operatorName || operatorName || null,
               operatorId: r.operatorId || operatorId || null,
               photoUrl: r.photoUrl || null,
@@ -94,7 +112,7 @@ export async function POST(request: NextRequest) {
     });
 
     const updated = await db.tapePlantRawMaterial.findMany({
-      where: { date, shiftId },
+      where: isAll ? { date } : { date, shiftId },
     });
 
     emitProductionSync({
