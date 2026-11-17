@@ -1,4 +1,4 @@
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { requireApiAuth } from "@/lib/api-auth";
 import { apiError, apiSuccess } from "@/lib/api-response";
 import { Module } from "@/generated/prisma";
@@ -47,6 +47,16 @@ export async function PATCH(
     return apiSuccess(updated);
   } catch (error: any) {
     console.error("Error updating gate entry:", error);
+    if (error.blockers) {
+      return NextResponse.json(
+        {
+          error: error.message || "Failed to update gate entry",
+          code: error.code || "GATE_OUT_BLOCKED",
+          blockers: error.blockers,
+        },
+        { status: 422 }
+      );
+    }
     return apiError(error.message || "Failed to update gate entry", 400);
   }
 }

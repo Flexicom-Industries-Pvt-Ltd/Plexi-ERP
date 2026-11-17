@@ -24,7 +24,13 @@ export async function GET(request: NextRequest) {
       orderBy: { time: "asc" },
     });
 
-    return NextResponse.json(records);
+    return NextResponse.json(records, {
+      headers: {
+        "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
+        Pragma: "no-cache",
+        Expires: "0",
+      },
+    });
   } catch (error) {
     console.error("Error fetching Tape Plant drive parameters:", error);
     return NextResponse.json({ error: "Failed to fetch drive parameters" }, { status: 500 });
@@ -59,6 +65,7 @@ export async function POST(request: NextRequest) {
             time: String(r.time).trim(),
             operatorName: r.operatorName || operatorName || null,
             operatorId: r.operatorId || operatorId || null,
+            photoUrl: r.photoUrl || null,
             extruderRpm: r.extruderRpm !== "" && r.extruderRpm !== null && r.extruderRpm !== undefined ? Number(r.extruderRpm) : null,
             meltPumpRpm: r.meltPumpRpm !== "" && r.meltPumpRpm !== null && r.meltPumpRpm !== undefined ? Number(r.meltPumpRpm) : null,
             takeUpMpm: r.takeUpMpm !== "" && r.takeUpMpm !== null && r.takeUpMpm !== undefined ? Number(r.takeUpMpm) : null,

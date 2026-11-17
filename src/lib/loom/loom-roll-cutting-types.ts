@@ -15,6 +15,7 @@ export interface LoomRollCuttingEntryItem {
   avgWeightPerMeter: number; // (Nett * 1000) / Meter in g/m
   supervisorSign: string;    // Supervisor name/initials
   remarks: string;           // Notes / inspection remarks
+  photoUrl?: string | null;  // Scale reading / physical roll evidence photo URL
   productionRollId?: string | null;
 }
 
@@ -110,25 +111,41 @@ export function computeRollWeightsAndAvg(
 }
 
 /**
- * Generates the next sequential roll number based on existing roll numbers or prefix.
- * Example: "CT-14376" -> "CT-14377"
+ * Generates the next sequential roll number based on factory barcode standard (ROL-YYYYMM-XXXXX)
+ * or increments the numeric sequence of existing roll numbers.
+ * Example: "ROL-202611-00001" -> "ROL-202611-00002"
  */
-export function generateNextRollNumber(previousRollNumber?: string): string {
+export function generateNextRollNumber(previousRollNumber?: string, targetDate?: string): string {
+  const d = targetDate ? new Date(targetDate) : new Date();
+  const year = isNaN(d.getFullYear()) ? new Date().getFullYear() : d.getFullYear();
+  const month = String(isNaN(d.getMonth()) ? new Date().getMonth() + 1 : d.getMonth() + 1).padStart(2, "0");
+  const yearMonth = `${year}${month}`;
+
   if (!previousRollNumber || !previousRollNumber.trim()) {
-    const today = new Date();
-    const prefix = today.getMonth() % 2 === 0 ? "CT" : "DT";
-    const randNum = 14000 + Math.floor(Math.random() * 900);
-    return `${prefix}-${randNum}`;
+    return `ROL-${yearMonth}-00001`;
   }
 
-  const match = previousRollNumber.trim().match(/^([A-Za-z]+)-?(\d+)$/);
-  if (match) {
-    const prefix = match[1];
-    const num = parseInt(match[2], 10) + 1;
-    return `${prefix}-${num}`;
+  const clean = previousRollNumber.trim().toUpperCase();
+
+  // Pattern: ROL-YYYYMM-XXXXX
+  const rolMatch = clean.match(/^ROL-(\d{6})-(\d+)$/);
+  if (rolMatch) {
+    const ym = rolMatch[1];
+    const seq = parseInt(rolMatch[2], 10) + 1;
+    const padLength = Math.max(5, rolMatch[2].length);
+    return `ROL-${ym}-${String(seq).padStart(padLength, "0")}`;
   }
 
-  return `${previousRollNumber}-1`;
+  // Pattern: PREFIX-NUM (e.g. CT-14376, ROL-00123)
+  const prefixMatch = clean.match(/^([A-Z]+)-?(\d+)$/);
+  if (prefixMatch) {
+    const prefix = prefixMatch[1];
+    const seq = parseInt(prefixMatch[2], 10) + 1;
+    const padLength = prefixMatch[2].length;
+    return `${prefix}-${String(seq).padStart(padLength, "0")}`;
+  }
+
+  return `ROL-${yearMonth}-00001`;
 }
 
 export interface RollCuttingContractorSummary {

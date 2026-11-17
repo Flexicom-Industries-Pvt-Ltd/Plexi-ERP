@@ -32,6 +32,65 @@ function getNormalizedShiftCandidates(shiftName: string): string[] {
   return Array.from(candidates);
 }
 
+/**
+ * Generates a permanently unique, monotonic, server-side roll number following
+ * the factory standard (e.g. ROL-YYYYMM-XXXXX).
+ * Queries both LoomRollCuttingEntry and Central ProductionRoll to ensure 100% collision-free guarantee.
+ */
+async function getGuaranteedServerRollNumber(targetDate?: string, offset: number = 0): Promise<string> {
+  const d = targetDate ? new Date(targetDate) : new Date();
+  const year = isNaN(d.getFullYear()) ? new Date().getFullYear() : d.getFullYear();
+  const month = String(isNaN(d.getMonth()) ? new Date().getMonth() + 1 : d.getMonth() + 1).padStart(2, "0");
+  const yearMonth = `${year}${month}`;
+  const prefix = `ROL-${yearMonth}-`;
+
+  const [cuttingEntries, prodRolls] = await Promise.all([
+    db.loomRollCuttingEntry.findMany({
+      where: { rollNumber: { startsWith: prefix } },
+      select: { rollNumber: true },
+      orderBy: { rollNumber: "desc" },
+      take: 50,
+    }),
+    db.productionRoll.findMany({
+      where: { rollNumber: { startsWith: prefix } },
+      select: { rollNumber: true },
+      orderBy: { rollNumber: "desc" },
+      take: 50,
+    }),
+  ]);
+
+  let maxSeq = 0;
+  const parseSeq = (rn: string) => {
+    const match = (rn || "").trim().match(/^ROL-\d{6}-(\d+)$/);
+    if (match) {
+      const num = parseInt(match[1], 10);
+      if (!isNaN(num) && num > maxSeq) {
+        maxSeq = num;
+      }
+    }
+  };
+
+  cuttingEntries.forEach((e) => parseSeq(e.rollNumber));
+  prodRolls.forEach((r) => parseSeq(r.rollNumber));
+
+  let nextSeq = maxSeq + 1 + offset;
+  let candidate = `${prefix}${String(nextSeq).padStart(5, "0")}`;
+
+  while (true) {
+    const [cExists, pExists] = await Promise.all([
+      db.loomRollCuttingEntry.findFirst({ where: { rollNumber: candidate }, select: { id: true } }),
+      db.productionRoll.findUnique({ where: { rollNumber: candidate }, select: { id: true } }),
+    ]);
+    if (!cExists && !pExists) {
+      break;
+    }
+    nextSeq += 1;
+    candidate = `${prefix}${String(nextSeq).padStart(5, "0")}`;
+  }
+
+  return candidate;
+}
+
 export async function GET(request: NextRequest) {
   const authResult = await requireLoomApiPermission("canRead");
   if (!authResult.ok) {
@@ -39,9 +98,19 @@ export async function GET(request: NextRequest) {
   }
 
   const { searchParams } = new URL(request.url);
+  const actionParam = searchParams.get("action");
   const dateParam = searchParams.get("date") || new Date().toISOString().slice(0, 10);
   const shiftNameParam = searchParams.get("shiftName") || "DAY";
   const search = searchParams.get("search")?.toLowerCase().trim() || "";
+
+  if (actionParam === "next-roll") {
+    try {
+      const rollNumber = await getGuaranteedServerRollNumber(dateParam);
+      return NextResponse.json({ rollNumber });
+    } catch (err: any) {
+      return NextResponse.json({ error: err?.message || "Failed to generate roll number" }, { status: 500 });
+    }
+  }
 
   try {
     const candidateShiftNames = getNormalizedShiftCandidates(shiftNameParam);
@@ -249,6 +318,7 @@ export async function GET(request: NextRequest) {
           contractor: e.contractor || "",
           supervisorSign: e.supervisorSign || "",
           remarks: e.remarks || "",
+          photoUrl: e.photoUrl || null,
           productionRollId: e.productionRollId || null,
         };
       });
@@ -288,11 +358,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const suggestedNextRoll = generateNextRollNumber(
-      entries.length > 0
-        ? entries[entries.length - 1].rollNumber
-        : lastEntry?.rollNumber || "CT-14376"
-    );
+    const suggestedNextRoll = await getGuaranteedServerRollNumber(dateParam);
 
     return NextResponse.json({
       report: {
@@ -409,7 +475,7 @@ export async function POST(request: NextRequest) {
 
         return {
           sequence: idx + 1,
-          rollNumber: (e.rollNumber || `ROLL-${idx + 1}`).trim().toUpperCase(),
+          rollNumber: (e.rollNumber || "").trim().toUpperCase(),
           loomNumber: Number(e.loomNumber) || 1,
           size: e.size?.trim() || null,
           qualityType: (e.qualityType || "STANDARD").trim(),
@@ -423,9 +489,17 @@ export async function POST(request: NextRequest) {
           avgWeightPerMeter,
           supervisorSign: e.supervisorSign?.trim() || supervisorName?.trim() || null,
           remarks: e.remarks?.trim() || null,
+          photoUrl: e.photoUrl?.trim() || null,
           productionRollId: e.productionRollId || null,
         };
       });
+
+      // Ensure every roll has a guaranteed unique monotonic roll number
+      for (let i = 0; i < processedEntries.length; i++) {
+        if (!processedEntries[i].rollNumber) {
+          processedEntries[i].rollNumber = await getGuaranteedServerRollNumber(date, i);
+        }
+      }
 
       const averageWeightPerMeter = reportTotalMeters > 0 && reportTotalNett > 0
         ? Math.round(((reportTotalNett * 1000) / reportTotalMeters) * 10) / 10
@@ -507,6 +581,7 @@ export async function POST(request: NextRequest) {
             avgWeightPerMeter: item.avgWeightPerMeter,
             supervisorSign: item.supervisorSign,
             remarks: item.remarks,
+            photoUrl: item.photoUrl,
             productionRollId: item.productionRollId,
           })),
         });
@@ -542,6 +617,7 @@ export async function POST(request: NextRequest) {
                     date,
                     shiftName: targetShiftName,
                     supervisorSign: item.supervisorSign,
+                    photoUrl: item.photoUrl,
                   },
                   remarks: `Loom #${item.loomNumber} Roll Cut: ${item.qualityType} (${item.meter}m, ${weightVal}kg)`,
                 },
@@ -562,6 +638,7 @@ export async function POST(request: NextRequest) {
                     date,
                     shiftName: targetShiftName,
                     supervisorSign: item.supervisorSign,
+                    photoUrl: item.photoUrl,
                   },
                   remarks: `Loom #${item.loomNumber} Roll Cut: ${item.qualityType} (${item.meter}m, ${weightVal}kg)`,
                 },
@@ -620,10 +697,10 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      let currentRollSequence = 14370;
       const prefilledEntries: LoomRollCuttingEntryItem[] = [];
+      let rollSeqOffset = 0;
 
-      sheet.entries.forEach((e) => {
+      for (const e of sheet.entries) {
         const hasProd = (e.totalProduction || 0) > 0;
         const hasReadings = e.initialReading !== null && (e.r6Reading !== null || e.r5Reading !== null || e.r4Reading !== null || e.r3Reading !== null || e.r2Reading !== null || e.r1Reading !== null);
         
@@ -634,8 +711,8 @@ export async function POST(request: NextRequest) {
           const estGross = Math.round((meter * 0.16 + 1.2) * 100) / 100;
           const { nettWeightKg, avgWeightPerMeter } = computeRollWeightsAndAvg(meter, estGross, 1.2);
 
-          currentRollSequence += 1;
-          const rollNumber = `CT-${currentRollSequence}`;
+          const rollNumber = await getGuaranteedServerRollNumber(date, rollSeqOffset);
+          rollSeqOffset += 1;
 
           prefilledEntries.push({
             sequence: prefilledEntries.length + 1,
@@ -652,9 +729,10 @@ export async function POST(request: NextRequest) {
             avgWeightPerMeter,
             supervisorSign: sheet.preparedBy || "",
             remarks: e.breakdownReason ? `Changeover / Note: ${e.breakdownReason}` : "",
+            photoUrl: (e as any).photoUrl || null,
           });
         }
-      });
+      }
 
       return NextResponse.json({
         success: true,
