@@ -74,6 +74,111 @@ interface ProcessTemperatureSectionProps {
   shiftName: string;
 }
 
+function mergeTemperatureReadings(data: any[], intervals: string[]): TemperatureReading[] {
+  const dataByTime = new Map<string, any>();
+  const extraItems: any[] = [];
+
+  for (const d of data) {
+    const t = (d.time || "").trim();
+    if (intervals.includes(t) && !dataByTime.has(t)) {
+      dataByTime.set(t, d);
+    } else {
+      extraItems.push(d);
+    }
+  }
+
+  const result: TemperatureReading[] = intervals.map((time) => {
+    const d = dataByTime.get(time);
+    if (d) {
+      return {
+        id: d.id,
+        time,
+        photoUrl: d.photoUrl || undefined,
+        b1: d.b1 ?? "",
+        b2: d.b2 ?? "",
+        b3: d.b3 ?? "",
+        b4: d.b4 ?? "",
+        b5: d.b5 ?? "",
+        b6: d.b6 ?? "",
+        b7: d.b7 ?? "",
+        screenChanger: d.screenChanger ?? "",
+        ad1: d.ad1 ?? "",
+        ad2: d.ad2 ?? "",
+        meltPump: d.meltPump ?? "",
+        d1: d.d1 ?? "",
+        d2: d.d2 ?? "",
+        d3: d.d3 ?? "",
+        d4: d.d4 ?? "",
+        d5: d.d5 ?? "",
+        d6: d.d6 ?? "",
+        d7: d.d7 ?? "",
+        meltTemp: d.meltTemp ?? "",
+        h1: d.h1 !== undefined && d.h1 !== null ? d.h1 : (d.housingWater ?? ""),
+        h2: d.h2 ?? "",
+        hotAirTemp: d.hotAirTemp ?? "",
+      };
+    }
+    return {
+      time,
+      photoUrl: undefined,
+      b1: "",
+      b2: "",
+      b3: "",
+      b4: "",
+      b5: "",
+      b6: "",
+      b7: "",
+      screenChanger: "",
+      ad1: "",
+      ad2: "",
+      meltPump: "",
+      d1: "",
+      d2: "",
+      d3: "",
+      d4: "",
+      d5: "",
+      d6: "",
+      d7: "",
+      meltTemp: "",
+      h1: "",
+      h2: "",
+      hotAirTemp: "",
+    };
+  });
+
+  for (const d of extraItems) {
+    result.push({
+      id: d.id,
+      time: d.time || "",
+      photoUrl: d.photoUrl || undefined,
+      b1: d.b1 ?? "",
+      b2: d.b2 ?? "",
+      b3: d.b3 ?? "",
+      b4: d.b4 ?? "",
+      b5: d.b5 ?? "",
+      b6: d.b6 ?? "",
+      b7: d.b7 ?? "",
+      screenChanger: d.screenChanger ?? "",
+      ad1: d.ad1 ?? "",
+      ad2: d.ad2 ?? "",
+      meltPump: d.meltPump ?? "",
+      d1: d.d1 ?? "",
+      d2: d.d2 ?? "",
+      d3: d.d3 ?? "",
+      d4: d.d4 ?? "",
+      d5: d.d5 ?? "",
+      d6: d.d6 ?? "",
+      d7: d.d7 ?? "",
+      meltTemp: d.meltTemp ?? "",
+      h1: d.h1 !== undefined && d.h1 !== null ? d.h1 : (d.housingWater ?? ""),
+      h2: d.h2 ?? "",
+      hotAirTemp: d.hotAirTemp ?? "",
+    });
+  }
+
+  return result;
+}
+
 export function ProcessTemperatureSection({
   date,
   shiftId,
@@ -185,88 +290,22 @@ export function ProcessTemperatureSection({
     // Reset supervisor unlocks on shift/date change
     setUnlockedSlots(new Set());
 
-    fetch(`/api/production/tape-plant/temperature?date=${date}&shiftId=${shiftId}`)
+    fetch(`/api/production/tape-plant/temperature?date=${date}&shiftId=${shiftId}&_t=${Date.now()}`)
       .then((r) => (r.ok ? r.json() : []))
       .then((data: any[]) => {
-        if (data && data.length > 0) {
-          const opName = data[0]?.operatorName || "";
-          const opId = data[0]?.operatorId || "";
-          setOperatorName(opName);
-          setOperatorId(opId);
-          const mapped: TemperatureReading[] = data.map((d) => ({
-            id: d.id,
-            time: d.time || "",
-            photoUrl: d.photoUrl || undefined,
-            b1: d.b1 ?? "",
-            b2: d.b2 ?? "",
-            b3: d.b3 ?? "",
-            b4: d.b4 ?? "",
-            b5: d.b5 ?? "",
-            b6: d.b6 ?? "",
-            b7: d.b7 ?? "",
-            screenChanger: d.screenChanger ?? "",
-            ad1: d.ad1 ?? "",
-            ad2: d.ad2 ?? "",
-            meltPump: d.meltPump ?? "",
-            d1: d.d1 ?? "",
-            d2: d.d2 ?? "",
-            d3: d.d3 ?? "",
-            d4: d.d4 ?? "",
-            d5: d.d5 ?? "",
-            d6: d.d6 ?? "",
-            d7: d.d7 ?? "",
-            meltTemp: d.meltTemp ?? "",
-            h1: d.h1 !== undefined && d.h1 !== null ? d.h1 : (d.housingWater ?? ""),
-            h2: d.h2 ?? "",
-            hotAirTemp: d.hotAirTemp ?? "",
-          }));
-          setReadings(mapped);
-          lastSavedPayloadRef.current = JSON.stringify({
-            date,
-            shiftId,
-            operatorName: opName,
-            operatorId: opId,
-            readings: mapped,
-          });
-        } else {
-          setOperatorName("");
-          setOperatorId("");
-          // Initialize with dynamically derived shift intervals
-          const initial: TemperatureReading[] = shiftIntervals.map((time) => ({
-            time,
-            photoUrl: undefined,
-            b1: "",
-            b2: "",
-            b3: "",
-            b4: "",
-            b5: "",
-            b6: "",
-            b7: "",
-            screenChanger: "",
-            ad1: "",
-            ad2: "",
-            meltPump: "",
-            d1: "",
-            d2: "",
-            d3: "",
-            d4: "",
-            d5: "",
-            d6: "",
-            d7: "",
-            meltTemp: "",
-            h1: "",
-            h2: "",
-            hotAirTemp: "",
-          }));
-          setReadings(initial);
-          lastSavedPayloadRef.current = JSON.stringify({
-            date,
-            shiftId,
-            operatorName: "",
-            operatorId: "",
-            readings: initial,
-          });
-        }
+        const opName = (data && data[0]?.operatorName) || "";
+        const opId = (data && data[0]?.operatorId) || "";
+        setOperatorName(opName);
+        setOperatorId(opId);
+        const mapped = mergeTemperatureReadings(data || [], shiftIntervals);
+        setReadings(mapped);
+        lastSavedPayloadRef.current = JSON.stringify({
+          date,
+          shiftId,
+          operatorName: opName,
+          operatorId: opId,
+          readings: mapped,
+        });
       })
       .catch(() => toast.error("Failed to load temperature readings"))
       .finally(() => {
@@ -281,41 +320,12 @@ export function ProcessTemperatureSection({
     date,
     shift: shiftId,
     onSync: () => {
-      if (!date || !shiftId) return;
+      if (!date || !shiftId || autoSaving) return;
       fetch(`/api/production/tape-plant/temperature?date=${date}&shiftId=${shiftId}&_t=${Date.now()}`)
         .then((r) => (r.ok ? r.json() : []))
         .then((data: any[]) => {
           if (data && data.length > 0) {
-            const mapped: TemperatureReading[] = data.map((d) => ({
-              id: d.id,
-              time: d.time || "",
-              photoUrl: d.photoUrl || undefined,
-              b1: d.b1 ?? "",
-              b2: d.b2 ?? "",
-              b3: d.b3 ?? "",
-              b4: d.b4 ?? "",
-              b5: d.b5 ?? "",
-              b6: d.b6 ?? "",
-              b7: d.b7 ?? "",
-              screenChanger: d.screenChanger ?? "",
-              ad1: d.ad1 ?? "",
-              ad2: d.ad2 ?? "",
-              meltPump: d.meltPump ?? "",
-              d1: d.d1 ?? "",
-              d2: d.d2 ?? "",
-              d3: d.d3 ?? "",
-              dieBottom: d.dieBottom ?? "",
-              feedBlock: d.feedBlock ?? "",
-              holdingTank: d.holdingTank ?? "",
-              d4: d.d4 ?? "",
-              d5: d.d5 ?? "",
-              d6: d.d6 ?? "",
-              d7: d.d7 ?? "",
-              meltTemp: d.meltTemp ?? "",
-              h1: d.h1 ?? "",
-              h2: d.h2 ?? "",
-              hotAirTemp: d.hotAirTemp ?? "",
-            }));
+            const mapped = mergeTemperatureReadings(data, shiftIntervals);
             setReadings(mapped);
           }
         })
@@ -425,6 +435,7 @@ export function ProcessTemperatureSection({
     rawVal: string,
     isNumber = true
   ) => {
+    realtime.markLocalEdit();
     const val = isNumber && rawVal !== "" ? (isNaN(Number(rawVal)) ? rawVal : Number(rawVal)) : rawVal;
     setReadings((prev) => {
       const next = [...prev];
@@ -434,6 +445,7 @@ export function ProcessTemperatureSection({
   };
 
   const handleDeleteReading = (idx: number) => {
+    realtime.markLocalEdit();
     setReadings((prev) => prev.filter((_, i) => i !== idx));
     setExpandedSlots((prev) => {
       const next = new Set<number>();
@@ -446,6 +458,7 @@ export function ProcessTemperatureSection({
   };
 
   const handleAddReading = () => {
+    realtime.markLocalEdit();
     const now = new Date();
     const timeStr = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
     const newIdx = readings.length;
@@ -483,6 +496,7 @@ export function ProcessTemperatureSection({
 
   const handleCopyPrevious = (idx: number) => {
     if (idx <= 0) return;
+    realtime.markLocalEdit();
     const prev = readings[idx - 1];
     const updated = [...readings];
     updated[idx] = {
@@ -1432,7 +1446,10 @@ export function ProcessTemperatureSection({
           title="Extruder & Die Zone Temperature Spreadsheet"
           columns={tempColumns}
           data={readings}
-          onChange={setReadings}
+          onChange={(newReadings) => {
+            realtime.markLocalEdit();
+            setReadings(newReadings);
+          }}
           allowAddRow={true}
           onAddRow={handleAddReading}
           allowDeleteRow={true}

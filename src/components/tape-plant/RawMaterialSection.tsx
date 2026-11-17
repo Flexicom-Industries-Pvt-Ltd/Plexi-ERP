@@ -175,7 +175,7 @@ export function RawMaterialSection({ date, shiftId, shiftName }: RawMaterialSect
     date,
     shift: shiftId,
     onSync: () => {
-      if (!date || !shiftId) return;
+      if (!date || !shiftId || autoSaving) return;
       fetch(`/api/production/tape-plant/raw-material?date=${date}&shiftId=${shiftId}&_t=${Date.now()}`)
         .then((r) => (r.ok ? r.json() : []))
         .then((data: any[]) => {
@@ -305,6 +305,7 @@ export function RawMaterialSection({ date, shiftId, shiftName }: RawMaterialSect
     rawVal: string,
     isNumber = true
   ) => {
+    realtime.markLocalEdit();
     const val = isNumber && rawVal !== "" ? (isNaN(Number(rawVal)) ? rawVal : Number(rawVal)) : rawVal;
     setRecords((prev) => {
       const next = [...prev];
@@ -314,6 +315,7 @@ export function RawMaterialSection({ date, shiftId, shiftName }: RawMaterialSect
   };
 
   const handleDeleteRow = (idx: number) => {
+    realtime.markLocalEdit();
     setRecords((prev) => prev.filter((_, i) => i !== idx));
     setExpandedMaterials((prev) => {
       const next = new Set<number>();
@@ -326,6 +328,7 @@ export function RawMaterialSection({ date, shiftId, shiftName }: RawMaterialSect
   };
 
   const handleAddRow = () => {
+    realtime.markLocalEdit();
     const newIdx = records.length;
     setRecords([
       ...records,
@@ -885,7 +888,10 @@ export function RawMaterialSection({ date, shiftId, shiftName }: RawMaterialSect
           title="Raw Material Consumption & Inventory Position"
           columns={materialColumns}
           data={records}
-          onChange={setRecords}
+          onChange={(newRecords) => {
+            realtime.markLocalEdit();
+            setRecords(newRecords);
+          }}
           allowAddRow={true}
           onAddRow={handleAddRow}
           allowDeleteRow={true}
