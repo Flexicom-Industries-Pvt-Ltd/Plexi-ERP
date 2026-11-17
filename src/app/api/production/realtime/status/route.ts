@@ -20,6 +20,7 @@ export async function GET(request: Request) {
   const dateParam = searchParams.get("date") || undefined;
   const shiftParam = searchParams.get("shift") || undefined;
   const sinceParam = searchParams.get("since");
+  const callerClientId = searchParams.get("clientId") || undefined;
 
   if (!moduleParam) {
     return NextResponse.json({ error: "module parameter is required" }, { status: 400 });
@@ -50,6 +51,7 @@ export async function GET(request: Request) {
       shift: shiftParam,
       user: dbUpdate.user,
       timestamp: dbUpdate.timestamp,
+      clientId: memoryUpdate && Math.abs(memoryUpdate.timestamp - dbUpdate.timestamp) < 5000 ? memoryUpdate.clientId : null,
     };
   }
 
@@ -68,12 +70,15 @@ export async function GET(request: Request) {
     return NextResponse.json({ hasUpdate: false, latest: null }, { headers: noCacheHeaders });
   }
 
+  const isOriginatingClient = Boolean(callerClientId && latestEvent.clientId === callerClientId);
+
   if (sinceParam) {
     const sinceTime = parseInt(sinceParam, 10);
     const hasUpdate = !isNaN(sinceTime) && latestTimestamp > sinceTime;
     return NextResponse.json(
       {
         hasUpdate,
+        isSelfUpdate: isOriginatingClient,
         latest: hasUpdate ? latestEvent : null,
         timestamp: latestTimestamp,
       },
@@ -84,6 +89,7 @@ export async function GET(request: Request) {
   return NextResponse.json(
     {
       hasUpdate: true,
+      isSelfUpdate: isOriginatingClient,
       latest: latestEvent,
       timestamp: latestTimestamp,
     },
@@ -96,7 +102,7 @@ export async function POST(request: Request) {
     const session = await auth();
     const body = await request.json();
 
-    const { module: mod, sheet, action, date, shift, metadata } = body;
+    const { module: mod, sheet, action, date, shift, metadata, clientId } = body;
     if (!mod || !sheet) {
       return NextResponse.json({ error: "module and sheet are required" }, { status: 400 });
     }
@@ -107,6 +113,7 @@ export async function POST(request: Request) {
       action: action || "UPDATE",
       date,
       shift,
+      clientId: clientId || body.user?.clientId || null,
       metadata,
       user: {
         name: session?.user?.name || body.user?.name || "Production Operator",
