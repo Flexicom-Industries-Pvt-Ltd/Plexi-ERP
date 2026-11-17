@@ -69,6 +69,7 @@ export function RawMaterialSection({ date, shiftId, shiftName }: RawMaterialSect
   const [lastAutoSavedAt, setLastAutoSavedAt] = useState<Date | null>(null);
   const isInitialLoadedRef = useRef(false);
   const lastSavedPayloadRef = useRef("");
+  const lastUserEditTimeRef = useRef(0);
   const [operatorName, setOperatorName] = useState("");
   const [operatorId, setOperatorId] = useState("");
   const [records, setRecords] = useState<RawMaterialRow[]>(DEFAULT_MATERIALS);
@@ -176,14 +177,16 @@ export function RawMaterialSection({ date, shiftId, shiftName }: RawMaterialSect
     shift: shiftId,
     onSync: () => {
       if (!date || !shiftId || autoSaving) return;
+      // Prevent clobbering active input if user typed within last 3500ms
+      if (Date.now() - lastUserEditTimeRef.current < 3500) return;
       fetch(`/api/production/tape-plant/raw-material?date=${date}&shiftId=${shiftId}&_t=${Date.now()}`)
         .then((r) => (r.ok ? r.json() : []))
         .then((data: any[]) => {
           if (data && data.length > 0) {
-            const opName = data[0]?.operatorName || "";
-            const opId = data[0]?.operatorId || "";
-            setOperatorName(opName);
-            setOperatorId(opId);
+            const opName = data[0]?.operatorName || operatorName;
+            const opId = data[0]?.operatorId || operatorId;
+            if (opName && !operatorName) setOperatorName(opName);
+            if (opId && !operatorId) setOperatorId(opId);
             const mapped: RawMaterialRow[] = data.map((d) => ({
               id: d.id,
               material: d.material || "",
@@ -198,6 +201,14 @@ export function RawMaterialSection({ date, shiftId, shiftName }: RawMaterialSect
               operatorName: d.operatorName || opName,
               operatorId: d.operatorId || opId,
             }));
+            // CRITICAL: Update lastSavedPayloadRef so receiving device will NOT fire an echo auto-save back
+            lastSavedPayloadRef.current = JSON.stringify({
+              date,
+              shiftId,
+              operatorName: opName,
+              operatorId: opId,
+              records: mapped,
+            });
             setRecords(mapped);
           }
         })
@@ -306,6 +317,7 @@ export function RawMaterialSection({ date, shiftId, shiftName }: RawMaterialSect
     isNumber = true
   ) => {
     realtime.markLocalEdit();
+    lastUserEditTimeRef.current = Date.now();
     const val = isNumber && rawVal !== "" ? (isNaN(Number(rawVal)) ? rawVal : Number(rawVal)) : rawVal;
     setRecords((prev) => {
       const next = [...prev];
@@ -316,6 +328,7 @@ export function RawMaterialSection({ date, shiftId, shiftName }: RawMaterialSect
 
   const handleDeleteRow = (idx: number) => {
     realtime.markLocalEdit();
+    lastUserEditTimeRef.current = Date.now();
     setRecords((prev) => prev.filter((_, i) => i !== idx));
     setExpandedMaterials((prev) => {
       const next = new Set<number>();
@@ -329,6 +342,7 @@ export function RawMaterialSection({ date, shiftId, shiftName }: RawMaterialSect
 
   const handleAddRow = () => {
     realtime.markLocalEdit();
+    lastUserEditTimeRef.current = Date.now();
     const newIdx = records.length;
     setRecords([
       ...records,
@@ -475,6 +489,8 @@ export function RawMaterialSection({ date, shiftId, shiftName }: RawMaterialSect
               value={operatorName}
               operatorId={operatorId}
               onChange={(name, id) => {
+                realtime.markLocalEdit();
+                lastUserEditTimeRef.current = Date.now();
                 setOperatorName(name);
                 setOperatorId(id || "");
               }}
@@ -534,6 +550,8 @@ export function RawMaterialSection({ date, shiftId, shiftName }: RawMaterialSect
               value={operatorName}
               operatorId={operatorId}
               onChange={(name, id) => {
+                realtime.markLocalEdit();
+                lastUserEditTimeRef.current = Date.now();
                 setOperatorName(name);
                 setOperatorId(id || "");
               }}
