@@ -27,7 +27,26 @@ export async function GET(request: NextRequest) {
       orderBy: { time: "asc" },
     });
 
-    return NextResponse.json(records, {
+    // Deduplicate in memory in case legacy duplicates exist
+    const dedupedMap = new Map<string, (typeof records)[0]>();
+    for (const r of records) {
+      const key = isAll ? r.time : `${r.time}__${r.shiftId}`;
+      if (!dedupedMap.has(key)) {
+        dedupedMap.set(key, { ...r });
+      } else {
+        const existing = dedupedMap.get(key)!;
+        for (const [k, v] of Object.entries(r)) {
+          if (v !== null && v !== undefined && v !== "") {
+            (existing as any)[k] = v;
+          }
+        }
+        if (r.photoUrl) existing.photoUrl = r.photoUrl;
+        dedupedMap.set(key, existing);
+      }
+    }
+    const cleanRecords = Array.from(dedupedMap.values());
+
+    return NextResponse.json(cleanRecords, {
       headers: {
         "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
         Pragma: "no-cache",
@@ -114,9 +133,30 @@ export async function POST(request: NextRequest) {
             };
           });
 
-        if (validRecords.length > 0) {
+        // Enforce strict uniqueness per time slot to prevent exponential duplicate rows
+        const dedupedMap = new Map<string, (typeof validRecords)[0]>();
+        for (const item of validRecords) {
+          const key = isAll ? item.time : `${item.time}__${item.shiftId}`;
+          if (!dedupedMap.has(key)) {
+            dedupedMap.set(key, { ...item });
+          } else {
+            const existing = dedupedMap.get(key)!;
+            for (const [k, v] of Object.entries(item)) {
+              if (v !== null && v !== undefined && v !== "") {
+                (existing as any)[k] = v;
+              }
+            }
+            if (item.photoUrl) existing.photoUrl = item.photoUrl;
+            if (item.operatorName) existing.operatorName = item.operatorName;
+            if (item.operatorId) existing.operatorId = item.operatorId;
+            dedupedMap.set(key, existing);
+          }
+        }
+        const dedupedRecords = Array.from(dedupedMap.values());
+
+        if (dedupedRecords.length > 0) {
           await tx.tapePlantDriveParameter.createMany({
-            data: validRecords,
+            data: dedupedRecords,
           });
         }
       }
