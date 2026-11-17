@@ -253,6 +253,7 @@ export function LoomReadingSheetSection() {
       const params = new URLSearchParams({
         date,
         shiftName: shift,
+        _t: Date.now().toString(),
       });
       const res = await fetch(`/api/production/loom/reading-sheet?${params.toString()}`, {
         cache: "no-store",
