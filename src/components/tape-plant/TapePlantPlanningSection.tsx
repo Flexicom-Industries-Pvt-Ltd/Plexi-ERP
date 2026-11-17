@@ -340,9 +340,20 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName, shifts }: T
               isDayNight: Boolean(p.isDayNight),
               status: p.status || "DRAFT",
             }));
+            const newStatus = data.plans[0]?.status === "SUBMITTED" ? "SUBMITTED" : "SAVED";
+            lastSavedPayloadRef.current = JSON.stringify({
+              date,
+              shiftId: shiftId !== "ALL" ? shiftId : undefined,
+              plans: loaded.map((p: any) => ({
+                ...p,
+                isDayNight: Boolean(p.isDayNight),
+                shiftId: p.shiftId || (shiftId !== "ALL" ? shiftId : undefined),
+                status: newStatus,
+              })),
+            });
             setRecipePlans(loaded);
             if (data.plans[0]?.status) {
-              setStatus(data.plans[0].status === "SUBMITTED" ? "SUBMITTED" : "SAVED");
+              setStatus(newStatus);
             }
           }
         })

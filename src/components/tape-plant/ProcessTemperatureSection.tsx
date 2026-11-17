@@ -76,14 +76,39 @@ interface ProcessTemperatureSectionProps {
 
 function mergeTemperatureReadings(data: any[], intervals: string[]): TemperatureReading[] {
   const dataByTime = new Map<string, any>();
-  const extraItems: any[] = [];
+  const extraItemsByTime = new Map<string, any>();
 
   for (const d of data) {
     const t = (d.time || "").trim();
-    if (intervals.includes(t) && !dataByTime.has(t)) {
-      dataByTime.set(t, d);
+    if (!t) continue;
+    if (intervals.includes(t)) {
+      if (!dataByTime.has(t)) {
+        dataByTime.set(t, { ...d });
+      } else {
+        const existing = dataByTime.get(t);
+        for (const [key, val] of Object.entries(d)) {
+          if (val !== null && val !== undefined && val !== "") {
+            existing[key] = val;
+          }
+        }
+        if (d.id) existing.id = d.id;
+        if (d.photoUrl) existing.photoUrl = d.photoUrl;
+        dataByTime.set(t, existing);
+      }
     } else {
-      extraItems.push(d);
+      if (!extraItemsByTime.has(t)) {
+        extraItemsByTime.set(t, { ...d });
+      } else {
+        const existing = extraItemsByTime.get(t);
+        for (const [key, val] of Object.entries(d)) {
+          if (val !== null && val !== undefined && val !== "") {
+            existing[key] = val;
+          }
+        }
+        if (d.id) existing.id = d.id;
+        if (d.photoUrl) existing.photoUrl = d.photoUrl;
+        extraItemsByTime.set(t, existing);
+      }
     }
   }
 
@@ -146,7 +171,7 @@ function mergeTemperatureReadings(data: any[], intervals: string[]): Temperature
     };
   });
 
-  for (const d of extraItems) {
+  for (const d of extraItemsByTime.values()) {
     result.push({
       id: d.id,
       time: d.time || "",
@@ -190,6 +215,7 @@ export function ProcessTemperatureSection({
   const [lastAutoSavedAt, setLastAutoSavedAt] = useState<Date | null>(null);
   const isInitialLoadedRef = useRef(false);
   const lastSavedPayloadRef = useRef("");
+  const lastUserEditTimeRef = useRef(0);
   const [operatorName, setOperatorName] = useState("");
   const [operatorId, setOperatorId] = useState("");
   const [readings, setReadings] = useState<TemperatureReading[]>([]);
@@ -321,11 +347,25 @@ export function ProcessTemperatureSection({
     shift: shiftId,
     onSync: () => {
       if (!date || !shiftId || autoSaving) return;
+      // Prevent clobbering active input if user typed within last 3500ms
+      if (Date.now() - lastUserEditTimeRef.current < 3500) return;
       fetch(`/api/production/tape-plant/temperature?date=${date}&shiftId=${shiftId}&_t=${Date.now()}`)
         .then((r) => (r.ok ? r.json() : []))
         .then((data: any[]) => {
           if (data && data.length > 0) {
+            const opName = (data && data[0]?.operatorName) || operatorName;
+            const opId = (data && data[0]?.operatorId) || operatorId;
+            if (opName && !operatorName) setOperatorName(opName);
+            if (opId && !operatorId) setOperatorId(opId);
             const mapped = mergeTemperatureReadings(data, shiftIntervals);
+            // CRITICAL: Update lastSavedPayloadRef so receiving device will NOT fire an echo auto-save back
+            lastSavedPayloadRef.current = JSON.stringify({
+              date,
+              shiftId,
+              operatorName: opName,
+              operatorId: opId,
+              readings: mapped,
+            });
             setReadings(mapped);
           }
         })
@@ -436,6 +476,7 @@ export function ProcessTemperatureSection({
     isNumber = true
   ) => {
     realtime.markLocalEdit();
+    lastUserEditTimeRef.current = Date.now();
     const val = isNumber && rawVal !== "" ? (isNaN(Number(rawVal)) ? rawVal : Number(rawVal)) : rawVal;
     setReadings((prev) => {
       const next = [...prev];
@@ -446,6 +487,7 @@ export function ProcessTemperatureSection({
 
   const handleDeleteReading = (idx: number) => {
     realtime.markLocalEdit();
+    lastUserEditTimeRef.current = Date.now();
     setReadings((prev) => prev.filter((_, i) => i !== idx));
     setExpandedSlots((prev) => {
       const next = new Set<number>();
@@ -924,6 +966,8 @@ export function ProcessTemperatureSection({
               value={operatorName}
               operatorId={operatorId}
               onChange={(name, id) => {
+                realtime.markLocalEdit();
+                lastUserEditTimeRef.current = Date.now();
                 setOperatorName(name);
                 setOperatorId(id || "");
               }}
@@ -983,6 +1027,8 @@ export function ProcessTemperatureSection({
               value={operatorName}
               operatorId={operatorId}
               onChange={(name, id) => {
+                realtime.markLocalEdit();
+                lastUserEditTimeRef.current = Date.now();
                 setOperatorName(name);
                 setOperatorId(id || "");
               }}
