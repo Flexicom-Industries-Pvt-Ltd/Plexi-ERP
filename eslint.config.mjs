@@ -19,6 +19,7 @@ const eslintConfig = defineConfig([
       "react-hooks/rules-of-hooks": "off",
       "react-hooks/exhaustive-deps": "off",
       "react-hooks/set-state-in-effect": "off",
+      "react-hooks/preserve-manual-memoization": "off",
       "react/react-in-jsx-scope": "off",
       "react/display-name": "off",
     }

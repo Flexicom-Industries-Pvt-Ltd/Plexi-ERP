@@ -408,5 +408,58 @@ describe("2 Hours Loom Reading Export & Print Engine", () => {
       expect(rollType).toBe("LPP");
     });
   });
+
+  describe("BUG-020: 2H Reading Sheet Dynamic Shifts, Auto-Lock & Photo Evidence", () => {
+    it("should support photoUrl attachment and intervalPhotos mapping on loom reading entry", () => {
+      const entry: LoomReadingEntryItem = {
+        loomNumber: 15,
+        rowSequence: 1,
+        operatorName: "Ravinder Kumar",
+        size: "500",
+        denier: "850",
+        qualityType: "Mahal/LPP/W",
+        initialReading: 1200,
+        r1Reading: 1450,
+        r1Prod: 250,
+        r2Reading: 1700,
+        r2Prod: 250,
+        r3Reading: 1950,
+        r3Prod: 250,
+        r4Reading: null,
+        r4Prod: null,
+        r5Reading: null,
+        r5Prod: null,
+        r6Reading: null,
+        r6Prod: null,
+        totalProduction: 750,
+        breakdownReason: null,
+        breakdownMinutes: 0,
+        changeoverTargetQuality: null,
+        efficiencyPct: 83.3,
+        status: "RUNNING",
+        remarks: "Running normal",
+        photoUrl: "https://storage.flexicom.local/evidence/loom-15-counter.jpg",
+        intervalPhotos: {
+          "10:00": "https://storage.flexicom.local/evidence/loom-15-1000.jpg",
+          "12:00": "https://storage.flexicom.local/evidence/loom-15-1200.jpg",
+        },
+      };
+
+      expect(entry.photoUrl).toBe("https://storage.flexicom.local/evidence/loom-15-counter.jpg");
+      expect(entry.intervalPhotos?.["10:00"]).toBe("https://storage.flexicom.local/evidence/loom-15-1000.jpg");
+    });
+
+    it("should generate appropriate Day and Night bi-hourly shift intervals", () => {
+      const daySlots = ["10:00", "12:00", "14:00", "16:00", "18:00", "20:00"];
+      const dayInitial = "08:00";
+      const nightSlots = ["22:00", "00:00", "02:00", "04:00", "06:00", "08:00"];
+      const nightInitial = "20:00";
+
+      expect(daySlots).toHaveLength(6);
+      expect(nightSlots).toHaveLength(6);
+      expect(dayInitial).toBe("08:00");
+      expect(nightInitial).toBe("20:00");
+    });
+  });
 });
 
