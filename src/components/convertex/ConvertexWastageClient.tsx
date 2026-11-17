@@ -36,6 +36,8 @@ import { exportConvertexWastageReportExcel } from "@/lib/convertex/convertex-exp
 import { UniversalQualityInput } from "@/components/ui/UniversalQualityInput";
 import { UniversalPersonnelInput } from "@/components/ui/UniversalPersonnelInput";
 import { UniversalShiftSelector } from "@/components/production/UniversalShiftSelector";
+import { useProductionRealtime } from "@/hooks/useProductionRealtime";
+import { RealtimeSyncBadge } from "@/components/production/RealtimeSyncBadge";
 
 const ConvertexWastagePrintModal = dynamic(
   () => import("./ConvertexWastagePrintModal").then((m) => m.ConvertexWastagePrintModal),
@@ -216,6 +218,16 @@ export function ConvertexWastageClient() {
     fetchReportData();
   }, [fetchReportData]);
 
+  const realtime = useProductionRealtime({
+    module: "convertex",
+    sheet: "wastage",
+    date,
+    shift: shiftName,
+    onSync: () => {
+      fetchReportData();
+    },
+  });
+
   // Import rolls from Daily Production
   const handleImportFromProduction = () => {
     if (linkedProductionEntries.length === 0) {
@@ -386,6 +398,12 @@ export function ConvertexWastageClient() {
         setLastSavedAt(format(new Date(), "hh:mm:ss a"));
         isDirtyRef.current = false;
 
+        realtime.broadcastSync({
+          action: newStatus === "SUBMITTED" ? "SUBMIT" : "SAVE",
+          date: current.date,
+          shift: current.shiftName,
+        });
+
         if (!silent) {
           toast.success(
             newStatus === "SUBMITTED"
@@ -497,6 +515,14 @@ export function ConvertexWastageClient() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
+            <RealtimeSyncBadge
+              isConnected={realtime.isConnected}
+              lastUpdatedBy={realtime.lastUpdatedBy}
+              lastUpdatedAt={realtime.lastUpdatedAt}
+              lastAction={realtime.lastAction}
+              isSelfUpdate={realtime.isSelfUpdate}
+            />
+
             {linkedProductionEntries.length > 0 && (
               <button
                 type="button"

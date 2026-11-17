@@ -21,6 +21,8 @@ import { SpreadsheetTable, ColumnDef } from "./SpreadsheetTable";
 import { OperatorSelect } from "./OperatorSelect";
 import { PhotoEvidenceModal } from "./PhotoEvidenceModal";
 import { canUserOverrideLock } from "@/lib/tape-plant/telemetry-time-slots";
+import { useProductionRealtime } from "@/hooks/useProductionRealtime";
+import { RealtimeSyncBadge } from "@/components/production/RealtimeSyncBadge";
 
 const RawMaterialPrintPreviewModal = dynamic(
   () => import("./RawMaterialPrintPreviewModal").then((m) => m.RawMaterialPrintPreviewModal),
@@ -167,6 +169,42 @@ export function RawMaterialSection({ date, shiftId, shiftName }: RawMaterialSect
       });
   }, [date, shiftId]);
 
+  const realtime = useProductionRealtime({
+    module: "tape-plant",
+    sheet: "raw-material",
+    date,
+    shift: shiftId,
+    onSync: () => {
+      if (!date || !shiftId) return;
+      fetch(`/api/production/tape-plant/raw-material?date=${date}&shiftId=${shiftId}&_t=${Date.now()}`)
+        .then((r) => (r.ok ? r.json() : []))
+        .then((data: any[]) => {
+          if (data && data.length > 0) {
+            const opName = data[0]?.operatorName || "";
+            const opId = data[0]?.operatorId || "";
+            setOperatorName(opName);
+            setOperatorId(opId);
+            const mapped: RawMaterialRow[] = data.map((d) => ({
+              id: d.id,
+              material: d.material || "",
+              grade: d.grade || "",
+              openingStock: d.openingStock ?? "",
+              received: d.received ?? "",
+              consumption: d.consumption ?? "",
+              settingPercent: d.settingPercent ?? "",
+              actualPercent: d.actualPercent ?? "",
+              wastage: d.wastage ?? "",
+              photoUrl: d.photoUrl || undefined,
+              operatorName: d.operatorName || opName,
+              operatorId: d.operatorId || opId,
+            }));
+            setRecords(mapped);
+          }
+        })
+        .catch(() => {});
+    },
+  });
+
   // Debounced Auto-Save
   useEffect(() => {
     if (!isInitialLoadedRef.current || !date || !shiftId) return;
@@ -196,6 +234,7 @@ export function RawMaterialSection({ date, shiftId, shiftName }: RawMaterialSect
         if (res.ok) {
           lastSavedPayloadRef.current = serialized;
           setLastAutoSavedAt(new Date());
+          realtime.broadcastSync({ action: "SAVE", date, shift: shiftId });
         }
       } catch (err) {
         console.error("Auto-save error:", err);
@@ -231,6 +270,7 @@ export function RawMaterialSection({ date, shiftId, shiftName }: RawMaterialSect
 
       lastSavedPayloadRef.current = JSON.stringify(payload);
       setLastAutoSavedAt(new Date());
+      realtime.broadcastSync({ action: "SAVE", date, shift: shiftId });
       toast.success("Raw material position & consumption saved");
     } catch (err: any) {
       toast.error(err.message || "Failed to save raw materials");
@@ -440,6 +480,14 @@ export function RawMaterialSection({ date, shiftId, shiftName }: RawMaterialSect
           </div>
 
           {/* Desktop Auto-save Status Indicator */}
+          <RealtimeSyncBadge
+            isConnected={realtime.isConnected}
+            lastUpdatedBy={realtime.lastUpdatedBy}
+            lastUpdatedAt={realtime.lastUpdatedAt}
+            lastAction={realtime.lastAction}
+            isSelfUpdate={realtime.isSelfUpdate}
+          />
+
           {autoSaving ? (
             <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 text-slate-600 border border-slate-200 text-xs font-medium rounded-lg h-8">
               <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />

@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { requireLaminationApiPermission } from "@/lib/lamination/permissions";
 import { calculateWastage } from "@/lib/lamination/lamination-wastage-types";
 import { logEvent } from "@/lib/logging";
+import { emitProductionSync } from "@/lib/realtime/production-bus";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -210,6 +211,19 @@ export async function POST(request: NextRequest) {
       url: "/api/production/lamination/wastage",
       statusCode: 200,
     }).catch(console.error);
+
+    emitProductionSync({
+      module: "lamination",
+      sheet: "wastage",
+      action: status === "SUBMITTED" ? "SUBMIT" : "SAVE",
+      date: report.date,
+      shift: report.shiftName,
+      user: {
+        name: authResult.session?.user?.name || "Lamination Operator",
+        email: authResult.session?.user?.email || undefined,
+        role: (authResult.session?.user as any)?.roleName || (authResult.session?.user as any)?.role || "Staff",
+      },
+    });
 
     return NextResponse.json({
       success: true,

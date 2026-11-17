@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireLoomApiPermission } from "@/lib/loom/permissions";
+import { emitProductionSync } from "@/lib/realtime/production-bus";
 import {
   BOBBIN_WEIGHT_KG,
   CRATE_WEIGHT_KG,
@@ -478,11 +479,25 @@ export async function POST(request: NextRequest) {
       ? [shifts.trim()]
       : [];
 
+    const notifySync = (act: string) => {
+      emitProductionSync({
+        module: "loom",
+        sheet: "summary",
+        action: act,
+        user: {
+          name: authResult.session?.user?.name || "Floor Admin",
+          email: authResult.session?.user?.email || undefined,
+          role: (authResult.session?.user as any)?.roleName || (authResult.session?.user as any)?.role || "Staff",
+        },
+      });
+    };
+
     // Action: Reset all loom assignments to blank
     if (action === "RESET_ALL_MAPPINGS") {
       await db.loomMachineMapping.updateMany({
         data: { loomNumbers: [], totalLooms: 0, allocationDate: null, activeShifts: [] },
       });
+      notifySync("RESET");
       return NextResponse.json({
         success: true,
         message: "All circular loom assignments have been reset to blank (Idle).",
@@ -501,6 +516,7 @@ export async function POST(request: NextRequest) {
         data: { loomNumbers: [], totalLooms: 0, allocationDate: null, activeShifts: [] },
       });
 
+      notifySync("CLEAR");
       return NextResponse.json({
         success: true,
         message: `Deleted loom assignment for quality "${cleanCode}".`,
@@ -528,6 +544,7 @@ export async function POST(request: NextRequest) {
           });
         }
 
+        notifySync("UNASSIGN");
         return NextResponse.json({
           success: true,
           message: `Loom #${lNum} has been unassigned and set to Idle.`,
@@ -593,6 +610,7 @@ export async function POST(request: NextRequest) {
         });
       }
 
+      notifySync("ASSIGN");
       return NextResponse.json({
         success: true,
         message: `Loom #${lNum} successfully assigned to quality "${cleanCode}".`,
@@ -618,6 +636,7 @@ export async function POST(request: NextRequest) {
         });
       }
 
+      notifySync("UNASSIGN");
       return NextResponse.json({
         success: true,
         message: `Loom #${lNum} set to Idle.`,
@@ -698,6 +717,7 @@ export async function POST(request: NextRequest) {
         });
       }
 
+      notifySync("ALLOCATE");
       return NextResponse.json({
         success: true,
         message: `Allocated ${sanitizedLooms.length} looms to quality "${cleanCode}".`,

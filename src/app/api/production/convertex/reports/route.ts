@@ -8,6 +8,7 @@ import {
 } from "@/lib/convertex/convertex-types";
 import { logEvent } from "@/lib/logging";
 import { withResourceLock } from "@/lib/concurrency-lock";
+import { emitProductionSync } from "@/lib/realtime/production-bus";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -307,6 +308,19 @@ export async function POST(request: NextRequest) {
       statusCode: 200,
     }).catch(() => {});
 
+    emitProductionSync({
+      module: "convertex",
+      sheet: "daily-report",
+      action: status === "SUBMITTED" ? "SUBMIT" : "SAVE",
+      date,
+      shift: shiftName,
+      user: {
+        name: authResult.session?.user?.name || "Convertex Operator",
+        email: authResult.session?.user?.email || undefined,
+        role: (authResult.session?.user as any)?.roleName || (authResult.session?.user as any)?.role || "Staff",
+      },
+    });
+
     return NextResponse.json({
       success: true,
       report: savedReport,
@@ -363,6 +377,19 @@ export async function DELETE(request: NextRequest) {
       url: "/api/production/convertex/reports",
       statusCode: 200,
     }).catch(() => {});
+
+    emitProductionSync({
+      module: "convertex",
+      sheet: "daily-report",
+      action: "DELETE",
+      date: report.date,
+      shift: report.shiftName,
+      user: {
+        name: authResult.session?.user?.name || "Convertex Operator",
+        email: authResult.session?.user?.email || undefined,
+        role: (authResult.session?.user as any)?.roleName || (authResult.session?.user as any)?.role || "Staff",
+      },
+    });
 
     return NextResponse.json({ success: true, message: "Report deleted successfully" });
   } catch (error: any) {

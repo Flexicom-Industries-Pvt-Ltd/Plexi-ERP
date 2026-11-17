@@ -31,6 +31,8 @@ import { BobbinInwardSlipModal } from "./BobbinInwardSlipModal";
 import { BobbinIssueSlipData } from "@/lib/tape-plant/print-bobbin-issue-slip";
 import { BobbinInwardSlipData } from "@/lib/tape-plant/print-bobbin-inward-slip";
 import { BOBBIN_WEIGHT_KG, CRATE_WEIGHT_KG } from "@/lib/tape-plant/bobbin-stock";
+import { useProductionRealtime } from "@/hooks/useProductionRealtime";
+import { RealtimeSyncBadge } from "@/components/production/RealtimeSyncBadge";
 
 interface BobbinIssueItem {
   slNo: number;
@@ -295,9 +297,20 @@ export function BobbinIssueSection({ onNavigateToBobbinStock }: BobbinIssueSecti
     fetchAvailableStock();
   }, [fetchIssuesData, fetchLedgerData, fetchAvailableStock]);
 
+  const realtime = useProductionRealtime({
+    module: "tape-plant",
+    sheet: "bobbin-issue",
+    onSync: () => {
+      fetchIssuesData();
+      fetchLedgerData();
+      fetchAvailableStock();
+    },
+  });
+
   const handleIssueSuccess = (issueData: BobbinIssueSlipData) => {
     setSelectedIssueSlip(issueData);
     setIssueSlipModalOpen(true);
+    realtime.broadcastSync({ action: "ISSUE" });
     fetchIssuesData(true);
     fetchLedgerData();
     fetchAvailableStock();
@@ -350,6 +363,7 @@ export function BobbinIssueSection({ onNavigateToBobbinStock }: BobbinIssueSecti
       });
       if (!res.ok) throw new Error("Failed to cancel issue");
       toast.success(`Slip ${slipNumber} cancelled and stock restored`);
+      realtime.broadcastSync({ action: "CANCEL" });
       fetchIssuesData(true);
       fetchLedgerData();
       fetchAvailableStock();
@@ -541,6 +555,14 @@ export function BobbinIssueSection({ onNavigateToBobbinStock }: BobbinIssueSecti
 
             {/* Actions */}
             <div className="flex items-center gap-2">
+              <RealtimeSyncBadge
+                isConnected={realtime.isConnected}
+                lastUpdatedBy={realtime.lastUpdatedBy}
+                lastUpdatedAt={realtime.lastUpdatedAt}
+                lastAction={realtime.lastAction}
+                isSelfUpdate={realtime.isSelfUpdate}
+              />
+
               <button
                 type="button"
                 onClick={() => {

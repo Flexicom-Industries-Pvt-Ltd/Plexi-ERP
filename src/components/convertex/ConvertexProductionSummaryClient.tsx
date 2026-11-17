@@ -24,6 +24,8 @@ import {
 import { ConvertexSummaryResult } from "@/lib/convertex/convertex-types";
 import { ConvertexSummaryPrintModal } from "./ConvertexSummaryPrintModal";
 import { exportConvertexSummaryExcel } from "@/lib/convertex/convertex-export";
+import { useProductionRealtime } from "@/hooks/useProductionRealtime";
+import { RealtimeSyncBadge } from "@/components/production/RealtimeSyncBadge";
 
 export function ConvertexProductionSummaryClient() {
   const [dateFrom, setDateFrom] = useState<string>(() =>
@@ -73,6 +75,14 @@ export function ConvertexProductionSummaryClient() {
   useEffect(() => {
     fetchSummary();
   }, [fetchSummary]);
+
+  const realtime = useProductionRealtime({
+    module: "convertex",
+    sheet: "summary",
+    onSync: () => {
+      fetchSummary();
+    },
+  });
 
   const dateRangeLabel = useMemo(() => {
     if (dateFrom && dateTo) return `${dateFrom} to ${dateTo}`;
@@ -166,6 +176,14 @@ export function ConvertexProductionSummaryClient() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
+            <RealtimeSyncBadge
+              isConnected={realtime.isConnected}
+              lastUpdatedBy={realtime.lastUpdatedBy}
+              lastUpdatedAt={realtime.lastUpdatedAt}
+              lastAction={realtime.lastAction}
+              isSelfUpdate={realtime.isSelfUpdate}
+            />
+
             <button
               onClick={() => fetchSummary()}
               disabled={loading}

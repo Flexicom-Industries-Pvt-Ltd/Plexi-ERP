@@ -33,6 +33,8 @@ import {
 } from "@/lib/loom/print-loom-production-report";
 import { exportLoomProductionReportExcel } from "@/lib/loom/loom-production-report-export";
 import { LoomProductionReportPrintModal } from "./LoomProductionReportPrintModal";
+import { useProductionRealtime } from "@/hooks/useProductionRealtime";
+import { RealtimeSyncBadge } from "@/components/production/RealtimeSyncBadge";
 
 type ViewCriteria = "LOOM" | "SUPERVISOR" | "OPERATOR" | "CONSOLIDATED";
 
@@ -136,6 +138,14 @@ export function LoomProductionReportSection() {
   useEffect(() => {
     fetchReport();
   }, [fetchReport]);
+
+  const realtime = useProductionRealtime({
+    module: "loom",
+    sheet: "production-report",
+    onSync: () => {
+      fetchReport();
+    },
+  });
 
   // Date Range Quick Preset Helper
   const applyPreset = (preset: "today" | "yesterday" | "week" | "month") => {
@@ -241,6 +251,14 @@ export function LoomProductionReportSection() {
 
         {/* Global Action Buttons */}
         <div className="flex flex-wrap items-center gap-2">
+          <RealtimeSyncBadge
+            isConnected={realtime.isConnected}
+            lastUpdatedBy={realtime.lastUpdatedBy}
+            lastUpdatedAt={realtime.lastUpdatedAt}
+            lastAction={realtime.lastAction}
+            isSelfUpdate={realtime.isSelfUpdate}
+          />
+
           {/* Quick Date Presets */}
           <div className="hidden lg:flex items-center bg-muted/60 p-1 rounded-lg border text-xs">
             <button
