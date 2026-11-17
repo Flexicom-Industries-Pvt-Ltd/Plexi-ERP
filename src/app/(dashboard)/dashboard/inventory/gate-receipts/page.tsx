@@ -4,8 +4,8 @@ import { Metadata } from "next";
 import { GateReceiptsClient } from "./receipts-client";
 
 export const metadata: Metadata = {
-  title: "Gate Receipts | Flexicom ERP",
-  description: "Verify and commit pending gate receipts into inventory",
+  title: "Pending Gate Receipts | Flexicom ERP",
+  description: "Verify and reconcile pending gate receipts into inventory",
 };
 
 export const dynamic = "force-dynamic";
@@ -19,7 +19,7 @@ export default async function GateReceiptsPage() {
       <div>
         <h1 className="text-xl sm:text-2xl font-bold text-slate-800">Pending Gate Receipts</h1>
         <p className="text-xs sm:text-sm text-slate-500 mt-1">
-          Review incoming materials from the Security Gate and commit them to the physical inventory.
+          Review gate consignment items from the Security Gate and reconcile physical quantities into inventory.
         </p>
       </div>
 

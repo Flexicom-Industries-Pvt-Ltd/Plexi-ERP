@@ -19,9 +19,9 @@ export default async function InventoryItemsPage() {
   return (
     <div className="flex flex-col gap-4 sm:gap-6 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full min-w-0">
       <div>
-        <h1 className="text-xl sm:text-2xl font-bold text-slate-800">Inventory Items</h1>
+        <h1 className="text-xl sm:text-2xl font-bold text-slate-800">All Items</h1>
         <p className="text-xs sm:text-sm text-slate-500 mt-1">
-          Master data for raw materials, WIP, and finished goods.
+          Master catalog and live available stock for raw materials, WIP, and finished goods.
         </p>
       </div>
 

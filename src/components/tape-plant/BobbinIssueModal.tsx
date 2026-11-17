@@ -339,14 +339,13 @@ export function BobbinIssueModal({
 
           {/* Quality Selection */}
           <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="block text-[11px] font-medium text-slate-600">
+            <div className="flex flex-wrap items-center justify-between gap-1 mb-1">
+              <label className="text-[11px] font-medium text-slate-600">
                 Recipe Quality *
               </label>
               {selectedQualityStock && (
-                <span className="text-[11px] font-mono text-slate-600 bg-slate-100 px-2 py-0.5 rounded border border-slate-200/70">
-                  Available Stock: <strong className="text-slate-900">{selectedQualityStock.availableCrates.toFixed(1)}</strong> crates (
-                  {selectedQualityStock.availableKg.toFixed(0)} kg)
+                <span className="text-[10px] sm:text-[11px] font-mono text-emerald-800 bg-emerald-50 border border-emerald-200/70 px-2 py-0.5 rounded-md">
+                  Avail: <strong>{selectedQualityStock.availableCrates.toFixed(1)}</strong> crates ({selectedQualityStock.availableKg.toFixed(0)} kg)
                 </span>
               )}
             </div>
@@ -363,62 +362,49 @@ export function BobbinIssueModal({
             />
           </div>
 
-          {/* Multi-Loom Allocation Schedule */}
-          <div className="space-y-2.5 pt-1">
+          {/* Multi-Loom Allocation Schedule (BUG-016 Streamlined) */}
+          <div className="space-y-2 pt-1">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <label className="text-[11px] font-bold text-slate-800 uppercase tracking-wider">
-                  Loom Allocations ({loomRows.length})
-                </label>
-                <span className="text-[10px] text-slate-400">
-                  (Assign crates per loom)
-                </span>
-              </div>
+              <label className="text-[11px] font-bold text-slate-800 uppercase tracking-wider">
+                Loom Allocations ({loomRows.length})
+              </label>
               <button
                 type="button"
                 onClick={handleAddLoomRow}
-                className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 rounded-lg transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 rounded-lg transition-colors cursor-pointer"
               >
                 <Plus className="h-3 w-3" />
-                <span>Add Another Loom</span>
+                <span>Add Loom</span>
               </button>
             </div>
 
-            <div className="space-y-2">
-              {loomRows.map((row, idx) => {
-                const rowCrates = Number(row.crateCount) || 0;
-                const rowKg = Number((rowCrates * CRATE_WEIGHT_KG).toFixed(2));
+            {/* Desktop Allocation Table Layout (Hidden on Mobile) */}
+            <div className="hidden sm:block rounded-xl border border-slate-200 overflow-hidden bg-white shadow-2xs">
+              <div className="grid grid-cols-12 gap-2 px-3 py-2 bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                <span className="col-span-4">Loom #</span>
+                <span className="col-span-3">Custom / Shed</span>
+                <span className="col-span-3">Crates</span>
+                <span className="col-span-2 text-right">Net Wt</span>
+              </div>
 
-                return (
-                  <div
-                    key={row.id}
-                    className="p-3 bg-slate-50/80 rounded-xl border border-slate-200/90 space-y-2.5 relative group"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                        Allocation #{idx + 1}
-                      </span>
-                      {loomRows.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveLoomRow(row.id)}
-                          className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer"
-                          title="Remove this loom"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      )}
-                    </div>
+              <div className="divide-y divide-slate-100">
+                {loomRows.map((row) => {
+                  const rowCrates = Number(row.crateCount) || 0;
+                  const rowKg = Number((rowCrates * CRATE_WEIGHT_KG).toFixed(1));
 
-                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-center">
-                      {/* Loom Dropdown */}
-                      <div className="sm:col-span-4">
+                  return (
+                    <div
+                      key={row.id}
+                      className="grid grid-cols-12 gap-2 p-2.5 items-center hover:bg-slate-50/50 transition-colors"
+                    >
+                      {/* Loom Number */}
+                      <div className="col-span-4">
                         <select
                           value={row.loomNumber}
                           onChange={(e) => handleUpdateLoomRow(row.id, "loomNumber", e.target.value)}
-                          className="w-full text-xs font-medium text-slate-900 bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-slate-800 transition-colors cursor-pointer"
+                          className="w-full text-xs font-semibold text-slate-900 bg-white border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-slate-800 transition-colors cursor-pointer"
                         >
-                          <option value="">Select Loom (1-91)</option>
+                          <option value="">Select Loom...</option>
                           {Array.from({ length: 91 }, (_, i) => i + 1).map((num) => (
                             <option key={num} value={num}>
                               Loom #{num}
@@ -427,20 +413,130 @@ export function BobbinIssueModal({
                         </select>
                       </div>
 
-                      {/* Custom Label (Optional) */}
-                      <div className="sm:col-span-3">
+                      {/* Custom / Shed */}
+                      <div className="col-span-3">
                         <input
                           type="text"
                           value={row.customLoom}
                           onChange={(e) => handleUpdateLoomRow(row.id, "customLoom", e.target.value)}
-                          placeholder="Custom label / shed"
-                          className="w-full text-xs font-medium text-slate-900 bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-slate-800 transition-colors"
+                          placeholder="e.g. Shed B"
+                          className="w-full text-xs text-slate-800 bg-slate-50/60 border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-slate-800 focus:bg-white transition-colors"
                         />
                       </div>
 
-                      {/* Crate Input */}
-                      <div className="sm:col-span-5 flex items-center gap-2">
-                        <div className="relative flex-1">
+                      {/* Crates Input */}
+                      <div className="col-span-3">
+                        <input
+                          type="number"
+                          step="0.5"
+                          min="0.5"
+                          value={row.crateCount}
+                          onChange={(e) => handleUpdateLoomRow(row.id, "crateCount", e.target.value)}
+                          required
+                          placeholder="Crates"
+                          className="w-full text-xs font-bold font-mono text-slate-900 bg-white border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-slate-900 transition-all text-center"
+                        />
+                      </div>
+
+                      {/* Calculated Weight & Delete */}
+                      <div className="col-span-2 flex items-center justify-end gap-1.5">
+                        <span className="text-[11px] font-mono font-semibold text-slate-700 whitespace-nowrap">
+                          {rowKg} kg
+                        </span>
+                        {loomRows.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveLoomRow(row.id)}
+                            className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer"
+                            title="Remove this loom"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Mobile Touch-Friendly Allocation Cards (< sm) */}
+            <div className="block sm:hidden space-y-2.5">
+              {loomRows.map((row, idx) => {
+                const rowCrates = Number(row.crateCount) || 0;
+                const rowKg = Number((rowCrates * CRATE_WEIGHT_KG).toFixed(1));
+                const rowBobbins = Number((rowCrates * BOBBINS_PER_CRATE).toFixed(0));
+
+                return (
+                  <div
+                    key={row.id}
+                    className="bg-slate-50/70 border border-slate-200 rounded-xl p-3 space-y-2.5 shadow-2xs"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-slate-800 bg-white px-2 py-0.5 rounded border border-slate-200 shadow-2xs">
+                        {row.loomNumber ? `Loom #${row.loomNumber}` : `Allocation #${idx + 1}`}
+                      </span>
+                      {loomRows.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveLoomRow(row.id)}
+                          className="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-600 hover:text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-100 transition-colors"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                          <span>Remove</span>
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                          Loom Number *
+                        </label>
+                        <select
+                          value={row.loomNumber}
+                          onChange={(e) => handleUpdateLoomRow(row.id, "loomNumber", e.target.value)}
+                          className="w-full text-xs font-semibold text-slate-900 bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-slate-800 transition-colors cursor-pointer"
+                        >
+                          <option value="">Select Loom...</option>
+                          {Array.from({ length: 91 }, (_, i) => i + 1).map((num) => (
+                            <option key={num} value={num}>
+                              Loom #{num}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                          Custom / Shed
+                        </label>
+                        <input
+                          type="text"
+                          value={row.customLoom}
+                          onChange={(e) => handleUpdateLoomRow(row.id, "customLoom", e.target.value)}
+                          placeholder="e.g. Shed B"
+                          className="w-full text-xs text-slate-800 bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 outline-none focus:border-slate-800 transition-colors"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-3 pt-2 border-t border-slate-200/70">
+                      <div className="flex-1">
+                        <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                          Crates
+                        </label>
+                        <div className="flex items-center">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const curr = Number(row.crateCount) || 0;
+                              if (curr > 0.5) handleUpdateLoomRow(row.id, "crateCount", String(Math.max(0.5, curr - 0.5)));
+                            }}
+                            className="px-2.5 py-1 bg-white border border-slate-200 rounded-l-lg hover:bg-slate-100 text-slate-700 font-bold text-xs"
+                          >
+                            -
+                          </button>
                           <input
                             type="number"
                             step="0.5"
@@ -448,18 +544,29 @@ export function BobbinIssueModal({
                             value={row.crateCount}
                             onChange={(e) => handleUpdateLoomRow(row.id, "crateCount", e.target.value)}
                             required
-                            placeholder="Crates"
-                            className="w-full text-xs font-bold font-mono text-slate-900 bg-white border border-slate-200 rounded-lg pl-2.5 pr-12 py-1.5 outline-none focus:border-slate-900 transition-all"
+                            className="w-full text-center text-xs font-mono font-bold text-slate-900 bg-white border-y border-slate-200 py-1 outline-none"
                           />
-                          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] font-bold text-slate-400 uppercase font-mono">
-                            Crates
-                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const curr = Number(row.crateCount) || 0;
+                              handleUpdateLoomRow(row.id, "crateCount", String(curr + 0.5));
+                            }}
+                            className="px-2.5 py-1 bg-white border border-slate-200 rounded-r-lg hover:bg-slate-100 text-slate-700 font-bold text-xs"
+                          >
+                            +
+                          </button>
                         </div>
+                      </div>
 
-                        {/* Per-row calculated preview tag */}
-                        <div className="text-[10px] font-mono text-slate-600 bg-white px-2 py-1.5 rounded-lg border border-slate-200 whitespace-nowrap">
-                          <strong>{rowKg.toFixed(1)}</strong> kg
-                        </div>
+                      <div className="flex-1 text-right">
+                        <span className="block text-[10px] font-medium text-slate-500">Calculated Weight</span>
+                        <span className="block text-xs font-mono font-bold text-emerald-700">
+                          {rowKg} kg
+                        </span>
+                        <span className="block text-[10px] font-mono text-slate-400">
+                          ({rowBobbins} bobbins)
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -468,24 +575,44 @@ export function BobbinIssueModal({
             </div>
           </div>
 
-          {/* Grand Totals & Stock Verification Summary Card */}
-          <div className="rounded-xl border border-slate-200 bg-slate-50/90 p-3.5 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-slate-800 uppercase tracking-wider">
-                Total Dispatch Summary
-              </span>
-              <div className="flex items-center gap-1">
+          {/* Inline Total Summary Bar (Responsive) */}
+          <div className="rounded-xl border border-slate-200 bg-slate-50/90 p-3 space-y-2.5">
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="bg-white rounded-lg border border-slate-200/80 p-2 shadow-2xs">
+                <span className="block text-[10px] uppercase font-bold text-slate-400">Crates</span>
+                <span className="block text-sm font-mono font-bold text-slate-900">
+                  {grandTotalCrates.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                </span>
+              </div>
+              <div className="bg-white rounded-lg border border-slate-200/80 p-2 shadow-2xs">
+                <span className="block text-[10px] uppercase font-bold text-slate-400">Bobbins</span>
+                <span className="block text-sm font-mono font-bold text-slate-900">
+                  {grandTotalBobbins.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                </span>
+              </div>
+              <div className="bg-white rounded-lg border border-slate-200/80 p-2 shadow-2xs">
+                <span className="block text-[10px] uppercase font-bold text-slate-400">Total Wt</span>
+                <span className="block text-sm font-mono font-bold text-emerald-700">
+                  {grandTotalWeightKg.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 })} kg
+                </span>
+              </div>
+            </div>
+
+            {/* Quick Preset Buttons */}
+            <div className="flex items-center justify-between pt-1 border-t border-slate-200/60">
+              <span className="text-[11px] font-medium text-slate-500">Quick adjust:</span>
+              <div className="flex items-center gap-1.5">
                 <button
                   type="button"
                   onClick={() => handleQuickAddActive(5)}
-                  className="px-2 py-0.5 text-[10px] font-medium text-slate-600 bg-white border border-slate-200 rounded hover:bg-slate-100 transition-colors"
+                  className="px-2.5 py-1 text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-md hover:bg-slate-100 transition-colors shadow-2xs"
                 >
                   +5
                 </button>
                 <button
                   type="button"
                   onClick={() => handleQuickAddActive(10)}
-                  className="px-2 py-0.5 text-[10px] font-medium text-slate-600 bg-white border border-slate-200 rounded hover:bg-slate-100 transition-colors"
+                  className="px-2.5 py-1 text-xs font-semibold text-slate-700 bg-white border border-slate-200 rounded-md hover:bg-slate-100 transition-colors shadow-2xs"
                 >
                   +10
                 </button>
@@ -493,42 +620,11 @@ export function BobbinIssueModal({
                   <button
                     type="button"
                     onClick={handleSetMax}
-                    className="px-2 py-0.5 text-[10px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 transition-colors"
+                    className="px-2.5 py-1 text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-md hover:bg-indigo-100 transition-colors shadow-2xs"
                   >
                     Max
                   </button>
                 )}
-              </div>
-            </div>
-
-            {/* Calculated Values Grid */}
-            <div className="grid grid-cols-3 gap-2">
-              <div className="bg-white p-2.5 rounded-lg border border-slate-200 shadow-2xs text-center">
-                <span className="text-[9px] font-medium text-slate-500 uppercase tracking-wider block">
-                  Total Crates
-                </span>
-                <span className="text-sm font-bold font-mono text-slate-900">
-                  {grandTotalCrates.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 })}
-                </span>
-              </div>
-
-              <div className="bg-white p-2.5 rounded-lg border border-slate-200 shadow-2xs text-center">
-                <span className="text-[9px] font-medium text-slate-500 uppercase tracking-wider block">
-                  Total Bobbins (@ 8)
-                </span>
-                <span className="text-sm font-bold font-mono text-slate-900">
-                  {grandTotalBobbins.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 })}
-                </span>
-              </div>
-
-              <div className="bg-white p-2.5 rounded-lg border border-slate-200 shadow-2xs text-center">
-                <span className="text-[9px] font-medium text-slate-500 uppercase tracking-wider block">
-                  Total Weight (@ 12.8)
-                </span>
-                <span className="text-sm font-bold font-mono text-slate-900">
-                  {grandTotalWeightKg.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{" "}
-                  <span className="text-[10px] font-normal text-slate-500">kg</span>
-                </span>
               </div>
             </div>
 
@@ -586,12 +682,12 @@ export function BobbinIssueModal({
           </div>
 
           {/* Actions */}
-          <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+          <div className="grid grid-cols-2 gap-2 pt-3 border-t border-slate-100 sm:flex sm:items-center sm:justify-end">
             <button
               type="button"
               onClick={onClose}
               disabled={submitting}
-              className="px-3.5 py-1.5 text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+              className="w-full sm:w-auto px-4 py-2.5 sm:py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl sm:rounded-lg border border-slate-200 sm:border-transparent text-center transition-colors cursor-pointer"
             >
               Cancel
             </button>
@@ -599,9 +695,9 @@ export function BobbinIssueModal({
             <button
               type="submit"
               disabled={submitting || grandTotalCrates <= 0 || !recipeQuality}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 active:bg-black text-white text-xs font-medium rounded-lg shadow-xs transition-all disabled:opacity-50 cursor-pointer"
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 sm:py-2 bg-slate-900 hover:bg-slate-800 active:bg-black text-white text-xs font-semibold rounded-xl sm:rounded-lg shadow-xs transition-all disabled:opacity-50 cursor-pointer"
             >
-              <Printer className="h-3.5 w-3.5" />
+              <Printer className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
               <span>{submitting ? "Recording..." : "Issue & Print Slip"}</span>
             </button>
           </div>

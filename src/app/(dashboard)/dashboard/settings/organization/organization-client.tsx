@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { masterDataConfig, ModelConfig, ORGANIZATION_MODEL_NAMES } from "@/lib/config/master-data";
 import { DynamicMasterTable } from "@/components/settings/DynamicMasterTable";
+import { ShiftSettingsProvisionCard } from "@/components/settings/ShiftSettingsProvisionCard";
 import { 
   Building2, 
   MapPin, 
@@ -56,6 +57,7 @@ export function OrganizationClient() {
 
       {/* Main Content Area */}
       <div className="flex-1 min-w-0">
+        {activeModel.modelName === "shift" && <ShiftSettingsProvisionCard />}
         <DynamicMasterTable key={activeModel.modelName} modelConfig={activeModel} />
       </div>
     </div>
