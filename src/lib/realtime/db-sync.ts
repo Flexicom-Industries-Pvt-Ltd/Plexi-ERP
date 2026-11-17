@@ -127,10 +127,11 @@ export async function getLatestDatabaseSheetUpdate(
             };
           }
         } else if (normSheet === "temperature") {
+          const isAll = shift && shift.toUpperCase() === "ALL";
           const row = await db.tapePlantTemperatureReading.findFirst({
             where: {
               ...(date ? { date } : {}),
-              ...(shift ? { shiftId: shift } : {}),
+              ...(shift && !isAll ? { shiftId: shift } : {}),
             },
             orderBy: { updatedAt: "desc" },
             select: { updatedAt: true, operatorName: true },
@@ -143,10 +144,11 @@ export async function getLatestDatabaseSheetUpdate(
             };
           }
         } else if (normSheet === "drive-parameter" || normSheet === "drive-parameters") {
+          const isAll = shift && shift.toUpperCase() === "ALL";
           const row = await db.tapePlantDriveParameter.findFirst({
             where: {
               ...(date ? { date } : {}),
-              ...(shift ? { shiftId: shift } : {}),
+              ...(shift && !isAll ? { shiftId: shift } : {}),
             },
             orderBy: { updatedAt: "desc" },
             select: { updatedAt: true, operatorName: true },
@@ -159,10 +161,11 @@ export async function getLatestDatabaseSheetUpdate(
             };
           }
         } else if (normSheet === "raw-material") {
+          const isAll = shift && shift.toUpperCase() === "ALL";
           const row = await db.tapePlantRawMaterial.findFirst({
             where: {
               ...(date ? { date } : {}),
-              ...(shift ? { shiftId: shift } : {}),
+              ...(shift && !isAll ? { shiftId: shift } : {}),
             },
             orderBy: { updatedAt: "desc" },
             select: { updatedAt: true, operatorName: true },
@@ -175,10 +178,11 @@ export async function getLatestDatabaseSheetUpdate(
             };
           }
         } else if (normSheet === "post-production") {
+          const isAll = shift && shift.toUpperCase() === "ALL";
           const row = await db.tapePlantPostProduction.findFirst({
             where: {
               ...(date ? { date } : {}),
-              ...(shift ? { shiftId: shift } : {}),
+              ...(shift && !isAll ? { shiftId: shift } : {}),
             },
             orderBy: { updatedAt: "desc" },
             select: { updatedAt: true, operatorName: true },
@@ -191,10 +195,11 @@ export async function getLatestDatabaseSheetUpdate(
             };
           }
         } else if (normSheet === "bobbin-issue" || normSheet === "bobbin-stock") {
+          const isAll = shift && shift.toUpperCase() === "ALL";
           const row = await db.tapePlantBobbinIssue.findFirst({
             where: {
               ...(date ? { date } : {}),
-              ...(shift ? { shiftName: shift } : {}),
+              ...(shift && !isAll ? { shiftName: shift } : {}),
             },
             orderBy: { updatedAt: "desc" },
             select: { updatedAt: true, issuedBy: true, receivedBy: true },
