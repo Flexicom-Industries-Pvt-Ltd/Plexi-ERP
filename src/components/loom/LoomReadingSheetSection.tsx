@@ -336,7 +336,9 @@ export function LoomReadingSheetSection() {
     date: selectedDate,
     shift: selectedShift,
     onSync: () => {
-      fetchSheetData(selectedDate, selectedShift);
+      if (!isSavingRef.current && !pendingSaveRef.current) {
+        fetchSheetData(selectedDate, selectedShift);
+      }
     },
   });
 

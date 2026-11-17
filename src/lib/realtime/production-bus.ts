@@ -15,6 +15,7 @@ export interface ProductionSyncEvent {
   timestamp: number;
   date?: string | null;
   shift?: string | null;
+  clientId?: string | null;
   metadata?: Record<string, any>;
 }
 
