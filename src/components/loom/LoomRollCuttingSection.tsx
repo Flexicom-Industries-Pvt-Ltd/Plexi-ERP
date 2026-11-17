@@ -249,7 +249,9 @@ export function LoomRollCuttingSection() {
     date: selectedDate,
     shift: selectedShift,
     onSync: () => {
-      fetchData();
+      if (!autoSaving) {
+        fetchData();
+      }
     },
   });
 
@@ -393,6 +395,7 @@ export function LoomRollCuttingSection() {
 
   // Handle entry field update with live recalculation
   const handleUpdateEntry = (index: number, field: keyof LoomRollCuttingEntryItem, value: any) => {
+    realtime.markLocalEdit();
     setEntries((prev) => {
       const copy = [...prev];
       const current = { ...copy[index], [field]: value };

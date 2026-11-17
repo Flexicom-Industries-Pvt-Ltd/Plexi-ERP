@@ -17,6 +17,7 @@ interface UseProductionRealtimeOptions {
   enabled?: boolean;
 }
 
+
 interface UseProductionRealtimeResult {
   isConnected: boolean;
   lastUpdatedBy: ProductionSyncUser | null;
@@ -24,6 +25,7 @@ interface UseProductionRealtimeResult {
   lastAction: string | null;
   isSelfUpdate: boolean;
   broadcastSync: (params?: { action?: string; date?: string; shift?: string; metadata?: Record<string, any> }) => void;
+  markLocalEdit: () => void;
 }
 
 const BROADCAST_CHANNEL_NAME = "plexi-production-realtime";
@@ -72,7 +74,7 @@ export function useProductionRealtime({
           });
         }
       })
-      .catch(() => {});
+      .catch(() => { });
   }, [currentUser]);
 
   // Unique tab identifier generated in memory to distinguish separate tabs/devices
@@ -83,8 +85,13 @@ export function useProductionRealtime({
 
   const broadcastChannelRef = useRef<BroadcastChannel | null>(null);
   const lastEventTimestampRef = useRef<number>(0);
+  const lastLocalSaveTimestampRef = useRef<number>(0);
   const onSyncRef = useRef(onSync);
   onSyncRef.current = onSync;
+
+  const markLocalEdit = useCallback(() => {
+    lastLocalSaveTimestampRef.current = Date.now();
+  }, []);
 
   const handleIncomingEvent = useCallback(
     (event: ProductionSyncEvent, sourceClientId?: string) => {
@@ -107,16 +114,22 @@ export function useProductionRealtime({
       }
       lastEventTimestampRef.current = event.timestamp;
 
-      // Only the originating browser tab skips re-fetching.
-      // Other devices/tabs (even under the same user account) must trigger onSync to see fresh data!
-      const isFromSelf = Boolean(sourceClientId && sourceClientId === clientIdRef.current);
+      // Only remote events trigger onSync.
+      // A change is from self if:
+      // 1. Matches tab clientId from BroadcastChannel or server payload
+      // 2. Or happened within our local save/edit grace window (5000ms)
+      const isFromSelf = Boolean(
+        (sourceClientId && sourceClientId === clientIdRef.current) ||
+        (event.clientId && event.clientId === clientIdRef.current) ||
+        (lastLocalSaveTimestampRef.current > 0 && Math.abs(event.timestamp - lastLocalSaveTimestampRef.current) < 5000)
+      );
 
       setIsSelfUpdate(isFromSelf);
       setLastUpdatedBy(event.user);
       setLastUpdatedAt(new Date(event.timestamp));
       setLastAction(event.action || "UPDATE");
 
-      // Notify consumer component to quietly re-fetch if update came from another tab or device
+      // Notify consumer component to quietly re-fetch ONLY if update came from another tab or device
       if (!isFromSelf) {
         onSyncRef.current?.(event);
       }
@@ -164,6 +177,7 @@ export function useProductionRealtime({
         const params = new URLSearchParams({
           module: mod,
           sheet,
+          clientId: clientIdRef.current,
           _t: Date.now().toString(),
         });
         if (date) params.set("date", date);
@@ -184,8 +198,16 @@ export function useProductionRealtime({
         if (res.ok && !isDisposed) {
           setIsConnected(true);
           const data = await res.json();
-          if (data.hasUpdate && data.latest) {
-            handleIncomingEvent(data.latest);
+          if (data.isSelfUpdate) {
+            // Server confirmed this modification was authored by this tab
+            setIsSelfUpdate(true);
+            if (data.latest?.user) setLastUpdatedBy(data.latest.user);
+            if (data.timestamp) {
+              setLastUpdatedAt(new Date(data.timestamp));
+              lastEventTimestampRef.current = data.timestamp;
+            }
+          } else if (data.hasUpdate && data.latest) {
+            handleIncomingEvent(data.latest, data.latest.clientId);
           } else if (data.timestamp && data.timestamp > lastEventTimestampRef.current) {
             // Sync up initial timestamp
             lastEventTimestampRef.current = data.timestamp;
@@ -256,6 +278,7 @@ export function useProductionRealtime({
         timestamp: eventTimestamp,
       };
 
+      lastLocalSaveTimestampRef.current = eventTimestamp;
       lastEventTimestampRef.current = eventTimestamp;
       setIsSelfUpdate(true);
       setLastUpdatedBy(event.user);
@@ -294,5 +317,6 @@ export function useProductionRealtime({
     lastAction,
     isSelfUpdate,
     broadcastSync,
+    markLocalEdit,
   };
 }
