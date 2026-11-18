@@ -12,8 +12,18 @@ import {
   Eye,
   AlertCircle,
   Sparkles,
+  Lock,
 } from "lucide-react";
 import { toast } from "sonner";
+
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
 
 interface PhotoEvidenceModalProps {
   isOpen: boolean;
@@ -86,24 +96,63 @@ export function PhotoEvidenceModal({
     }
   }, [activeTab, stopCamera]);
 
-  // Initialize camera when camera tab is active
+  // Initialize camera when camera tab is active with tiered constraint negotiation
   const startCamera = async () => {
     setCameraError(null);
     try {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error("Camera API is not supported in this browser environment.");
+      if (typeof navigator === "undefined" || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error("Camera API is not supported in this browser. Please tap 'Open Device Camera' below.");
       }
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } },
-      });
+
+      let stream: MediaStream | null = null;
+      // Tier 1: Try environment / rear camera (ideal for mobile / tablet telemetry scanning)
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } },
+        });
+      } catch (firstErr: any) {
+        // If permission explicitly denied by user or browser, do not retry constraints
+        if (
+          firstErr.name === "NotAllowedError" ||
+          firstErr.name === "PermissionDeniedError" ||
+          String(firstErr.message).toLowerCase().includes("permission denied")
+        ) {
+          throw firstErr;
+        }
+        // Tier 2: Fall back to user-facing or default webcam (laptops, desktops, single-camera devices)
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } },
+          });
+        } catch {
+          // Tier 3: Simplest bare video constraints
+          stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        }
+      }
+
       setCameraStream(stream);
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        videoRef.current.play();
+        videoRef.current.play().catch((playErr) => {
+          console.warn("Camera auto-play deferred:", playErr);
+        });
       }
     } catch (err: any) {
       console.warn("Could not start live webcam:", err);
-      setCameraError(err.message || "Could not access device camera. Please upload an image file instead.");
+      const isDenied =
+        err.name === "NotAllowedError" ||
+        err.name === "PermissionDeniedError" ||
+        String(err.message).toLowerCase().includes("permission denied");
+
+      if (isDenied) {
+        setCameraError(
+          "Browser Camera Blocked: Tap the lock or tune icon in your browser address bar → Site Settings / Permissions → Allow Camera, then click Retry. You can also tap 'Open Device Camera' below."
+        );
+      } else {
+        setCameraError(
+          err.message || "Could not access device camera. Please tap 'Open Device Camera' below or upload an image file."
+        );
+      }
     }
   };
 
@@ -128,6 +177,7 @@ export function PhotoEvidenceModal({
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
     const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+    setCameraError(null);
     setPreviewUrl(dataUrl);
     stopCamera();
   };
@@ -141,9 +191,11 @@ export function PhotoEvidenceModal({
       return;
     }
 
+    setCameraError(null); // CRITICAL: Reset camera error so preview displays immediately!
     setSelectedFile(file);
     const objectUrl = URL.createObjectURL(file);
     setPreviewUrl(objectUrl);
+    stopCamera();
   };
 
   const handleSave = async () => {
@@ -157,6 +209,8 @@ export function PhotoEvidenceModal({
 
     setUploading(true);
     try {
+      let finalPhotoUrl = previewUrl;
+
       const formData = new FormData();
       if (selectedFile) {
         formData.append("file", selectedFile);
@@ -164,18 +218,31 @@ export function PhotoEvidenceModal({
         formData.append("base64", previewUrl);
       }
 
-      const res = await fetch("/api/production/tape-plant/photos", {
-        method: "POST",
-        body: formData,
-      });
+      try {
+        const res = await fetch("/api/production/tape-plant/photos", {
+          method: "POST",
+          body: formData,
+        });
 
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.error || "Failed to upload photo");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.photoUrl) {
+            finalPhotoUrl = data.photoUrl;
+          }
+        } else {
+          // If serverless upload returned non-200, fallback to local base64 data URL
+          if (selectedFile) {
+            finalPhotoUrl = await fileToDataUrl(selectedFile);
+          }
+        }
+      } catch (uploadErr) {
+        console.warn("Photo upload API failed, falling back to client data URL:", uploadErr);
+        if (selectedFile) {
+          finalPhotoUrl = await fileToDataUrl(selectedFile);
+        }
       }
 
-      const data = await res.json();
-      onSavePhoto(data.photoUrl);
+      onSavePhoto(finalPhotoUrl);
       toast.success("Telemetry evidence photo saved successfully");
       onClose();
     } catch (err: any) {
@@ -281,7 +348,18 @@ export function PhotoEvidenceModal({
               </span>
             </div>
           )}
-          {!allowUpload && !allowCapture && !previewUrl && (
+          {disabled && !previewUrl && (
+            <div className="w-full py-10 flex flex-col items-center justify-center text-center px-4">
+              <div className="p-3 bg-amber-50 text-amber-600 rounded-full mb-3">
+                <Lock className="h-6 w-6" />
+              </div>
+              <h4 className="text-sm font-bold text-slate-800">Telemetry Interval Locked</h4>
+              <p className="text-xs text-slate-500 max-w-sm mt-1">
+                This time interval has expired and is locked. To attach or change evidence photos, please request a supervisor to unlock this slot.
+              </p>
+            </div>
+          )}
+          {!allowUpload && !allowCapture && !previewUrl && !disabled && (
             <div className="w-full py-10 flex flex-col items-center justify-center text-center px-4">
               <div className="p-3 bg-red-50 text-red-600 rounded-full mb-3">
                 <AlertCircle className="h-6 w-6" />
@@ -359,15 +437,32 @@ export function PhotoEvidenceModal({
           {/* 3. Live Camera Tab */}
           {activeTab === "camera" && (
             <div className="w-full flex flex-col items-center">
-              {cameraError ? (
-                <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl text-center max-w-sm">
-                  <AlertCircle className="h-6 w-6 text-rose-500 mx-auto mb-2" />
-                  <p className="text-xs font-bold text-rose-800">Camera Unavailable</p>
-                  <p className="text-[11px] text-rose-600 mt-1">{cameraError}</p>
-                  <div className="mt-3">
-                    <label className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-rose-600 text-white rounded-lg text-xs font-semibold hover:bg-rose-700 transition-colors cursor-pointer">
-                      <Camera className="h-3.5 w-3.5" />
-                      <span>Take Photo via Mobile Camera</span>
+              {/* If user took a snapshot or picked a photo via native camera, show preview! */}
+              {previewUrl && !cameraStream ? (
+                <div className="w-full flex flex-col items-center">
+                  <div className="relative w-full max-h-[300px] rounded-xl overflow-hidden border border-slate-200 bg-black flex items-center justify-center shadow-inner">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={previewUrl}
+                      alt="Captured Telemetry"
+                      className="max-h-[300px] w-auto object-contain rounded-lg"
+                    />
+                  </div>
+                  <div className="mt-3 flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPreviewUrl(null);
+                        setSelectedFile(null);
+                        setCameraError(null);
+                        startCamera();
+                      }}
+                      className="text-xs text-sky-600 hover:text-sky-700 font-semibold flex items-center gap-1 cursor-pointer"
+                    >
+                      <RotateCcw className="h-3.5 w-3.5" /> Retake Live Stream
+                    </button>
+                    <label className="text-xs text-slate-600 hover:text-slate-800 font-semibold flex items-center gap-1 cursor-pointer">
+                      <Camera className="h-3.5 w-3.5" /> Retake via Device Camera
                       <input
                         type="file"
                         accept="image/*"
@@ -378,30 +473,41 @@ export function PhotoEvidenceModal({
                     </label>
                   </div>
                 </div>
-              ) : previewUrl && !cameraStream ? (
-                <div className="w-full flex flex-col items-center">
-                  <div className="relative w-full max-h-[300px] rounded-xl overflow-hidden border border-slate-200 bg-black flex items-center justify-center">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={previewUrl}
-                      alt="Captured Telemetry"
-                      className="max-h-[300px] w-auto object-contain rounded-lg"
-                    />
+              ) : cameraError ? (
+                <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl text-center max-w-sm">
+                  <AlertCircle className="h-6 w-6 text-rose-500 mx-auto mb-2" />
+                  <p className="text-xs font-bold text-rose-800">Browser Camera Blocked</p>
+                  <p className="text-[11px] text-rose-600 mt-1 leading-relaxed">{cameraError}</p>
+
+                  <div className="mt-4 flex flex-col gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCameraError(null);
+                        startCamera();
+                      }}
+                      className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-sky-600 text-white rounded-lg text-xs font-semibold hover:bg-sky-700 transition-colors cursor-pointer shadow-xs"
+                    >
+                      <RotateCcw className="h-3.5 w-3.5" />
+                      <span>Retry Camera Permission</span>
+                    </button>
+
+                    <label className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-semibold hover:bg-emerald-700 transition-colors cursor-pointer shadow-xs">
+                      <Camera className="h-3.5 w-3.5" />
+                      <span>Open Device Camera App</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        onChange={handleFileChange}
+                        className="hidden"
+                      />
+                    </label>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPreviewUrl(null);
-                      startCamera();
-                    }}
-                    className="mt-2 text-xs text-sky-600 hover:text-sky-700 font-semibold flex items-center gap-1 cursor-pointer"
-                  >
-                    <RotateCcw className="h-3 w-3" /> Retake Photo
-                  </button>
                 </div>
               ) : (
                 <div className="w-full flex flex-col items-center">
-                  <div className="relative w-full max-h-[320px] rounded-xl overflow-hidden border border-slate-300 bg-black flex items-center justify-center">
+                  <div className="relative w-full max-h-[320px] rounded-xl overflow-hidden border border-slate-300 bg-black flex items-center justify-center shadow-inner">
                     <video
                       ref={videoRef}
                       autoPlay
@@ -411,14 +517,27 @@ export function PhotoEvidenceModal({
                     />
                     <canvas ref={canvasRef} className="hidden" />
                   </div>
-                  <button
-                    type="button"
-                    onClick={handleCaptureFrame}
-                    className="mt-3 inline-flex items-center gap-2 px-5 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-full text-xs font-bold shadow-md transition-all active:scale-95 cursor-pointer"
-                  >
-                    <Camera className="h-4 w-4" />
-                    <span>Snap Telemetry Photo</span>
-                  </button>
+                  <div className="mt-3 flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleCaptureFrame}
+                      className="inline-flex items-center gap-2 px-5 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-full text-xs font-bold shadow-md transition-all active:scale-95 cursor-pointer"
+                    >
+                      <Camera className="h-4 w-4" />
+                      <span>Snap Telemetry Photo</span>
+                    </button>
+                    <label className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-full text-xs font-semibold transition-all cursor-pointer">
+                      <Camera className="h-3.5 w-3.5 text-slate-500" />
+                      <span>Device Camera App</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        onChange={handleFileChange}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
                 </div>
               )}
             </div>
