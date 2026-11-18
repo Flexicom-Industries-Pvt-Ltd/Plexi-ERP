@@ -13,6 +13,7 @@ import {
   AlertCircle,
   Sparkles,
   Lock,
+  Video,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -135,8 +136,8 @@ export function PhotoEvidenceModal({
 }: PhotoEvidenceModalProps) {
   const resolveDefaultTab = (hasPhoto: boolean, uploadAllowed: boolean, captureAllowed: boolean): "view" | "upload" | "camera" => {
     if (hasPhoto) return "view";
-    if (uploadAllowed) return "upload";
     if (captureAllowed) return "camera";
+    if (uploadAllowed) return "upload";
     return "view";
   };
 
@@ -179,12 +180,12 @@ export function PhotoEvidenceModal({
     }
   }, [activeTab, stopCamera]);
 
-  // Initialize camera when camera tab is active with tiered constraint negotiation
+  // Initialize camera ONLY when user explicitly requests live webcam stream
   const startCamera = async () => {
     setCameraError(null);
     try {
       if (typeof navigator === "undefined" || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error("Camera API is not supported in this browser. Please tap 'Open Device Camera' below.");
+        throw new Error("Webcam API not supported in this browser. Please tap 'Open Camera' to use your device camera.");
       }
 
       let stream: MediaStream | null = null;
@@ -194,7 +195,6 @@ export function PhotoEvidenceModal({
           video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } },
         });
       } catch (firstErr: any) {
-        // If permission explicitly denied by user or browser, do not retry constraints
         if (
           firstErr.name === "NotAllowedError" ||
           firstErr.name === "PermissionDeniedError" ||
@@ -202,7 +202,7 @@ export function PhotoEvidenceModal({
         ) {
           throw firstErr;
         }
-        // Tier 2: Fall back to user-facing or default webcam (laptops, desktops, single-camera devices)
+        // Tier 2: Fall back to user-facing or default webcam
         try {
           stream = await navigator.mediaDevices.getUserMedia({
             video: { facingMode: "user", width: { ideal: 1280 }, height: { ideal: 720 } },
@@ -229,24 +229,21 @@ export function PhotoEvidenceModal({
 
       if (isDenied) {
         setCameraError(
-          "Browser Camera Blocked: Tap the lock or tune icon in your browser address bar → Site Settings / Permissions → Allow Camera, then click Retry. You can also tap 'Open Device Camera' below."
+          "Webcam access was denied by the browser. You can allow camera in browser site settings or simply tap 'Open Camera' below."
         );
       } else {
         setCameraError(
-          err.message || "Could not access device camera. Please tap 'Open Device Camera' below or upload an image file."
+          err.message || "Could not access live webcam. Please tap 'Open Camera' below."
         );
       }
     }
   };
 
   useEffect(() => {
-    if (isOpen && activeTab === "camera" && !cameraStream) {
-      startCamera();
-    }
     return () => {
       stopCamera();
     };
-  }, [isOpen, activeTab]);
+  }, [stopCamera]);
 
   const handleCaptureFrame = async () => {
     if (!videoRef.current || !canvasRef.current) return;
@@ -426,7 +423,10 @@ export function PhotoEvidenceModal({
               {allowCapture && (
                 <button
                   type="button"
-                  onClick={() => setActiveTab("camera")}
+                  onClick={() => {
+                    setActiveTab("camera");
+                    setCameraError(null);
+                  }}
                   className={`pb-2.5 px-3 text-xs font-semibold border-b-2 transition-all cursor-pointer flex items-center gap-1.5 ${
                     activeTab === "camera"
                       ? "border-primary text-primary"
@@ -434,7 +434,7 @@ export function PhotoEvidenceModal({
                   }`}
                 >
                   <Camera className="h-3.5 w-3.5" />
-                  <span>Live Camera</span>
+                  <span>Camera</span>
                 </button>
               )}
             </>
@@ -537,10 +537,10 @@ export function PhotoEvidenceModal({
             </div>
           )}
 
-          {/* 3. Live Camera Tab */}
+          {/* 3. Camera Tab */}
           {activeTab === "camera" && (
             <div className="w-full flex flex-col items-center">
-              {/* If user took a snapshot or picked a photo via native camera, show preview! */}
+              {/* State A: Photo captured or chosen, display preview */}
               {previewUrl && !cameraStream ? (
                 <div className="w-full flex flex-col items-center">
                   <div className="relative w-full max-h-[300px] rounded-xl overflow-hidden border border-slate-200 bg-black flex items-center justify-center shadow-inner">
@@ -552,63 +552,32 @@ export function PhotoEvidenceModal({
                     />
                   </div>
                   <div className="mt-3 flex items-center gap-3">
+                    <label className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-semibold cursor-pointer transition-colors shadow-xs">
+                      <Camera className="h-3.5 w-3.5" />
+                      <span>Retake Photo</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        onChange={handleFileChange}
+                        className="hidden"
+                      />
+                    </label>
                     <button
                       type="button"
                       onClick={() => {
                         setPreviewUrl(null);
                         setSelectedFile(null);
                         setCameraError(null);
-                        startCamera();
                       }}
-                      className="text-xs text-sky-600 hover:text-sky-700 font-semibold flex items-center gap-1 cursor-pointer"
+                      className="text-xs text-rose-600 hover:text-rose-700 font-semibold flex items-center gap-1 cursor-pointer"
                     >
-                      <RotateCcw className="h-3.5 w-3.5" /> Retake Live Stream
+                      <RotateCcw className="h-3 w-3" /> Discard
                     </button>
-                    <label className="text-xs text-slate-600 hover:text-slate-800 font-semibold flex items-center gap-1 cursor-pointer">
-                      <Camera className="h-3.5 w-3.5" /> Retake via Device Camera
-                      <input
-                        type="file"
-                        accept="image/*"
-                        capture="environment"
-                        onChange={handleFileChange}
-                        className="hidden"
-                      />
-                    </label>
                   </div>
                 </div>
-              ) : cameraError ? (
-                <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl text-center max-w-sm">
-                  <AlertCircle className="h-6 w-6 text-rose-500 mx-auto mb-2" />
-                  <p className="text-xs font-bold text-rose-800">Browser Camera Blocked</p>
-                  <p className="text-[11px] text-rose-600 mt-1 leading-relaxed">{cameraError}</p>
-
-                  <div className="mt-4 flex flex-col gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setCameraError(null);
-                        startCamera();
-                      }}
-                      className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-sky-600 text-white rounded-lg text-xs font-semibold hover:bg-sky-700 transition-colors cursor-pointer shadow-xs"
-                    >
-                      <RotateCcw className="h-3.5 w-3.5" />
-                      <span>Retry Camera Permission</span>
-                    </button>
-
-                    <label className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-semibold hover:bg-emerald-700 transition-colors cursor-pointer shadow-xs">
-                      <Camera className="h-3.5 w-3.5" />
-                      <span>Open Device Camera App</span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        capture="environment"
-                        onChange={handleFileChange}
-                        className="hidden"
-                      />
-                    </label>
-                  </div>
-                </div>
-              ) : (
+              ) : cameraStream ? (
+                /* State B: Live desktop webcam stream actively running */
                 <div className="w-full flex flex-col items-center">
                   <div className="relative w-full max-h-[320px] rounded-xl overflow-hidden border border-slate-300 bg-black flex items-center justify-center shadow-inner">
                     <video
@@ -624,23 +593,80 @@ export function PhotoEvidenceModal({
                     <button
                       type="button"
                       onClick={handleCaptureFrame}
-                      className="inline-flex items-center gap-2 px-5 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-full text-xs font-bold shadow-md transition-all active:scale-95 cursor-pointer"
+                      className="inline-flex items-center gap-2 px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full text-xs font-bold shadow-md transition-all active:scale-95 cursor-pointer"
                     >
                       <Camera className="h-4 w-4" />
                       <span>Snap Telemetry Photo</span>
                     </button>
-                    <label className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-full text-xs font-semibold transition-all cursor-pointer">
-                      <Camera className="h-3.5 w-3.5 text-slate-500" />
-                      <span>Device Camera App</span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        capture="environment"
-                        onChange={handleFileChange}
-                        className="hidden"
-                      />
-                    </label>
+                    <button
+                      type="button"
+                      onClick={stopCamera}
+                      className="px-3.5 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 cursor-pointer"
+                    >
+                      Cancel Webcam
+                    </button>
                   </div>
+                </div>
+              ) : cameraError ? (
+                /* State C: Live webcam stream failed after explicit user request */
+                <div className="w-full py-6 flex flex-col items-center justify-center text-center px-4 max-w-sm">
+                  <div className="p-3 bg-amber-50 text-amber-600 rounded-full mb-3">
+                    <AlertCircle className="h-6 w-6" />
+                  </div>
+                  <h4 className="text-sm font-bold text-slate-800">Webcam Not Available</h4>
+                  <p className="text-xs text-slate-500 mt-1 mb-4 leading-relaxed">
+                    {cameraError}
+                  </p>
+                  <label className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md hover:shadow-lg transition-all active:scale-95 cursor-pointer">
+                    <Camera className="h-4 w-4" />
+                    <span>Open Camera</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      onChange={handleFileChange}
+                      className="hidden"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setCameraError(null)}
+                    className="mt-3 text-xs text-slate-400 hover:text-slate-600 cursor-pointer"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              ) : (
+                /* State D: Default Clean & Professional Single-Button Camera Launch */
+                <div className="w-full py-8 flex flex-col items-center justify-center text-center px-4">
+                  <div className="p-4 bg-emerald-50 text-emerald-600 rounded-2xl mb-4 shadow-xs">
+                    <Camera className="h-8 w-8" />
+                  </div>
+                  <h4 className="text-sm font-bold text-slate-800 mb-1">Device Camera</h4>
+                  <p className="text-xs text-slate-500 max-w-xs mb-5">
+                    Capture telemetry evidence directly using your device camera.
+                  </p>
+
+                  <label className="inline-flex items-center justify-center gap-2 px-6 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold shadow-md hover:shadow-lg transition-all active:scale-95 cursor-pointer">
+                    <Camera className="h-5 w-5" />
+                    <span>Open Camera</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      onChange={handleFileChange}
+                      className="hidden"
+                    />
+                  </label>
+
+                  <button
+                    type="button"
+                    onClick={() => startCamera()}
+                    className="mt-4 inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
+                  >
+                    <Video className="h-3.5 w-3.5" />
+                    <span>Or use live webcam stream</span>
+                  </button>
                 </div>
               )}
             </div>
