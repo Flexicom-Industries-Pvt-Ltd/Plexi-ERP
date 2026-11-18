@@ -475,6 +475,7 @@ export async function POST(request: NextRequest) {
         reportTotalNett += nettWeightKg;
 
         return {
+          id: e.id || undefined,
           sequence: idx + 1,
           rollNumber: (e.rollNumber || "").trim().toUpperCase(),
           loomNumber: Number(e.loomNumber) || 1,
@@ -558,34 +559,83 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      // Replace entries
-      await db.loomRollCuttingEntry.deleteMany({
-        where: { reportId: savedReport.id },
-      });
+      // Non-destructive atomic row-level upserts per roll
+      // Preserves concurrent edits from other supervisors / devices
+      for (const item of processedEntries) {
+        const entryData = {
+          sequence: item.sequence,
+          rollNumber: item.rollNumber,
+          loomNumber: item.loomNumber,
+          size: item.size,
+          qualityType: item.qualityType,
+          contractor: item.contractor,
+          initialReading: item.initialReading,
+          finalReading: item.finalReading,
+          meter: item.meter,
+          grossWeightKg: item.grossWeightKg,
+          tareWeightKg: item.tareWeightKg,
+          nettWeightKg: item.nettWeightKg,
+          avgWeightPerMeter: item.avgWeightPerMeter,
+          supervisorSign: item.supervisorSign,
+          remarks: item.remarks,
+          photoUrl: item.photoUrl,
+          productionRollId: item.productionRollId,
+        };
+
+        if (item.id) {
+          await db.loomRollCuttingEntry.upsert({
+            where: { id: item.id },
+            update: entryData,
+            create: {
+              id: item.id,
+              reportId: savedReport.id,
+              ...entryData,
+            },
+          });
+        } else {
+          // Check if an entry with this rollNumber already exists in the report
+          const existing = await db.loomRollCuttingEntry.findFirst({
+            where: {
+              reportId: savedReport.id,
+              rollNumber: item.rollNumber,
+            },
+          });
+
+          if (existing) {
+            await db.loomRollCuttingEntry.update({
+              where: { id: existing.id },
+              data: entryData,
+            });
+          } else {
+            await db.loomRollCuttingEntry.create({
+              data: {
+                reportId: savedReport.id,
+                ...entryData,
+              },
+            });
+          }
+        }
+      }
+
+      // Explicit deletion of specific rolls if requested
+      if (Array.isArray(body.deletedRollIds) && body.deletedRollIds.length > 0) {
+        await db.loomRollCuttingEntry.deleteMany({
+          where: {
+            reportId: savedReport.id,
+            id: { in: body.deletedRollIds },
+          },
+        });
+      }
+      if (Array.isArray(body.deletedRollNumbers) && body.deletedRollNumbers.length > 0) {
+        await db.loomRollCuttingEntry.deleteMany({
+          where: {
+            reportId: savedReport.id,
+            rollNumber: { in: body.deletedRollNumbers },
+          },
+        });
+      }
 
       if (processedEntries.length > 0) {
-        await db.loomRollCuttingEntry.createMany({
-          data: processedEntries.map((item) => ({
-            reportId: savedReport.id,
-            sequence: item.sequence,
-            rollNumber: item.rollNumber,
-            loomNumber: item.loomNumber,
-            size: item.size,
-            qualityType: item.qualityType,
-            contractor: item.contractor,
-            initialReading: item.initialReading,
-            finalReading: item.finalReading,
-            meter: item.meter,
-            grossWeightKg: item.grossWeightKg,
-            tareWeightKg: item.tareWeightKg,
-            nettWeightKg: item.nettWeightKg,
-            avgWeightPerMeter: item.avgWeightPerMeter,
-            supervisorSign: item.supervisorSign,
-            remarks: item.remarks,
-            photoUrl: item.photoUrl,
-            productionRollId: item.productionRollId,
-          })),
-        });
 
         // -------------------------------------------------------------
         // Sync to Central ProductionRoll Inventory / Quality Stage
@@ -666,6 +716,7 @@ export async function POST(request: NextRequest) {
         action: status === "SUBMITTED" ? "SUBMIT" : "SAVE",
         date,
         shift: targetShiftName,
+        clientId: body.clientId,
         user: {
           name: authResult.session?.user?.name || supervisorName || "Operator",
           email: authResult.session?.user?.email,

@@ -578,45 +578,72 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      // Fast batch replace entries in a single SQL statement
-      await db.loomReadingEntry.deleteMany({
-        where: { sheetId: savedSheet.id },
-      });
+      // Non-destructive atomic row-level upserts per (sheetId, loomNumber, rowSequence)
+      // Preserves concurrent edits from other devices / operators
+      for (const item of processedEntries) {
+        const entryPayload = {
+          operatorName: item.operatorName,
+          size: item.size,
+          denier: item.denier,
+          qualityType: item.qualityType,
+          initialReading: item.initialReading,
+          r1Reading: item.r1Reading,
+          r1Prod: item.r1Prod,
+          r2Reading: item.r2Reading,
+          r2Prod: item.r2Prod,
+          r3Reading: item.r3Reading,
+          r3Prod: item.r3Prod,
+          r4Reading: item.r4Reading,
+          r4Prod: item.r4Prod,
+          r5Reading: item.r5Reading,
+          r5Prod: item.r5Prod,
+          r6Reading: item.r6Reading,
+          r6Prod: item.r6Prod,
+          totalProduction: item.totalProduction,
+          breakdownReason: item.breakdownReason,
+          breakdownMinutes: item.breakdownMinutes,
+          changeoverTargetQuality: item.changeoverTargetQuality,
+          efficiencyPct: item.efficiencyPct,
+          status: item.status,
+          remarks: item.remarks,
+          photoUrl: item.photoUrl,
+          intervalPhotos: item.intervalPhotos || undefined,
+        };
 
-      if (processedEntries.length > 0) {
-        await db.loomReadingEntry.createMany({
-          data: processedEntries.map((item) => ({
+        await db.loomReadingEntry.upsert({
+          where: {
+            sheetId_loomNumber_rowSequence: {
+              sheetId: savedSheet.id,
+              loomNumber: item.loomNumber,
+              rowSequence: item.rowSequence,
+            },
+          },
+          update: entryPayload,
+          create: {
             sheetId: savedSheet.id,
             loomNumber: item.loomNumber,
             rowSequence: item.rowSequence,
-            operatorName: item.operatorName,
-            size: item.size,
-            denier: item.denier,
-            qualityType: item.qualityType,
-            initialReading: item.initialReading,
-            r1Reading: item.r1Reading,
-            r1Prod: item.r1Prod,
-            r2Reading: item.r2Reading,
-            r2Prod: item.r2Prod,
-            r3Reading: item.r3Reading,
-            r3Prod: item.r3Prod,
-            r4Reading: item.r4Reading,
-            r4Prod: item.r4Prod,
-            r5Reading: item.r5Reading,
-            r5Prod: item.r5Prod,
-            r6Reading: item.r6Reading,
-            r6Prod: item.r6Prod,
-            totalProduction: item.totalProduction,
-            breakdownReason: item.breakdownReason,
-            breakdownMinutes: item.breakdownMinutes,
-            changeoverTargetQuality: item.changeoverTargetQuality,
-            efficiencyPct: item.efficiencyPct,
-            status: item.status,
-            remarks: item.remarks,
-            photoUrl: item.photoUrl,
-            intervalPhotos: item.intervalPhotos || undefined,
-          })),
+            ...entryPayload,
+          },
         });
+      }
+
+      // Explicit deletion of split rows if requested
+      if (Array.isArray(body.deletedEntries) && body.deletedEntries.length > 0) {
+        for (const del of body.deletedEntries) {
+          if (del && del.loomNumber && del.rowSequence) {
+            await db.loomReadingEntry.deleteMany({
+              where: {
+                sheetId: savedSheet.id,
+                loomNumber: Number(del.loomNumber),
+                rowSequence: Number(del.rowSequence),
+              },
+            });
+          }
+        }
+      }
+
+      if (processedEntries.length > 0) {
 
         // -------------------------------------------------------------
         // Automatic Changeover Execution & Roll Stock WIP Preservation
@@ -760,6 +787,7 @@ export async function POST(request: NextRequest) {
         action: "SAVE",
         date,
         shift: shiftName,
+        clientId: body.clientId,
         user: {
           name: authResult.session?.user?.name || authResult.session?.user?.email || "Operator",
           email: authResult.session?.user?.email || undefined,
@@ -848,6 +876,7 @@ export async function POST(request: NextRequest) {
         action: "UPDATE",
         date,
         shift: shiftName,
+        clientId: body.clientId,
         user: {
           name: authResult.session?.user?.name || authResult.session?.user?.email || "Operator",
           email: authResult.session?.user?.email || undefined,
@@ -890,6 +919,7 @@ export async function POST(request: NextRequest) {
         action: "CLEAR",
         date,
         shift: shiftName,
+        clientId: body.clientId,
         user: {
           name: authResult.session?.user?.name || authResult.session?.user?.email || "Operator",
           email: authResult.session?.user?.email || undefined,
