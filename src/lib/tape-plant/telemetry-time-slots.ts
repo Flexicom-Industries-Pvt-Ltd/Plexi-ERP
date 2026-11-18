@@ -175,3 +175,15 @@ export function resolveShiftIdForTime(
   return fallbackShiftId;
 }
 
+export function normalizeTimeSlot(t?: string): string {
+  if (!t) return "";
+  const trimmed = t.trim();
+  const parts = trimmed.split(":");
+  if (parts.length >= 2) {
+    const hh = parts[0].padStart(2, "0");
+    const mm = parts[1].padStart(2, "0");
+    return `${hh}:${mm}`;
+  }
+  return trimmed;
+}
+

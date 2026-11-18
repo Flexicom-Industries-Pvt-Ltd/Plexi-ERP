@@ -360,6 +360,7 @@ export async function POST(request: NextRequest) {
       action: status === "SUBMITTED" ? "SUBMIT" : "SAVE",
       date,
       shift: shiftId,
+      clientId: body.clientId,
       user: {
         name: authResult.session?.user?.name || "Floor Admin",
         email: authResult.session?.user?.email || undefined,
@@ -471,6 +472,7 @@ export async function DELETE(request: NextRequest) {
         action: "DELETE",
         date: existingPlan?.date,
         shift: existingPlan?.shiftId,
+        clientId: searchParams.get("clientId") || undefined,
         user: {
           name: authResult.session?.user?.name || "Floor Admin",
           email: authResult.session?.user?.email || undefined,
