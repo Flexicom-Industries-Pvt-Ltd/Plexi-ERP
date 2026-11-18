@@ -74,16 +74,172 @@ interface ProcessTemperatureSectionProps {
   shiftName: string;
 }
 
-function mergeTemperatureReadings(data: any[], intervals: string[]): TemperatureReading[] {
+export function normalizeTimeSlot(t?: string): string {
+  if (!t) return "";
+  const trimmed = t.trim();
+  const parts = trimmed.split(":");
+  if (parts.length >= 2) {
+    const hh = parts[0].padStart(2, "0");
+    const mm = parts[1].padStart(2, "0");
+    return `${hh}:${mm}`;
+  }
+  return trimmed;
+}
+
+export function serializeTemperaturePayload(
+  date: string,
+  shiftId: string,
+  operatorName: string,
+  operatorId: string,
+  readings: TemperatureReading[]
+): string {
+  return JSON.stringify({
+    date,
+    shiftId,
+    operatorName: (operatorName || "").trim(),
+    operatorId: (operatorId || "").trim(),
+    readings: readings.map((r) => ({
+      time: normalizeTimeSlot(r.time),
+      photoUrl: r.photoUrl || null,
+      b1: r.b1 ?? "",
+      b2: r.b2 ?? "",
+      b3: r.b3 ?? "",
+      b4: r.b4 ?? "",
+      b5: r.b5 ?? "",
+      b6: r.b6 ?? "",
+      b7: r.b7 ?? "",
+      screenChanger: r.screenChanger ?? "",
+      ad1: r.ad1 ?? "",
+      ad2: r.ad2 ?? "",
+      meltPump: r.meltPump ?? "",
+      d1: r.d1 ?? "",
+      d2: r.d2 ?? "",
+      d3: r.d3 ?? "",
+      d4: r.d4 ?? "",
+      d5: r.d5 ?? "",
+      d6: r.d6 ?? "",
+      d7: r.d7 ?? "",
+      meltTemp: r.meltTemp ?? "",
+      h1: r.h1 ?? "",
+      h2: r.h2 ?? "",
+      hotAirTemp: r.hotAirTemp ?? "",
+    })),
+  });
+}
+
+export function reconcileServerReadings(
+  localReadings: TemperatureReading[],
+  incomingServerReadings: TemperatureReading[],
+  activeCell: { time: string; field: string } | null,
+  intervals: string[]
+): TemperatureReading[] {
+  const normIntervals = intervals.map(normalizeTimeSlot);
+  const serverMap = new Map<string, TemperatureReading>();
+  for (const s of incomingServerReadings) {
+    const t = normalizeTimeSlot(s.time);
+    if (t) serverMap.set(t, s);
+  }
+
+  const localMap = new Map<string, TemperatureReading>();
+  for (const l of localReadings) {
+    const t = normalizeTimeSlot(l.time);
+    if (t) localMap.set(t, l);
+  }
+
+  const allTimes = new Set<string>();
+  normIntervals.forEach((t) => allTimes.add(t));
+  localReadings.forEach((l) => {
+    const t = normalizeTimeSlot(l.time);
+    if (t) allTimes.add(t);
+  });
+  incomingServerReadings.forEach((s) => {
+    const t = normalizeTimeSlot(s.time);
+    if (t) allTimes.add(t);
+  });
+
+  const merged: TemperatureReading[] = [];
+
+  for (const t of allTimes) {
+    const local = localMap.get(t);
+    const server = serverMap.get(t);
+
+    if (server && !local) {
+      merged.push({ ...server, time: t });
+      continue;
+    }
+
+    if (!server && local) {
+      merged.push({ ...local, time: t });
+      continue;
+    }
+
+    if (server && local) {
+      const mergedRow: TemperatureReading = {
+        id: server.id || local.id,
+        time: t,
+        photoUrl: server.photoUrl !== undefined ? server.photoUrl : local.photoUrl,
+        b1: server.b1 ?? "",
+        b2: server.b2 ?? "",
+        b3: server.b3 ?? "",
+        b4: server.b4 ?? "",
+        b5: server.b5 ?? "",
+        b6: server.b6 ?? "",
+        b7: server.b7 ?? "",
+        screenChanger: server.screenChanger ?? "",
+        ad1: server.ad1 ?? "",
+        ad2: server.ad2 ?? "",
+        meltPump: server.meltPump ?? "",
+        d1: server.d1 ?? "",
+        d2: server.d2 ?? "",
+        d3: server.d3 ?? "",
+        d4: server.d4 ?? "",
+        d5: server.d5 ?? "",
+        d6: server.d6 ?? "",
+        d7: server.d7 ?? "",
+        meltTemp: server.meltTemp ?? "",
+        h1: server.h1 ?? "",
+        h2: server.h2 ?? "",
+        hotAirTemp: server.hotAirTemp ?? "",
+      };
+
+      // FOCUSED CELL ISOLATION (Google Docs-Grade):
+      // If the local operator is actively typing in a cell on this row,
+      // retain local draft value to prevent cursor jumps and dropped keystrokes!
+      if (activeCell && normalizeTimeSlot(activeCell.time) === t) {
+        const fieldKey = activeCell.field as keyof TemperatureReading;
+        if (fieldKey && fieldKey in local) {
+          (mergedRow as any)[fieldKey] = (local as any)[fieldKey];
+        }
+      }
+
+      merged.push(mergedRow);
+    }
+  }
+
+  // Sort deterministically: intervals first in defined order, then any custom rows
+  merged.sort((a, b) => {
+    const idxA = normIntervals.indexOf(normalizeTimeSlot(a.time));
+    const idxB = normIntervals.indexOf(normalizeTimeSlot(b.time));
+    if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+    if (idxA !== -1) return -1;
+    if (idxB !== -1) return 1;
+    return normalizeTimeSlot(a.time).localeCompare(normalizeTimeSlot(b.time));
+  });
+
+  return merged;
+}
+
+export function mergeTemperatureReadings(data: any[], intervals: string[]): TemperatureReading[] {
+  const normIntervals = intervals.map(normalizeTimeSlot);
   const dataByTime = new Map<string, any>();
   const extraItemsByTime = new Map<string, any>();
 
   for (const d of data) {
-    const t = (d.time || "").trim();
+    const t = normalizeTimeSlot(d.time);
     if (!t) continue;
-    if (intervals.includes(t)) {
+    if (normIntervals.includes(t)) {
       if (!dataByTime.has(t)) {
-        dataByTime.set(t, { ...d });
+        dataByTime.set(t, { ...d, time: t });
       } else {
         const existing = dataByTime.get(t);
         for (const [key, val] of Object.entries(d)) {
@@ -99,7 +255,7 @@ function mergeTemperatureReadings(data: any[], intervals: string[]): Temperature
       }
     } else {
       if (!extraItemsByTime.has(t)) {
-        extraItemsByTime.set(t, { ...d });
+        extraItemsByTime.set(t, { ...d, time: t });
       } else {
         const existing = extraItemsByTime.get(t);
         for (const [key, val] of Object.entries(d)) {
@@ -116,7 +272,7 @@ function mergeTemperatureReadings(data: any[], intervals: string[]): Temperature
     }
   }
 
-  const result: TemperatureReading[] = intervals.map((time) => {
+  const result: TemperatureReading[] = normIntervals.map((time) => {
     const d = dataByTime.get(time);
     if (d) {
       return {
@@ -220,6 +376,9 @@ export function ProcessTemperatureSection({
   const isInitialLoadedRef = useRef(false);
   const lastSavedPayloadRef = useRef("");
   const lastUserEditTimeRef = useRef(0);
+  const activeFocusedCellRef = useRef<{ time: string; field: string } | null>(null);
+  const hasUnsavedLocalEditsRef = useRef(false);
+  const deletedTimesRef = useRef<Set<string>>(new Set());
   const [operatorName, setOperatorName] = useState("");
   const [operatorId, setOperatorId] = useState("");
   const [readings, setReadings] = useState<TemperatureReading[]>([]);
@@ -312,12 +471,79 @@ export function ProcessTemperatureSection({
     }
   }, [photoModalRowIdx, refreshUserPermissions]);
 
-  // Fetch data on date / shift change
+  // Authoritative data fetch & Google Docs-style 3-way reconciliation
+  const fetchAuthoritativeState = useCallback(async (force = false) => {
+    if (!date || !shiftId) return;
+    try {
+      const res = await fetch(
+        `/api/production/tape-plant/temperature?date=${date}&shiftId=${shiftId}&_t=${Date.now()}`,
+        {
+          cache: "no-store",
+          headers: { Pragma: "no-cache", "Cache-Control": "no-cache" },
+        }
+      );
+      if (!res.ok) return;
+      const data: any[] = await res.json();
+      if (!data) return;
+
+      const opName = (data && data[0]?.operatorName) || "";
+      const opId = (data && data[0]?.operatorId) || "";
+      if (opName) setOperatorName((prev) => prev || opName);
+      if (opId) setOperatorId((prev) => prev || opId);
+
+      const mapped = mergeTemperatureReadings(data, shiftIntervals);
+
+      setReadings((currentLocal) => {
+        // If initial load or forced, replace local state directly
+        if (!isInitialLoadedRef.current || force) {
+          lastSavedPayloadRef.current = serializeTemperaturePayload(
+            date,
+            shiftId,
+            opName || operatorName,
+            opId || operatorId,
+            mapped
+          );
+          return mapped;
+        }
+
+        // Cell-level 3-way merge isolating actively focused cell typing
+        const reconciled = reconcileServerReadings(
+          currentLocal,
+          mapped,
+          activeFocusedCellRef.current,
+          shiftIntervals
+        );
+
+        // Filter out any locally deleted time slots that have not landed yet
+        const finalReadings = reconciled.filter(
+          (r) => !deletedTimesRef.current.has(normalizeTimeSlot(r.time))
+        );
+
+        // Update baseline snapshot only if user has no unsaved local edits
+        if (!hasUnsavedLocalEditsRef.current) {
+          lastSavedPayloadRef.current = serializeTemperaturePayload(
+            date,
+            shiftId,
+            opName || operatorName,
+            opId || operatorId,
+            finalReadings
+          );
+        }
+
+        return finalReadings;
+      });
+    } catch (err) {
+      console.warn("Authoritative telemetry sync error:", err);
+    }
+  }, [date, shiftId, shiftIntervals, operatorName, operatorId]);
+
+  // Initial load on date / shift change
   useEffect(() => {
     if (!date || !shiftId) return;
     isInitialLoadedRef.current = false;
+    hasUnsavedLocalEditsRef.current = false;
+    deletedTimesRef.current.clear();
     setLoading(true);
-    // Reset supervisor unlocks on shift/date change
     setUnlockedSlots(new Set());
 
     fetch(`/api/production/tape-plant/temperature?date=${date}&shiftId=${shiftId}&_t=${Date.now()}`)
@@ -329,13 +555,13 @@ export function ProcessTemperatureSection({
         setOperatorId(opId);
         const mapped = mergeTemperatureReadings(data || [], shiftIntervals);
         setReadings(mapped);
-        lastSavedPayloadRef.current = JSON.stringify({
+        lastSavedPayloadRef.current = serializeTemperaturePayload(
           date,
           shiftId,
-          operatorName: opName,
-          operatorId: opId,
-          readings: mapped,
-        });
+          opName,
+          opId,
+          mapped
+        );
       })
       .catch(() => toast.error("Failed to load temperature readings"))
       .finally(() => {
@@ -344,68 +570,69 @@ export function ProcessTemperatureSection({
       });
   }, [date, shiftId, shiftIntervals]);
 
+  // Google Docs-grade catch-up when tab/browser is minimized, backgrounded, or wakes up from sleep
+  useEffect(() => {
+    const handleVisibilityOrFocus = () => {
+      if (typeof document !== "undefined" && document.visibilityState === "visible") {
+        fetchAuthoritativeState();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityOrFocus);
+    window.addEventListener("focus", handleVisibilityOrFocus);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityOrFocus);
+      window.removeEventListener("focus", handleVisibilityOrFocus);
+    };
+  }, [fetchAuthoritativeState]);
+
   const realtime = useProductionRealtime({
     module: "tape-plant",
     sheet: "temperature",
     date,
     shift: shiftId,
     onSync: (event) => {
-      if (!date || !shiftId || autoSaving) return;
-      const isPhotoSync = event?.action === "PHOTO_UPDATE";
-      // Prevent clobbering active input if user typed within last 2000ms (unless it's a photo sync)
-      if (!isPhotoSync && Date.now() - lastUserEditTimeRef.current < 2000) return;
-      fetch(`/api/production/tape-plant/temperature?date=${date}&shiftId=${shiftId}&_t=${Date.now()}`)
-        .then((r) => (r.ok ? r.json() : []))
-        .then((data: any[]) => {
-          if (data && data.length > 0) {
-            const opName = (data && data[0]?.operatorName) || operatorName;
-            const opId = (data && data[0]?.operatorId) || operatorId;
-            if (opName && !operatorName) setOperatorName(opName);
-            if (opId && !operatorId) setOperatorId(opId);
-            const mapped = mergeTemperatureReadings(data, shiftIntervals);
-            // CRITICAL: Update lastSavedPayloadRef so receiving device will NOT fire an echo auto-save back
-            lastSavedPayloadRef.current = JSON.stringify({
-              date,
-              shiftId,
-              operatorName: opName,
-              operatorId: opId,
-              readings: mapped,
-            });
-            setReadings(mapped);
-          }
-        })
-        .catch(() => {});
+      if (!date || !shiftId) return;
+      // Echo suppression: ignore broadcasts generated by our own client
+      if (event?.clientId && event.clientId === realtime.clientId) return;
+      fetchAuthoritativeState();
     },
   });
 
-  // Debounced Auto-Save
+  // Debounced Auto-Save (only fires when local user made changes; avoids echo loops)
   useEffect(() => {
     if (!isInitialLoadedRef.current || !date || !shiftId) return;
+    if (!hasUnsavedLocalEditsRef.current) return;
 
     const hasData = readings.some((r) => r.time && r.time.trim() !== "");
-    if (!hasData) return;
+    if (!hasData && deletedTimesRef.current.size === 0) return;
 
-    const payload = {
-      date,
-      shiftId,
-      operatorName,
-      operatorId,
-      readings,
-    };
-
-    const serialized = JSON.stringify(payload);
-    if (serialized === lastSavedPayloadRef.current) return;
+    const serialized = serializeTemperaturePayload(date, shiftId, operatorName, operatorId, readings);
+    if (serialized === lastSavedPayloadRef.current && deletedTimesRef.current.size === 0) return;
 
     const timer = setTimeout(async () => {
       setAutoSaving(true);
       try {
+        const deletedTimes = Array.from(deletedTimesRef.current);
+        const payload = {
+          date,
+          shiftId,
+          operatorName,
+          operatorId,
+          readings,
+          deletedTimes,
+          clientId: realtime.clientId,
+        };
+
         const res = await fetch("/api/production/tape-plant/temperature", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: serialized,
+          body: JSON.stringify(payload),
         });
         if (res.ok) {
           lastSavedPayloadRef.current = serialized;
+          hasUnsavedLocalEditsRef.current = false;
+          deletedTimesRef.current.clear();
           setLastAutoSavedAt(new Date());
           realtime.broadcastSync({ action: "SAVE", date, shift: shiftId });
         }
@@ -417,17 +644,20 @@ export function ProcessTemperatureSection({
     }, 1000);
 
     return () => clearTimeout(timer);
-  }, [readings, operatorName, operatorId, date, shiftId]);
+  }, [readings, operatorName, operatorId, date, shiftId, realtime]);
 
   const handleSave = async () => {
     setSaving(true);
     try {
+      const deletedTimes = Array.from(deletedTimesRef.current);
       const payload = {
         date,
         shiftId,
         operatorName,
         operatorId,
         readings,
+        deletedTimes,
+        clientId: realtime.clientId,
       };
 
       const res = await fetch("/api/production/tape-plant/temperature", {
@@ -441,7 +671,9 @@ export function ProcessTemperatureSection({
         throw new Error(err.error || "Failed to save readings");
       }
 
-      lastSavedPayloadRef.current = JSON.stringify(payload);
+      lastSavedPayloadRef.current = serializeTemperaturePayload(date, shiftId, operatorName, operatorId, readings);
+      hasUnsavedLocalEditsRef.current = false;
+      deletedTimesRef.current.clear();
       setLastAutoSavedAt(new Date());
       realtime.broadcastSync({ action: "SAVE", date, shift: shiftId });
       toast.success("Process temperature readings saved");
@@ -481,6 +713,7 @@ export function ProcessTemperatureSection({
     isNumber = true
   ) => {
     realtime.markLocalEdit();
+    hasUnsavedLocalEditsRef.current = true;
     lastUserEditTimeRef.current = Date.now();
     const val = isNumber && rawVal !== "" ? (isNaN(Number(rawVal)) ? rawVal : Number(rawVal)) : rawVal;
     setReadings((prev) => {
@@ -492,7 +725,12 @@ export function ProcessTemperatureSection({
 
   const handleDeleteReading = (idx: number) => {
     realtime.markLocalEdit();
+    hasUnsavedLocalEditsRef.current = true;
     lastUserEditTimeRef.current = Date.now();
+    const target = readings[idx];
+    if (target?.time) {
+      deletedTimesRef.current.add(normalizeTimeSlot(target.time));
+    }
     setReadings((prev) => prev.filter((_, i) => i !== idx));
     setExpandedSlots((prev) => {
       const next = new Set<number>();
@@ -506,6 +744,8 @@ export function ProcessTemperatureSection({
 
   const handleAddReading = () => {
     realtime.markLocalEdit();
+    hasUnsavedLocalEditsRef.current = true;
+    lastUserEditTimeRef.current = Date.now();
     const now = new Date();
     const timeStr = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
     const newIdx = readings.length;
@@ -544,6 +784,8 @@ export function ProcessTemperatureSection({
   const handleCopyPrevious = (idx: number) => {
     if (idx <= 0) return;
     realtime.markLocalEdit();
+    hasUnsavedLocalEditsRef.current = true;
+    lastUserEditTimeRef.current = Date.now();
     const prev = readings[idx - 1];
     const updated = [...readings];
     updated[idx] = {
@@ -627,22 +869,27 @@ export function ProcessTemperatureSection({
 
     if (!date || !shiftId) return;
 
+    const deletedTimes = Array.from(deletedTimesRef.current);
     const payload = {
       date,
       shiftId,
       operatorName,
       operatorId,
       readings: updated,
+      deletedTimes,
+      clientId: realtime.clientId,
     };
 
-    const serialized = JSON.stringify(payload);
+    const serialized = serializeTemperaturePayload(date, shiftId, operatorName, operatorId, updated);
     lastSavedPayloadRef.current = serialized;
+    hasUnsavedLocalEditsRef.current = false;
+    deletedTimesRef.current.clear();
 
     try {
       const res = await fetch("/api/production/tape-plant/temperature", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: serialized,
+        body: JSON.stringify(payload),
       });
       if (res.ok) {
         setLastAutoSavedAt(new Date());
@@ -999,6 +1246,7 @@ export function ProcessTemperatureSection({
               operatorId={operatorId}
               onChange={(name, id) => {
                 realtime.markLocalEdit();
+                hasUnsavedLocalEditsRef.current = true;
                 lastUserEditTimeRef.current = Date.now();
                 setOperatorName(name);
                 setOperatorId(id || "");
@@ -1060,6 +1308,7 @@ export function ProcessTemperatureSection({
               operatorId={operatorId}
               onChange={(name, id) => {
                 realtime.markLocalEdit();
+                hasUnsavedLocalEditsRef.current = true;
                 lastUserEditTimeRef.current = Date.now();
                 setOperatorName(name);
                 setOperatorId(id || "");
@@ -1233,6 +1482,12 @@ export function ProcessTemperatureSection({
                         <input
                           type="text"
                           value={row.time}
+                          onFocus={() => {
+                            activeFocusedCellRef.current = { time: row.time || "", field: "time" };
+                          }}
+                          onBlur={() => {
+                            activeFocusedCellRef.current = null;
+                          }}
                           onChange={(e) => handleFieldChange(idx, "time", e.target.value, false)}
                           placeholder="HH:MM"
                           className="text-xs font-bold text-slate-800 bg-white border border-slate-300 rounded px-2 py-1 w-20 text-center focus:ring-1 focus:ring-primary"
@@ -1363,6 +1618,12 @@ export function ProcessTemperatureSection({
                             type="number"
                             inputMode="decimal"
                             value={row[item.key as keyof TemperatureReading] ?? ""}
+                            onFocus={() => {
+                              activeFocusedCellRef.current = { time: row.time || "", field: item.key };
+                            }}
+                            onBlur={() => {
+                              activeFocusedCellRef.current = null;
+                            }}
                             onChange={(e) => handleFieldChange(idx, item.key as keyof TemperatureReading, e.target.value)}
                             disabled={isLocked}
                             placeholder="°C"
@@ -1403,6 +1664,12 @@ export function ProcessTemperatureSection({
                             type="number"
                             inputMode="decimal"
                             value={row[item.key as keyof TemperatureReading] ?? ""}
+                            onFocus={() => {
+                              activeFocusedCellRef.current = { time: row.time || "", field: item.key };
+                            }}
+                            onBlur={() => {
+                              activeFocusedCellRef.current = null;
+                            }}
                             onChange={(e) => handleFieldChange(idx, item.key as keyof TemperatureReading, e.target.value)}
                             disabled={isLocked}
                             placeholder="°C"
@@ -1447,6 +1714,12 @@ export function ProcessTemperatureSection({
                             type="number"
                             inputMode="decimal"
                             value={row[item.key as keyof TemperatureReading] ?? ""}
+                            onFocus={() => {
+                              activeFocusedCellRef.current = { time: row.time || "", field: item.key };
+                            }}
+                            onBlur={() => {
+                              activeFocusedCellRef.current = null;
+                            }}
                             onChange={(e) => handleFieldChange(idx, item.key as keyof TemperatureReading, e.target.value)}
                             disabled={isLocked}
                             placeholder="°C"
@@ -1486,6 +1759,12 @@ export function ProcessTemperatureSection({
                             type="number"
                             inputMode="decimal"
                             value={row[item.key as keyof TemperatureReading] ?? ""}
+                            onFocus={() => {
+                              activeFocusedCellRef.current = { time: row.time || "", field: item.key };
+                            }}
+                            onBlur={() => {
+                              activeFocusedCellRef.current = null;
+                            }}
                             onChange={(e) => handleFieldChange(idx, item.key as keyof TemperatureReading, e.target.value)}
                             disabled={isLocked}
                             placeholder="°C"
@@ -1526,7 +1805,18 @@ export function ProcessTemperatureSection({
           data={readings}
           onChange={(newReadings) => {
             realtime.markLocalEdit();
+            hasUnsavedLocalEditsRef.current = true;
+            lastUserEditTimeRef.current = Date.now();
             setReadings(newReadings);
+          }}
+          onCellFocus={(rowIndex, columnKey) => {
+            activeFocusedCellRef.current = {
+              time: readings[rowIndex]?.time || "",
+              field: columnKey,
+            };
+          }}
+          onCellBlur={() => {
+            activeFocusedCellRef.current = null;
           }}
           allowAddRow={true}
           onAddRow={handleAddReading}
