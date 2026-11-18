@@ -56,7 +56,6 @@ export function LaminationRawMaterialEntryClient() {
 
   // Line items
   const [entries, setEntries] = useState<RawMaterialEntryItem[]>([]);
-  const [, setMasterMaterials] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isPending, startTransition] = useTransition();
   const [isAutoSaving, setIsAutoSaving] = useState<boolean>(false);
@@ -108,8 +107,6 @@ export function LaminationRawMaterialEntryClient() {
       const data = await res.json();
 
       if (data.success) {
-        setMasterMaterials(data.masterMaterials || []);
-
         if (data.exists && data.report) {
           const rep = data.report;
           setOperatorName(rep.operatorName || "");
@@ -140,7 +137,7 @@ export function LaminationRawMaterialEntryClient() {
           // Initialize fresh draft using master materials
           const initialEntries: RawMaterialEntryItem[] = (
             data.templateEntries || []
-          ).map((t: any) => ({
+          ).map((t: { rawMaterialId?: string; materialName: string; percentage: number; sequence: number }) => ({
             rawMaterialId: t.rawMaterialId,
             materialName: t.materialName,
             percentage: t.percentage,

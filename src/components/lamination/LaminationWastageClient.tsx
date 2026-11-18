@@ -76,7 +76,7 @@ export function LaminationWastageClient() {
     sourceFabricNetWtKg: 0,
   });
 
-  const [contractorsList, setContractorsList] = useState<any[]>([]);
+  const [contractorsList, setContractorsList] = useState<{ id: string; name: string; code?: string }[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isPending, startTransition] = useTransition();
   const [isPrintModalOpen, setIsPrintModalOpen] = useState<boolean>(false);
