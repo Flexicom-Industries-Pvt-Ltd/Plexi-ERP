@@ -139,6 +139,7 @@ export async function POST(request: NextRequest) {
       fabricWastageKg = 0,
       status = "DRAFT",
       remarks,
+      clientId,
     } = body;
 
     if (!date || !shiftName) {
@@ -218,6 +219,7 @@ export async function POST(request: NextRequest) {
       action: status === "SUBMITTED" ? "SUBMIT" : "SAVE",
       date: report.date,
       shift: report.shiftName,
+      clientId: clientId || undefined,
       user: {
         name: authResult.session?.user?.name || "Lamination Operator",
         email: authResult.session?.user?.email || undefined,

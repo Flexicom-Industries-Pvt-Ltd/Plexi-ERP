@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
   LaminationProductionReportData,
   LaminationProductionEntryData,
@@ -8,6 +8,12 @@ import {
   calculateLaminationEntry,
   computeLaminationReportTotals,
 } from "@/lib/lamination/lamination-types";
+import {
+  reconcileServerLaminationReportEntries,
+  serializeLaminationReportPayload,
+  getLaminationRowKey,
+  FocusedLaminationCell,
+} from "@/lib/lamination/production-report-google-docs-sync";
 import dynamic from "next/dynamic";
 import { UniversalRollSelector } from "./UniversalRollSelector";
 import { UniversalQualityInput } from "@/components/ui/UniversalQualityInput";
@@ -74,6 +80,28 @@ export function LaminationReportClient() {
   const [entries, setEntries] = useState<LaminationProductionEntryData[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [saving, setSaving] = useState<boolean>(false);
+  const [isAutoSaving, setIsAutoSaving] = useState<boolean>(false);
+  const [lastAutoSavedAt, setLastAutoSavedAt] = useState<Date | null>(null);
+
+  // Google Docs Concurrent Sync & Typing Isolation Refs
+  const lastSavedPayloadRef = useRef<string>("");
+  const hasUnsavedLocalEditsRef = useRef<boolean>(false);
+  const activeFocusedCellRef = useRef<FocusedLaminationCell | null>(null);
+  const deletedEntryIdsRef = useRef<Set<string>>(new Set());
+  const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const [focusedCell, setFocusedCellState] = useState<FocusedLaminationCell | null>(null);
+
+  const setFocusedCell = useCallback((rowKey: string, field: keyof LaminationProductionEntryData) => {
+    const next = { rowKey, field };
+    activeFocusedCellRef.current = next;
+    setFocusedCellState(next);
+  }, []);
+
+  const clearFocusedCell = useCallback(() => {
+    activeFocusedCellRef.current = null;
+    setFocusedCellState(null);
+  }, []);
 
   // Available Rolls from Circular Loom Roll Stock
   const [availableRolls, setAvailableRolls] = useState<AvailableLaminationRoll[]>([]);
@@ -133,12 +161,12 @@ export function LaminationReportClient() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isFullscreen]);
 
-  // Fetch report for Date and Shift
+  // Fetch report for Date and Shift with non-destructive 3-way reconciliation
   const fetchReport = useCallback(async (targetDate: string, targetShift: string) => {
     setLoading(true);
     try {
       const res = await fetch(
-        `/api/production/lamination/reports?date=${targetDate}&shiftName=${encodeURIComponent(targetShift)}`
+        `/api/production/lamination/reports?date=${targetDate}&shiftName=${encodeURIComponent(targetShift)}&_t=${Date.now()}`
       );
       const json = await res.json();
       if (json.success && json.report) {
@@ -149,16 +177,32 @@ export function LaminationReportClient() {
         setSupervisorName(r.supervisorName || "");
         setStatus(r.status || "DRAFT");
         setRemarks(r.remarks || "");
-        setEntries(
-          (r.entries || []).map((e: any, idx: number) =>
-            calculateLaminationEntry({ ...e, sequence: idx + 1 })
-          )
+
+        const incomingEntries = (r.entries || []).map((e: any, idx: number) =>
+          calculateLaminationEntry({ ...e, sequence: idx + 1 })
         );
+
+        setEntries((prev) => {
+          if (prev.length === 0 && !hasUnsavedLocalEditsRef.current) {
+            lastSavedPayloadRef.current = serializeLaminationReportPayload(r, incomingEntries);
+            return incomingEntries;
+          }
+          const reconciled = reconcileServerLaminationReportEntries({
+            localEntries: prev,
+            incomingEntries,
+            focusedCell: activeFocusedCellRef.current,
+            hasUnsavedLocalEdits: hasUnsavedLocalEditsRef.current,
+            deletedEntryIds: deletedEntryIdsRef.current,
+          });
+          lastSavedPayloadRef.current = serializeLaminationReportPayload(r, incomingEntries);
+          return reconciled;
+        });
       } else {
         // Reset to empty draft
         setReportId(undefined);
         setStatus("DRAFT");
         setEntries([]);
+        lastSavedPayloadRef.current = "";
       }
     } catch (err) {
       console.error("Failed to load report:", err);
@@ -198,12 +242,102 @@ export function LaminationReportClient() {
     sheet: "production-report",
     date,
     shift: shiftName,
-    onSync: () => {
+    onSync: (event) => {
+      // Echo suppression: prevent self-echo circular loops
+      if (event?.clientId === realtime.clientId) return;
       if (date && shiftName) {
         fetchReport(date, shiftName);
       }
     },
   });
+
+  // Tab switch / sleep wake-up listeners to pull latest edits immediately upon return
+  useEffect(() => {
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === "visible" && date && shiftName) {
+        fetchReport(date, shiftName);
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityOrFocus);
+    window.addEventListener("focus", handleVisibilityOrFocus);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityOrFocus);
+      window.removeEventListener("focus", handleVisibilityOrFocus);
+    };
+  }, [date, shiftName, fetchReport]);
+
+  // Debounced auto-save handler (1500ms) with zero-loop echo broadcast
+  const triggerAutoSave = useCallback(
+    (currentEntries: LaminationProductionEntryData[], currentStatus: "DRAFT" | "SUBMITTED" | "APPROVED" = status) => {
+      if (!date || !shiftName || currentEntries.length === 0) return;
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+
+      autoSaveTimerRef.current = setTimeout(async () => {
+        const payloadString = serializeLaminationReportPayload(
+          {
+            date,
+            shiftName,
+            operatorName,
+            operatorId: undefined,
+            helperCount: Number(helperCount) || 0,
+            supervisorName,
+            status: currentStatus,
+            remarks,
+          },
+          currentEntries,
+          Array.from(deletedEntryIdsRef.current)
+        );
+
+        if (payloadString === lastSavedPayloadRef.current) {
+          hasUnsavedLocalEditsRef.current = false;
+          return;
+        }
+
+        setIsAutoSaving(true);
+        try {
+          const payload = JSON.parse(payloadString);
+          const res = await fetch("/api/production/lamination/reports", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              ...payload,
+              clientId: realtime.clientId,
+            }),
+          });
+          const json = await res.json();
+          if (res.ok && json.success) {
+            lastSavedPayloadRef.current = payloadString;
+            hasUnsavedLocalEditsRef.current = false;
+            setLastAutoSavedAt(new Date());
+            if (json.report?.id) setReportId(json.report.id);
+            if (Array.isArray(json.report?.entries)) {
+              setEntries((prev) =>
+                reconcileServerLaminationReportEntries({
+                  localEntries: prev,
+                  incomingEntries: json.report.entries,
+                  focusedCell: activeFocusedCellRef.current,
+                  hasUnsavedLocalEdits: hasUnsavedLocalEditsRef.current,
+                  deletedEntryIds: deletedEntryIdsRef.current,
+                })
+              );
+            }
+            realtime.broadcastSync({
+              action: currentStatus === "SUBMITTED" ? "SUBMIT" : "SAVE",
+              date,
+              shift: shiftName,
+            });
+          }
+        } catch (err) {
+          console.error("Auto-save failed:", err);
+        } finally {
+          setIsAutoSaving(false);
+        }
+      }, 1500);
+    },
+    [date, shiftName, operatorName, helperCount, supervisorName, status, remarks, realtime]
+  );
 
   // Combined set of master qualities + any dynamically entered in active sheet
   const allQualities = useMemo(() => {
@@ -221,6 +355,7 @@ export function LaminationReportClient() {
 
   // Handle entry cell changes
   const handleUpdateEntry = (index: number, field: keyof LaminationProductionEntryData, value: any) => {
+    hasUnsavedLocalEditsRef.current = true;
     setEntries((prev) => {
       const next = [...prev];
       const updated = {
@@ -228,23 +363,31 @@ export function LaminationReportClient() {
         [field]: value,
       };
       next[index] = calculateLaminationEntry(updated);
+      triggerAutoSave(next);
       return next;
     });
   };
 
   // Remove row
   const handleDeleteRow = (index: number) => {
+    hasUnsavedLocalEditsRef.current = true;
     setEntries((prev) => {
+      const target = prev[index];
+      if (target?.id) {
+        deletedEntryIdsRef.current.add(target.id);
+      }
       const next = prev.filter((_, i) => i !== index);
-      return next.map((e, idx) => ({ ...e, sequence: idx + 1 }));
+      const resequenced = next.map((e, idx) => ({ ...e, sequence: idx + 1 }));
+      triggerAutoSave(resequenced);
+      return resequenced;
     });
   };
 
   // Add blank manual row
   const handleAddManualRow = () => {
-    setEntries((prev) => [
-      ...prev,
-      calculateLaminationEntry({
+    hasUnsavedLocalEditsRef.current = true;
+    setEntries((prev) => {
+      const newEntry = calculateLaminationEntry({
         sequence: prev.length + 1,
         rollNumber: "",
         quality: prev.length > 0 ? prev[prev.length - 1].quality : "",
@@ -258,8 +401,11 @@ export function LaminationReportClient() {
         avgWeightAfter: 0,
         coating: 0,
         remarks: "",
-      }),
-    ]);
+      });
+      const next = [...prev, newEntry];
+      triggerAutoSave(next);
+      return next;
+    });
   };
 
   // Handle Roll ID selection and auto-populate upstream specs
@@ -268,6 +414,7 @@ export function LaminationReportClient() {
     rollNumber: string,
     selectedRoll?: AvailableLaminationRoll
   ) => {
+    hasUnsavedLocalEditsRef.current = true;
     setEntries((prev) => {
       const next = [...prev];
       if (selectedRoll) {
@@ -295,6 +442,7 @@ export function LaminationReportClient() {
           rollNumber,
         });
       }
+      triggerAutoSave(next);
       return next;
     });
   };
@@ -311,9 +459,10 @@ export function LaminationReportClient() {
       return;
     }
 
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     setSaving(true);
     try {
-      const payload: LaminationProductionReportData = {
+      const payload: LaminationProductionReportData & { deletedEntryIds: string[]; clientId: string } = {
         id: reportId,
         date,
         shiftName,
@@ -330,6 +479,8 @@ export function LaminationReportClient() {
         avgWtAfter: totals.avgWtAfter,
         avgCoating: totals.avgCoating,
         entries,
+        deletedEntryIds: Array.from(deletedEntryIdsRef.current),
+        clientId: realtime.clientId,
       };
 
       const res = await fetch("/api/production/lamination/reports", {
@@ -345,18 +496,22 @@ export function LaminationReportClient() {
 
       setReportId(json.report.id);
       setStatus(newStatus);
+      hasUnsavedLocalEditsRef.current = false;
+      deletedEntryIdsRef.current.clear();
+      setLastAutoSavedAt(new Date());
       realtime.broadcastSync({
         action: newStatus === "SUBMITTED" ? "SUBMIT" : "SAVE",
         date,
         shift: shiftName,
       });
+
       toast.success(
         newStatus === "SUBMITTED"
-          ? "Lamination Production Report submitted successfully!"
-          : "Report saved as draft"
+          ? "Lamination Production Report submitted successfully"
+          : "Lamination Production Report draft saved successfully"
       );
     } catch (err: any) {
-      console.error("Save error:", err);
+      console.error(err);
       toast.error(err.message || "Failed to save report");
     } finally {
       setSaving(false);
@@ -754,6 +909,8 @@ export function LaminationReportClient() {
                         <Input
                           value={entry.size || ""}
                           onChange={(e) => handleUpdateEntry(index, "size", e.target.value)}
+                          onFocus={() => setFocusedCell(getLaminationRowKey(entry, index), "size")}
+                          onBlur={clearFocusedCell}
                           className="h-8 text-xs text-center text-slate-700 bg-transparent border-slate-200 focus:bg-white"
                           placeholder="500"
                         />
@@ -767,6 +924,8 @@ export function LaminationReportClient() {
                           onChange={(e) =>
                             handleUpdateEntry(index, "loomNumber", Number(e.target.value) || 0)
                           }
+                          onFocus={() => setFocusedCell(getLaminationRowKey(entry, index), "loomNumber")}
+                          onBlur={clearFocusedCell}
                           className="h-8 text-xs text-center font-bold text-sky-700 bg-transparent border-slate-200 focus:bg-white"
                           placeholder="88"
                         />
@@ -781,6 +940,8 @@ export function LaminationReportClient() {
                           onChange={(e) =>
                             handleUpdateEntry(index, "rollMeter", Number(e.target.value) || 0)
                           }
+                          onFocus={() => setFocusedCell(getLaminationRowKey(entry, index), "rollMeter")}
+                          onBlur={clearFocusedCell}
                           className="h-8 text-xs text-right font-medium text-slate-800 bg-transparent border-slate-200 focus:bg-white"
                           placeholder="6367"
                         />
@@ -795,6 +956,8 @@ export function LaminationReportClient() {
                           onChange={(e) =>
                             handleUpdateEntry(index, "netWeightBefore", Number(e.target.value) || 0)
                           }
+                          onFocus={() => setFocusedCell(getLaminationRowKey(entry, index), "netWeightBefore")}
+                          onBlur={clearFocusedCell}
                           className="h-8 text-xs text-right font-medium text-slate-800 bg-transparent border-slate-200 focus:bg-white"
                           placeholder="407.4"
                         />
@@ -814,6 +977,8 @@ export function LaminationReportClient() {
                           onChange={(e) =>
                             handleUpdateEntry(index, "productionMeter", Number(e.target.value) || 0)
                           }
+                          onFocus={() => setFocusedCell(getLaminationRowKey(entry, index), "productionMeter")}
+                          onBlur={clearFocusedCell}
                           className="h-8 text-xs text-right font-bold text-sky-800 bg-white border-sky-300 focus:ring-1 focus:ring-sky-500"
                           placeholder="6251"
                         />
@@ -828,6 +993,8 @@ export function LaminationReportClient() {
                           onChange={(e) =>
                             handleUpdateEntry(index, "netWeightAfter", Number(e.target.value) || 0)
                           }
+                          onFocus={() => setFocusedCell(getLaminationRowKey(entry, index), "netWeightAfter")}
+                          onBlur={clearFocusedCell}
                           className="h-8 text-xs text-right font-bold text-sky-800 bg-white border-sky-300 focus:ring-1 focus:ring-sky-500"
                           placeholder="524"
                         />
@@ -848,6 +1015,8 @@ export function LaminationReportClient() {
                         <Input
                           value={entry.remarks || ""}
                           onChange={(e) => handleUpdateEntry(index, "remarks", e.target.value)}
+                          onFocus={() => setFocusedCell(getLaminationRowKey(entry, index), "remarks")}
+                          onBlur={clearFocusedCell}
                           className="h-8 text-xs bg-transparent border-slate-200 focus:bg-white"
                           placeholder="Notes"
                         />
@@ -932,14 +1101,30 @@ export function LaminationReportClient() {
                     {status}
                   </Badge>
                 </div>
-                <p className="text-[11px] font-mono text-slate-400 font-medium truncate">
-                  {date} • {shiftName}
+                <p className="text-[11px] font-mono text-slate-400 font-medium truncate flex items-center gap-1.5">
+                  <span>{date} • {shiftName}</span>
+                  {isAutoSaving ? (
+                    <span className="text-[10px] text-sky-600 font-semibold animate-pulse flex items-center gap-1">
+                      <Loader2 className="h-2.5 w-2.5 animate-spin" /> Saving...
+                    </span>
+                  ) : lastAutoSavedAt ? (
+                    <span className="text-[10px] text-slate-400">
+                      • Saved
+                    </span>
+                  ) : null}
                 </p>
               </div>
             </div>
 
             {/* Quick Actions */}
             <div className="flex items-center gap-1.5 shrink-0">
+              <RealtimeSyncBadge
+                isConnected={realtime.isConnected}
+                lastUpdatedBy={realtime.lastUpdatedBy}
+                lastUpdatedAt={realtime.lastUpdatedAt}
+                lastAction={realtime.lastAction}
+                isSelfUpdate={realtime.isSelfUpdate}
+              />
               <Button
                 variant="outline"
                 size="sm"
@@ -1257,6 +1442,8 @@ export function LaminationReportClient() {
                               type="text"
                               value={entry.size}
                               onChange={(e) => handleUpdateEntry(index, "size", e.target.value)}
+                              onFocus={() => setFocusedCell(getLaminationRowKey(entry, index), "size")}
+                              onBlur={clearFocusedCell}
                               className="h-8 text-xs font-mono bg-white"
                               placeholder="500"
                             />
@@ -1306,6 +1493,8 @@ export function LaminationReportClient() {
                               onChange={(e) =>
                                 handleUpdateEntry(index, "productionMeter", Number(e.target.value) || 0)
                               }
+                              onFocus={() => setFocusedCell(getLaminationRowKey(entry, index), "productionMeter")}
+                              onBlur={clearFocusedCell}
                               className="h-7 text-xs text-right font-bold text-sky-900 bg-white border-sky-300"
                               placeholder="Meters"
                             />
@@ -1319,6 +1508,8 @@ export function LaminationReportClient() {
                               onChange={(e) =>
                                 handleUpdateEntry(index, "netWeightAfter", Number(e.target.value) || 0)
                               }
+                              onFocus={() => setFocusedCell(getLaminationRowKey(entry, index), "netWeightAfter")}
+                              onBlur={clearFocusedCell}
                               className="h-7 text-xs text-right font-bold text-sky-900 bg-white border-sky-300"
                               placeholder="Kg"
                             />
@@ -1345,6 +1536,8 @@ export function LaminationReportClient() {
                         <Input
                           value={entry.remarks || ""}
                           onChange={(e) => handleUpdateEntry(index, "remarks", e.target.value)}
+                          onFocus={() => setFocusedCell(getLaminationRowKey(entry, index), "remarks")}
+                          onBlur={clearFocusedCell}
                           className="h-7 text-xs bg-white border-slate-200 flex-1"
                           placeholder="Remarks / notes..."
                         />
