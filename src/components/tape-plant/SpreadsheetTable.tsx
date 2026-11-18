@@ -37,6 +37,8 @@ interface SpreadsheetTableProps<T extends Record<string, any>> {
   isRowDisabled?: (row: T, index: number) => boolean;
   renderRowBadge?: (row: T, index: number) => React.ReactNode;
   rowActions?: (row: T, index: number) => React.ReactNode;
+  onCellFocus?: (rowIndex: number, columnKey: string) => void;
+  onCellBlur?: (rowIndex: number, columnKey: string) => void;
 }
 
 export function SpreadsheetTable<T extends Record<string, any>>({
@@ -57,6 +59,8 @@ export function SpreadsheetTable<T extends Record<string, any>>({
   isRowDisabled,
   renderRowBadge,
   rowActions,
+  onCellFocus,
+  onCellBlur,
 }: SpreadsheetTableProps<T>) {
   const tableRef = useRef<HTMLTableElement>(null);
   const [activeCell, setActiveCell] = useState<{ row: number; col: number } | null>(null);
@@ -548,7 +552,13 @@ export function SpreadsheetTable<T extends Record<string, any>>({
                                 col.type === "number" ? (e.target.value === "" ? "" : Number(e.target.value)) : e.target.value
                               )
                             }
-                            onFocus={() => setActiveCell({ row: rIdx, col: cIdx })}
+                            onFocus={() => {
+                              setActiveCell({ row: rIdx, col: cIdx });
+                              onCellFocus?.(rIdx, col.key);
+                            }}
+                            onBlur={() => {
+                              onCellBlur?.(rIdx, col.key);
+                            }}
                             onKeyDown={(e) => handleKeyDown(e, rIdx, cIdx)}
                             className={`w-full h-8 px-2.5 text-xs bg-transparent border-0 focus:ring-2 focus:ring-primary focus:bg-blue-50/20 text-slate-800 outline-none transition-all ${
                               col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"
