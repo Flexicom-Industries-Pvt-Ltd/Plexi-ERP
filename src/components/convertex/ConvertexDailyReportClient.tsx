@@ -19,12 +19,8 @@ import {
   Calendar,
   Clock,
   User,
-  Scale,
-  Sparkles,
   FileCheck,
   AlertCircle,
-  Layers,
-  Tag,
 } from "lucide-react";
 import {
   ConvertexReportItem,
@@ -32,6 +28,12 @@ import {
   calculateConvertexRow,
   computeConvertexTotals,
 } from "@/lib/convertex/convertex-types";
+import {
+  FocusedConvertexReportCell,
+  getConvertexReportRowKey,
+  reconcileServerConvertexReportEntries,
+  serializeConvertexReportPayload,
+} from "@/lib/convertex/convertex-daily-report-google-docs-sync";
 import dynamic from "next/dynamic";
 import { exportConvertexReportExcel } from "@/lib/convertex/convertex-export";
 import { UniversalQualityInput } from "@/components/ui/UniversalQualityInput";
@@ -109,6 +111,30 @@ export function ConvertexDailyReportClient() {
   const isInitialLoadRef = useRef<boolean>(true);
   const isDirtyRef = useRef<boolean>(false);
   const lastUserEditTimeRef = useRef<number>(0);
+
+  // Google Docs Concurrent Sync & Typing Isolation Refs
+  const lastSavedPayloadRef = useRef<string>("");
+  const hasUnsavedLocalEditsRef = useRef<boolean>(false);
+  const activeFocusedCellRef = useRef<FocusedConvertexReportCell | null>(null);
+  const deletedEntryIdsRef = useRef<Set<string>>(new Set());
+
+  const [, setFocusedCellState] = useState<FocusedConvertexReportCell | null>(null);
+
+  const setFocusedCell = useCallback((rowKey: string, field: keyof ConvertexReportItem) => {
+    const next = { rowKey, field };
+    activeFocusedCellRef.current = next;
+    setFocusedCellState(next);
+  }, []);
+
+  const clearFocusedCell = useCallback((rowKey: string, field: keyof ConvertexReportItem) => {
+    if (
+      activeFocusedCellRef.current?.rowKey === rowKey &&
+      activeFocusedCellRef.current?.field === field
+    ) {
+      activeFocusedCellRef.current = null;
+      setFocusedCellState(null);
+    }
+  }, []);
 
   // Keep a reference to the latest data to prevent stale closures during auto-save
   const latestDataRef = useRef({
@@ -192,20 +218,39 @@ export function ConvertexDailyReportClient() {
         setUnitName(rep.unitName || "Unit-1");
         setRemarks(rep.remarks || "");
 
-        if (Array.isArray(rep.entries) && rep.entries.length > 0) {
-          const parsed = rep.entries.map((e: any, idx: number) =>
-            calculateConvertexRow({
-              ...e,
-              quality: e.quality || e.partyName || "",
-              partyName: e.quality || e.partyName || "",
-              sequence: idx + 1,
-            })
-          );
-          while (parsed.length < 5) {
-            parsed.push(createEmptyConvertexRow(parsed.length + 1));
+        const incomingEntries: ConvertexReportItem[] =
+          Array.isArray(rep.entries) && rep.entries.length > 0
+            ? rep.entries.map((e: any, idx: number) =>
+                calculateConvertexRow({
+                  ...e,
+                  quality: e.quality || e.partyName || "",
+                  partyName: e.quality || e.partyName || "",
+                  sequence: idx + 1,
+                })
+              )
+            : [];
+
+        setEntries((prev) => {
+          const reconciled = reconcileServerConvertexReportEntries({
+            localEntries: prev,
+            incomingEntries,
+            focusedCell: activeFocusedCellRef.current,
+            hasUnsavedLocalEdits: hasUnsavedLocalEditsRef.current,
+            deletedEntryIds: deletedEntryIdsRef.current,
+          });
+          while (reconciled.length < 5) {
+            reconciled.push(createEmptyConvertexRow(reconciled.length + 1));
           }
-          setEntries(parsed);
-        } else {
+          lastSavedPayloadRef.current = serializeConvertexReportPayload(rep, incomingEntries);
+          return reconciled;
+        });
+
+        setLastSavedAt(format(new Date(rep.updatedAt || Date.now()), "hh:mm a"));
+      } else {
+        // No report exists for this shift
+        if (!hasUnsavedLocalEditsRef.current) {
+          setStatus("DRAFT");
+          setRemarks("");
           setEntries([
             createEmptyConvertexRow(1),
             createEmptyConvertexRow(2),
@@ -213,20 +258,8 @@ export function ConvertexDailyReportClient() {
             createEmptyConvertexRow(4),
             createEmptyConvertexRow(5),
           ]);
+          setLastSavedAt(null);
         }
-        setLastSavedAt(format(new Date(rep.updatedAt || Date.now()), "hh:mm a"));
-      } else {
-        // No report exists for this shift
-        setStatus("DRAFT");
-        setRemarks("");
-        setEntries([
-          createEmptyConvertexRow(1),
-          createEmptyConvertexRow(2),
-          createEmptyConvertexRow(3),
-          createEmptyConvertexRow(4),
-          createEmptyConvertexRow(5),
-        ]);
-        setLastSavedAt(null);
       }
     } catch (err: any) {
       toast.error(err.message || "Failed to load Convertex production report");
@@ -247,105 +280,36 @@ export function ConvertexDailyReportClient() {
     sheet: "daily-report",
     date,
     shift: shiftName,
-    onSync: () => {
-      if (Date.now() - lastUserEditTimeRef.current < 3500) return;
+    onSync: (event?: { clientId?: string | null }) => {
+      // Echo suppression: Ignore notifications originating from this client session
+      if (event?.clientId && event.clientId === realtime.clientId) return;
+      if (Date.now() - lastUserEditTimeRef.current < 2500 && activeFocusedCellRef.current) return;
       fetchReportData();
     },
   });
 
-  // Handle cell edits with live recalculation and dirty flagging
-  const handleCellChange = (index: number, field: keyof ConvertexReportItem, value: any) => {
-    isDirtyRef.current = true;
-    lastUserEditTimeRef.current = Date.now();
-    realtime.markLocalEdit();
-    setEntries((prev) => {
-      const next = [...prev];
-      const updatedRow = { ...next[index], [field]: value };
-      next[index] = calculateConvertexRow(updatedRow);
-      return next;
-    });
-  };
-
-  // Add row
-  const handleAddRow = () => {
-    isDirtyRef.current = true;
-    setEntries((prev) => [...prev, createEmptyConvertexRow(prev.length + 1)]);
-  };
-
-  // Add 5 rows
-  const handleAdd5Rows = () => {
-    isDirtyRef.current = true;
-    setEntries((prev) => {
-      const start = prev.length + 1;
-      return [
-        ...prev,
-        createEmptyConvertexRow(start),
-        createEmptyConvertexRow(start + 1),
-        createEmptyConvertexRow(start + 2),
-        createEmptyConvertexRow(start + 3),
-        createEmptyConvertexRow(start + 4),
-      ];
-    });
-  };
-
-  // Reset to blank
-  const handleResetToBlank = () => {
-    if (confirm("Reset sheet to 5 blank rows? Unsaved changes will be discarded.")) {
-      isDirtyRef.current = true;
-      setEntries([
-        createEmptyConvertexRow(1),
-        createEmptyConvertexRow(2),
-        createEmptyConvertexRow(3),
-        createEmptyConvertexRow(4),
-        createEmptyConvertexRow(5),
-      ]);
-      setRemarks("");
-    }
-  };
-
-  // Remove row
-  const handleRemoveRow = (index: number) => {
-    isDirtyRef.current = true;
-    setEntries((prev) => {
-      if (prev.length <= 1) {
-        return [createEmptyConvertexRow(1)];
+  // Catch-up upon tab wake-up (e.g., user returns after lock or tab switch)
+  useEffect(() => {
+    const handleVisibilityCatchup = () => {
+      if (document.visibilityState === "visible") {
+        fetchReportData();
       }
-      return prev
-        .filter((_, i) => i !== index)
-        .map((row, i) => ({ ...row, sequence: i + 1 }));
-    });
-  };
+    };
+    const handleFocusCatchup = () => {
+      fetchReportData();
+    };
 
-  // Select an available roll to populate row
-  const handleSelectRoll = (rowIndex: number, roll: any) => {
-    isDirtyRef.current = true;
-    setEntries((prev) => {
-      const next = [...prev];
-      const target = next[rowIndex];
-      next[rowIndex] = calculateConvertexRow({
-        ...target,
-        rollNumber: roll.rollNumber || target.rollNumber,
-        companyName: roll.companyName || target.companyName,
-        unitName: roll.unitName || target.unitName,
-        grade: roll.grade || target.grade,
-        targetProductionPcs: roll.targetProductionPcs || target.targetProductionPcs,
-        quality: roll.quality || roll.partyName || target.quality,
-        partyName: roll.quality || roll.partyName || target.partyName,
-        loomNumber: roll.loomNumber || target.loomNumber,
-        rollMtr: roll.rollMtr || target.rollMtr,
-        netWeight: roll.netWeight || target.netWeight,
-        avgWeight: roll.avgWeight || target.avgWeight,
-      });
-      return next;
-    });
-    setActiveRollSearchRow(null);
-  };
+    document.addEventListener("visibilitychange", handleVisibilityCatchup);
+    window.addEventListener("focus", handleFocusCatchup);
 
-  // Compute live totals
-  const totals = useMemo(() => computeConvertexTotals(entries), [entries]);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityCatchup);
+      window.removeEventListener("focus", handleFocusCatchup);
+    };
+  }, [fetchReportData]);
 
   // Helper to determine if a row has any user entered data
-  const hasRowData = (e: ConvertexReportItem) => {
+  const hasRowData = useCallback((e: ConvertexReportItem) => {
     return Boolean(
       (e.companyName && e.companyName.trim()) ||
       (e.unitName && e.unitName.trim()) ||
@@ -365,7 +329,7 @@ export function ConvertexDailyReportClient() {
       Number(e.closingMeterReading) > 0 ||
       (e.remarks && e.remarks.trim())
     );
-  };
+  }, []);
 
   // Save handler (manual submit or silent auto-save)
   const executeSave = useCallback(
@@ -404,7 +368,7 @@ export function ConvertexDailyReportClient() {
       const currentTotals = computeConvertexTotals(current.entries);
 
       try {
-        const payload: ConvertexDailyReportData = {
+        const payload = {
           date: current.date,
           shiftName: current.shiftName,
           machineNo: current.machineNo,
@@ -414,6 +378,8 @@ export function ConvertexDailyReportClient() {
           supervisorName: current.supervisorName.trim() || undefined,
           status: newStatus,
           remarks: current.remarks.trim() || undefined,
+          clientId: realtime.clientId,
+          deletedEntryIds: Array.from(deletedEntryIdsRef.current),
           totalRolls: currentTotals.totalRolls,
           totalRollMtr: currentTotals.totalRollMtr,
           totalNetWt: currentTotals.totalNetWt,
@@ -438,6 +404,9 @@ export function ConvertexDailyReportClient() {
           throw new Error(err.error || "Failed to save Convertex report");
         }
 
+        lastSavedPayloadRef.current = serializeConvertexReportPayload(current, filledEntries);
+        hasUnsavedLocalEditsRef.current = false;
+        deletedEntryIdsRef.current.clear();
         setStatus(newStatus);
         setLastSavedAt(format(new Date(), "hh:mm:ss a"));
         isDirtyRef.current = false;
@@ -464,10 +433,130 @@ export function ConvertexDailyReportClient() {
         setIsAutoSaving(false);
       }
     },
-    []
+    [hasRowData, realtime]
   );
 
-  // Debounced auto-save effect: triggers 1000ms after last keystroke when dirty
+  const triggerAutoSave = useCallback(() => {
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    autoSaveTimerRef.current = setTimeout(() => {
+      executeSave("DRAFT", true);
+    }, 1500);
+  }, [executeSave]);
+
+  const markDirtyAndTriggerAutoSave = useCallback(() => {
+    isDirtyRef.current = true;
+    hasUnsavedLocalEditsRef.current = true;
+    lastUserEditTimeRef.current = Date.now();
+    realtime.markLocalEdit();
+    triggerAutoSave();
+  }, [realtime, triggerAutoSave]);
+
+  // Handle cell edits with live recalculation and dirty flagging
+  const handleCellChange = useCallback(
+    (index: number, field: keyof ConvertexReportItem, value: any) => {
+      setEntries((prev) => {
+        const next = [...prev];
+        const updatedRow = { ...next[index], [field]: value };
+        next[index] = calculateConvertexRow(updatedRow);
+        return next;
+      });
+      markDirtyAndTriggerAutoSave();
+    },
+    [markDirtyAndTriggerAutoSave]
+  );
+
+  // Add row
+  const handleAddRow = useCallback(() => {
+    setEntries((prev) => [...prev, createEmptyConvertexRow(prev.length + 1)]);
+    markDirtyAndTriggerAutoSave();
+  }, [markDirtyAndTriggerAutoSave]);
+
+  // Add 5 rows
+  const handleAdd5Rows = useCallback(() => {
+    setEntries((prev) => {
+      const start = prev.length + 1;
+      return [
+        ...prev,
+        createEmptyConvertexRow(start),
+        createEmptyConvertexRow(start + 1),
+        createEmptyConvertexRow(start + 2),
+        createEmptyConvertexRow(start + 3),
+        createEmptyConvertexRow(start + 4),
+      ];
+    });
+    markDirtyAndTriggerAutoSave();
+  }, [markDirtyAndTriggerAutoSave]);
+
+  // Reset to blank
+  const handleResetToBlank = useCallback(() => {
+    if (confirm("Reset sheet to 5 blank rows? Unsaved changes will be discarded.")) {
+      setEntries([
+        createEmptyConvertexRow(1),
+        createEmptyConvertexRow(2),
+        createEmptyConvertexRow(3),
+        createEmptyConvertexRow(4),
+        createEmptyConvertexRow(5),
+      ]);
+      setRemarks("");
+      markDirtyAndTriggerAutoSave();
+    }
+  }, [markDirtyAndTriggerAutoSave]);
+
+  // Remove row
+  const handleRemoveRow = useCallback(
+    (index: number) => {
+      setEntries((prev) => {
+        const target = prev[index];
+        if (target?.id) {
+          deletedEntryIdsRef.current.add(target.id);
+        }
+        if (target?.rollNumber?.trim()) {
+          deletedEntryIdsRef.current.add(target.rollNumber.trim().toUpperCase());
+        }
+        if (prev.length <= 1) {
+          return [createEmptyConvertexRow(1)];
+        }
+        return prev
+          .filter((_, i) => i !== index)
+          .map((row, i) => ({ ...row, sequence: i + 1 }));
+      });
+      markDirtyAndTriggerAutoSave();
+    },
+    [markDirtyAndTriggerAutoSave]
+  );
+
+  // Select an available roll to populate row
+  const handleSelectRoll = useCallback(
+    (rowIndex: number, roll: any) => {
+      setEntries((prev) => {
+        const next = [...prev];
+        const target = next[rowIndex];
+        next[rowIndex] = calculateConvertexRow({
+          ...target,
+          rollNumber: roll.rollNumber || target.rollNumber,
+          companyName: roll.companyName || target.companyName,
+          unitName: roll.unitName || target.unitName,
+          grade: roll.grade || target.grade,
+          targetProductionPcs: roll.targetProductionPcs || target.targetProductionPcs,
+          quality: roll.quality || roll.partyName || target.quality,
+          partyName: roll.quality || roll.partyName || target.partyName,
+          loomNumber: roll.loomNumber || target.loomNumber,
+          rollMtr: roll.rollMtr || target.rollMtr,
+          netWeight: roll.netWeight || target.netWeight,
+          avgWeight: roll.avgWeight || target.avgWeight,
+        });
+        return next;
+      });
+      setActiveRollSearchRow(null);
+      markDirtyAndTriggerAutoSave();
+    },
+    [markDirtyAndTriggerAutoSave]
+  );
+
+  // Compute live totals
+  const totals = useMemo(() => computeConvertexTotals(entries), [entries]);
+
+  // Auto-save effect for header fields (operator, supervisor, remarks)
   useEffect(() => {
     if (isInitialLoadRef.current || loading) return;
     if (!isDirtyRef.current) return;
@@ -478,12 +567,12 @@ export function ConvertexDailyReportClient() {
       if (isDirtyRef.current) {
         executeSave("DRAFT", true);
       }
-    }, 1000);
+    }, 1500);
 
     return () => {
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     };
-  }, [entries, remarks, operatorName, supervisorName, loading, executeSave]);
+  }, [remarks, operatorName, supervisorName, loading, executeSave]);
 
   // Flush unsaved changes on tab blur or beforeunload
   useEffect(() => {
@@ -843,302 +932,339 @@ export function ConvertexDailyReportClient() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 font-medium">
-              {entries.map((entry, index) => (
-                <tr
-                  key={index}
-                  className={`hover:bg-sky-50/40 transition-colors ${
-                    index % 2 === 1 ? "bg-slate-50/40" : "bg-white"
-                  }`}
-                >
-                  {/* Sequence */}
-                  <td className="py-1.5 px-2 text-center font-bold text-slate-500 border-r border-slate-200">
-                    {entry.sequence}
-                  </td>
+              {entries.map((entry, index) => {
+                const rowKey = getConvertexReportRowKey(entry, index);
+                return (
+                  <tr
+                    key={rowKey}
+                    className={`hover:bg-sky-50/40 transition-colors ${
+                      index % 2 === 1 ? "bg-slate-50/40" : "bg-white"
+                    }`}
+                  >
+                    {/* Sequence */}
+                    <td className="py-1.5 px-2 text-center font-bold text-slate-500 border-r border-slate-200">
+                      {entry.sequence}
+                    </td>
 
-                  {/* Company Name */}
-                  <td className="py-1 px-1 border-r border-slate-200">
-                    <input
-                      type="text"
-                      value={entry.companyName || ""}
-                      onChange={(e) => handleCellChange(index, "companyName", e.target.value)}
-                      placeholder="e.g. UltraTech"
-                      className="w-full px-2 py-1 text-xs border border-transparent hover:border-slate-300 focus:border-primary focus:bg-white rounded transition-colors"
-                    />
-                  </td>
-
-                  {/* Unit Name */}
-                  <td className="py-1 px-1 border-r border-slate-200">
-                    <input
-                      type="text"
-                      value={entry.unitName || ""}
-                      onChange={(e) => handleCellChange(index, "unitName", e.target.value)}
-                      placeholder="e.g. Unit-1"
-                      className="w-full px-2 py-1 text-xs border border-transparent hover:border-slate-300 focus:border-primary focus:bg-white rounded transition-colors"
-                    />
-                  </td>
-
-                  {/* Grade */}
-                  <td className="py-1 px-1 border-r border-slate-200 text-center">
-                    <input
-                      type="text"
-                      value={entry.grade || ""}
-                      onChange={(e) => handleCellChange(index, "grade", e.target.value)}
-                      placeholder="PPC"
-                      className="w-full px-2 py-1 text-xs text-center border border-transparent hover:border-slate-300 focus:border-primary focus:bg-white rounded transition-colors"
-                    />
-                  </td>
-
-                  {/* Target Production (in pcs) */}
-                  <td className="py-1 px-1 border-r border-slate-200">
-                    <input
-                      type="number"
-                      value={entry.targetProductionPcs || ""}
-                      onChange={(e) => handleCellChange(index, "targetProductionPcs", e.target.value)}
-                      placeholder="0"
-                      className="w-full px-2 py-1 text-xs text-right font-mono text-blue-700 border border-transparent hover:border-slate-300 focus:border-primary focus:bg-white rounded transition-colors"
-                    />
-                  </td>
-
-                  {/* Quality (Replaced Party Name!) */}
-                  <td className="py-1 px-1 border-r border-slate-200 bg-amber-50/20 min-w-[200px]">
-                    <UniversalQualityInput
-                      value={entry.quality || entry.partyName || ""}
-                      onChange={(newVal) => {
-                        handleCellChange(index, "quality", newVal);
-                        handleCellChange(index, "partyName", newVal);
-                      }}
-                      placeholder="— Quality —"
-                      compact={true}
-                      inputClassName="h-7 text-xs font-semibold text-slate-800"
-                    />
-                  </td>
-
-                  {/* Roll No. (with quick autocomplete popup) */}
-                  <td className="py-1 px-1 border-r border-slate-200 relative">
-                    <div className="flex items-center gap-1">
+                    {/* Company Name */}
+                    <td className="py-1 px-1 border-r border-slate-200">
                       <input
                         type="text"
-                        value={entry.rollNumber}
-                        onChange={(e) => {
-                          handleCellChange(index, "rollNumber", e.target.value);
-                          setRollSearchQuery(e.target.value);
-                        }}
-                        onFocus={() => {
-                          setActiveRollSearchRow(index);
-                          setRollSearchQuery(entry.rollNumber || "");
-                        }}
-                        placeholder="e.g. D14332"
-                        className="w-full px-2 py-1 text-xs font-mono font-bold text-slate-900 border border-transparent hover:border-slate-300 focus:border-primary focus:bg-white rounded transition-colors"
+                        value={entry.companyName || ""}
+                        onChange={(e) => handleCellChange(index, "companyName", e.target.value)}
+                        onFocus={() => setFocusedCell(rowKey, "companyName")}
+                        onBlur={() => clearFocusedCell(rowKey, "companyName")}
+                        placeholder="e.g. UltraTech"
+                        className="w-full px-2 py-1 text-xs border border-transparent hover:border-slate-300 focus:border-primary focus:bg-white rounded transition-colors"
                       />
+                    </td>
+
+                    {/* Unit Name */}
+                    <td className="py-1 px-1 border-r border-slate-200">
+                      <input
+                        type="text"
+                        value={entry.unitName || ""}
+                        onChange={(e) => handleCellChange(index, "unitName", e.target.value)}
+                        onFocus={() => setFocusedCell(rowKey, "unitName")}
+                        onBlur={() => clearFocusedCell(rowKey, "unitName")}
+                        placeholder="e.g. Unit-1"
+                        className="w-full px-2 py-1 text-xs border border-transparent hover:border-slate-300 focus:border-primary focus:bg-white rounded transition-colors"
+                      />
+                    </td>
+
+                    {/* Grade */}
+                    <td className="py-1 px-1 border-r border-slate-200 text-center">
+                      <input
+                        type="text"
+                        value={entry.grade || ""}
+                        onChange={(e) => handleCellChange(index, "grade", e.target.value)}
+                        onFocus={() => setFocusedCell(rowKey, "grade")}
+                        onBlur={() => clearFocusedCell(rowKey, "grade")}
+                        placeholder="PPC"
+                        className="w-full px-2 py-1 text-xs text-center border border-transparent hover:border-slate-300 focus:border-primary focus:bg-white rounded transition-colors"
+                      />
+                    </td>
+
+                    {/* Target Production (in pcs) */}
+                    <td className="py-1 px-1 border-r border-slate-200">
+                      <input
+                        type="number"
+                        value={entry.targetProductionPcs || ""}
+                        onChange={(e) => handleCellChange(index, "targetProductionPcs", e.target.value)}
+                        onFocus={() => setFocusedCell(rowKey, "targetProductionPcs")}
+                        onBlur={() => clearFocusedCell(rowKey, "targetProductionPcs")}
+                        placeholder="0"
+                        className="w-full px-2 py-1 text-xs text-right font-mono text-blue-700 border border-transparent hover:border-slate-300 focus:border-primary focus:bg-white rounded transition-colors"
+                      />
+                    </td>
+
+                    {/* Quality (Replaced Party Name!) */}
+                    <td className="py-1 px-1 border-r border-slate-200 bg-amber-50/20 min-w-[200px]">
+                      <UniversalQualityInput
+                        value={entry.quality || entry.partyName || ""}
+                        onChange={(newVal) => {
+                          handleCellChange(index, "quality", newVal);
+                          handleCellChange(index, "partyName", newVal);
+                        }}
+                        onFocus={() => setFocusedCell(rowKey, "quality")}
+                        onBlur={() => clearFocusedCell(rowKey, "quality")}
+                        placeholder="— Quality —"
+                        compact={true}
+                        inputClassName="h-7 text-xs font-semibold text-slate-800"
+                      />
+                    </td>
+
+                    {/* Roll No. (with quick autocomplete popup) */}
+                    <td className="py-1 px-1 border-r border-slate-200 relative">
+                      <div className="flex items-center gap-1">
+                        <input
+                          type="text"
+                          value={entry.rollNumber}
+                          onChange={(e) => {
+                            handleCellChange(index, "rollNumber", e.target.value);
+                            setRollSearchQuery(e.target.value);
+                          }}
+                          onFocus={() => {
+                            setFocusedCell(rowKey, "rollNumber");
+                            setActiveRollSearchRow(index);
+                            setRollSearchQuery(entry.rollNumber || "");
+                          }}
+                          onBlur={() => clearFocusedCell(rowKey, "rollNumber")}
+                          placeholder="e.g. D14332"
+                          className="w-full px-2 py-1 text-xs font-mono font-bold text-slate-900 border border-transparent hover:border-slate-300 focus:border-primary focus:bg-white rounded transition-colors"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActiveRollSearchRow(activeRollSearchRow === index ? null : index);
+                            setRollSearchQuery(entry.rollNumber || "");
+                          }}
+                          className="p-1 text-slate-400 hover:text-primary transition-colors"
+                          title="Pick from available printed rolls"
+                        >
+                          <Search className="w-3 h-3" />
+                        </button>
+                      </div>
+
+                      {/* Autocomplete Dropdown Popup */}
+                      {activeRollSearchRow === index && availableRolls.length > 0 && (
+                        <div className="absolute left-0 top-full z-30 mt-1 w-80 bg-white border border-slate-300 rounded-lg shadow-xl p-2 max-h-60 overflow-y-auto">
+                          <div className="flex items-center justify-between pb-1.5 mb-1.5 border-b border-slate-100 text-[10px] font-bold text-slate-500 uppercase">
+                            <span>Available Rolls ({availableRolls.length})</span>
+                            <button
+                              type="button"
+                              onClick={() => setActiveRollSearchRow(null)}
+                              className="text-slate-400 hover:text-slate-700"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                          <div className="space-y-1">
+                            {availableRolls
+                              .filter(
+                                (r) =>
+                                  !rollSearchQuery ||
+                                  r.rollNumber.toLowerCase().includes(rollSearchQuery.toLowerCase()) ||
+                                  (r.companyName && r.companyName.toLowerCase().includes(rollSearchQuery.toLowerCase()))
+                              )
+                              .slice(0, 15)
+                              .map((roll) => (
+                                <button
+                                  key={roll.id}
+                                  type="button"
+                                  onClick={() => handleSelectRoll(index, roll)}
+                                  className="w-full text-left p-1.5 rounded hover:bg-sky-50 transition-colors flex items-center justify-between text-xs"
+                                >
+                                  <div>
+                                    <span className="font-mono font-bold text-slate-900">
+                                      {roll.rollNumber}
+                                    </span>
+                                    {roll.companyName && (
+                                      <span className="text-slate-500 text-[10px] ml-1.5">
+                                        ({roll.companyName})
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="text-right text-[10px] font-mono text-slate-600">
+                                    <span>{roll.rollMtr}m</span> / <span>{roll.netWeight}kg</span>
+                                  </div>
+                                </button>
+                              ))}
+                          </div>
+                        </div>
+                      )}
+                    </td>
+
+                    {/* Loom No. */}
+                    <td className="py-1 px-1 border-r border-slate-200 text-center">
+                      <input
+                        type="text"
+                        value={entry.loomNumber || ""}
+                        onChange={(e) => handleCellChange(index, "loomNumber", e.target.value)}
+                        onFocus={() => setFocusedCell(rowKey, "loomNumber")}
+                        onBlur={() => clearFocusedCell(rowKey, "loomNumber")}
+                        placeholder="e.g. 42"
+                        className="w-full px-2 py-1 text-xs text-center font-mono text-sky-700 border border-transparent hover:border-slate-300 focus:border-primary focus:bg-white rounded transition-colors"
+                      />
+                    </td>
+
+                    {/* Roll Mtr */}
+                    <td className="py-1 px-1 border-r border-slate-200">
+                      <input
+                        type="number"
+                        step="any"
+                        value={entry.rollMtr || ""}
+                        onChange={(e) => handleCellChange(index, "rollMtr", e.target.value)}
+                        onFocus={() => setFocusedCell(rowKey, "rollMtr")}
+                        onBlur={() => clearFocusedCell(rowKey, "rollMtr")}
+                        placeholder="0"
+                        className="w-full px-2 py-1 text-xs text-right font-mono font-medium text-slate-900 border border-transparent hover:border-slate-300 focus:border-primary focus:bg-white rounded transition-colors"
+                      />
+                    </td>
+
+                    {/* Net Wt */}
+                    <td className="py-1 px-1 border-r border-slate-200">
+                      <input
+                        type="number"
+                        step="any"
+                        value={entry.netWeight || ""}
+                        onChange={(e) => handleCellChange(index, "netWeight", e.target.value)}
+                        onFocus={() => setFocusedCell(rowKey, "netWeight")}
+                        onBlur={() => clearFocusedCell(rowKey, "netWeight")}
+                        placeholder="0"
+                        className="w-full px-2 py-1 text-xs text-right font-mono text-slate-800 border border-transparent hover:border-slate-300 focus:border-primary focus:bg-white rounded transition-colors"
+                      />
+                    </td>
+
+                    {/* Avg. (g/m) */}
+                    <td className="py-1.5 px-2 border-r border-slate-200 text-right font-mono font-bold text-sky-800 bg-sky-50/30">
+                      {entry.avgWeight ? entry.avgWeight.toFixed(1) : "—"}
+                    </td>
+
+                    {/* Opening Meter Reading */}
+                    <td className="py-1 px-1 border-r border-slate-200">
+                      <input
+                        type="number"
+                        step="any"
+                        value={entry.openingMeterReading || ""}
+                        onChange={(e) => handleCellChange(index, "openingMeterReading", e.target.value)}
+                        onFocus={() => setFocusedCell(rowKey, "openingMeterReading")}
+                        onBlur={() => clearFocusedCell(rowKey, "openingMeterReading")}
+                        placeholder="0"
+                        className="w-full px-2 py-1 text-xs text-right font-mono text-slate-600 border border-transparent hover:border-slate-300 focus:border-primary focus:bg-white rounded transition-colors"
+                      />
+                    </td>
+
+                    {/* Closing Meter Reading */}
+                    <td className="py-1 px-1 border-r border-slate-200">
+                      <input
+                        type="number"
+                        step="any"
+                        value={entry.closingMeterReading || ""}
+                        onChange={(e) => handleCellChange(index, "closingMeterReading", e.target.value)}
+                        onFocus={() => setFocusedCell(rowKey, "closingMeterReading")}
+                        onBlur={() => clearFocusedCell(rowKey, "closingMeterReading")}
+                        placeholder="0"
+                        className="w-full px-2 py-1 text-xs text-right font-mono text-slate-600 border border-transparent hover:border-slate-300 focus:border-primary focus:bg-white rounded transition-colors"
+                      />
+                    </td>
+
+                    {/* Cover Patch OS */}
+                    <td className="py-1 px-1 border-r border-slate-200 bg-indigo-50/15">
+                      <input
+                        type="number"
+                        step="any"
+                        value={entry.coverPatchOs || ""}
+                        onChange={(e) => handleCellChange(index, "coverPatchOs", e.target.value)}
+                        onFocus={() => setFocusedCell(rowKey, "coverPatchOs")}
+                        onBlur={() => clearFocusedCell(rowKey, "coverPatchOs")}
+                        placeholder="0"
+                        className="w-full px-2 py-1 text-xs text-right font-mono text-indigo-700 border border-transparent hover:border-indigo-300 focus:border-indigo-500 rounded transition-colors"
+                      />
+                    </td>
+
+                    {/* Cover Patch DS */}
+                    <td className="py-1 px-1 border-r border-slate-200 bg-indigo-50/15">
+                      <input
+                        type="number"
+                        step="any"
+                        value={entry.coverPatchDs || ""}
+                        onChange={(e) => handleCellChange(index, "coverPatchDs", e.target.value)}
+                        onFocus={() => setFocusedCell(rowKey, "coverPatchDs")}
+                        onBlur={() => clearFocusedCell(rowKey, "coverPatchDs")}
+                        placeholder="0"
+                        className="w-full px-2 py-1 text-xs text-right font-mono text-indigo-700 border border-transparent hover:border-indigo-300 focus:border-indigo-500 rounded transition-colors"
+                      />
+                    </td>
+
+                    {/* Valve Patch */}
+                    <td className="py-1 px-1 border-r border-slate-200 bg-indigo-50/20">
+                      <input
+                        type="number"
+                        step="any"
+                        value={entry.valvePatch || ""}
+                        onChange={(e) => handleCellChange(index, "valvePatch", e.target.value)}
+                        onFocus={() => setFocusedCell(rowKey, "valvePatch")}
+                        onBlur={() => clearFocusedCell(rowKey, "valvePatch")}
+                        placeholder="0"
+                        className="w-full px-2 py-1 text-xs text-right font-mono text-indigo-800 border border-transparent hover:border-indigo-300 focus:border-indigo-500 rounded transition-colors"
+                      />
+                    </td>
+
+                    {/* Production (In Pcs) */}
+                    <td className="py-1 px-1 border-r border-slate-200 bg-emerald-50/25">
+                      <input
+                        type="number"
+                        value={entry.productionPcs || ""}
+                        onChange={(e) => handleCellChange(index, "productionPcs", e.target.value)}
+                        onFocus={() => setFocusedCell(rowKey, "productionPcs")}
+                        onBlur={() => clearFocusedCell(rowKey, "productionPcs")}
+                        placeholder="0"
+                        className="w-full px-2 py-1 text-xs text-right font-mono font-bold text-emerald-700 bg-transparent border border-transparent hover:border-emerald-300 focus:border-emerald-500 rounded transition-colors"
+                      />
+                    </td>
+
+                    {/* Production (In Kg) */}
+                    <td className="py-1 px-1 border-r border-slate-200 bg-teal-50/25">
+                      <input
+                        type="number"
+                        step="any"
+                        value={entry.productionKg || ""}
+                        onChange={(e) => handleCellChange(index, "productionKg", e.target.value)}
+                        onFocus={() => setFocusedCell(rowKey, "productionKg")}
+                        onBlur={() => clearFocusedCell(rowKey, "productionKg")}
+                        placeholder="0.00"
+                        className="w-full px-2 py-1 text-xs text-right font-mono font-bold text-teal-800 bg-transparent border border-transparent hover:border-teal-300 focus:border-teal-500 rounded transition-colors"
+                      />
+                    </td>
+
+                    {/* Remarks */}
+                    <td className="py-1 px-1 border-r border-slate-200">
+                      <input
+                        type="text"
+                        value={entry.remarks || ""}
+                        onChange={(e) => handleCellChange(index, "remarks", e.target.value)}
+                        onFocus={() => setFocusedCell(rowKey, "remarks")}
+                        onBlur={() => clearFocusedCell(rowKey, "remarks")}
+                        placeholder="Notes..."
+                        className="w-full px-2 py-1 text-xs text-slate-700 border border-transparent hover:border-slate-300 focus:border-primary focus:bg-white rounded transition-colors"
+                      />
+                    </td>
+
+                    {/* Delete Action */}
+                    <td className="py-1 px-1 text-center">
                       <button
                         type="button"
-                        onClick={() => {
-                          setActiveRollSearchRow(activeRollSearchRow === index ? null : index);
-                          setRollSearchQuery(entry.rollNumber || "");
-                        }}
-                        className="p-1 text-slate-400 hover:text-primary transition-colors"
-                        title="Pick from available printed rolls"
+                        onClick={() => handleRemoveRow(index)}
+                        className="p-1.5 text-slate-400 hover:text-red-600 rounded hover:bg-red-50 transition-colors"
+                        title="Delete row"
                       >
-                        <Search className="w-3 h-3" />
+                        <Trash2 className="w-3.5 h-3.5" />
                       </button>
-                    </div>
-
-                    {/* Autocomplete Dropdown Popup */}
-                    {activeRollSearchRow === index && availableRolls.length > 0 && (
-                      <div className="absolute left-0 top-full z-30 mt-1 w-80 bg-white border border-slate-300 rounded-lg shadow-xl p-2 max-h-60 overflow-y-auto">
-                        <div className="flex items-center justify-between pb-1.5 mb-1.5 border-b border-slate-100 text-[10px] font-bold text-slate-500 uppercase">
-                          <span>Available Rolls ({availableRolls.length})</span>
-                          <button
-                            type="button"
-                            onClick={() => setActiveRollSearchRow(null)}
-                            className="text-slate-400 hover:text-slate-700"
-                          >
-                            ✕
-                          </button>
-                        </div>
-                        <div className="space-y-1">
-                          {availableRolls
-                            .filter(
-                              (r) =>
-                                !rollSearchQuery ||
-                                r.rollNumber.toLowerCase().includes(rollSearchQuery.toLowerCase()) ||
-                                (r.companyName && r.companyName.toLowerCase().includes(rollSearchQuery.toLowerCase()))
-                            )
-                            .slice(0, 15)
-                            .map((roll) => (
-                              <button
-                                key={roll.id}
-                                type="button"
-                                onClick={() => handleSelectRoll(index, roll)}
-                                className="w-full text-left p-1.5 rounded hover:bg-sky-50 transition-colors flex items-center justify-between text-xs"
-                              >
-                                <div>
-                                  <span className="font-mono font-bold text-slate-900">
-                                    {roll.rollNumber}
-                                  </span>
-                                  {roll.companyName && (
-                                    <span className="text-slate-500 text-[10px] ml-1.5">
-                                      ({roll.companyName})
-                                    </span>
-                                  )}
-                                </div>
-                                <div className="text-right text-[10px] font-mono text-slate-600">
-                                  <span>{roll.rollMtr}m</span> / <span>{roll.netWeight}kg</span>
-                                </div>
-                              </button>
-                            ))}
-                        </div>
-                      </div>
-                    )}
-                  </td>
-
-                  {/* Loom No. */}
-                  <td className="py-1 px-1 border-r border-slate-200 text-center">
-                    <input
-                      type="text"
-                      value={entry.loomNumber || ""}
-                      onChange={(e) => handleCellChange(index, "loomNumber", e.target.value)}
-                      placeholder="e.g. 42"
-                      className="w-full px-2 py-1 text-xs text-center font-mono text-sky-700 border border-transparent hover:border-slate-300 focus:border-primary focus:bg-white rounded transition-colors"
-                    />
-                  </td>
-
-                  {/* Roll Mtr */}
-                  <td className="py-1 px-1 border-r border-slate-200">
-                    <input
-                      type="number"
-                      step="any"
-                      value={entry.rollMtr || ""}
-                      onChange={(e) => handleCellChange(index, "rollMtr", e.target.value)}
-                      placeholder="0"
-                      className="w-full px-2 py-1 text-xs text-right font-mono font-medium text-slate-900 border border-transparent hover:border-slate-300 focus:border-primary focus:bg-white rounded transition-colors"
-                    />
-                  </td>
-
-                  {/* Net Wt */}
-                  <td className="py-1 px-1 border-r border-slate-200">
-                    <input
-                      type="number"
-                      step="any"
-                      value={entry.netWeight || ""}
-                      onChange={(e) => handleCellChange(index, "netWeight", e.target.value)}
-                      placeholder="0"
-                      className="w-full px-2 py-1 text-xs text-right font-mono text-slate-800 border border-transparent hover:border-slate-300 focus:border-primary focus:bg-white rounded transition-colors"
-                    />
-                  </td>
-
-                  {/* Avg. (g/m) */}
-                  <td className="py-1.5 px-2 border-r border-slate-200 text-right font-mono font-bold text-sky-800 bg-sky-50/30">
-                    {entry.avgWeight ? entry.avgWeight.toFixed(1) : "—"}
-                  </td>
-
-                  {/* Opening Meter Reading */}
-                  <td className="py-1 px-1 border-r border-slate-200">
-                    <input
-                      type="number"
-                      step="any"
-                      value={entry.openingMeterReading || ""}
-                      onChange={(e) => handleCellChange(index, "openingMeterReading", e.target.value)}
-                      placeholder="0"
-                      className="w-full px-2 py-1 text-xs text-right font-mono text-slate-600 border border-transparent hover:border-slate-300 focus:border-primary focus:bg-white rounded transition-colors"
-                    />
-                  </td>
-
-                  {/* Closing Meter Reading */}
-                  <td className="py-1 px-1 border-r border-slate-200">
-                    <input
-                      type="number"
-                      step="any"
-                      value={entry.closingMeterReading || ""}
-                      onChange={(e) => handleCellChange(index, "closingMeterReading", e.target.value)}
-                      placeholder="0"
-                      className="w-full px-2 py-1 text-xs text-right font-mono text-slate-600 border border-transparent hover:border-slate-300 focus:border-primary focus:bg-white rounded transition-colors"
-                    />
-                  </td>
-
-                  {/* Cover Patch OS */}
-                  <td className="py-1 px-1 border-r border-slate-200 bg-indigo-50/15">
-                    <input
-                      type="number"
-                      step="any"
-                      value={entry.coverPatchOs || ""}
-                      onChange={(e) => handleCellChange(index, "coverPatchOs", e.target.value)}
-                      placeholder="0"
-                      className="w-full px-2 py-1 text-xs text-right font-mono text-indigo-700 border border-transparent hover:border-indigo-300 focus:border-indigo-500 rounded transition-colors"
-                    />
-                  </td>
-
-                  {/* Cover Patch DS */}
-                  <td className="py-1 px-1 border-r border-slate-200 bg-indigo-50/15">
-                    <input
-                      type="number"
-                      step="any"
-                      value={entry.coverPatchDs || ""}
-                      onChange={(e) => handleCellChange(index, "coverPatchDs", e.target.value)}
-                      placeholder="0"
-                      className="w-full px-2 py-1 text-xs text-right font-mono text-indigo-700 border border-transparent hover:border-indigo-300 focus:border-indigo-500 rounded transition-colors"
-                    />
-                  </td>
-
-                  {/* Valve Patch */}
-                  <td className="py-1 px-1 border-r border-slate-200 bg-indigo-50/20">
-                    <input
-                      type="number"
-                      step="any"
-                      value={entry.valvePatch || ""}
-                      onChange={(e) => handleCellChange(index, "valvePatch", e.target.value)}
-                      placeholder="0"
-                      className="w-full px-2 py-1 text-xs text-right font-mono text-indigo-800 border border-transparent hover:border-indigo-300 focus:border-indigo-500 rounded transition-colors"
-                    />
-                  </td>
-
-                  {/* Production (In Pcs) */}
-                  <td className="py-1 px-1 border-r border-slate-200 bg-emerald-50/25">
-                    <input
-                      type="number"
-                      value={entry.productionPcs || ""}
-                      onChange={(e) => handleCellChange(index, "productionPcs", e.target.value)}
-                      placeholder="0"
-                      className="w-full px-2 py-1 text-xs text-right font-mono font-bold text-emerald-700 bg-transparent border border-transparent hover:border-emerald-300 focus:border-emerald-500 rounded transition-colors"
-                    />
-                  </td>
-
-                  {/* Production (In Kg) */}
-                  <td className="py-1 px-1 border-r border-slate-200 bg-teal-50/25">
-                    <input
-                      type="number"
-                      step="any"
-                      value={entry.productionKg || ""}
-                      onChange={(e) => handleCellChange(index, "productionKg", e.target.value)}
-                      placeholder="0.00"
-                      className="w-full px-2 py-1 text-xs text-right font-mono font-bold text-teal-800 bg-transparent border border-transparent hover:border-teal-300 focus:border-teal-500 rounded transition-colors"
-                    />
-                  </td>
-
-                  {/* Remarks */}
-                  <td className="py-1 px-1 border-r border-slate-200">
-                    <input
-                      type="text"
-                      value={entry.remarks || ""}
-                      onChange={(e) => handleCellChange(index, "remarks", e.target.value)}
-                      placeholder="Notes..."
-                      className="w-full px-2 py-1 text-xs text-slate-700 border border-transparent hover:border-slate-300 focus:border-primary focus:bg-white rounded transition-colors"
-                    />
-                  </td>
-
-                  {/* Delete Action */}
-                  <td className="py-1 px-1 text-center">
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveRow(index)}
-                      className="p-1.5 text-slate-400 hover:text-red-600 rounded hover:bg-red-50 transition-colors"
-                      title="Delete row"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
 
             {/* Totals Summary Footer Row */}
@@ -1231,269 +1357,304 @@ export function ConvertexDailyReportClient() {
               No entries in this report. Tap &quot;Add Row&quot; to begin.
             </div>
           ) : (
-            entries.map((entry, index) => (
-              <div
-                key={index}
-                className="bg-white border border-slate-200/90 rounded-xl shadow-2xs overflow-hidden"
-              >
-                {/* Card Header Strip */}
-                <div className="bg-slate-50/90 px-3.5 py-2 border-b border-slate-100 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="h-5 w-5 rounded-md bg-slate-900 text-white font-bold text-[10px] flex items-center justify-center">
-                      {entry.sequence}
-                    </span>
-                    <span className="text-xs font-mono font-bold text-slate-900">
-                      {entry.rollNumber ? entry.rollNumber : `Row ${index + 1}`}
-                    </span>
-                    {entry.loomNumber && (
-                      <span className="text-[10px] text-sky-700 bg-sky-50 px-1.5 py-0.5 rounded border border-sky-200 font-mono">
-                        Loom #{entry.loomNumber}
+            entries.map((entry, index) => {
+              const rowKey = getConvertexReportRowKey(entry, index);
+              return (
+                <div
+                  key={rowKey}
+                  className="bg-white border border-slate-200/90 rounded-xl shadow-2xs overflow-hidden"
+                >
+                  {/* Card Header Strip */}
+                  <div className="bg-slate-50/90 px-3.5 py-2 border-b border-slate-100 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="h-5 w-5 rounded-md bg-slate-900 text-white font-bold text-[10px] flex items-center justify-center">
+                        {entry.sequence}
                       </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {entry.productionPcs > 0 && (
-                      <span className="text-xs font-black font-mono text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
-                        {entry.productionPcs.toLocaleString()} pcs
+                      <span className="text-xs font-mono font-bold text-slate-900">
+                        {entry.rollNumber ? entry.rollNumber : `Row ${index + 1}`}
                       </span>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveRow(index)}
-                      className="p-1 text-slate-400 hover:text-rose-600 rounded active:scale-90 transition-all"
-                      title="Delete row"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                      {entry.loomNumber && (
+                        <span className="text-[10px] text-sky-700 bg-sky-50 px-1.5 py-0.5 rounded border border-sky-200 font-mono">
+                          Loom #{entry.loomNumber}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {entry.productionPcs > 0 && (
+                        <span className="text-xs font-black font-mono text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                          {entry.productionPcs.toLocaleString()} pcs
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveRow(index)}
+                        className="p-1 text-slate-400 hover:text-rose-600 rounded active:scale-90 transition-all"
+                        title="Delete row"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
-                </div>
 
-                <div className="p-3.5 space-y-3 text-xs">
-                  {/* Quality & Company */}
-                  <div className="space-y-2">
+                  <div className="p-3.5 space-y-3 text-xs">
+                    {/* Quality & Company */}
+                    <div className="space-y-2">
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                          Quality
+                        </label>
+                        <UniversalQualityInput
+                          value={entry.quality || entry.partyName || ""}
+                          onChange={(newVal) => {
+                            handleCellChange(index, "quality", newVal);
+                            handleCellChange(index, "partyName", newVal);
+                          }}
+                          onFocus={() => setFocusedCell(rowKey, "quality")}
+                          onBlur={() => clearFocusedCell(rowKey, "quality")}
+                          placeholder="Select quality..."
+                          compact={false}
+                          inputClassName="h-9 text-xs font-semibold"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">
+                            Company Name
+                          </label>
+                          <input
+                            type="text"
+                            value={entry.companyName || ""}
+                            onChange={(e) => handleCellChange(index, "companyName", e.target.value)}
+                            onFocus={() => setFocusedCell(rowKey, "companyName")}
+                            onBlur={() => clearFocusedCell(rowKey, "companyName")}
+                            placeholder="e.g. UltraTech"
+                            className="w-full h-8 px-2.5 text-xs border border-slate-200 rounded-md focus:ring-1 focus:ring-primary"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">
+                            Unit / Grade
+                          </label>
+                          <div className="grid grid-cols-2 gap-1">
+                            <input
+                              type="text"
+                              value={entry.unitName || ""}
+                              onChange={(e) => handleCellChange(index, "unitName", e.target.value)}
+                              onFocus={() => setFocusedCell(rowKey, "unitName")}
+                              onBlur={() => clearFocusedCell(rowKey, "unitName")}
+                              placeholder="Unit"
+                              className="w-full h-8 px-2 text-xs border border-slate-200 rounded-md focus:ring-1 focus:ring-primary"
+                            />
+                            <input
+                              type="text"
+                              value={entry.grade || ""}
+                              onChange={(e) => handleCellChange(index, "grade", e.target.value)}
+                              onFocus={() => setFocusedCell(rowKey, "grade")}
+                              onBlur={() => clearFocusedCell(rowKey, "grade")}
+                              placeholder="Grade"
+                              className="w-full h-8 px-2 text-xs border border-slate-200 rounded-md focus:ring-1 focus:ring-primary"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Roll No & Loom Details */}
+                    <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100 space-y-2">
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
+                            Roll Number
+                          </label>
+                          <input
+                            type="text"
+                            value={entry.rollNumber}
+                            onChange={(e) => handleCellChange(index, "rollNumber", e.target.value)}
+                            onFocus={() => setFocusedCell(rowKey, "rollNumber")}
+                            onBlur={() => clearFocusedCell(rowKey, "rollNumber")}
+                            placeholder="e.g. D14332"
+                            className="w-full h-8 px-2.5 text-xs font-mono font-bold border border-slate-200 rounded-md bg-white focus:ring-1 focus:ring-primary"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
+                            Loom Number
+                          </label>
+                          <input
+                            type="text"
+                            value={entry.loomNumber || ""}
+                            onChange={(e) => handleCellChange(index, "loomNumber", e.target.value)}
+                            onFocus={() => setFocusedCell(rowKey, "loomNumber")}
+                            onBlur={() => clearFocusedCell(rowKey, "loomNumber")}
+                            placeholder="e.g. 42"
+                            className="w-full h-8 px-2.5 text-xs font-mono border border-slate-200 rounded-md bg-white focus:ring-1 focus:ring-primary"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2 text-center pt-1">
+                        <div>
+                          <span className="text-[9px] uppercase font-bold text-slate-400 block">Roll Mtr</span>
+                          <input
+                            type="number"
+                            step="any"
+                            value={entry.rollMtr || ""}
+                            onChange={(e) => handleCellChange(index, "rollMtr", e.target.value)}
+                            onFocus={() => setFocusedCell(rowKey, "rollMtr")}
+                            onBlur={() => clearFocusedCell(rowKey, "rollMtr")}
+                            placeholder="0"
+                            className="w-full h-7 text-center font-mono font-bold text-xs border border-slate-200 rounded bg-white"
+                          />
+                        </div>
+                        <div>
+                          <span className="text-[9px] uppercase font-bold text-slate-400 block">Net Wt (Kg)</span>
+                          <input
+                            type="number"
+                            step="any"
+                            value={entry.netWeight || ""}
+                            onChange={(e) => handleCellChange(index, "netWeight", e.target.value)}
+                            onFocus={() => setFocusedCell(rowKey, "netWeight")}
+                            onBlur={() => clearFocusedCell(rowKey, "netWeight")}
+                            placeholder="0"
+                            className="w-full h-7 text-center font-mono font-bold text-xs border border-slate-200 rounded bg-white"
+                          />
+                        </div>
+                        <div>
+                          <span className="text-[9px] uppercase font-bold text-slate-400 block">Avg (g/m)</span>
+                          <div className="h-7 flex items-center justify-center font-mono font-bold text-sky-800 bg-sky-50 rounded border border-sky-200 text-xs">
+                            {entry.avgWeight ? entry.avgWeight.toFixed(1) : "—"}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Meter Readings & Patches */}
+                    <div className="p-2.5 rounded-lg bg-indigo-50/30 border border-indigo-100 space-y-2">
+                      <span className="text-[10px] font-bold uppercase text-indigo-900 tracking-wider block">
+                        Meter Readings &amp; Patches
+                      </span>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <span className="text-[10px] text-slate-500 block">Opening Reading</span>
+                          <input
+                            type="number"
+                            step="any"
+                            value={entry.openingMeterReading || ""}
+                            onChange={(e) => handleCellChange(index, "openingMeterReading", e.target.value)}
+                            onFocus={() => setFocusedCell(rowKey, "openingMeterReading")}
+                            onBlur={() => clearFocusedCell(rowKey, "openingMeterReading")}
+                            placeholder="0"
+                            className="w-full h-7 px-2 text-xs font-mono border border-slate-200 rounded bg-white"
+                          />
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-slate-500 block">Closing Reading</span>
+                          <input
+                            type="number"
+                            step="any"
+                            value={entry.closingMeterReading || ""}
+                            onChange={(e) => handleCellChange(index, "closingMeterReading", e.target.value)}
+                            onFocus={() => setFocusedCell(rowKey, "closingMeterReading")}
+                            onBlur={() => clearFocusedCell(rowKey, "closingMeterReading")}
+                            placeholder="0"
+                            className="w-full h-7 px-2 text-xs font-mono border border-slate-200 rounded bg-white"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2 text-center pt-1">
+                        <div>
+                          <span className="text-[9px] uppercase font-bold text-indigo-700 block">Cover OS</span>
+                          <input
+                            type="number"
+                            step="any"
+                            value={entry.coverPatchOs || ""}
+                            onChange={(e) => handleCellChange(index, "coverPatchOs", e.target.value)}
+                            onFocus={() => setFocusedCell(rowKey, "coverPatchOs")}
+                            onBlur={() => clearFocusedCell(rowKey, "coverPatchOs")}
+                            placeholder="0"
+                            className="w-full h-7 text-center font-mono font-bold text-xs border border-indigo-200 rounded bg-white text-indigo-800"
+                          />
+                        </div>
+                        <div>
+                          <span className="text-[9px] uppercase font-bold text-indigo-700 block">Cover DS</span>
+                          <input
+                            type="number"
+                            step="any"
+                            value={entry.coverPatchDs || ""}
+                            onChange={(e) => handleCellChange(index, "coverPatchDs", e.target.value)}
+                            onFocus={() => setFocusedCell(rowKey, "coverPatchDs")}
+                            onBlur={() => clearFocusedCell(rowKey, "coverPatchDs")}
+                            placeholder="0"
+                            className="w-full h-7 text-center font-mono font-bold text-xs border border-indigo-200 rounded bg-white text-indigo-800"
+                          />
+                        </div>
+                        <div>
+                          <span className="text-[9px] uppercase font-bold text-indigo-800 block">Valve</span>
+                          <input
+                            type="number"
+                            step="any"
+                            value={entry.valvePatch || ""}
+                            onChange={(e) => handleCellChange(index, "valvePatch", e.target.value)}
+                            onFocus={() => setFocusedCell(rowKey, "valvePatch")}
+                            onBlur={() => clearFocusedCell(rowKey, "valvePatch")}
+                            placeholder="0"
+                            className="w-full h-7 text-center font-mono font-bold text-xs border border-indigo-200 rounded bg-white text-indigo-900"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Production Output Highlights */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="bg-emerald-50/50 p-2.5 rounded-lg border border-emerald-200">
+                        <label className="block text-[10px] font-bold text-emerald-800 uppercase mb-0.5">
+                          Production (Pcs)
+                        </label>
+                        <input
+                          type="number"
+                          value={entry.productionPcs || ""}
+                          onChange={(e) => handleCellChange(index, "productionPcs", e.target.value)}
+                          onFocus={() => setFocusedCell(rowKey, "productionPcs")}
+                          onBlur={() => clearFocusedCell(rowKey, "productionPcs")}
+                          placeholder="0"
+                          className="w-full h-8 px-2 font-mono font-black text-sm text-emerald-900 bg-white border border-emerald-300 rounded focus:ring-1 focus:ring-emerald-500"
+                        />
+                      </div>
+                      <div className="bg-teal-50/50 p-2.5 rounded-lg border border-teal-200">
+                        <label className="block text-[10px] font-bold text-teal-800 uppercase mb-0.5">
+                          Production (Kg)
+                        </label>
+                        <input
+                          type="number"
+                          step="any"
+                          value={entry.productionKg || ""}
+                          onChange={(e) => handleCellChange(index, "productionKg", e.target.value)}
+                          onFocus={() => setFocusedCell(rowKey, "productionKg")}
+                          onBlur={() => clearFocusedCell(rowKey, "productionKg")}
+                          placeholder="0.00"
+                          className="w-full h-8 px-2 font-mono font-black text-sm text-teal-900 bg-white border border-teal-300 rounded focus:ring-1 focus:ring-teal-500"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Remarks Input */}
                     <div>
-                      <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                        Quality
-                      </label>
-                      <UniversalQualityInput
-                        value={entry.quality || entry.partyName || ""}
-                        onChange={(newVal) => {
-                          handleCellChange(index, "quality", newVal);
-                          handleCellChange(index, "partyName", newVal);
-                        }}
-                        placeholder="Select quality..."
-                        compact={false}
-                        inputClassName="h-9 text-xs font-semibold"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">
-                          Company Name
-                        </label>
-                        <input
-                          type="text"
-                          value={entry.companyName || ""}
-                          onChange={(e) => handleCellChange(index, "companyName", e.target.value)}
-                          placeholder="e.g. UltraTech"
-                          className="w-full h-8 px-2.5 text-xs border border-slate-200 rounded-md focus:ring-1 focus:ring-primary"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">
-                          Unit / Grade
-                        </label>
-                        <div className="grid grid-cols-2 gap-1">
-                          <input
-                            type="text"
-                            value={entry.unitName || ""}
-                            onChange={(e) => handleCellChange(index, "unitName", e.target.value)}
-                            placeholder="Unit"
-                            className="w-full h-8 px-2 text-xs border border-slate-200 rounded-md focus:ring-1 focus:ring-primary"
-                          />
-                          <input
-                            type="text"
-                            value={entry.grade || ""}
-                            onChange={(e) => handleCellChange(index, "grade", e.target.value)}
-                            placeholder="Grade"
-                            className="w-full h-8 px-2 text-xs border border-slate-200 rounded-md focus:ring-1 focus:ring-primary"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Roll No & Loom Details */}
-                  <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100 space-y-2">
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
-                          Roll Number
-                        </label>
-                        <input
-                          type="text"
-                          value={entry.rollNumber}
-                          onChange={(e) => handleCellChange(index, "rollNumber", e.target.value)}
-                          placeholder="e.g. D14332"
-                          className="w-full h-8 px-2.5 text-xs font-mono font-bold border border-slate-200 rounded-md bg-white focus:ring-1 focus:ring-primary"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
-                          Loom Number
-                        </label>
-                        <input
-                          type="text"
-                          value={entry.loomNumber || ""}
-                          onChange={(e) => handleCellChange(index, "loomNumber", e.target.value)}
-                          placeholder="e.g. 42"
-                          className="w-full h-8 px-2.5 text-xs font-mono border border-slate-200 rounded-md bg-white focus:ring-1 focus:ring-primary"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-2 text-center pt-1">
-                      <div>
-                        <span className="text-[9px] uppercase font-bold text-slate-400 block">Roll Mtr</span>
-                        <input
-                          type="number"
-                          step="any"
-                          value={entry.rollMtr || ""}
-                          onChange={(e) => handleCellChange(index, "rollMtr", e.target.value)}
-                          placeholder="0"
-                          className="w-full h-7 text-center font-mono font-bold text-xs border border-slate-200 rounded bg-white"
-                        />
-                      </div>
-                      <div>
-                        <span className="text-[9px] uppercase font-bold text-slate-400 block">Net Wt (Kg)</span>
-                        <input
-                          type="number"
-                          step="any"
-                          value={entry.netWeight || ""}
-                          onChange={(e) => handleCellChange(index, "netWeight", e.target.value)}
-                          placeholder="0"
-                          className="w-full h-7 text-center font-mono font-bold text-xs border border-slate-200 rounded bg-white"
-                        />
-                      </div>
-                      <div>
-                        <span className="text-[9px] uppercase font-bold text-slate-400 block">Avg (g/m)</span>
-                        <div className="h-7 flex items-center justify-center font-mono font-bold text-sky-800 bg-sky-50 rounded border border-sky-200 text-xs">
-                          {entry.avgWeight ? entry.avgWeight.toFixed(1) : "—"}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Meter Readings & Patches */}
-                  <div className="p-2.5 rounded-lg bg-indigo-50/30 border border-indigo-100 space-y-2">
-                    <span className="text-[10px] font-bold uppercase text-indigo-900 tracking-wider block">
-                      Meter Readings &amp; Patches
-                    </span>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <span className="text-[10px] text-slate-500 block">Opening Reading</span>
-                        <input
-                          type="number"
-                          step="any"
-                          value={entry.openingMeterReading || ""}
-                          onChange={(e) => handleCellChange(index, "openingMeterReading", e.target.value)}
-                          placeholder="0"
-                          className="w-full h-7 px-2 text-xs font-mono border border-slate-200 rounded bg-white"
-                        />
-                      </div>
-                      <div>
-                        <span className="text-[10px] text-slate-500 block">Closing Reading</span>
-                        <input
-                          type="number"
-                          step="any"
-                          value={entry.closingMeterReading || ""}
-                          onChange={(e) => handleCellChange(index, "closingMeterReading", e.target.value)}
-                          placeholder="0"
-                          className="w-full h-7 px-2 text-xs font-mono border border-slate-200 rounded bg-white"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-2 text-center pt-1">
-                      <div>
-                        <span className="text-[9px] uppercase font-bold text-indigo-700 block">Cover OS</span>
-                        <input
-                          type="number"
-                          step="any"
-                          value={entry.coverPatchOs || ""}
-                          onChange={(e) => handleCellChange(index, "coverPatchOs", e.target.value)}
-                          placeholder="0"
-                          className="w-full h-7 text-center font-mono font-bold text-xs border border-indigo-200 rounded bg-white text-indigo-800"
-                        />
-                      </div>
-                      <div>
-                        <span className="text-[9px] uppercase font-bold text-indigo-700 block">Cover DS</span>
-                        <input
-                          type="number"
-                          step="any"
-                          value={entry.coverPatchDs || ""}
-                          onChange={(e) => handleCellChange(index, "coverPatchDs", e.target.value)}
-                          placeholder="0"
-                          className="w-full h-7 text-center font-mono font-bold text-xs border border-indigo-200 rounded bg-white text-indigo-800"
-                        />
-                      </div>
-                      <div>
-                        <span className="text-[9px] uppercase font-bold text-indigo-800 block">Valve</span>
-                        <input
-                          type="number"
-                          step="any"
-                          value={entry.valvePatch || ""}
-                          onChange={(e) => handleCellChange(index, "valvePatch", e.target.value)}
-                          placeholder="0"
-                          className="w-full h-7 text-center font-mono font-bold text-xs border border-indigo-200 rounded bg-white text-indigo-900"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Production Output Highlights */}
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="bg-emerald-50/50 p-2.5 rounded-lg border border-emerald-200">
-                      <label className="block text-[10px] font-bold text-emerald-800 uppercase mb-0.5">
-                        Production (Pcs)
-                      </label>
                       <input
-                        type="number"
-                        value={entry.productionPcs || ""}
-                        onChange={(e) => handleCellChange(index, "productionPcs", e.target.value)}
-                        placeholder="0"
-                        className="w-full h-8 px-2 font-mono font-black text-sm text-emerald-900 bg-white border border-emerald-300 rounded focus:ring-1 focus:ring-emerald-500"
+                        type="text"
+                        value={entry.remarks || ""}
+                        onChange={(e) => handleCellChange(index, "remarks", e.target.value)}
+                        onFocus={() => setFocusedCell(rowKey, "remarks")}
+                        onBlur={() => clearFocusedCell(rowKey, "remarks")}
+                        placeholder="Row remarks or defects..."
+                        className="w-full h-8 px-2.5 text-xs border border-slate-200 rounded-md focus:ring-1 focus:ring-primary"
                       />
                     </div>
-                    <div className="bg-teal-50/50 p-2.5 rounded-lg border border-teal-200">
-                      <label className="block text-[10px] font-bold text-teal-800 uppercase mb-0.5">
-                        Production (Kg)
-                      </label>
-                      <input
-                        type="number"
-                        step="any"
-                        value={entry.productionKg || ""}
-                        onChange={(e) => handleCellChange(index, "productionKg", e.target.value)}
-                        placeholder="0.00"
-                        className="w-full h-8 px-2 font-mono font-black text-sm text-teal-900 bg-white border border-teal-300 rounded focus:ring-1 focus:ring-teal-500"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Remarks Input */}
-                  <div>
-                    <input
-                      type="text"
-                      value={entry.remarks || ""}
-                      onChange={(e) => handleCellChange(index, "remarks", e.target.value)}
-                      placeholder="Row remarks or defects..."
-                      className="w-full h-8 px-2.5 text-xs border border-slate-200 rounded-md focus:ring-1 focus:ring-primary"
-                    />
                   </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
 
