@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireTapePlantApiPermission } from "@/lib/tape-plant/permissions";
 import { emitProductionSync } from "@/lib/realtime/production-bus";
+import { invalidateSyncCache } from "@/lib/realtime/db-sync";
 
 export const dynamic = "force-dynamic";
 
@@ -115,6 +116,7 @@ export async function POST(request: NextRequest) {
       where: isAll ? { date } : { date, shiftId },
     });
 
+    invalidateSyncCache("tape-plant", "raw-material");
     emitProductionSync({
       module: "tape-plant",
       sheet: "raw-material",

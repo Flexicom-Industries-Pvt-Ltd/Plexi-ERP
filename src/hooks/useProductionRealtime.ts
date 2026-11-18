@@ -117,8 +117,13 @@ export function useProductionRealtime({
       // Only remote events trigger onSync.
       // A change is from self if:
       // 1. Matches tab clientId from BroadcastChannel or server payload
-      // 2. Or happened within our local save/edit grace window (5000ms)
-      const isFromSelf = Boolean(
+      // 2. Or if no client ID is known, happened within our local save/edit grace window (5000ms)
+      const hasKnownRemoteSender = Boolean(
+        (sourceClientId && sourceClientId !== clientIdRef.current) ||
+        (event.clientId && event.clientId !== clientIdRef.current)
+      );
+
+      const isFromSelf = !hasKnownRemoteSender && Boolean(
         (sourceClientId && sourceClientId === clientIdRef.current) ||
         (event.clientId && event.clientId === clientIdRef.current) ||
         (lastLocalSaveTimestampRef.current > 0 && Math.abs(event.timestamp - lastLocalSaveTimestampRef.current) < 5000)
