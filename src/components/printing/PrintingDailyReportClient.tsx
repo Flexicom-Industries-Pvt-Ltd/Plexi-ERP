@@ -123,6 +123,8 @@ export function PrintingDailyReportClient() {
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isInitialLoadRef = useRef<boolean>(true);
+  const isDirtyRef = useRef<boolean>(false);
+  const lastUserEditTimeRef = useRef<number>(0);
 
   // Close fullscreen on Escape
   useEffect(() => {
@@ -218,6 +220,7 @@ export function PrintingDailyReportClient() {
       toast.error(err.message || "Failed to load printing report");
     } finally {
       setLoading(false);
+      isDirtyRef.current = false;
       // Allow auto-save only after initial data is loaded
       setTimeout(() => {
         isInitialLoadRef.current = false;
@@ -236,6 +239,7 @@ export function PrintingDailyReportClient() {
     date,
     shift: shiftName,
     onSync: () => {
+      if (Date.now() - lastUserEditTimeRef.current < 3500) return;
       fetchReportData();
     },
   });
@@ -305,6 +309,7 @@ export function PrintingDailyReportClient() {
 
         setStatus(targetStatus);
         setLastSavedAt(format(new Date(), "hh:mm:ss a"));
+        isDirtyRef.current = false;
         realtime.broadcastSync({
           action: targetStatus === "SUBMITTED" ? "SUBMIT" : "SAVE",
           date,
@@ -329,12 +334,14 @@ export function PrintingDailyReportClient() {
 
   // Debounced Auto-Save Trigger
   useEffect(() => {
-    if (isInitialLoadRef.current || loading) return;
+    if (isInitialLoadRef.current || loading || !isDirtyRef.current) return;
 
     if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
 
     autoSaveTimerRef.current = setTimeout(() => {
-      saveReport("DRAFT", true);
+      if (isDirtyRef.current) {
+        saveReport("DRAFT", true);
+      }
     }, 1200);
 
     return () => {
@@ -370,6 +377,9 @@ export function PrintingDailyReportClient() {
 
   // Row update handlers
   const handleFieldChange = (index: number, field: keyof PrintingReportItem, value: any) => {
+    isDirtyRef.current = true;
+    lastUserEditTimeRef.current = Date.now();
+    realtime.markLocalEdit();
     setEntries((prev) => {
       const updated = [...prev];
       const current = { ...updated[index], [field]: value };
@@ -385,6 +395,9 @@ export function PrintingDailyReportClient() {
 
   // Select party suggestion
   const handleSelectParty = (index: number, party: PartyPrintingDetailItem) => {
+    isDirtyRef.current = true;
+    lastUserEditTimeRef.current = Date.now();
+    realtime.markLocalEdit();
     setEntries((prev) => {
       const updated = [...prev];
       updated[index] = {
@@ -403,6 +416,9 @@ export function PrintingDailyReportClient() {
 
   // Select roll autocomplete
   const handleSelectRoll = (index: number, roll: AvailablePrintingRoll) => {
+    isDirtyRef.current = true;
+    lastUserEditTimeRef.current = Date.now();
+    realtime.markLocalEdit();
     setEntries((prev) => {
       const updated = [...prev];
       const withRoll = {
@@ -421,10 +437,16 @@ export function PrintingDailyReportClient() {
   };
 
   const handleAddRow = () => {
+    isDirtyRef.current = true;
+    lastUserEditTimeRef.current = Date.now();
+    realtime.markLocalEdit();
     setEntries((prev) => [...prev, createEmptyRow(prev.length + 1)]);
   };
 
   const handleRemoveRow = (index: number) => {
+    isDirtyRef.current = true;
+    lastUserEditTimeRef.current = Date.now();
+    realtime.markLocalEdit();
     setEntries((prev) => {
       if (prev.length <= 1) {
         return [createEmptyRow(1)];
@@ -436,6 +458,9 @@ export function PrintingDailyReportClient() {
 
   const handleResetToBlank = () => {
     if (window.confirm("Clear all rows and reset to blank boxes?")) {
+      isDirtyRef.current = true;
+      lastUserEditTimeRef.current = Date.now();
+      realtime.markLocalEdit();
       setEntries([
         createEmptyRow(1),
         createEmptyRow(2),
@@ -582,7 +607,12 @@ export function PrintingDailyReportClient() {
               type="operator"
               section="PRINTING"
               value={operatorName}
-              onChange={(name) => setOperatorName(name)}
+              onChange={(name) => {
+                isDirtyRef.current = true;
+                lastUserEditTimeRef.current = Date.now();
+                realtime.markLocalEdit();
+                setOperatorName(name);
+              }}
               placeholder="Select / Type Operator"
             />
           </div>
@@ -594,7 +624,12 @@ export function PrintingDailyReportClient() {
             <UniversalPersonnelInput
               type="supervisor"
               value={supervisorName}
-              onChange={(name) => setSupervisorName(name)}
+              onChange={(name) => {
+                isDirtyRef.current = true;
+                lastUserEditTimeRef.current = Date.now();
+                realtime.markLocalEdit();
+                setSupervisorName(name);
+              }}
               placeholder="Select / Type Supervisor"
             />
           </div>
@@ -609,7 +644,12 @@ export function PrintingDailyReportClient() {
             type="text"
             placeholder="Optional production notes, cylinder changes, ink shade variations, batch comments..."
             value={remarks}
-            onChange={(e) => setRemarks(e.target.value)}
+            onChange={(e) => {
+              isDirtyRef.current = true;
+              lastUserEditTimeRef.current = Date.now();
+              realtime.markLocalEdit();
+              setRemarks(e.target.value);
+            }}
             className="flex-1 px-3 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary"
           />
         </div>
