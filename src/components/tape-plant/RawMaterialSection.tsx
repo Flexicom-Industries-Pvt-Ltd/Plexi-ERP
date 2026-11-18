@@ -62,6 +62,117 @@ interface RawMaterialSectionProps {
   shiftName: string;
 }
 
+export function serializeRawMaterialPayload(
+  date: string,
+  shiftId: string,
+  operatorName: string,
+  operatorId: string,
+  records: RawMaterialRow[]
+): string {
+  return JSON.stringify({
+    date,
+    shiftId,
+    operatorName: (operatorName || "").trim(),
+    operatorId: (operatorId || "").trim(),
+    records: records.map((r) => ({
+      material: (r.material || "").trim(),
+      grade: (r.grade || "").trim(),
+      photoUrl: r.photoUrl || null,
+      openingStock: r.openingStock ?? "",
+      received: r.received ?? "",
+      consumption: r.consumption ?? "",
+      settingPercent: r.settingPercent ?? "",
+      actualPercent: r.actualPercent ?? "",
+      wastage: r.wastage ?? "",
+    })),
+  });
+}
+
+export function reconcileServerRawMaterialRows(
+  localRows: RawMaterialRow[],
+  incomingServerRows: RawMaterialRow[],
+  activeCell: { material: string; field: string } | null
+): RawMaterialRow[] {
+  const serverMap = new Map<string, RawMaterialRow>();
+  for (const s of incomingServerRows) {
+    const m = (s.material || "").trim().toUpperCase();
+    if (m) serverMap.set(m, s);
+  }
+
+  const localMap = new Map<string, RawMaterialRow>();
+  for (const l of localRows) {
+    const m = (l.material || "").trim().toUpperCase();
+    if (m) localMap.set(m, l);
+  }
+
+  const allMaterials = new Set<string>();
+  localRows.forEach((l) => {
+    const m = (l.material || "").trim().toUpperCase();
+    if (m) allMaterials.add(m);
+  });
+  incomingServerRows.forEach((s) => {
+    const m = (s.material || "").trim().toUpperCase();
+    if (m) allMaterials.add(m);
+  });
+
+  const merged: RawMaterialRow[] = [];
+
+  for (const m of allMaterials) {
+    const local = localMap.get(m);
+    const server = serverMap.get(m);
+
+    if (server && !local) {
+      merged.push({ ...server });
+      continue;
+    }
+
+    if (!server && local) {
+      merged.push({ ...local });
+      continue;
+    }
+
+    if (server && local) {
+      const mergedRow: RawMaterialRow = {
+        id: server.id || local.id,
+        material: local.material || server.material,
+        grade: server.grade !== undefined && server.grade !== null ? server.grade : local.grade,
+        photoUrl: server.photoUrl !== undefined ? server.photoUrl : local.photoUrl,
+        operatorName: server.operatorName || local.operatorName || "",
+        operatorId: server.operatorId || local.operatorId || "",
+        openingStock: server.openingStock ?? "",
+        received: server.received ?? "",
+        consumption: server.consumption ?? "",
+        settingPercent: server.settingPercent ?? "",
+        actualPercent: server.actualPercent ?? "",
+        wastage: server.wastage ?? "",
+      };
+
+      // FOCUSED CELL ISOLATION
+      if (activeCell && (activeCell.material || "").trim().toUpperCase() === m) {
+        const fieldKey = activeCell.field as keyof RawMaterialRow;
+        if (fieldKey && fieldKey in local) {
+          (mergedRow as any)[fieldKey] = (local as any)[fieldKey];
+        }
+      }
+
+      merged.push(mergedRow);
+    }
+  }
+
+  // Preserve order of DEFAULT_MATERIALS, then custom added materials
+  const defaultKeys = DEFAULT_MATERIALS.map((d) => d.material.toUpperCase());
+  merged.sort((a, b) => {
+    const idxA = defaultKeys.indexOf((a.material || "").trim().toUpperCase());
+    const idxB = defaultKeys.indexOf((b.material || "").trim().toUpperCase());
+    if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+    if (idxA !== -1) return -1;
+    if (idxB !== -1) return 1;
+    return (a.material || "").localeCompare(b.material || "");
+  });
+
+  return merged;
+}
+
 export function RawMaterialSection({ date, shiftId, shiftName }: RawMaterialSectionProps) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -70,6 +181,9 @@ export function RawMaterialSection({ date, shiftId, shiftName }: RawMaterialSect
   const isInitialLoadedRef = useRef(false);
   const lastSavedPayloadRef = useRef("");
   const lastUserEditTimeRef = useRef(0);
+  const activeFocusedCellRef = useRef<{ material: string; field: string } | null>(null);
+  const hasUnsavedLocalEditsRef = useRef(false);
+  const deletedMaterialsRef = useRef<Set<string>>(new Set());
   const [operatorName, setOperatorName] = useState("");
   const [operatorId, setOperatorId] = useState("");
   const [records, setRecords] = useState<RawMaterialRow[]>(DEFAULT_MATERIALS);
@@ -116,79 +230,29 @@ export function RawMaterialSection({ date, shiftId, shiftName }: RawMaterialSect
     }
   }, [photoModalRowIdx, refreshUserPermissions]);
 
-  useEffect(() => {
+  // Authoritative data fetch & Google Docs-style 3-way reconciliation
+  const fetchAuthoritativeState = useCallback(async (force = false) => {
     if (!date || !shiftId) return;
-    isInitialLoadedRef.current = false;
-    setLoading(true);
-    fetch(`/api/production/tape-plant/raw-material?date=${date}&shiftId=${shiftId}`)
-      .then((r) => (r.ok ? r.json() : []))
-      .then((data: any[]) => {
-        if (data && data.length > 0) {
-          const opName = data[0]?.operatorName || "";
-          const opId = data[0]?.operatorId || "";
-          setOperatorName(opName);
-          setOperatorId(opId);
-          const mapped: RawMaterialRow[] = data.map((d) => ({
-            id: d.id,
-            material: d.material || "",
-            grade: d.grade || "",
-            openingStock: d.openingStock ?? "",
-            received: d.received ?? "",
-            consumption: d.consumption ?? "",
-            settingPercent: d.settingPercent ?? "",
-            actualPercent: d.actualPercent ?? "",
-            wastage: d.wastage ?? "",
-            photoUrl: d.photoUrl || undefined,
-            operatorName: d.operatorName || opName,
-            operatorId: d.operatorId || opId,
-          }));
-          setRecords(mapped);
-          lastSavedPayloadRef.current = JSON.stringify({
-            date,
-            shiftId,
-            operatorName: opName,
-            operatorId: opId,
-            records: mapped,
-          });
-        } else {
-          setOperatorName("");
-          setOperatorId("");
-          setRecords(DEFAULT_MATERIALS);
-          lastSavedPayloadRef.current = JSON.stringify({
-            date,
-            shiftId,
-            operatorName: "",
-            operatorId: "",
-            records: DEFAULT_MATERIALS,
-          });
+    try {
+      const res = await fetch(
+        `/api/production/tape-plant/raw-material?date=${date}&shiftId=${shiftId}&_t=${Date.now()}`,
+        {
+          cache: "no-store",
+          headers: { Pragma: "no-cache", "Cache-Control": "no-cache" },
         }
-      })
-      .catch(() => toast.error("Failed to load raw materials"))
-      .finally(() => {
-        setLoading(false);
-        isInitialLoadedRef.current = true;
-      });
-  }, [date, shiftId]);
+      );
+      if (!res.ok) return;
+      const data: any[] = await res.json();
+      if (!data) return;
 
-  const realtime = useProductionRealtime({
-    module: "tape-plant",
-    sheet: "raw-material",
-    date,
-    shift: shiftId,
-    onSync: (event) => {
-      if (!date || !shiftId || autoSaving) return;
-      const isPhotoSync = event?.action === "PHOTO_UPDATE";
-      // Prevent clobbering active input if user typed within last 2000ms (unless it's a photo sync)
-      if (!isPhotoSync && Date.now() - lastUserEditTimeRef.current < 2000) return;
-      fetch(`/api/production/tape-plant/raw-material?date=${date}&shiftId=${shiftId}&_t=${Date.now()}`)
-        .then((r) => (r.ok ? r.json() : []))
-        .then((data: any[]) => {
-          if (data && data.length > 0) {
-            const opName = data[0]?.operatorName || operatorName;
-            const opId = data[0]?.operatorId || operatorId;
-            if (opName && !operatorName) setOperatorName(opName);
-            if (opId && !operatorId) setOperatorId(opId);
-            const mapped: RawMaterialRow[] = data.map((d) => ({
+      const opName = (data && data[0]?.operatorName) || "";
+      const opId = (data && data[0]?.operatorId) || "";
+      if (opName) setOperatorName((prev) => prev || opName);
+      if (opId) setOperatorId((prev) => prev || opId);
+
+      const mapped: RawMaterialRow[] =
+        data && data.length > 0
+          ? data.map((d) => ({
               id: d.id,
               material: d.material || "",
               grade: d.grade || "",
@@ -201,50 +265,129 @@ export function RawMaterialSection({ date, shiftId, shiftName }: RawMaterialSect
               photoUrl: d.photoUrl || undefined,
               operatorName: d.operatorName || opName,
               operatorId: d.operatorId || opId,
-            }));
-            // CRITICAL: Update lastSavedPayloadRef so receiving device will NOT fire an echo auto-save back
-            lastSavedPayloadRef.current = JSON.stringify({
-              date,
-              shiftId,
-              operatorName: opName,
-              operatorId: opId,
-              records: mapped,
-            });
-            setRecords(mapped);
-          }
-        })
-        .catch(() => {});
+            }))
+          : DEFAULT_MATERIALS;
+
+      setRecords((currentLocal) => {
+        // If initial load or forced, replace local state directly
+        if (!isInitialLoadedRef.current || force) {
+          lastSavedPayloadRef.current = serializeRawMaterialPayload(
+            date,
+            shiftId,
+            opName || operatorName,
+            opId || operatorId,
+            mapped
+          );
+          return mapped;
+        }
+
+        // Cell-level 3-way merge isolating actively focused cell typing
+        const reconciled = reconcileServerRawMaterialRows(
+          currentLocal,
+          mapped,
+          activeFocusedCellRef.current
+        );
+
+        // Filter out any locally deleted materials that have not landed yet
+        const finalRecords = reconciled.filter(
+          (r) => !deletedMaterialsRef.current.has((r.material || "").trim().toUpperCase())
+        );
+
+        // Update baseline snapshot only if user has no unsaved local edits
+        if (!hasUnsavedLocalEditsRef.current) {
+          lastSavedPayloadRef.current = serializeRawMaterialPayload(
+            date,
+            shiftId,
+            opName || operatorName,
+            opId || operatorId,
+            finalRecords
+          );
+        }
+
+        return finalRecords;
+      });
+    } catch (err) {
+      console.warn("Authoritative raw material sync error:", err);
+    }
+  }, [date, shiftId, operatorName, operatorId]);
+
+  // Initial load on date / shift change
+  useEffect(() => {
+    if (!date || !shiftId) return;
+    isInitialLoadedRef.current = false;
+    hasUnsavedLocalEditsRef.current = false;
+    deletedMaterialsRef.current.clear();
+    setLoading(true);
+
+    fetchAuthoritativeState(true).finally(() => {
+      setLoading(false);
+      isInitialLoadedRef.current = true;
+    });
+  }, [date, shiftId, fetchAuthoritativeState]);
+
+  // Google Docs-grade catch-up when tab/browser is minimized, backgrounded, or wakes up from sleep
+  useEffect(() => {
+    const handleVisibilityOrFocus = () => {
+      if (typeof document !== "undefined" && document.visibilityState === "visible") {
+        fetchAuthoritativeState();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityOrFocus);
+    window.addEventListener("focus", handleVisibilityOrFocus);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityOrFocus);
+      window.removeEventListener("focus", handleVisibilityOrFocus);
+    };
+  }, [fetchAuthoritativeState]);
+
+  const realtime = useProductionRealtime({
+    module: "tape-plant",
+    sheet: "raw-material",
+    date,
+    shift: shiftId,
+    onSync: (event) => {
+      if (!date || !shiftId) return;
+      // Echo suppression: ignore broadcasts generated by our own client
+      if (event?.clientId && event.clientId === realtime.clientId) return;
+      fetchAuthoritativeState();
     },
   });
 
-  // Debounced Auto-Save
+  // Debounced Auto-Save (only fires when local user made changes; avoids echo loops)
   useEffect(() => {
     if (!isInitialLoadedRef.current || !date || !shiftId) return;
+    if (!hasUnsavedLocalEditsRef.current) return;
 
     const hasData = records.some((r) => r.material && r.material.trim() !== "");
-    if (!hasData) return;
+    if (!hasData && deletedMaterialsRef.current.size === 0) return;
 
-    const payload = {
-      date,
-      shiftId,
-      operatorName,
-      operatorId,
-      records,
-    };
-
-    const serialized = JSON.stringify(payload);
-    if (serialized === lastSavedPayloadRef.current) return;
+    const serialized = serializeRawMaterialPayload(date, shiftId, operatorName, operatorId, records);
+    if (serialized === lastSavedPayloadRef.current && deletedMaterialsRef.current.size === 0) return;
 
     const timer = setTimeout(async () => {
       setAutoSaving(true);
       try {
+        const deletedMaterials = Array.from(deletedMaterialsRef.current);
+        const payload = {
+          date,
+          shiftId,
+          operatorName,
+          operatorId,
+          records,
+          deletedMaterials,
+          clientId: realtime.clientId,
+        };
+
         const res = await fetch("/api/production/tape-plant/raw-material", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: serialized,
+          body: JSON.stringify(payload),
         });
         if (res.ok) {
           lastSavedPayloadRef.current = serialized;
+          hasUnsavedLocalEditsRef.current = false;
+          deletedMaterialsRef.current.clear();
           setLastAutoSavedAt(new Date());
           realtime.broadcastSync({ action: "SAVE", date, shift: shiftId });
         }
@@ -256,17 +399,20 @@ export function RawMaterialSection({ date, shiftId, shiftName }: RawMaterialSect
     }, 1000);
 
     return () => clearTimeout(timer);
-  }, [records, operatorName, operatorId, date, shiftId]);
+  }, [records, operatorName, operatorId, date, shiftId, realtime]);
 
   const handleSave = async () => {
     setSaving(true);
     try {
+      const deletedMaterials = Array.from(deletedMaterialsRef.current);
       const payload = {
         date,
         shiftId,
         operatorName,
         operatorId,
         records,
+        deletedMaterials,
+        clientId: realtime.clientId,
       };
 
       const res = await fetch("/api/production/tape-plant/raw-material", {
@@ -280,7 +426,9 @@ export function RawMaterialSection({ date, shiftId, shiftName }: RawMaterialSect
         throw new Error(err.error || "Failed to save raw materials");
       }
 
-      lastSavedPayloadRef.current = JSON.stringify(payload);
+      lastSavedPayloadRef.current = serializeRawMaterialPayload(date, shiftId, operatorName, operatorId, records);
+      hasUnsavedLocalEditsRef.current = false;
+      deletedMaterialsRef.current.clear();
       setLastAutoSavedAt(new Date());
       realtime.broadcastSync({ action: "SAVE", date, shift: shiftId });
       toast.success("Raw material position & consumption saved");
@@ -318,6 +466,7 @@ export function RawMaterialSection({ date, shiftId, shiftName }: RawMaterialSect
     isNumber = true
   ) => {
     realtime.markLocalEdit();
+    hasUnsavedLocalEditsRef.current = true;
     lastUserEditTimeRef.current = Date.now();
     const val = isNumber && rawVal !== "" ? (isNaN(Number(rawVal)) ? rawVal : Number(rawVal)) : rawVal;
     setRecords((prev) => {
@@ -329,7 +478,12 @@ export function RawMaterialSection({ date, shiftId, shiftName }: RawMaterialSect
 
   const handleDeleteRow = (idx: number) => {
     realtime.markLocalEdit();
+    hasUnsavedLocalEditsRef.current = true;
     lastUserEditTimeRef.current = Date.now();
+    const target = records[idx];
+    if (target?.material) {
+      deletedMaterialsRef.current.add(target.material.trim().toUpperCase());
+    }
     setRecords((prev) => prev.filter((_, i) => i !== idx));
     setExpandedMaterials((prev) => {
       const next = new Set<number>();
@@ -343,6 +497,7 @@ export function RawMaterialSection({ date, shiftId, shiftName }: RawMaterialSect
 
   const handleAddRow = () => {
     realtime.markLocalEdit();
+    hasUnsavedLocalEditsRef.current = true;
     lastUserEditTimeRef.current = Date.now();
     const newIdx = records.length;
     setRecords([
@@ -370,22 +525,27 @@ export function RawMaterialSection({ date, shiftId, shiftName }: RawMaterialSect
 
     if (!date || !shiftId) return;
 
+    const deletedMaterials = Array.from(deletedMaterialsRef.current);
     const payload = {
       date,
       shiftId,
       operatorName,
       operatorId,
       records: updated,
+      deletedMaterials,
+      clientId: realtime.clientId,
     };
 
-    const serialized = JSON.stringify(payload);
+    const serialized = serializeRawMaterialPayload(date, shiftId, operatorName, operatorId, updated);
     lastSavedPayloadRef.current = serialized;
+    hasUnsavedLocalEditsRef.current = false;
+    deletedMaterialsRef.current.clear();
 
     try {
       const res = await fetch("/api/production/tape-plant/raw-material", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: serialized,
+        body: JSON.stringify(payload),
       });
       if (res.ok) {
         setLastAutoSavedAt(new Date());
@@ -519,6 +679,7 @@ export function RawMaterialSection({ date, shiftId, shiftName }: RawMaterialSect
               operatorId={operatorId}
               onChange={(name, id) => {
                 realtime.markLocalEdit();
+                hasUnsavedLocalEditsRef.current = true;
                 lastUserEditTimeRef.current = Date.now();
                 setOperatorName(name);
                 setOperatorId(id || "");
@@ -580,6 +741,7 @@ export function RawMaterialSection({ date, shiftId, shiftName }: RawMaterialSect
               operatorId={operatorId}
               onChange={(name, id) => {
                 realtime.markLocalEdit();
+                hasUnsavedLocalEditsRef.current = true;
                 lastUserEditTimeRef.current = Date.now();
                 setOperatorName(name);
                 setOperatorId(id || "");
@@ -805,6 +967,12 @@ export function RawMaterialSection({ date, shiftId, shiftName }: RawMaterialSect
                           type="number"
                           inputMode="decimal"
                           value={row.openingStock}
+                          onFocus={() => {
+                            activeFocusedCellRef.current = { material: row.material, field: "openingStock" };
+                          }}
+                          onBlur={() => {
+                            activeFocusedCellRef.current = null;
+                          }}
                           onChange={(e) => handleFieldChange(idx, "openingStock", e.target.value)}
                           placeholder="0.0"
                           className="w-full text-xs font-semibold text-slate-800 bg-white border border-slate-200 rounded-lg px-2 py-1.5 focus:ring-1 focus:ring-emerald-500 text-right"
@@ -817,6 +985,12 @@ export function RawMaterialSection({ date, shiftId, shiftName }: RawMaterialSect
                           type="number"
                           inputMode="decimal"
                           value={row.received}
+                          onFocus={() => {
+                            activeFocusedCellRef.current = { material: row.material, field: "received" };
+                          }}
+                          onBlur={() => {
+                            activeFocusedCellRef.current = null;
+                          }}
                           onChange={(e) => handleFieldChange(idx, "received", e.target.value)}
                           placeholder="0.0"
                           className="w-full text-xs font-semibold text-slate-800 bg-white border border-slate-200 rounded-lg px-2 py-1.5 focus:ring-1 focus:ring-emerald-500 text-right"
@@ -836,6 +1010,12 @@ export function RawMaterialSection({ date, shiftId, shiftName }: RawMaterialSect
                           type="number"
                           inputMode="decimal"
                           value={row.consumption}
+                          onFocus={() => {
+                            activeFocusedCellRef.current = { material: row.material, field: "consumption" };
+                          }}
+                          onBlur={() => {
+                            activeFocusedCellRef.current = null;
+                          }}
                           onChange={(e) => handleFieldChange(idx, "consumption", e.target.value)}
                           placeholder="0.0"
                           className="w-full text-xs font-extrabold text-emerald-800 bg-emerald-50/50 border border-emerald-300 rounded-lg px-2 py-1.5 focus:ring-1 focus:ring-emerald-500 text-right"
@@ -869,6 +1049,12 @@ export function RawMaterialSection({ date, shiftId, shiftName }: RawMaterialSect
                         <input
                           type="text"
                           value={row.grade}
+                          onFocus={() => {
+                            activeFocusedCellRef.current = { material: row.material, field: "grade" };
+                          }}
+                          onBlur={() => {
+                            activeFocusedCellRef.current = null;
+                          }}
                           onChange={(e) => handleFieldChange(idx, "grade", e.target.value, false)}
                           placeholder="e.g. H110MA"
                           className="w-full text-xs font-semibold text-slate-800 bg-white border border-slate-200 rounded-lg px-2 py-1.5 focus:ring-1 focus:ring-amber-500 text-left"
@@ -881,6 +1067,12 @@ export function RawMaterialSection({ date, shiftId, shiftName }: RawMaterialSect
                           type="number"
                           inputMode="decimal"
                           value={row.settingPercent}
+                          onFocus={() => {
+                            activeFocusedCellRef.current = { material: row.material, field: "settingPercent" };
+                          }}
+                          onBlur={() => {
+                            activeFocusedCellRef.current = null;
+                          }}
                           onChange={(e) => handleFieldChange(idx, "settingPercent", e.target.value)}
                           placeholder="%"
                           className="w-full text-xs font-semibold text-slate-800 bg-white border border-slate-200 rounded-lg px-2 py-1.5 focus:ring-1 focus:ring-amber-500 text-right"
@@ -893,6 +1085,12 @@ export function RawMaterialSection({ date, shiftId, shiftName }: RawMaterialSect
                           type="number"
                           inputMode="decimal"
                           value={row.actualPercent}
+                          onFocus={() => {
+                            activeFocusedCellRef.current = { material: row.material, field: "actualPercent" };
+                          }}
+                          onBlur={() => {
+                            activeFocusedCellRef.current = null;
+                          }}
                           onChange={(e) => handleFieldChange(idx, "actualPercent", e.target.value)}
                           placeholder="%"
                           className="w-full text-xs font-semibold text-slate-800 bg-white border border-slate-200 rounded-lg px-2 py-1.5 focus:ring-1 focus:ring-amber-500 text-right"
@@ -905,6 +1103,12 @@ export function RawMaterialSection({ date, shiftId, shiftName }: RawMaterialSect
                           type="number"
                           inputMode="decimal"
                           value={row.wastage}
+                          onFocus={() => {
+                            activeFocusedCellRef.current = { material: row.material, field: "wastage" };
+                          }}
+                          onBlur={() => {
+                            activeFocusedCellRef.current = null;
+                          }}
                           onChange={(e) => handleFieldChange(idx, "wastage", e.target.value)}
                           placeholder="0.0"
                           className="w-full text-xs font-extrabold text-rose-800 bg-rose-50/50 border border-rose-300 rounded-lg px-2 py-1.5 focus:ring-1 focus:ring-rose-500 text-right"
@@ -937,12 +1141,22 @@ export function RawMaterialSection({ date, shiftId, shiftName }: RawMaterialSect
           data={records}
           onChange={(newRecords) => {
             realtime.markLocalEdit();
+            hasUnsavedLocalEditsRef.current = true;
             setRecords(newRecords);
+          }}
+          onCellFocus={(rowIndex, columnKey) => {
+            activeFocusedCellRef.current = {
+              material: records[rowIndex]?.material || "",
+              field: columnKey,
+            };
+          }}
+          onCellBlur={() => {
+            activeFocusedCellRef.current = null;
           }}
           allowAddRow={true}
           onAddRow={handleAddRow}
           allowDeleteRow={true}
-          onDeleteRow={(idx) => setRecords(records.filter((_, i) => i !== idx))}
+          onDeleteRow={handleDeleteRow}
           actions={
             <div className="flex items-center gap-4 text-xs font-bold text-slate-700 mr-2">
               <span>

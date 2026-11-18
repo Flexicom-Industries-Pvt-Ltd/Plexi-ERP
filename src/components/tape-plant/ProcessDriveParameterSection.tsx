@@ -32,6 +32,7 @@ import {
   generateShiftTimeSlots,
   isTimeSlotLocked,
   canUserOverrideLock,
+  normalizeTimeSlot,
 } from "@/lib/tape-plant/telemetry-time-slots";
 
 const DriveParameterPrintPreviewModal = dynamic(
@@ -73,16 +74,156 @@ interface ProcessDriveParameterSectionProps {
   shiftName: string;
 }
 
-function mergeDriveReadings(data: any[], intervals: string[]): DriveParameterReading[] {
+export function serializeDrivePayload(
+  date: string,
+  shiftId: string,
+  operatorName: string,
+  operatorId: string,
+  records: DriveParameterReading[]
+): string {
+  return JSON.stringify({
+    date,
+    shiftId,
+    operatorName: (operatorName || "").trim(),
+    operatorId: (operatorId || "").trim(),
+    records: records.map((r) => ({
+      time: normalizeTimeSlot(r.time),
+      photoUrl: r.photoUrl || null,
+      extruderRpm: r.extruderRpm ?? "",
+      meltPumpRpm: r.meltPumpRpm ?? "",
+      takeUpMpm: r.takeUpMpm ?? "",
+      nipRollMpm: r.nipRollMpm ?? "",
+      isuMpm: r.isuMpm ?? "",
+      pauMpm: r.pauMpm ?? "",
+      stretchingMpm: r.stretchingMpm ?? "",
+      annealingMpm: r.annealingMpm ?? "",
+      stretchingRatio: r.stretchingRatio ?? "",
+      meltPressureP1: r.meltPressureP1 ?? "",
+      meltPressureP2: r.meltPressureP2 ?? "",
+      meltPressureP3: r.meltPressureP3 ?? "",
+      waterBath: r.waterBath ?? "",
+      colour: r.colour ?? "",
+      denier: r.denier ?? "",
+      tapeWidth: r.tapeWidth ?? "",
+      strength: r.strength ?? "",
+      eloPercent: r.eloPercent ?? "",
+      spacerWidth: r.spacerWidth ?? "",
+      numberOfTape: r.numberOfTape ?? "",
+    })),
+  });
+}
+
+export function reconcileServerDriveReadings(
+  localReadings: DriveParameterReading[],
+  incomingServerReadings: DriveParameterReading[],
+  activeCell: { time: string; field: string } | null,
+  intervals: string[]
+): DriveParameterReading[] {
+  const normIntervals = intervals.map(normalizeTimeSlot);
+  const serverMap = new Map<string, DriveParameterReading>();
+  for (const s of incomingServerReadings) {
+    const t = normalizeTimeSlot(s.time);
+    if (t) serverMap.set(t, s);
+  }
+
+  const localMap = new Map<string, DriveParameterReading>();
+  for (const l of localReadings) {
+    const t = normalizeTimeSlot(l.time);
+    if (t) localMap.set(t, l);
+  }
+
+  const allTimes = new Set<string>();
+  normIntervals.forEach((t) => allTimes.add(t));
+  localReadings.forEach((l) => {
+    const t = normalizeTimeSlot(l.time);
+    if (t) allTimes.add(t);
+  });
+  incomingServerReadings.forEach((s) => {
+    const t = normalizeTimeSlot(s.time);
+    if (t) allTimes.add(t);
+  });
+
+  const merged: DriveParameterReading[] = [];
+
+  for (const t of allTimes) {
+    const local = localMap.get(t);
+    const server = serverMap.get(t);
+
+    if (server && !local) {
+      merged.push({ ...server, time: t });
+      continue;
+    }
+
+    if (!server && local) {
+      merged.push({ ...local, time: t });
+      continue;
+    }
+
+    if (server && local) {
+      const mergedRow: DriveParameterReading = {
+        id: server.id || local.id,
+        time: t,
+        photoUrl: server.photoUrl !== undefined ? server.photoUrl : local.photoUrl,
+        operatorName: server.operatorName || local.operatorName || "",
+        operatorId: server.operatorId || local.operatorId || "",
+        extruderRpm: server.extruderRpm ?? "",
+        meltPumpRpm: server.meltPumpRpm ?? "",
+        takeUpMpm: server.takeUpMpm ?? "",
+        nipRollMpm: server.nipRollMpm ?? "",
+        isuMpm: server.isuMpm ?? "",
+        pauMpm: server.pauMpm ?? "",
+        stretchingMpm: server.stretchingMpm ?? "",
+        annealingMpm: server.annealingMpm ?? "",
+        stretchingRatio: server.stretchingRatio ?? "",
+        meltPressureP1: server.meltPressureP1 ?? "",
+        meltPressureP2: server.meltPressureP2 ?? "",
+        meltPressureP3: server.meltPressureP3 ?? "",
+        waterBath: server.waterBath ?? "",
+        colour: server.colour ?? "",
+        denier: server.denier ?? "",
+        tapeWidth: server.tapeWidth ?? "",
+        strength: server.strength ?? "",
+        eloPercent: server.eloPercent ?? "",
+        spacerWidth: server.spacerWidth ?? "",
+        numberOfTape: server.numberOfTape ?? "",
+      };
+
+      // Focused Cell Isolation (Google Docs-Grade)
+      if (activeCell && normalizeTimeSlot(activeCell.time) === t) {
+        const fieldKey = activeCell.field as keyof DriveParameterReading;
+        if (fieldKey && fieldKey in local) {
+          (mergedRow as any)[fieldKey] = (local as any)[fieldKey];
+        }
+      }
+
+      merged.push(mergedRow);
+    }
+  }
+
+  // Sort deterministically: intervals first in defined order, then custom rows
+  merged.sort((a, b) => {
+    const idxA = normIntervals.indexOf(normalizeTimeSlot(a.time));
+    const idxB = normIntervals.indexOf(normalizeTimeSlot(b.time));
+    if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+    if (idxA !== -1) return -1;
+    if (idxB !== -1) return 1;
+    return normalizeTimeSlot(a.time).localeCompare(normalizeTimeSlot(b.time));
+  });
+
+  return merged;
+}
+
+export function mergeDriveReadings(data: any[], intervals: string[]): DriveParameterReading[] {
+  const normIntervals = intervals.map(normalizeTimeSlot);
   const dataByTime = new Map<string, any>();
   const extraItemsByTime = new Map<string, any>();
 
   for (const d of data) {
-    const t = (d.time || "").trim();
+    const t = normalizeTimeSlot(d.time);
     if (!t) continue;
-    if (intervals.includes(t)) {
+    if (normIntervals.includes(t)) {
       if (!dataByTime.has(t)) {
-        dataByTime.set(t, { ...d });
+        dataByTime.set(t, { ...d, time: t });
       } else {
         const existing = dataByTime.get(t);
         for (const [key, val] of Object.entries(d)) {
@@ -98,7 +239,7 @@ function mergeDriveReadings(data: any[], intervals: string[]): DriveParameterRea
       }
     } else {
       if (!extraItemsByTime.has(t)) {
-        extraItemsByTime.set(t, { ...d });
+        extraItemsByTime.set(t, { ...d, time: t });
       } else {
         const existing = extraItemsByTime.get(t);
         for (const [key, val] of Object.entries(d)) {
@@ -115,7 +256,7 @@ function mergeDriveReadings(data: any[], intervals: string[]): DriveParameterRea
     }
   }
 
-  const result: DriveParameterReading[] = intervals.map((time) => {
+  const result: DriveParameterReading[] = normIntervals.map((time) => {
     const d = dataByTime.get(time);
     if (d) {
       return {
@@ -217,6 +358,9 @@ export function ProcessDriveParameterSection({
   const isInitialLoadedRef = useRef(false);
   const lastSavedPayloadRef = useRef("");
   const lastUserEditTimeRef = useRef(0);
+  const activeFocusedCellRef = useRef<{ time: string; field: string } | null>(null);
+  const hasUnsavedLocalEditsRef = useRef(false);
+  const deletedTimesRef = useRef<Set<string>>(new Set());
   const [operatorName, setOperatorName] = useState("");
   const [operatorId, setOperatorId] = useState("");
   const [records, setRecords] = useState<DriveParameterReading[]>([]);
@@ -305,12 +449,79 @@ export function ProcessDriveParameterSection({
     }
   }, [photoModalRowIdx, refreshUserPermissions]);
 
-  // Fetch data on date / shift change
+  // Authoritative data fetch & Google Docs-style 3-way reconciliation
+  const fetchAuthoritativeState = useCallback(async (force = false) => {
+    if (!date || !shiftId) return;
+    try {
+      const res = await fetch(
+        `/api/production/tape-plant/drive-parameters?date=${date}&shiftId=${shiftId}&_t=${Date.now()}`,
+        {
+          cache: "no-store",
+          headers: { Pragma: "no-cache", "Cache-Control": "no-cache" },
+        }
+      );
+      if (!res.ok) return;
+      const data: any[] = await res.json();
+      if (!data) return;
+
+      const opName = (data && data[0]?.operatorName) || "";
+      const opId = (data && data[0]?.operatorId) || "";
+      if (opName) setOperatorName((prev) => prev || opName);
+      if (opId) setOperatorId((prev) => prev || opId);
+
+      const mapped = mergeDriveReadings(data, shiftIntervals);
+
+      setRecords((currentLocal) => {
+        // If initial load or forced, replace local state directly
+        if (!isInitialLoadedRef.current || force) {
+          lastSavedPayloadRef.current = serializeDrivePayload(
+            date,
+            shiftId,
+            opName || operatorName,
+            opId || operatorId,
+            mapped
+          );
+          return mapped;
+        }
+
+        // Cell-level 3-way merge isolating actively focused cell typing
+        const reconciled = reconcileServerDriveReadings(
+          currentLocal,
+          mapped,
+          activeFocusedCellRef.current,
+          shiftIntervals
+        );
+
+        // Filter out any locally deleted time slots that have not landed yet
+        const finalRecords = reconciled.filter(
+          (r) => !deletedTimesRef.current.has(normalizeTimeSlot(r.time))
+        );
+
+        // Update baseline snapshot only if user has no unsaved local edits
+        if (!hasUnsavedLocalEditsRef.current) {
+          lastSavedPayloadRef.current = serializeDrivePayload(
+            date,
+            shiftId,
+            opName || operatorName,
+            opId || operatorId,
+            finalRecords
+          );
+        }
+
+        return finalRecords;
+      });
+    } catch (err) {
+      console.warn("Authoritative drive telemetry sync error:", err);
+    }
+  }, [date, shiftId, shiftIntervals, operatorName, operatorId]);
+
+  // Initial load on date / shift change
   useEffect(() => {
     if (!date || !shiftId) return;
     isInitialLoadedRef.current = false;
+    hasUnsavedLocalEditsRef.current = false;
+    deletedTimesRef.current.clear();
     setLoading(true);
-    // Reset supervisor unlocks on shift/date change
     setUnlockedSlots(new Set());
 
     fetch(`/api/production/tape-plant/drive-parameters?date=${date}&shiftId=${shiftId}&_t=${Date.now()}`)
@@ -322,13 +533,13 @@ export function ProcessDriveParameterSection({
         setOperatorId(opId);
         const mapped = mergeDriveReadings(data || [], shiftIntervals);
         setRecords(mapped);
-        lastSavedPayloadRef.current = JSON.stringify({
+        lastSavedPayloadRef.current = serializeDrivePayload(
           date,
           shiftId,
-          operatorName: opName,
-          operatorId: opId,
-          records: mapped,
-        });
+          opName,
+          opId,
+          mapped
+        );
       })
       .catch(() => toast.error("Failed to load drive parameters"))
       .finally(() => {
@@ -337,68 +548,69 @@ export function ProcessDriveParameterSection({
       });
   }, [date, shiftId, shiftIntervals]);
 
+  // Google Docs-grade catch-up when tab/browser is minimized, backgrounded, or wakes up from sleep
+  useEffect(() => {
+    const handleVisibilityOrFocus = () => {
+      if (typeof document !== "undefined" && document.visibilityState === "visible") {
+        fetchAuthoritativeState();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityOrFocus);
+    window.addEventListener("focus", handleVisibilityOrFocus);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityOrFocus);
+      window.removeEventListener("focus", handleVisibilityOrFocus);
+    };
+  }, [fetchAuthoritativeState]);
+
   const realtime = useProductionRealtime({
     module: "tape-plant",
     sheet: "drive-parameter",
     date,
     shift: shiftId,
     onSync: (event) => {
-      if (!date || !shiftId || autoSaving) return;
-      const isPhotoSync = event?.action === "PHOTO_UPDATE";
-      // Prevent clobbering active input if user typed within last 2000ms (unless it's a photo sync)
-      if (!isPhotoSync && Date.now() - lastUserEditTimeRef.current < 2000) return;
-      fetch(`/api/production/tape-plant/drive-parameters?date=${date}&shiftId=${shiftId}&_t=${Date.now()}`)
-        .then((r) => (r.ok ? r.json() : []))
-        .then((data: any[]) => {
-          if (data && data.length > 0) {
-            const opName = (data && data[0]?.operatorName) || operatorName;
-            const opId = (data && data[0]?.operatorId) || operatorId;
-            if (opName && !operatorName) setOperatorName(opName);
-            if (opId && !operatorId) setOperatorId(opId);
-            const mapped = mergeDriveReadings(data, shiftIntervals);
-            // CRITICAL: Update lastSavedPayloadRef so receiving device will NOT fire an echo auto-save back
-            lastSavedPayloadRef.current = JSON.stringify({
-              date,
-              shiftId,
-              operatorName: opName,
-              operatorId: opId,
-              records: mapped,
-            });
-            setRecords(mapped);
-          }
-        })
-        .catch(() => {});
+      if (!date || !shiftId) return;
+      // Echo suppression: ignore broadcasts generated by our own client
+      if (event?.clientId && event.clientId === realtime.clientId) return;
+      fetchAuthoritativeState();
     },
   });
 
-  // Debounced Auto-Save
+  // Debounced Auto-Save (only fires when local user made changes; avoids echo loops)
   useEffect(() => {
     if (!isInitialLoadedRef.current || !date || !shiftId) return;
+    if (!hasUnsavedLocalEditsRef.current) return;
 
     const hasData = records.some((r) => r.time && r.time.trim() !== "");
-    if (!hasData) return;
+    if (!hasData && deletedTimesRef.current.size === 0) return;
 
-    const payload = {
-      date,
-      shiftId,
-      operatorName,
-      operatorId,
-      records,
-    };
-
-    const serialized = JSON.stringify(payload);
-    if (serialized === lastSavedPayloadRef.current) return;
+    const serialized = serializeDrivePayload(date, shiftId, operatorName, operatorId, records);
+    if (serialized === lastSavedPayloadRef.current && deletedTimesRef.current.size === 0) return;
 
     const timer = setTimeout(async () => {
       setAutoSaving(true);
       try {
+        const deletedTimes = Array.from(deletedTimesRef.current);
+        const payload = {
+          date,
+          shiftId,
+          operatorName,
+          operatorId,
+          records,
+          deletedTimes,
+          clientId: realtime.clientId,
+        };
+
         const res = await fetch("/api/production/tape-plant/drive-parameters", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: serialized,
+          body: JSON.stringify(payload),
         });
         if (res.ok) {
           lastSavedPayloadRef.current = serialized;
+          hasUnsavedLocalEditsRef.current = false;
+          deletedTimesRef.current.clear();
           setLastAutoSavedAt(new Date());
           realtime.broadcastSync({ action: "SAVE", date, shift: shiftId });
         }
@@ -410,17 +622,20 @@ export function ProcessDriveParameterSection({
     }, 1000);
 
     return () => clearTimeout(timer);
-  }, [records, operatorName, operatorId, date, shiftId]);
+  }, [records, operatorName, operatorId, date, shiftId, realtime]);
 
   const handleSave = async () => {
     setSaving(true);
     try {
+      const deletedTimes = Array.from(deletedTimesRef.current);
       const payload = {
         date,
         shiftId,
         operatorName,
         operatorId,
         records,
+        deletedTimes,
+        clientId: realtime.clientId,
       };
 
       const res = await fetch("/api/production/tape-plant/drive-parameters", {
@@ -434,7 +649,9 @@ export function ProcessDriveParameterSection({
         throw new Error(err.error || "Failed to save drive parameters");
       }
 
-      lastSavedPayloadRef.current = JSON.stringify(payload);
+      lastSavedPayloadRef.current = serializeDrivePayload(date, shiftId, operatorName, operatorId, records);
+      hasUnsavedLocalEditsRef.current = false;
+      deletedTimesRef.current.clear();
       setLastAutoSavedAt(new Date());
       realtime.broadcastSync({ action: "SAVE", date, shift: shiftId });
       toast.success("Process drive parameters saved");
@@ -472,6 +689,7 @@ export function ProcessDriveParameterSection({
     isNumber = true
   ) => {
     realtime.markLocalEdit();
+    hasUnsavedLocalEditsRef.current = true;
     lastUserEditTimeRef.current = Date.now();
     const val = isNumber && rawVal !== "" ? (isNaN(Number(rawVal)) ? rawVal : Number(rawVal)) : rawVal;
     setRecords((prev) => {
@@ -483,7 +701,12 @@ export function ProcessDriveParameterSection({
 
   const handleDeleteReading = (idx: number) => {
     realtime.markLocalEdit();
+    hasUnsavedLocalEditsRef.current = true;
     lastUserEditTimeRef.current = Date.now();
+    const target = records[idx];
+    if (target?.time) {
+      deletedTimesRef.current.add(normalizeTimeSlot(target.time));
+    }
     setRecords((prev) => prev.filter((_, i) => i !== idx));
     setExpandedSlots((prev) => {
       const next = new Set<number>();
@@ -497,6 +720,8 @@ export function ProcessDriveParameterSection({
 
   const handleAddReading = () => {
     realtime.markLocalEdit();
+    hasUnsavedLocalEditsRef.current = true;
+    lastUserEditTimeRef.current = Date.now();
     const now = new Date();
     const timeStr = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
     const newIdx = records.length;
@@ -533,6 +758,8 @@ export function ProcessDriveParameterSection({
   const handleCopyPrevious = (idx: number) => {
     if (idx <= 0) return;
     realtime.markLocalEdit();
+    hasUnsavedLocalEditsRef.current = true;
+    lastUserEditTimeRef.current = Date.now();
     const prev = records[idx - 1];
     const updated = [...records];
     updated[idx] = {
@@ -616,22 +843,27 @@ export function ProcessDriveParameterSection({
 
     if (!date || !shiftId) return;
 
+    const deletedTimes = Array.from(deletedTimesRef.current);
     const payload = {
       date,
       shiftId,
       operatorName,
       operatorId,
       records: updated,
+      deletedTimes,
+      clientId: realtime.clientId,
     };
 
-    const serialized = JSON.stringify(payload);
+    const serialized = serializeDrivePayload(date, shiftId, operatorName, operatorId, updated);
     lastSavedPayloadRef.current = serialized;
+    hasUnsavedLocalEditsRef.current = false;
+    deletedTimesRef.current.clear();
 
     try {
       const res = await fetch("/api/production/tape-plant/drive-parameters", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: serialized,
+        body: JSON.stringify(payload),
       });
       if (res.ok) {
         setLastAutoSavedAt(new Date());
@@ -917,6 +1149,7 @@ export function ProcessDriveParameterSection({
               operatorId={operatorId}
               onChange={(name, id) => {
                 realtime.markLocalEdit();
+                hasUnsavedLocalEditsRef.current = true;
                 lastUserEditTimeRef.current = Date.now();
                 setOperatorName(name);
                 setOperatorId(id || "");
@@ -978,6 +1211,7 @@ export function ProcessDriveParameterSection({
               operatorId={operatorId}
               onChange={(name, id) => {
                 realtime.markLocalEdit();
+                hasUnsavedLocalEditsRef.current = true;
                 lastUserEditTimeRef.current = Date.now();
                 setOperatorName(name);
                 setOperatorId(id || "");
@@ -1149,6 +1383,12 @@ export function ProcessDriveParameterSection({
                         <input
                           type="text"
                           value={row.time}
+                          onFocus={() => {
+                            activeFocusedCellRef.current = { time: row.time || "", field: "time" };
+                          }}
+                          onBlur={() => {
+                            activeFocusedCellRef.current = null;
+                          }}
                           onChange={(e) => handleFieldChange(idx, "time", e.target.value, false)}
                           placeholder="HH:MM"
                           className="text-xs font-bold text-slate-800 bg-white border border-slate-300 rounded px-2 py-1 w-20 text-center focus:ring-1 focus:ring-primary"
@@ -1283,6 +1523,12 @@ export function ProcessDriveParameterSection({
                             inputMode="decimal"
                             disabled={isLocked}
                             value={(row as any)[item.key] ?? ""}
+                            onFocus={() => {
+                              activeFocusedCellRef.current = { time: row.time || "", field: item.key };
+                            }}
+                            onBlur={() => {
+                              activeFocusedCellRef.current = null;
+                            }}
                             onChange={(e) =>
                               handleFieldChange(idx, item.key as keyof DriveParameterReading, e.target.value)
                             }
@@ -1321,6 +1567,12 @@ export function ProcessDriveParameterSection({
                             inputMode="decimal"
                             disabled={isLocked}
                             value={(row as any)[item.key] ?? ""}
+                            onFocus={() => {
+                              activeFocusedCellRef.current = { time: row.time || "", field: item.key };
+                            }}
+                            onBlur={() => {
+                              activeFocusedCellRef.current = null;
+                            }}
                             onChange={(e) =>
                               handleFieldChange(idx, item.key as keyof DriveParameterReading, e.target.value)
                             }
@@ -1350,6 +1602,12 @@ export function ProcessDriveParameterSection({
                           type="text"
                           disabled={isLocked}
                           value={row.colour ?? ""}
+                          onFocus={() => {
+                            activeFocusedCellRef.current = { time: row.time || "", field: "colour" };
+                          }}
+                          onBlur={() => {
+                            activeFocusedCellRef.current = null;
+                          }}
                           onChange={(e) => handleFieldChange(idx, "colour", e.target.value, false)}
                           placeholder="Colour"
                           className="w-full text-xs font-semibold text-slate-800 bg-white border border-slate-200 rounded-lg px-2 py-1.5 focus:ring-1 focus:ring-emerald-500 disabled:bg-slate-100 disabled:text-slate-400 text-left"
@@ -1373,6 +1631,12 @@ export function ProcessDriveParameterSection({
                             inputMode="decimal"
                             disabled={isLocked}
                             value={(row as any)[item.key] ?? ""}
+                            onFocus={() => {
+                              activeFocusedCellRef.current = { time: row.time || "", field: item.key };
+                            }}
+                            onBlur={() => {
+                              activeFocusedCellRef.current = null;
+                            }}
                             onChange={(e) =>
                               handleFieldChange(idx, item.key as keyof DriveParameterReading, e.target.value)
                             }
@@ -1408,12 +1672,23 @@ export function ProcessDriveParameterSection({
           data={records}
           onChange={(newRecords) => {
             realtime.markLocalEdit();
+            hasUnsavedLocalEditsRef.current = true;
+            lastUserEditTimeRef.current = Date.now();
             setRecords(newRecords);
+          }}
+          onCellFocus={(rowIndex, columnKey) => {
+            activeFocusedCellRef.current = {
+              time: records[rowIndex]?.time || "",
+              field: columnKey,
+            };
+          }}
+          onCellBlur={() => {
+            activeFocusedCellRef.current = null;
           }}
           allowAddRow={true}
           onAddRow={handleAddReading}
           allowDeleteRow={true}
-          onDeleteRow={(idx) => setRecords(records.filter((_, i) => i !== idx))}
+          onDeleteRow={handleDeleteReading}
           allowCopyRow={true}
           onCopyPrevious={handleCopyPrevious}
           isRowDisabled={isRowLocked}
