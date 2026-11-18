@@ -100,6 +100,7 @@ export function ConvertexWastageClient() {
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isInitialLoadRef = useRef<boolean>(true);
   const isDirtyRef = useRef<boolean>(false);
+  const lastUserEditTimeRef = useRef<number>(0);
 
   // Ref to hold latest state for debounced auto-save
   const latestDataRef = useRef({
@@ -224,6 +225,7 @@ export function ConvertexWastageClient() {
     date,
     shift: shiftName,
     onSync: () => {
+      if (Date.now() - lastUserEditTimeRef.current < 3500) return;
       fetchReportData();
     },
   });
@@ -236,6 +238,8 @@ export function ConvertexWastageClient() {
     }
 
     isDirtyRef.current = true;
+    lastUserEditTimeRef.current = Date.now();
+    realtime.markLocalEdit();
     const importedRows = linkedProductionEntries.map((item, idx) =>
       calculateConvertexWastageRow({
         sequence: idx + 1,
@@ -267,6 +271,8 @@ export function ConvertexWastageClient() {
     value: any
   ) => {
     isDirtyRef.current = true;
+    lastUserEditTimeRef.current = Date.now();
+    realtime.markLocalEdit();
     setEntries((prev) => {
       const next = [...prev];
       const updatedRow = { ...next[index], [field]: value };
