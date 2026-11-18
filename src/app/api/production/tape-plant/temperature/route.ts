@@ -3,11 +3,13 @@ import { db } from "@/lib/db";
 import { requireTapePlantApiPermission } from "@/lib/tape-plant/permissions";
 import { emitProductionSync } from "@/lib/realtime/production-bus";
 import { resolveShiftIdForTime } from "@/lib/tape-plant/telemetry-time-slots";
+import { triggerOpportunisticPhotoPrune } from "@/lib/production/photo-retention";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export async function GET(request: NextRequest) {
+  triggerOpportunisticPhotoPrune();
   const authResult = await requireTapePlantApiPermission("canRead");
   if (!authResult.ok) {
     return NextResponse.json({ error: authResult.error }, { status: authResult.status });
