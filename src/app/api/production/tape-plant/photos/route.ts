@@ -41,10 +41,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unsupported image payload" }, { status: 400 });
     }
 
-    const filePath = path.join(uploadDir, fileName);
-    await writeFile(filePath, buffer);
-
-    const photoUrl = `/uploads/tape-plant/${fileName}`;
+    let photoUrl = "";
+    try {
+      const uploadDir = path.join(process.cwd(), "public", "uploads", "tape-plant");
+      await mkdir(uploadDir, { recursive: true });
+      const filePath = path.join(uploadDir, fileName);
+      await writeFile(filePath, buffer);
+      photoUrl = `/uploads/tape-plant/${fileName}`;
+    } catch (fsErr) {
+      console.warn("Filesystem write skipped (running on serverless/read-only environment):", fsErr);
+      const mime = file?.type || "image/jpeg";
+      photoUrl = `data:${mime};base64,${buffer.toString("base64")}`;
+    }
 
     return NextResponse.json({
       success: true,
