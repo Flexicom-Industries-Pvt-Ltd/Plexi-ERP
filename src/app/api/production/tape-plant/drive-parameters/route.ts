@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireTapePlantApiPermission } from "@/lib/tape-plant/permissions";
 import { emitProductionSync } from "@/lib/realtime/production-bus";
+import { invalidateSyncCache } from "@/lib/realtime/db-sync";
 import { resolveShiftIdForTime } from "@/lib/tape-plant/telemetry-time-slots";
 
 export const dynamic = "force-dynamic";
@@ -40,7 +41,7 @@ export async function GET(request: NextRequest) {
             (existing as any)[k] = v;
           }
         }
-        if (r.photoUrl) existing.photoUrl = r.photoUrl;
+        if ("photoUrl" in r) existing.photoUrl = r.photoUrl || null;
         dedupedMap.set(key, existing);
       }
     }
@@ -146,7 +147,7 @@ export async function POST(request: NextRequest) {
                 (existing as any)[k] = v;
               }
             }
-            if (item.photoUrl) existing.photoUrl = item.photoUrl;
+            if ("photoUrl" in item) existing.photoUrl = item.photoUrl || null;
             if (item.operatorName) existing.operatorName = item.operatorName;
             if (item.operatorId) existing.operatorId = item.operatorId;
             dedupedMap.set(key, existing);
@@ -167,6 +168,7 @@ export async function POST(request: NextRequest) {
       orderBy: { time: "asc" },
     });
 
+    invalidateSyncCache("tape-plant", "drive-parameter");
     emitProductionSync({
       module: "tape-plant",
       sheet: "drive-parameter",

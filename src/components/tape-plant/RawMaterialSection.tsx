@@ -175,10 +175,11 @@ export function RawMaterialSection({ date, shiftId, shiftName }: RawMaterialSect
     sheet: "raw-material",
     date,
     shift: shiftId,
-    onSync: () => {
+    onSync: (event) => {
       if (!date || !shiftId || autoSaving) return;
-      // Prevent clobbering active input if user typed within last 3500ms
-      if (Date.now() - lastUserEditTimeRef.current < 3500) return;
+      const isPhotoSync = event?.action === "PHOTO_UPDATE";
+      // Prevent clobbering active input if user typed within last 2000ms (unless it's a photo sync)
+      if (!isPhotoSync && Date.now() - lastUserEditTimeRef.current < 2000) return;
       fetch(`/api/production/tape-plant/raw-material?date=${date}&shiftId=${shiftId}&_t=${Date.now()}`)
         .then((r) => (r.ok ? r.json() : []))
         .then((data: any[]) => {
@@ -361,10 +362,38 @@ export function RawMaterialSection({ date, shiftId, shiftName }: RawMaterialSect
     setExpandedMaterials((prev) => new Set([...prev, newIdx]));
   };
 
-  const handleUpdateRowPhoto = (idx: number, photoUrl: string | undefined) => {
+  // Update photo for active row with immediate database persistence and cross-device sync
+  const handleUpdateRowPhoto = async (idx: number, photoUrl: string | undefined) => {
     const updated = [...records];
-    updated[idx] = { ...updated[idx], photoUrl };
+    updated[idx] = { ...updated[idx], photoUrl: photoUrl || undefined };
     setRecords(updated);
+
+    if (!date || !shiftId) return;
+
+    const payload = {
+      date,
+      shiftId,
+      operatorName,
+      operatorId,
+      records: updated,
+    };
+
+    const serialized = JSON.stringify(payload);
+    lastSavedPayloadRef.current = serialized;
+
+    try {
+      const res = await fetch("/api/production/tape-plant/raw-material", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: serialized,
+      });
+      if (res.ok) {
+        setLastAutoSavedAt(new Date());
+        realtime.broadcastSync({ action: "PHOTO_UPDATE", date, shift: shiftId });
+      }
+    } catch (err) {
+      console.error("Immediate photo save failed:", err);
+    }
   };
 
   const totalConsumption = records.reduce((sum, r) => sum + (Number(r.consumption) || 0), 0);

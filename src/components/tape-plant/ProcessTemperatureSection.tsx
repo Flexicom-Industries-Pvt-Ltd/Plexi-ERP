@@ -92,7 +92,9 @@ function mergeTemperatureReadings(data: any[], intervals: string[]): Temperature
           }
         }
         if (d.id) existing.id = d.id;
-        if (d.photoUrl) existing.photoUrl = d.photoUrl;
+        if ("photoUrl" in d) {
+          existing.photoUrl = d.photoUrl || undefined;
+        }
         dataByTime.set(t, existing);
       }
     } else {
@@ -106,7 +108,9 @@ function mergeTemperatureReadings(data: any[], intervals: string[]): Temperature
           }
         }
         if (d.id) existing.id = d.id;
-        if (d.photoUrl) existing.photoUrl = d.photoUrl;
+        if ("photoUrl" in d) {
+          existing.photoUrl = d.photoUrl || undefined;
+        }
         extraItemsByTime.set(t, existing);
       }
     }
@@ -345,10 +349,11 @@ export function ProcessTemperatureSection({
     sheet: "temperature",
     date,
     shift: shiftId,
-    onSync: () => {
+    onSync: (event) => {
       if (!date || !shiftId || autoSaving) return;
-      // Prevent clobbering active input if user typed within last 3500ms
-      if (Date.now() - lastUserEditTimeRef.current < 3500) return;
+      const isPhotoSync = event?.action === "PHOTO_UPDATE";
+      // Prevent clobbering active input if user typed within last 2000ms (unless it's a photo sync)
+      if (!isPhotoSync && Date.now() - lastUserEditTimeRef.current < 2000) return;
       fetch(`/api/production/tape-plant/temperature?date=${date}&shiftId=${shiftId}&_t=${Date.now()}`)
         .then((r) => (r.ok ? r.json() : []))
         .then((data: any[]) => {
@@ -614,11 +619,38 @@ export function ProcessTemperatureSection({
     }
   };
 
-  // Update photo for active row
-  const handleUpdateRowPhoto = (idx: number, photoUrl: string | undefined) => {
+  // Update photo for active row with immediate database persistence and cross-device sync
+  const handleUpdateRowPhoto = async (idx: number, photoUrl: string | undefined) => {
     const updated = [...readings];
-    updated[idx] = { ...updated[idx], photoUrl };
+    updated[idx] = { ...updated[idx], photoUrl: photoUrl || undefined };
     setReadings(updated);
+
+    if (!date || !shiftId) return;
+
+    const payload = {
+      date,
+      shiftId,
+      operatorName,
+      operatorId,
+      readings: updated,
+    };
+
+    const serialized = JSON.stringify(payload);
+    lastSavedPayloadRef.current = serialized;
+
+    try {
+      const res = await fetch("/api/production/tape-plant/temperature", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: serialized,
+      });
+      if (res.ok) {
+        setLastAutoSavedAt(new Date());
+        realtime.broadcastSync({ action: "PHOTO_UPDATE", date, shift: shiftId });
+      }
+    } catch (err) {
+      console.error("Immediate photo save failed:", err);
+    }
   };
 
   // Columns definition with Evidence Photo column
