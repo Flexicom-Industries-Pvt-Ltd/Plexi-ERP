@@ -213,6 +213,7 @@ export async function POST(request: NextRequest) {
         email: authResult.session?.user?.email || undefined,
         role: (authResult.session?.user as any)?.roleName || (authResult.session?.user as any)?.role || "Staff",
       },
+      clientId: body.clientId,
     });
 
     return NextResponse.json({ success: true, report: savedReport });

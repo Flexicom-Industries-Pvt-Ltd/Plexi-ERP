@@ -10,15 +10,12 @@ import {
   Printer,
   RefreshCw,
   Gauge,
-  Percent,
   Scale,
   Calendar,
   Clock,
   User,
   CheckCircle2,
   FileCheck,
-  ChevronRight,
-  Layers,
   Sparkles,
   Loader2,
   AlertCircle,
@@ -29,6 +26,12 @@ import {
   PrintingRawMaterialMasterItem,
   computePrintingRawMaterialTotals,
 } from "@/lib/printing/printing-types";
+import {
+  FocusedPrintingRawMaterialCell,
+  getPrintingRawMaterialRowKey,
+  reconcileServerPrintingRawMaterialEntries,
+  serializePrintingRawMaterialPayload,
+} from "@/lib/printing/printing-raw-material-google-docs-sync";
 import dynamic from "next/dynamic";
 import { UniversalPersonnelInput } from "@/components/ui/UniversalPersonnelInput";
 import { useProductionRealtime } from "@/hooks/useProductionRealtime";
@@ -68,6 +71,25 @@ export function PrintingRawMaterialEntryClient() {
   const isDirtyRef = useRef<boolean>(false);
   const lastUserEditTimeRef = useRef<number>(0);
 
+  // Google Docs Concurrent Sync & Typing Isolation Refs
+  const lastSavedPayloadRef = useRef<string>("");
+  const hasUnsavedLocalEditsRef = useRef<boolean>(false);
+  const activeFocusedCellRef = useRef<FocusedPrintingRawMaterialCell | null>(null);
+  const deletedEntryIdsRef = useRef<Set<string>>(new Set());
+
+  const [, setFocusedCellState] = useState<FocusedPrintingRawMaterialCell | null>(null);
+
+  const setFocusedCell = useCallback((rowKey: string, field: keyof PrintingRawMaterialEntryItem) => {
+    const next = { rowKey, field };
+    activeFocusedCellRef.current = next;
+    setFocusedCellState(next);
+  }, []);
+
+  const clearFocusedCell = useCallback(() => {
+    activeFocusedCellRef.current = null;
+    setFocusedCellState(null);
+  }, []);
+
   // 1. Fetch Master Materials from Data Centre
   useEffect(() => {
     async function loadMasterMaterials() {
@@ -106,31 +128,48 @@ export function PrintingRawMaterialEntryClient() {
         setRemarks(rep.remarks || "");
         setTotalPrintMtrs(rep.totalPrintMtrs || data.dailyReportTotals?.totalPrintMtrs || 0);
 
-        if (Array.isArray(rep.entries) && rep.entries.length > 0) {
-          setEntries(rep.entries);
-        } else {
-          setEntries([]);
-        }
+        const incomingEntries: PrintingRawMaterialEntryItem[] = Array.isArray(rep.entries)
+          ? rep.entries
+          : [];
+
+        setEntries((prev) => {
+          if (prev.length === 0 && !hasUnsavedLocalEditsRef.current) {
+            lastSavedPayloadRef.current = serializePrintingRawMaterialPayload(rep, incomingEntries);
+            return incomingEntries;
+          }
+          const reconciled = reconcileServerPrintingRawMaterialEntries({
+            localEntries: prev,
+            incomingEntries,
+            focusedCell: activeFocusedCellRef.current,
+            hasUnsavedLocalEdits: hasUnsavedLocalEditsRef.current,
+            deletedEntryIds: deletedEntryIdsRef.current,
+          });
+          lastSavedPayloadRef.current = serializePrintingRawMaterialPayload(rep, incomingEntries);
+          return reconciled;
+        });
+        setLastSavedAt(format(new Date(rep.updatedAt || Date.now()), "hh:mm a"));
       } else {
-        // No report yet: load linked values from dailyReportTotals
-        if (data.dailyReportTotals) {
-          setTotalPrintMtrs(data.dailyReportTotals.totalPrintMtrs || 0);
-          if (data.dailyReportTotals.operatorName) {
-            setOperatorName(data.dailyReportTotals.operatorName);
+        // No report yet: load linked values from dailyReportTotals if no unsaved local edits
+        if (!hasUnsavedLocalEditsRef.current) {
+          if (data.dailyReportTotals) {
+            setTotalPrintMtrs(data.dailyReportTotals.totalPrintMtrs || 0);
+            if (data.dailyReportTotals.operatorName) {
+              setOperatorName(data.dailyReportTotals.operatorName);
+            }
+            if (data.dailyReportTotals.supervisorName) {
+              setSupervisorName(data.dailyReportTotals.supervisorName);
+            }
+          } else {
+            setTotalPrintMtrs(0);
           }
-          if (data.dailyReportTotals.supervisorName) {
-            setSupervisorName(data.dailyReportTotals.supervisorName);
-          }
-        } else {
-          setTotalPrintMtrs(0);
+          setStatus("DRAFT");
+          setRemarks("");
+          setEntries([]);
+          setLastSavedAt(null);
         }
-        setStatus("DRAFT");
-        setRemarks("");
-        // Start with empty entries
-        setEntries([]);
       }
-    } catch (err: any) {
-      toast.error(err.message || "Failed to load raw material report");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to load raw material report");
     } finally {
       setLoading(false);
       isDirtyRef.current = false;
@@ -144,70 +183,32 @@ export function PrintingRawMaterialEntryClient() {
     loadReport();
   }, [loadReport]);
 
+  // Sleep wake-up catch-up
+  useEffect(() => {
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === "visible") {
+        loadReport();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityOrFocus);
+    window.addEventListener("focus", handleVisibilityOrFocus);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityOrFocus);
+      window.removeEventListener("focus", handleVisibilityOrFocus);
+    };
+  }, [loadReport]);
+
   const realtime = useProductionRealtime({
     module: "printing",
     sheet: "raw-materials",
     date,
     shift: shiftName,
-    onSync: () => {
-      if (Date.now() - lastUserEditTimeRef.current < 3500) return;
+    onSync: (event?: { clientId?: string | null }) => {
+      if (event?.clientId && event.clientId === realtime.clientId) return;
+      if (Date.now() - lastUserEditTimeRef.current < 2500) return;
       loadReport();
     },
   });
-
-  // Handle row change
-  const handleEntryChange = (index: number, field: keyof PrintingRawMaterialEntryItem, value: any) => {
-    isDirtyRef.current = true;
-    lastUserEditTimeRef.current = Date.now();
-    realtime.markLocalEdit();
-    setEntries((prev) => {
-      const next = [...prev];
-      const row = { ...next[index], [field]: value };
-
-      // If material selected from master, autofill unit and factor
-      if (field === "materialName") {
-        const match = masterMaterials.find(
-          (m) => m.name.toLowerCase() === String(value).trim().toLowerCase()
-        );
-        if (match) {
-          row.rawMaterialId = match.id;
-          row.unit = match.unit || "LITRE";
-          row.conversionFactor = match.conversionFactor || 0.82;
-        }
-      }
-
-      next[index] = row;
-      return next;
-    });
-  };
-
-  const addRow = (presetMaterial?: PrintingRawMaterialMasterItem) => {
-    isDirtyRef.current = true;
-    lastUserEditTimeRef.current = Date.now();
-    realtime.markLocalEdit();
-    setEntries((prev) => [
-      ...prev,
-      {
-        sequence: prev.length + 1,
-        rawMaterialId: presetMaterial?.id || undefined,
-        materialName: presetMaterial?.name || "",
-        unit: presetMaterial?.unit || "LITRE",
-        consumedLitre: 0,
-        conversionFactor: presetMaterial?.conversionFactor || 0.82,
-        consumedKg: 0,
-        ratioPercent: 0,
-        mileage: 0,
-        remarks: "",
-      },
-    ]);
-  };
-
-  const removeRow = (index: number) => {
-    isDirtyRef.current = true;
-    lastUserEditTimeRef.current = Date.now();
-    realtime.markLocalEdit();
-    setEntries((prev) => prev.filter((_, i) => i !== index));
-  };
 
   // Compute live totals and row ratios/mileage
   const { totals, calculatedEntries } = useMemo(() => {
@@ -216,10 +217,15 @@ export function PrintingRawMaterialEntryClient() {
 
   // Save handler (manual submit or silent auto-save)
   const handleSave = useCallback(
-    async (targetStatus?: "DRAFT" | "SUBMITTED" | "APPROVED", silent = false) => {
+    async (
+      targetStatus?: "DRAFT" | "SUBMITTED" | "APPROVED",
+      silent = false,
+      entriesToSave?: PrintingRawMaterialEntryItem[]
+    ) => {
       if (!date || !shiftName) return;
 
-      const validEntries = entries.filter((e) => e.materialName && e.materialName.trim());
+      const currentEntries = entriesToSave || entries;
+      const validEntries = currentEntries.filter((e) => e.materialName && e.materialName.trim());
       const hasAnyData =
         validEntries.length > 0 ||
         Boolean(operatorName.trim()) ||
@@ -233,31 +239,42 @@ export function PrintingRawMaterialEntryClient() {
         return;
       }
 
+      const newStatus = targetStatus || status;
+
+      const currentPayload = {
+        date,
+        shiftName,
+        operatorName: operatorName.trim() || undefined,
+        supervisorName: supervisorName.trim() || undefined,
+        totalPrintMtrs,
+        totalConsumedLitre: totals.totalConsumedLitre,
+        totalConsumedKg: totals.totalConsumedKg,
+        overallMileage: totals.overallMileage,
+        status: newStatus,
+        remarks: remarks.trim() || undefined,
+        entries: validEntries,
+      };
+
+      const serialized = serializePrintingRawMaterialPayload(currentPayload, validEntries);
+      if (silent && serialized === lastSavedPayloadRef.current) {
+        return;
+      }
+
       if (!silent) setSaving(true);
       else setIsAutoSaving(true);
       setAutoSaveError(null);
 
-      const newStatus = targetStatus || status;
-
       try {
-        const payload: PrintingRawMaterialReportData = {
-          date,
-          shiftName,
-          operatorName: operatorName.trim() || undefined,
-          supervisorName: supervisorName.trim() || undefined,
-          totalPrintMtrs,
-          totalConsumedLitre: totals.totalConsumedLitre,
-          totalConsumedKg: totals.totalConsumedKg,
-          overallMileage: totals.overallMileage,
-          status: newStatus,
-          remarks: remarks.trim() || undefined,
-          entries: validEntries,
+        const payloadWithMeta = {
+          ...currentPayload,
+          clientId: realtime.clientId,
+          deletedEntryIds: Array.from(deletedEntryIdsRef.current),
         };
 
         const res = await fetch("/api/production/printing/raw-materials", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
+          body: JSON.stringify(payloadWithMeta),
         });
 
         if (!res.ok) {
@@ -266,8 +283,12 @@ export function PrintingRawMaterialEntryClient() {
         }
 
         setStatus(newStatus);
-        setLastSavedAt(format(new Date(), "hh:mm:ss a"));
+        setLastSavedAt(format(new Date(), "hh:mm a"));
+        lastSavedPayloadRef.current = serialized;
+        hasUnsavedLocalEditsRef.current = false;
+        deletedEntryIdsRef.current.clear();
         isDirtyRef.current = false;
+
         realtime.broadcastSync({
           action: newStatus === "SUBMITTED" ? "SUBMIT" : "SAVE",
           date,
@@ -281,42 +302,126 @@ export function PrintingRawMaterialEntryClient() {
               : "Raw material report saved successfully"
           );
         }
-        // Local entries state is intentionally preserved so user typing, empty rows, and focus are never lost
-      } catch (err: any) {
+      } catch (err) {
         console.error("Printing raw material auto-save error:", err);
-        setAutoSaveError(err.message || "Auto-save failed");
-        if (!silent) toast.error(err.message || "Failed to save raw material report");
+        const errMsg = err instanceof Error ? err.message : "Auto-save failed";
+        setAutoSaveError(errMsg);
+        if (!silent) toast.error(errMsg);
       } finally {
         setSaving(false);
         setIsAutoSaving(false);
       }
     },
-    [date, shiftName, entries, status, operatorName, supervisorName, totalPrintMtrs, totals, remarks]
+    [
+      date,
+      shiftName,
+      entries,
+      status,
+      operatorName,
+      supervisorName,
+      totalPrintMtrs,
+      totals,
+      remarks,
+      realtime,
+    ]
   );
 
-  // Debounced Auto-Save Trigger (auto save as draft)
-  useEffect(() => {
-    if (isInitialLoadRef.current || loading || !isDirtyRef.current) return;
-    const hasAnyData =
-      entries.some((e) => Boolean(e.materialName?.trim() || Number(e.consumedLitre) > 0 || Number(e.consumedKg) > 0)) ||
-      Boolean(remarks.trim()) ||
-      Boolean(operatorName.trim()) ||
-      Boolean(supervisorName.trim());
-
-    if (!hasAnyData) return;
-
-    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
-
-    autoSaveTimerRef.current = setTimeout(() => {
-      if (isDirtyRef.current) {
-        handleSave("DRAFT", true);
-      }
-    }, 1200);
-
-    return () => {
+  // Debounced Auto-Save Trigger
+  const triggerAutoSave = useCallback(
+    (currentEntries: PrintingRawMaterialEntryItem[]) => {
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
-    };
-  }, [entries, remarks, operatorName, supervisorName, loading, handleSave]);
+      autoSaveTimerRef.current = setTimeout(() => {
+        handleSave("DRAFT", true, currentEntries);
+      }, 1500);
+    },
+    [handleSave]
+  );
+
+  // Handle row change
+  const handleEntryChange = useCallback(
+    (
+      index: number,
+      field: keyof PrintingRawMaterialEntryItem,
+      value: PrintingRawMaterialEntryItem[keyof PrintingRawMaterialEntryItem]
+    ) => {
+      isDirtyRef.current = true;
+      hasUnsavedLocalEditsRef.current = true;
+      lastUserEditTimeRef.current = Date.now();
+      realtime.markLocalEdit();
+      setEntries((prev) => {
+        const next = [...prev];
+        const row = { ...next[index], [field]: value };
+
+        // If material selected from master, autofill unit and factor
+        if (field === "materialName") {
+          const match = masterMaterials.find(
+            (m) => m.name.toLowerCase() === String(value).trim().toLowerCase()
+          );
+          if (match) {
+            row.rawMaterialId = match.id;
+            row.unit = match.unit || "LITRE";
+            row.conversionFactor = match.conversionFactor || 0.82;
+          }
+        }
+
+        next[index] = row;
+        triggerAutoSave(next);
+        return next;
+      });
+    },
+    [masterMaterials, triggerAutoSave, realtime]
+  );
+
+  const addRow = useCallback(
+    (presetMaterial?: PrintingRawMaterialMasterItem) => {
+      isDirtyRef.current = true;
+      hasUnsavedLocalEditsRef.current = true;
+      lastUserEditTimeRef.current = Date.now();
+      realtime.markLocalEdit();
+      setEntries((prev) => {
+        const next = [
+          ...prev,
+          {
+            sequence: prev.length + 1,
+            rawMaterialId: presetMaterial?.id || undefined,
+            materialName: presetMaterial?.name || "",
+            unit: presetMaterial?.unit || "LITRE",
+            consumedLitre: 0,
+            conversionFactor: presetMaterial?.conversionFactor || 0.82,
+            consumedKg: 0,
+            ratioPercent: 0,
+            mileage: 0,
+            remarks: "",
+          },
+        ];
+        triggerAutoSave(next);
+        return next;
+      });
+    },
+    [triggerAutoSave, realtime]
+  );
+
+  const removeRow = useCallback(
+    (index: number) => {
+      isDirtyRef.current = true;
+      hasUnsavedLocalEditsRef.current = true;
+      lastUserEditTimeRef.current = Date.now();
+      realtime.markLocalEdit();
+      setEntries((prev) => {
+        const target = prev[index];
+        if (target) {
+          if (target.id) deletedEntryIdsRef.current.add(target.id);
+          if (target.rawMaterialId) deletedEntryIdsRef.current.add(target.rawMaterialId);
+          if (target.materialName) deletedEntryIdsRef.current.add(target.materialName.trim().toUpperCase());
+          deletedEntryIdsRef.current.add(getPrintingRawMaterialRowKey(target, index));
+        }
+        const next = prev.filter((_, i) => i !== index);
+        triggerAutoSave(next);
+        return next;
+      });
+    },
+    [triggerAutoSave, realtime]
+  );
 
   const reportDataForPrint: PrintingRawMaterialReportData = useMemo(() => {
     return {
@@ -618,10 +723,11 @@ export function PrintingRawMaterialEntryClient() {
                   </tr>
                 ) : (
                   calculatedEntries.map((row, index) => {
+                    const rowKey = getPrintingRawMaterialRowKey(row, index);
                     const isLitre = (row.unit || "LITRE").toUpperCase() === "LITRE";
 
                     return (
-                      <tr key={index} className="hover:bg-slate-50/60 transition-colors">
+                      <tr key={row.id || rowKey} className="hover:bg-slate-50/60 transition-colors">
                         <td className="px-3 py-2 text-center font-bold text-slate-400">
                           {index + 1}
                         </td>
@@ -635,6 +741,8 @@ export function PrintingRawMaterialEntryClient() {
                               placeholder="Select or enter material name..."
                               value={row.materialName}
                               onChange={(e) => handleEntryChange(index, "materialName", e.target.value)}
+                              onFocus={() => setFocusedCell(rowKey, "materialName")}
+                              onBlur={() => clearFocusedCell()}
                               className="w-full px-2.5 py-1.5 text-xs font-semibold text-slate-900 border border-slate-200 rounded-md focus:ring-1 focus:ring-primary"
                             />
                             <datalist id={`materials-list-${index}`}>
@@ -652,6 +760,8 @@ export function PrintingRawMaterialEntryClient() {
                           <select
                             value={row.unit || "LITRE"}
                             onChange={(e) => handleEntryChange(index, "unit", e.target.value)}
+                            onFocus={() => setFocusedCell(rowKey, "unit")}
+                            onBlur={() => clearFocusedCell()}
                             className="px-2 py-1 text-xs border border-slate-200 rounded-md bg-white font-mono"
                           >
                             <option value="LITRE">LITRE</option>
@@ -675,6 +785,8 @@ export function PrintingRawMaterialEntryClient() {
                                 handleEntryChange(index, "consumedKg", val);
                               }
                             }}
+                            onFocus={() => setFocusedCell(rowKey, isLitre ? "consumedLitre" : "consumedKg")}
+                            onBlur={() => clearFocusedCell()}
                             className="w-full text-right px-2 py-1 text-xs font-mono font-bold text-blue-700 border border-slate-200 rounded-md focus:ring-1 focus:ring-primary"
                           />
                         </td>
@@ -691,6 +803,8 @@ export function PrintingRawMaterialEntryClient() {
                               onChange={(e) =>
                                 handleEntryChange(index, "conversionFactor", Number(e.target.value) || 0.82)
                               }
+                              onFocus={() => setFocusedCell(rowKey, "conversionFactor")}
+                              onBlur={() => clearFocusedCell()}
                               className="w-16 text-center px-1 py-1 text-xs font-mono text-slate-600 border border-slate-200 rounded-md"
                             />
                           ) : (
@@ -728,6 +842,8 @@ export function PrintingRawMaterialEntryClient() {
                             placeholder="e.g. Viscosity 18s"
                             value={row.remarks || ""}
                             onChange={(e) => handleEntryChange(index, "remarks", e.target.value)}
+                            onFocus={() => setFocusedCell(rowKey, "remarks")}
+                            onBlur={() => clearFocusedCell()}
                             className="w-full px-2 py-1 text-xs border border-slate-200 rounded-md"
                           />
                         </td>
@@ -826,11 +942,12 @@ export function PrintingRawMaterialEntryClient() {
           </div>
         ) : (
           calculatedEntries.map((row, index) => {
+            const rowKey = getPrintingRawMaterialRowKey(row, index);
             const isLitre = (row.unit || "LITRE").toUpperCase() === "LITRE";
 
             return (
               <div
-                key={index}
+                key={row.id || rowKey}
                 className="bg-white rounded-xl border border-slate-200 shadow-xs p-3.5 space-y-3"
               >
                 {/* Header: Sequence & Material Name */}
@@ -846,6 +963,8 @@ export function PrintingRawMaterialEntryClient() {
                         placeholder="Material name (ink / solvent)..."
                         value={row.materialName}
                         onChange={(e) => handleEntryChange(index, "materialName", e.target.value)}
+                        onFocus={() => setFocusedCell(rowKey, "materialName")}
+                        onBlur={() => clearFocusedCell()}
                         className="w-full px-2 py-1 text-xs font-bold text-slate-900 border border-slate-200 rounded-md focus:ring-1 focus:ring-primary"
                       />
                       <datalist id={`mobile-mat-list-${index}`}>
@@ -862,6 +981,8 @@ export function PrintingRawMaterialEntryClient() {
                   <select
                     value={row.unit || "LITRE"}
                     onChange={(e) => handleEntryChange(index, "unit", e.target.value)}
+                    onFocus={() => setFocusedCell(rowKey, "unit")}
+                    onBlur={() => clearFocusedCell()}
                     className="px-2 py-1 text-xs border border-slate-200 rounded-md bg-slate-50 font-bold text-slate-700 shrink-0"
                   >
                     <option value="LITRE">Litre</option>
@@ -889,6 +1010,8 @@ export function PrintingRawMaterialEntryClient() {
                           handleEntryChange(index, "consumedKg", val);
                         }
                       }}
+                      onFocus={() => setFocusedCell(rowKey, isLitre ? "consumedLitre" : "consumedKg")}
+                      onBlur={() => clearFocusedCell()}
                       className="w-full px-2.5 py-1.5 text-xs font-mono font-bold text-blue-700 border border-blue-200 bg-blue-50/20 rounded-md focus:ring-1 focus:ring-primary"
                     />
                   </div>
@@ -907,6 +1030,8 @@ export function PrintingRawMaterialEntryClient() {
                         onChange={(e) =>
                           handleEntryChange(index, "conversionFactor", Number(e.target.value) || 0.82)
                         }
+                        onFocus={() => setFocusedCell(rowKey, "conversionFactor")}
+                        onBlur={() => clearFocusedCell()}
                         className="w-full px-2.5 py-1.5 text-xs font-mono text-slate-700 border border-slate-200 rounded-md"
                       />
                     ) : (
@@ -946,6 +1071,8 @@ export function PrintingRawMaterialEntryClient() {
                     placeholder="Batch notes / viscosity (e.g. 18s)..."
                     value={row.remarks || ""}
                     onChange={(e) => handleEntryChange(index, "remarks", e.target.value)}
+                    onFocus={() => setFocusedCell(rowKey, "remarks")}
+                    onBlur={() => clearFocusedCell()}
                     className="flex-1 px-2.5 py-1 text-xs border border-slate-200 rounded-md text-slate-600"
                   />
                   <button

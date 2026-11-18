@@ -198,28 +198,66 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      // Clear existing entries for fresh sync
-      await tx.printingRawMaterialReportEntry.deleteMany({
+      // Delete specifically removed rows if requested
+      if (Array.isArray(body.deletedEntryIds) && body.deletedEntryIds.length > 0) {
+        await tx.printingRawMaterialReportEntry.deleteMany({
+          where: {
+            reportId: report.id,
+            OR: [
+              { id: { in: body.deletedEntryIds } },
+              { rawMaterialId: { in: body.deletedEntryIds } },
+              { materialName: { in: body.deletedEntryIds } },
+            ],
+          },
+        });
+      }
+
+      // Fetch existing entries to upsert non-destructively
+      const existingEntries = await tx.printingRawMaterialReportEntry.findMany({
         where: { reportId: report.id },
       });
+      const existingById = new Map(existingEntries.map((e) => [e.id, e]));
+      const existingByMatId = new Map(
+        existingEntries.filter((e) => e.rawMaterialId).map((e) => [e.rawMaterialId as string, e])
+      );
+      const existingByName = new Map(
+        existingEntries.map((e) => [e.materialName.trim().toUpperCase(), e])
+      );
 
-      // Insert calculated entries
-      if (calculatedEntries.length > 0) {
-        await tx.printingRawMaterialReportEntry.createMany({
-          data: calculatedEntries.map((e, index) => ({
-            reportId: report.id,
-            rawMaterialId: e.rawMaterialId || null,
-            materialName: String(e.materialName || "").trim(),
-            unit: (e.unit || "LITRE").toUpperCase(),
-            consumedLitre: Number(e.consumedLitre) || 0,
-            conversionFactor: Number(e.conversionFactor) || 0.82,
-            consumedKg: Number(e.consumedKg) || 0,
-            ratioPercent: Number(e.ratioPercent) || 0,
-            mileage: Number(e.mileage) || 0,
-            sequence: index + 1,
-            remarks: e.remarks?.trim() || null,
-          })),
-        });
+      for (let index = 0; index < calculatedEntries.length; index++) {
+        const e = calculatedEntries[index];
+        const matNameKey = String(e.materialName || "").trim().toUpperCase();
+        const matched =
+          (e.id && existingById.get(e.id)) ||
+          (e.rawMaterialId && existingByMatId.get(e.rawMaterialId)) ||
+          (matNameKey && existingByName.get(matNameKey));
+
+        const entryData = {
+          rawMaterialId: e.rawMaterialId || null,
+          materialName: String(e.materialName || "").trim(),
+          unit: (e.unit || "LITRE").toUpperCase(),
+          consumedLitre: Number(e.consumedLitre) || 0,
+          conversionFactor: Number(e.conversionFactor) || 0.82,
+          consumedKg: Number(e.consumedKg) || 0,
+          ratioPercent: Number(e.ratioPercent) || 0,
+          mileage: Number(e.mileage) || 0,
+          sequence: index + 1,
+          remarks: e.remarks?.trim() || null,
+        };
+
+        if (matched) {
+          await tx.printingRawMaterialReportEntry.update({
+            where: { id: matched.id },
+            data: entryData,
+          });
+        } else {
+          await tx.printingRawMaterialReportEntry.create({
+            data: {
+              reportId: report.id,
+              ...entryData,
+            },
+          });
+        }
       }
 
       return tx.printingRawMaterialReport.findUnique({
@@ -259,6 +297,7 @@ export async function POST(request: NextRequest) {
         email: authResult.session?.user?.email || undefined,
         role: (authResult.session?.user as any)?.roleName || (authResult.session?.user as any)?.role || "Staff",
       },
+      clientId: body.clientId,
     });
 
     return NextResponse.json({ success: true, report: savedReport });

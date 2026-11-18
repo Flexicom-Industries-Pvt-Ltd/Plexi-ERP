@@ -1,19 +1,12 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import {
-  BarChart3,
   Printer,
-  Search,
   RefreshCw,
-  Calendar,
-  Clock,
   Users,
   Award,
-  TrendingUp,
-  FileSpreadsheet,
-  Layers,
   Scale,
   Gauge,
   ArrowUpRight,
@@ -60,8 +53,8 @@ export function PrintingProductionSummaryClient() {
       if (data.summary) {
         setSummaryData(data.summary);
       }
-    } catch (err: any) {
-      toast.error(err.message || "Failed to load summary");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to load summary");
     } finally {
       setLoading(false);
     }
@@ -71,10 +64,26 @@ export function PrintingProductionSummaryClient() {
     fetchSummary();
   }, [fetchSummary]);
 
+  // Sleep wake-up catch-up
+  useEffect(() => {
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === "visible") {
+        fetchSummary();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityOrFocus);
+    window.addEventListener("focus", handleVisibilityOrFocus);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityOrFocus);
+      window.removeEventListener("focus", handleVisibilityOrFocus);
+    };
+  }, [fetchSummary]);
+
   const realtime = useProductionRealtime({
     module: "printing",
     sheet: "summary",
-    onSync: () => {
+    onSync: (event?: { clientId?: string | null }) => {
+      if (event?.clientId && event.clientId === realtime.clientId) return;
       fetchSummary();
     },
   });
