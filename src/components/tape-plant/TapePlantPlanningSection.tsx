@@ -115,6 +115,7 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName, shifts }: T
   const [lastAutoSavedAt, setLastAutoSavedAt] = useState<Date | null>(null);
   const isInitialLoadedRef = useRef(false);
   const lastSavedPayloadRef = useRef("");
+  const lastUserEditTimeRef = useRef<number>(0);
   const [status, setStatus] = useState("SAVED");
   const [showPrintModal, setShowPrintModal] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -310,7 +311,8 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName, shifts }: T
     date,
     shift: shiftId,
     onSync: () => {
-      if (!date || !shiftId) return;
+      if (!date || !shiftId || autoSaving) return;
+      if (Date.now() - lastUserEditTimeRef.current < 3500) return;
       fetch(`/api/production/tape-plant/planning?date=${date}&shiftId=${shiftId}&_t=${Date.now()}`, {
         cache: "no-store",
       })
@@ -365,6 +367,8 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName, shifts }: T
   const currentPlan = recipePlans[activeRecipeIndex] || recipePlans[0] || createEmptyRecipePlan(1);
 
   const updateCurrentPlan = (updates: Partial<RecipePlanItem>) => {
+    lastUserEditTimeRef.current = Date.now();
+    realtime.markLocalEdit();
     setRecipePlans((prev) =>
       prev.map((plan, idx) => (idx === activeRecipeIndex ? { ...plan, ...updates } : plan))
     );
