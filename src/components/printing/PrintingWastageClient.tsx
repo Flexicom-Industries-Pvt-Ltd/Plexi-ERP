@@ -58,6 +58,8 @@ export function PrintingWastageClient() {
 
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isInitialLoadRef = useRef<boolean>(true);
+  const isDirtyRef = useRef<boolean>(false);
+  const lastUserEditTimeRef = useRef<number>(0);
 
   // Fetch Report for Date & Shift
   const loadReport = useCallback(async () => {
@@ -105,6 +107,7 @@ export function PrintingWastageClient() {
       toast.error(err.message || "Failed to load wastage data");
     } finally {
       setLoading(false);
+      isDirtyRef.current = false;
       setTimeout(() => {
         isInitialLoadRef.current = false;
       }, 500);
@@ -121,6 +124,7 @@ export function PrintingWastageClient() {
     date,
     shift: shiftName,
     onSync: () => {
+      if (Date.now() - lastUserEditTimeRef.current < 3500) return;
       loadReport();
     },
   });
@@ -185,6 +189,7 @@ export function PrintingWastageClient() {
 
         setStatus(newStatus);
         setLastSavedAt(format(new Date(), "hh:mm:ss a"));
+        isDirtyRef.current = false;
         realtime.broadcastSync({
           action: newStatus === "SUBMITTED" ? "SUBMIT" : "SAVE",
           date,
@@ -224,7 +229,7 @@ export function PrintingWastageClient() {
 
   // Debounced Auto-Save Trigger (auto save as draft)
   useEffect(() => {
-    if (isInitialLoadRef.current || loading) return;
+    if (isInitialLoadRef.current || loading || !isDirtyRef.current) return;
     const hasAnyData =
       Boolean(laminationFabricWasteKg) ||
       Boolean(printFabricWasteKg) ||
@@ -237,7 +242,9 @@ export function PrintingWastageClient() {
     if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
 
     autoSaveTimerRef.current = setTimeout(() => {
-      handleSave("DRAFT", true);
+      if (isDirtyRef.current) {
+        handleSave("DRAFT", true);
+      }
     }, 1200);
 
     return () => {
@@ -404,7 +411,12 @@ export function PrintingWastageClient() {
               type="operator"
               section="PRINTING"
               value={operatorName}
-              onChange={(name) => setOperatorName(name)}
+              onChange={(name) => {
+                isDirtyRef.current = true;
+                lastUserEditTimeRef.current = Date.now();
+                realtime.markLocalEdit();
+                setOperatorName(name);
+              }}
               placeholder="e.g. Ramesh Kumar"
               inputClassName="h-9"
             />
@@ -419,7 +431,12 @@ export function PrintingWastageClient() {
             <UniversalPersonnelInput
               type="supervisor"
               value={supervisorName}
-              onChange={(name) => setSupervisorName(name)}
+              onChange={(name) => {
+                isDirtyRef.current = true;
+                lastUserEditTimeRef.current = Date.now();
+                realtime.markLocalEdit();
+                setSupervisorName(name);
+              }}
               placeholder="e.g. Anil Verma"
               inputClassName="h-9"
             />
@@ -450,7 +467,12 @@ export function PrintingWastageClient() {
               type="text"
               placeholder="Trim scrap cause, roll core tail, or color mismatch..."
               value={remarks}
-              onChange={(e) => setRemarks(e.target.value)}
+              onChange={(e) => {
+                isDirtyRef.current = true;
+                lastUserEditTimeRef.current = Date.now();
+                realtime.markLocalEdit();
+                setRemarks(e.target.value);
+              }}
               className="h-8 text-xs bg-slate-50/50 w-full rounded-md border border-slate-200 px-3"
             />
           </div>
@@ -609,7 +631,12 @@ export function PrintingWastageClient() {
                       step="0.01"
                       min="0"
                       value={laminationFabricWasteKg}
-                      onChange={(e) => setLaminationFabricWasteKg(e.target.value)}
+                      onChange={(e) => {
+                        isDirtyRef.current = true;
+                        lastUserEditTimeRef.current = Date.now();
+                        realtime.markLocalEdit();
+                        setLaminationFabricWasteKg(e.target.value);
+                      }}
                       placeholder="Enter kg"
                       className="w-full h-8 px-3 text-right font-bold text-xs pr-6 bg-amber-50/40 border border-amber-300 rounded-md focus:ring-1 focus:ring-amber-500 text-amber-950"
                     />
@@ -663,7 +690,12 @@ export function PrintingWastageClient() {
                       step="0.01"
                       min="0"
                       value={printFabricWasteKg}
-                      onChange={(e) => setPrintFabricWasteKg(e.target.value)}
+                      onChange={(e) => {
+                        isDirtyRef.current = true;
+                        lastUserEditTimeRef.current = Date.now();
+                        realtime.markLocalEdit();
+                        setPrintFabricWasteKg(e.target.value);
+                      }}
                       placeholder="Enter kg"
                       className="w-full h-8 px-3 text-right font-bold text-xs pr-6 bg-purple-50/40 border border-purple-300 rounded-md focus:ring-1 focus:ring-purple-500 text-purple-950"
                     />
@@ -759,7 +791,12 @@ export function PrintingWastageClient() {
                   step="0.01"
                   min="0"
                   value={laminationFabricWasteKg}
-                  onChange={(e) => setLaminationFabricWasteKg(e.target.value)}
+                  onChange={(e) => {
+                    isDirtyRef.current = true;
+                    lastUserEditTimeRef.current = Date.now();
+                    realtime.markLocalEdit();
+                    setLaminationFabricWasteKg(e.target.value);
+                  }}
                   placeholder="Enter wastage kg"
                   className="w-full h-10 px-3 text-sm font-extrabold text-amber-950 pr-7 bg-amber-50/40 border border-amber-300 rounded-lg focus:ring-1 focus:ring-amber-500"
                 />
@@ -834,7 +871,12 @@ export function PrintingWastageClient() {
                   step="0.01"
                   min="0"
                   value={printFabricWasteKg}
-                  onChange={(e) => setPrintFabricWasteKg(e.target.value)}
+                  onChange={(e) => {
+                    isDirtyRef.current = true;
+                    lastUserEditTimeRef.current = Date.now();
+                    realtime.markLocalEdit();
+                    setPrintFabricWasteKg(e.target.value);
+                  }}
                   placeholder="Enter wastage kg"
                   className="w-full h-10 px-3 text-sm font-extrabold text-purple-950 pr-7 bg-purple-50/40 border border-purple-300 rounded-lg focus:ring-1 focus:ring-purple-500"
                 />

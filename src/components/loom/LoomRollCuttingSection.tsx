@@ -179,6 +179,7 @@ export function LoomRollCuttingSection() {
   const latestPayloadRef = useRef<any>(null);
   const lastSavedPayloadRef = useRef<string>("");
   const isInitialMountRef = useRef<boolean>(true);
+  const lastUserEditTimeRef = useRef<number>(0);
 
   // Fetch report data
   const fetchData = useCallback(async () => {
@@ -249,7 +250,7 @@ export function LoomRollCuttingSection() {
     date: selectedDate,
     shift: selectedShift,
     onSync: () => {
-      if (!autoSaving) {
+      if (!autoSaving && Date.now() - lastUserEditTimeRef.current >= 3500) {
         fetchData();
       }
     },
@@ -395,6 +396,7 @@ export function LoomRollCuttingSection() {
 
   // Handle entry field update with live recalculation
   const handleUpdateEntry = (index: number, field: keyof LoomRollCuttingEntryItem, value: any) => {
+    lastUserEditTimeRef.current = Date.now();
     realtime.markLocalEdit();
     setEntries((prev) => {
       const copy = [...prev];
