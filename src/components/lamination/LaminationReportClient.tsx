@@ -30,13 +30,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Printer,
   FileSpreadsheet,
   Save,
@@ -44,7 +37,6 @@ import {
   Trash2,
   Layers,
   Calendar,
-  Clock,
   User,
   Users,
   CheckCircle2,
@@ -90,7 +82,7 @@ export function LaminationReportClient() {
   const deletedEntryIdsRef = useRef<Set<string>>(new Set());
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  const [focusedCell, setFocusedCellState] = useState<FocusedLaminationCell | null>(null);
+  const [, setFocusedCellState] = useState<FocusedLaminationCell | null>(null);
 
   const setFocusedCell = useCallback((rowKey: string, field: keyof LaminationProductionEntryData) => {
     const next = { rowKey, field };
@@ -105,7 +97,7 @@ export function LaminationReportClient() {
 
   // Available Rolls from Circular Loom Roll Stock
   const [availableRolls, setAvailableRolls] = useState<AvailableLaminationRoll[]>([]);
-  const [rollsLoading, setRollsLoading] = useState(false);
+  const [, setRollsLoading] = useState(false);
 
   // Modals & Viewport
   const [printModalOpen, setPrintModalOpen] = useState(false);
