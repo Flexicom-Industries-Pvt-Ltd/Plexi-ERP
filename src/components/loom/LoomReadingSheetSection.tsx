@@ -39,6 +39,12 @@ import {
   LOOM_BREAKDOWN_REASONS,
   IntervalKpiSummary,
 } from "@/lib/loom/loom-reading-types";
+import {
+  serializeLoomReadingPayload,
+  reconcileServerLoomReadings,
+  getLoomEntryKey,
+  ActiveFocusedCell,
+} from "@/lib/loom/reading-sheet-google-docs-sync";
 import { exportLoomReadingSheetExcel } from "@/lib/loom/loom-reading-export";
 import { printLoomReadingSheet } from "@/lib/loom/print-loom-reading";
 import { LoomReadingPrintPreviewModal } from "./LoomReadingPrintPreviewModal";
@@ -133,6 +139,9 @@ export function LoomReadingSheetSection() {
   const latestPayloadRef = useRef<any>(null);
   const isInitialMountRef = useRef<boolean>(true);
   const lastUserEditTimeRef = useRef<number>(0);
+  const activeFocusedCellRef = useRef<ActiveFocusedCell | null>(null);
+  const hasUnsavedLocalEditsRef = useRef<boolean>(false);
+  const deletedEntriesRef = useRef<Set<string>>(new Set());
 
   const [data, setData] = useState<ReadingSheetData | null>(null);
   const [entries, setEntries] = useState<LoomReadingEntryItem[]>([]);
@@ -246,10 +255,9 @@ export function LoomReadingSheetSection() {
     }
   };
 
-  // Fetch sheet data from server
+  // Fetch sheet data from server with 3-way Google Docs-grade reconciliation
   const fetchSheetData = useCallback(async (date: string, shift: string) => {
     setLoading(true);
-    isInitialMountRef.current = true;
     try {
       const params = new URLSearchParams({
         date,
@@ -293,19 +301,7 @@ export function LoomReadingSheetSection() {
         };
       });
 
-      setEntries(computedEntries);
-      setPreparedBy(json.sheet?.preparedBy || "");
-      setCheckedBy(json.sheet?.checkedBy || "");
-      setApprovedBy(json.sheet?.approvedBy || "");
-      setTotalWastageKg(String(json.sheet?.totalWastageKg || 0));
-      setSheetRemarks(json.sheet?.remarks || "");
-      setSheetStatus(json.sheet?.status || "DRAFT");
-
-      const initialPayload = {
-        action: "SAVE_SHEET",
-        date,
-        shiftName: json.sheet?.shiftName || shift,
-        entries: computedEntries,
+      const metadata = {
         preparedBy: json.sheet?.preparedBy || "",
         checkedBy: json.sheet?.checkedBy || "",
         approvedBy: json.sheet?.approvedBy || "",
@@ -316,9 +312,61 @@ export function LoomReadingSheetSection() {
         timeSlots: json.sheet?.timeSlots,
         initialTimeSlot: json.sheet?.initialTimeSlot,
       };
-      latestPayloadRef.current = initialPayload;
-      lastSavedPayloadRef.current = JSON.stringify(initialPayload);
-      isInitialMountRef.current = false;
+
+      if (isInitialMountRef.current) {
+        setEntries(computedEntries);
+        setPreparedBy(metadata.preparedBy);
+        setCheckedBy(metadata.checkedBy);
+        setApprovedBy(metadata.approvedBy);
+        setTotalWastageKg(String(metadata.totalWastageKg));
+        setSheetRemarks(metadata.remarks);
+        setSheetStatus(metadata.status);
+
+        const initialPayload = {
+          action: "SAVE_SHEET",
+          date,
+          shiftName: json.sheet?.shiftName || shift,
+          entries: computedEntries,
+          ...metadata,
+        };
+        latestPayloadRef.current = initialPayload;
+        lastSavedPayloadRef.current = serializeLoomReadingPayload(
+          date,
+          json.sheet?.shiftName || shift,
+          computedEntries,
+          metadata
+        );
+        isInitialMountRef.current = false;
+      } else {
+        // Reconcile server data while isolating active focused cell typing
+        setEntries((currentLocal) => {
+          const reconciled = reconcileServerLoomReadings(
+            currentLocal,
+            computedEntries,
+            activeFocusedCellRef.current,
+            deletedEntriesRef.current,
+            json.sheet?.shiftHours || 12
+          );
+
+          if (!hasUnsavedLocalEditsRef.current) {
+            setPreparedBy((p) => metadata.preparedBy || p);
+            setCheckedBy((c) => metadata.checkedBy || c);
+            setApprovedBy((a) => metadata.approvedBy || a);
+            setTotalWastageKg((w) => (metadata.totalWastageKg ? String(metadata.totalWastageKg) : w));
+            setSheetRemarks((r) => metadata.remarks || r);
+            setSheetStatus((s) => metadata.status || s);
+
+            lastSavedPayloadRef.current = serializeLoomReadingPayload(
+              date,
+              json.sheet?.shiftName || shift,
+              reconciled,
+              metadata
+            );
+          }
+
+          return reconciled;
+        });
+      }
     } catch (err: any) {
       console.error("fetchSheetData error:", err);
       showNotification(err.message || "Failed to load reading sheet", "error");
@@ -328,16 +376,37 @@ export function LoomReadingSheetSection() {
   }, []);
 
   useEffect(() => {
+    isInitialMountRef.current = true;
+    hasUnsavedLocalEditsRef.current = false;
+    deletedEntriesRef.current.clear();
     fetchSheetData(selectedDate, selectedShift);
   }, [selectedDate, selectedShift, fetchSheetData]);
+
+  // Google Docs-grade sleep wake-up and tab backgrounding catch-up
+  useEffect(() => {
+    const handleVisibilityOrFocus = () => {
+      if (typeof document !== "undefined" && document.visibilityState === "visible") {
+        fetchSheetData(selectedDate, selectedShift);
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityOrFocus);
+    window.addEventListener("focus", handleVisibilityOrFocus);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityOrFocus);
+      window.removeEventListener("focus", handleVisibilityOrFocus);
+    };
+  }, [fetchSheetData, selectedDate, selectedShift]);
 
   const realtime = useProductionRealtime({
     module: "loom",
     sheet: "reading-sheet",
     date: selectedDate,
     shift: selectedShift,
-    onSync: () => {
-      if (!isSavingRef.current && !pendingSaveRef.current && Date.now() - lastUserEditTimeRef.current >= 3500) {
+    onSync: (event) => {
+      // Echo suppression: ignore broadcasts generated by our own client
+      if (event?.clientId && event.clientId === realtime.clientId) return;
+      if (!isSavingRef.current && !pendingSaveRef.current) {
         fetchSheetData(selectedDate, selectedShift);
       }
     },
@@ -350,8 +419,14 @@ export function LoomReadingSheetSection() {
 
   const triggerAutoSave = useCallback(async (isImmediate: boolean = false, keepalive: boolean = false) => {
     if (!latestPayloadRef.current || isInitialMountRef.current) return;
-    const serialized = JSON.stringify(latestPayloadRef.current);
-    if (serialized === lastSavedPayloadRef.current) return;
+    const currentPayload = latestPayloadRef.current;
+    const serialized = serializeLoomReadingPayload(
+      currentPayload.date,
+      currentPayload.shiftName,
+      currentPayload.entries || [],
+      currentPayload
+    );
+    if (serialized === lastSavedPayloadRef.current && deletedEntriesRef.current.size === 0) return;
 
     if (isSavingRef.current) {
       pendingSaveRef.current = serialized;
@@ -364,15 +439,28 @@ export function LoomReadingSheetSection() {
     }
 
     try {
+      const deletedEntries = Array.from(deletedEntriesRef.current).map((k) => {
+        const [loomNum, rowSeq] = k.split("_").map(Number);
+        return { loomNumber: loomNum, rowSequence: rowSeq };
+      });
+
+      const bodyPayload = {
+        ...currentPayload,
+        clientId: realtime.clientId,
+        deletedEntries,
+      };
+
       const res = await fetch("/api/production/loom/reading-sheet", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: serialized,
+        body: JSON.stringify(bodyPayload),
         keepalive,
       });
 
       if (res.ok) {
         lastSavedPayloadRef.current = serialized;
+        hasUnsavedLocalEditsRef.current = false;
+        deletedEntriesRef.current.clear();
         setLastAutoSavedAt(new Date());
         realtime.broadcastSync({ action: "SAVE", date: selectedDate, shift: selectedShift });
       }
@@ -389,8 +477,18 @@ export function LoomReadingSheetSection() {
       }
     }
   }, [realtime, selectedDate, selectedShift]);
+
   useEffect(() => {
     triggerAutoSaveRef.current = triggerAutoSave;
+  }, [triggerAutoSave]);
+
+  const setFocusedCell = useCallback((loomNumber: number, rowSequence: number, field: string) => {
+    activeFocusedCellRef.current = { loomNumber, rowSequence, field };
+  }, []);
+
+  const clearFocusedCell = useCallback(() => {
+    activeFocusedCellRef.current = null;
+    triggerAutoSave(true);
   }, [triggerAutoSave]);
 
   // Sync latestPayloadRef and debounce auto-save (400ms)
@@ -414,8 +512,13 @@ export function LoomReadingSheetSection() {
     };
 
     latestPayloadRef.current = payload;
-    const serialized = JSON.stringify(payload);
-    if (serialized === lastSavedPayloadRef.current) return;
+    const serialized = serializeLoomReadingPayload(
+      selectedDate,
+      selectedShift,
+      entries,
+      payload
+    );
+    if (serialized === lastSavedPayloadRef.current && deletedEntriesRef.current.size === 0) return;
 
     const timer = setTimeout(() => {
       triggerAutoSave(false);
@@ -478,6 +581,7 @@ export function LoomReadingSheetSection() {
     value: any
   ) => {
     lastUserEditTimeRef.current = Date.now();
+    hasUnsavedLocalEditsRef.current = true;
     realtime.markLocalEdit();
     setEntries((prev) =>
       prev.map((item) => {
@@ -563,6 +667,7 @@ export function LoomReadingSheetSection() {
 
   // Add a new quality change split row for the specified loom
   const handleAddSplitRow = (loomNumber: number) => {
+    hasUnsavedLocalEditsRef.current = true;
     setEntries((prev) => {
       const loomRows = prev.filter((e) => e.loomNumber === loomNumber);
       const maxSeq = Math.max(...loomRows.map((e) => e.rowSequence || 1), 1);
@@ -625,6 +730,8 @@ export function LoomReadingSheetSection() {
   // Remove a split row for the specified loom
   const handleRemoveSplitRow = (loomNumber: number, rowSequence: number) => {
     if (rowSequence <= 1) return;
+    deletedEntriesRef.current.add(getLoomEntryKey(loomNumber, rowSequence));
+    hasUnsavedLocalEditsRef.current = true;
     setEntries((prev) =>
       prev.filter((e) => !(e.loomNumber === loomNumber && (e.rowSequence || 1) === rowSequence))
     );
@@ -721,6 +828,11 @@ export function LoomReadingSheetSection() {
   const handleSaveSheet = async (targetStatus: string = sheetStatus) => {
     setSaving(true);
     try {
+      const deletedEntries = Array.from(deletedEntriesRef.current).map((k) => {
+        const [loomNum, rowSeq] = k.split("_").map(Number);
+        return { loomNumber: loomNum, rowSequence: rowSeq };
+      });
+
       const payload = {
         action: "SAVE_SHEET",
         date: selectedDate,
@@ -735,6 +847,8 @@ export function LoomReadingSheetSection() {
         shiftHours: data?.sheet?.shiftHours || 12,
         timeSlots: data?.sheet?.timeSlots,
         initialTimeSlot: data?.sheet?.initialTimeSlot,
+        clientId: realtime.clientId,
+        deletedEntries,
       };
 
       const res = await fetch("/api/production/loom/reading-sheet", {
@@ -747,7 +861,14 @@ export function LoomReadingSheetSection() {
       if (!res.ok) throw new Error(json.error || "Failed to save reading sheet");
 
       setSheetStatus(targetStatus);
-      lastSavedPayloadRef.current = JSON.stringify(payload);
+      lastSavedPayloadRef.current = serializeLoomReadingPayload(
+        selectedDate,
+        selectedShift,
+        entries,
+        payload
+      );
+      hasUnsavedLocalEditsRef.current = false;
+      deletedEntriesRef.current.clear();
       setLastAutoSavedAt(new Date());
 
       realtime.broadcastSync({
@@ -1789,7 +1910,8 @@ export function LoomReadingSheetSection() {
                         <select
                           value={e.operatorName || ""}
                           onChange={(ev) => handleEntryChange(e.loomNumber, rowSeq, "operatorName", ev.target.value)}
-                          onBlur={() => triggerAutoSave(true)}
+                          onFocus={() => setFocusedCell(e.loomNumber, rowSeq, "operatorName")}
+                          onBlur={clearFocusedCell}
                           className="w-full px-2.5 py-1.5 text-xs bg-slate-50/60 group-hover:bg-white focus:bg-white border border-slate-200 focus:border-slate-800 rounded-lg outline-none font-medium text-slate-800 cursor-pointer transition-all truncate"
                         >
                           <option value="">-- Select Operator --</option>
@@ -1811,7 +1933,8 @@ export function LoomReadingSheetSection() {
                           type="text"
                           value={e.size || ""}
                           onChange={(ev) => handleEntryChange(e.loomNumber, rowSeq, "size", ev.target.value)}
-                          onBlur={() => triggerAutoSave(true)}
+                          onFocus={() => setFocusedCell(e.loomNumber, rowSeq, "size")}
+                          onBlur={clearFocusedCell}
                           placeholder="Size"
                           title="Auto-derived from assigned Quality"
                           className="w-full px-2 py-1.5 text-xs text-center font-mono font-bold text-slate-800 bg-slate-100/60 group-hover:bg-white focus:bg-white border border-transparent hover:border-slate-300 focus:border-slate-800 rounded-lg outline-none placeholder:text-slate-300 transition-all"
@@ -1824,7 +1947,8 @@ export function LoomReadingSheetSection() {
                           type="text"
                           value={e.denier || ""}
                           onChange={(ev) => handleEntryChange(e.loomNumber, rowSeq, "denier", ev.target.value)}
-                          onBlur={() => triggerAutoSave(true)}
+                          onFocus={() => setFocusedCell(e.loomNumber, rowSeq, "denier")}
+                          onBlur={clearFocusedCell}
                           placeholder="DNR"
                           title="Auto-derived from assigned Quality"
                           className="w-full px-2 py-1.5 text-xs text-center font-mono font-bold text-slate-800 bg-slate-100/60 group-hover:bg-white focus:bg-white border border-transparent hover:border-slate-300 focus:border-slate-800 rounded-lg outline-none placeholder:text-slate-300 transition-all"
@@ -1839,6 +1963,8 @@ export function LoomReadingSheetSection() {
                             handleEntryChange(e.loomNumber, rowSeq, "qualityType", newCode);
                             triggerAutoSave(true);
                           }}
+                          onFocus={() => setFocusedCell(e.loomNumber, rowSeq, "qualityType")}
+                          onBlur={clearFocusedCell}
                           options={data?.availableQualities || []}
                           placeholder="— Quality —"
                           compact={true}
@@ -1861,7 +1987,8 @@ export function LoomReadingSheetSection() {
                               ev.target.value === "" ? null : parseFloat(ev.target.value)
                             )
                           }
-                          onBlur={() => triggerAutoSave(true)}
+                          onFocus={() => setFocusedCell(e.loomNumber, rowSeq, "initialReading")}
+                          onBlur={clearFocusedCell}
                           placeholder="I/R"
                           title={isInitialLocked ? `Auto-locked (>2h window past ${initialTimeSlot}). Supervisor unlock required.` : "Initial reading"}
                           className={`w-full px-2 py-1.5 text-xs text-right font-mono font-black rounded-lg outline-none transition-all ${
@@ -1887,7 +2014,8 @@ export function LoomReadingSheetSection() {
                               ev.target.value === "" ? null : parseFloat(ev.target.value)
                             )
                           }
-                          onBlur={() => triggerAutoSave(true)}
+                          onFocus={() => setFocusedCell(e.loomNumber, rowSeq, "r1Reading")}
+                          onBlur={clearFocusedCell}
                           placeholder="—"
                           title={isR1Locked ? `Auto-locked (>2h window past ${timeSlots[0] || "10:00"}). Supervisor unlock required.` : undefined}
                           className={`w-full px-2 py-1.5 text-xs text-right font-mono rounded-lg outline-none transition-all ${
@@ -1916,7 +2044,8 @@ export function LoomReadingSheetSection() {
                               ev.target.value === "" ? null : parseFloat(ev.target.value)
                             )
                           }
-                          onBlur={() => triggerAutoSave(true)}
+                          onFocus={() => setFocusedCell(e.loomNumber, rowSeq, "r2Reading")}
+                          onBlur={clearFocusedCell}
                           placeholder="—"
                           title={isR2Locked ? `Auto-locked (>2h window past ${timeSlots[1] || "12:00"}). Supervisor unlock required.` : undefined}
                           className={`w-full px-2 py-1.5 text-xs text-right font-mono rounded-lg outline-none transition-all ${
@@ -1945,7 +2074,8 @@ export function LoomReadingSheetSection() {
                               ev.target.value === "" ? null : parseFloat(ev.target.value)
                             )
                           }
-                          onBlur={() => triggerAutoSave(true)}
+                          onFocus={() => setFocusedCell(e.loomNumber, rowSeq, "r3Reading")}
+                          onBlur={clearFocusedCell}
                           placeholder="—"
                           title={isR3Locked ? `Auto-locked (>2h window past ${timeSlots[2] || "14:00"}). Supervisor unlock required.` : undefined}
                           className={`w-full px-2 py-1.5 text-xs text-right font-mono rounded-lg outline-none transition-all ${
@@ -1974,7 +2104,8 @@ export function LoomReadingSheetSection() {
                               ev.target.value === "" ? null : parseFloat(ev.target.value)
                             )
                           }
-                          onBlur={() => triggerAutoSave(true)}
+                          onFocus={() => setFocusedCell(e.loomNumber, rowSeq, "r4Reading")}
+                          onBlur={clearFocusedCell}
                           placeholder="—"
                           title={isR4Locked ? `Auto-locked (>2h window past ${timeSlots[3] || "16:00"}). Supervisor unlock required.` : undefined}
                           className={`w-full px-2 py-1.5 text-xs text-right font-mono rounded-lg outline-none transition-all ${
@@ -2003,7 +2134,8 @@ export function LoomReadingSheetSection() {
                               ev.target.value === "" ? null : parseFloat(ev.target.value)
                             )
                           }
-                          onBlur={() => triggerAutoSave(true)}
+                          onFocus={() => setFocusedCell(e.loomNumber, rowSeq, "r5Reading")}
+                          onBlur={clearFocusedCell}
                           placeholder="—"
                           title={isR5Locked ? `Auto-locked (>2h window past ${timeSlots[4] || "18:00"}). Supervisor unlock required.` : undefined}
                           className={`w-full px-2 py-1.5 text-xs text-right font-mono rounded-lg outline-none transition-all ${
@@ -2032,7 +2164,8 @@ export function LoomReadingSheetSection() {
                               ev.target.value === "" ? null : parseFloat(ev.target.value)
                             )
                           }
-                          onBlur={() => triggerAutoSave(true)}
+                          onFocus={() => setFocusedCell(e.loomNumber, rowSeq, "r6Reading")}
+                          onBlur={clearFocusedCell}
                           placeholder="End Read"
                           title={isR6Locked ? `Auto-locked (>2h window past ${timeSlots[5] || "20:00"}). Supervisor unlock required.` : "Final reading"}
                           className={`w-full px-2 py-1.5 text-xs text-right font-mono font-black rounded-lg outline-none transition-all ${
@@ -2054,7 +2187,8 @@ export function LoomReadingSheetSection() {
                           <select
                             value={e.breakdownReason || ""}
                             onChange={(ev) => handleEntryChange(e.loomNumber, rowSeq, "breakdownReason", ev.target.value || null)}
-                            onBlur={() => triggerAutoSave(true)}
+                            onFocus={() => setFocusedCell(e.loomNumber, rowSeq, "breakdownReason")}
+                            onBlur={clearFocusedCell}
                             className="flex-1 text-xs font-semibold px-2 py-1 bg-white border border-amber-300 text-slate-800 rounded-lg outline-none hover:border-amber-500 focus:border-amber-600 shadow-2xs cursor-pointer"
                           >
                             <option value="">No Breakdown</option>
@@ -2078,7 +2212,8 @@ export function LoomReadingSheetSection() {
                                   ev.target.value === "" ? 0 : Math.max(0, parseInt(ev.target.value, 10) || 0)
                                 )
                               }
-                              onBlur={() => triggerAutoSave(true)}
+                              onFocus={() => setFocusedCell(e.loomNumber, rowSeq, "breakdownMinutes")}
+                              onBlur={clearFocusedCell}
                               placeholder="0"
                               title="Downtime in minutes"
                               className="w-12 text-xs text-right font-mono font-black text-amber-950 outline-none"
@@ -2097,6 +2232,8 @@ export function LoomReadingSheetSection() {
                               handleEntryChange(e.loomNumber, rowSeq, "changeoverTargetQuality", newCode || null);
                               triggerAutoSave(true);
                             }}
+                            onFocus={() => setFocusedCell(e.loomNumber, rowSeq, "changeoverTargetQuality")}
+                            onBlur={clearFocusedCell}
                             options={data?.availableQualities || []}
                             placeholder="Target Quality..."
                             compact={true}
@@ -2136,7 +2273,8 @@ export function LoomReadingSheetSection() {
                         <select
                           value={e.status}
                           onChange={(ev) => handleEntryChange(e.loomNumber, rowSeq, "status", ev.target.value)}
-                          onBlur={() => triggerAutoSave(true)}
+                          onFocus={() => setFocusedCell(e.loomNumber, rowSeq, "status")}
+                          onBlur={clearFocusedCell}
                           className={`text-xs font-bold px-2 py-1 rounded-lg border outline-none cursor-pointer ${
                             e.status === "RUNNING"
                               ? "bg-emerald-50 text-emerald-800 border-emerald-300"
@@ -2159,7 +2297,8 @@ export function LoomReadingSheetSection() {
                           type="text"
                           value={e.remarks || ""}
                           onChange={(ev) => handleEntryChange(e.loomNumber, rowSeq, "remarks", ev.target.value)}
-                          onBlur={() => triggerAutoSave(true)}
+                          onFocus={() => setFocusedCell(e.loomNumber, rowSeq, "remarks")}
+                          onBlur={clearFocusedCell}
                           placeholder="Notes..."
                           className="flex-1 min-w-[110px] px-2 py-1 text-xs bg-slate-50/40 group-hover:bg-white focus:bg-white border border-transparent hover:border-slate-200 focus:border-slate-800 rounded-lg outline-none transition-all placeholder:text-slate-300"
                         />
@@ -2755,7 +2894,8 @@ export function LoomReadingSheetSection() {
                           <select
                             value={e.operatorName || ""}
                             onChange={(ev) => handleEntryChange(e.loomNumber, rowSeq, "operatorName", ev.target.value)}
-                            onBlur={() => triggerAutoSave(true)}
+                            onFocus={() => setFocusedCell(e.loomNumber, rowSeq, "operatorName")}
+                            onBlur={clearFocusedCell}
                             className="w-full px-2 py-1.5 text-xs bg-white border border-slate-200 rounded-lg outline-none font-medium truncate cursor-pointer"
                           >
                             <option value="">-- Unassigned --</option>
@@ -2776,7 +2916,8 @@ export function LoomReadingSheetSection() {
                           <select
                             value={e.status}
                             onChange={(ev) => handleEntryChange(e.loomNumber, rowSeq, "status", ev.target.value)}
-                            onBlur={() => triggerAutoSave(true)}
+                            onFocus={() => setFocusedCell(e.loomNumber, rowSeq, "status")}
+                            onBlur={clearFocusedCell}
                             className={`w-full text-xs font-bold px-2 py-1.5 rounded-lg border outline-none cursor-pointer ${
                               e.status === "RUNNING"
                                 ? "bg-emerald-50 text-emerald-800 border-emerald-300"
@@ -2826,7 +2967,8 @@ export function LoomReadingSheetSection() {
                           type="text"
                           value={e.remarks || ""}
                           onChange={(ev) => handleEntryChange(e.loomNumber, rowSeq, "remarks", ev.target.value)}
-                          onBlur={() => triggerAutoSave(true)}
+                          onFocus={() => setFocusedCell(e.loomNumber, rowSeq, "remarks")}
+                          onBlur={clearFocusedCell}
                           placeholder="Notes / comments..."
                           className="flex-1 min-w-0 px-2.5 py-1.5 text-xs bg-white border border-slate-200 rounded-lg outline-none focus:border-slate-800"
                         />
@@ -2878,7 +3020,8 @@ export function LoomReadingSheetSection() {
                                     ev.target.value === "" ? null : parseFloat(ev.target.value)
                                   )
                                 }
-                                onBlur={() => triggerAutoSave(true)}
+                                onFocus={() => setFocusedCell(e.loomNumber, rowSeq, item.field)}
+                                onBlur={clearFocusedCell}
                                 placeholder="0"
                                 className={`w-full px-2 py-1 text-xs text-right font-mono font-bold rounded-lg border outline-none transition-all ${
                                   item.locked
@@ -2903,7 +3046,8 @@ export function LoomReadingSheetSection() {
                             <select
                               value={e.breakdownReason || ""}
                               onChange={(ev) => handleEntryChange(e.loomNumber, rowSeq, "breakdownReason", ev.target.value || null)}
-                              onBlur={() => triggerAutoSave(true)}
+                              onFocus={() => setFocusedCell(e.loomNumber, rowSeq, "breakdownReason")}
+                              onBlur={clearFocusedCell}
                               className="w-full text-xs font-semibold px-2 py-1.5 bg-white border border-amber-300 rounded-lg outline-none cursor-pointer"
                             >
                               <option value="">No Breakdown</option>
@@ -2930,7 +3074,8 @@ export function LoomReadingSheetSection() {
                                     ev.target.value === "" ? 0 : Math.max(0, parseInt(ev.target.value, 10) || 0)
                                   )
                                 }
-                                onBlur={() => triggerAutoSave(true)}
+                                onFocus={() => setFocusedCell(e.loomNumber, rowSeq, "breakdownMinutes")}
+                                onBlur={clearFocusedCell}
                                 placeholder="0"
                                 className="w-full text-xs text-right font-mono font-bold text-amber-950 outline-none"
                               />
@@ -2949,6 +3094,8 @@ export function LoomReadingSheetSection() {
                                 handleEntryChange(e.loomNumber, rowSeq, "changeoverTargetQuality", newCode || null);
                                 triggerAutoSave(true);
                               }}
+                              onFocus={() => setFocusedCell(e.loomNumber, rowSeq, "changeoverTargetQuality")}
+                              onBlur={clearFocusedCell}
                               options={data?.availableQualities || []}
                               placeholder="Select new quality..."
                               compact={true}

@@ -139,10 +139,26 @@ export function LoomSummarySection() {
     fetchSummary();
   }, [fetchSummary]);
 
+  // Google Docs-grade sleep wake-up and tab backgrounding catch-up
+  useEffect(() => {
+    const handleVisibilityOrFocus = () => {
+      if (typeof document !== "undefined" && document.visibilityState === "visible") {
+        fetchSummary();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityOrFocus);
+    window.addEventListener("focus", handleVisibilityOrFocus);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityOrFocus);
+      window.removeEventListener("focus", handleVisibilityOrFocus);
+    };
+  }, [fetchSummary]);
+
   const realtime = useProductionRealtime({
     module: "loom",
     sheet: "summary",
-    onSync: () => {
+    onSync: (event) => {
+      if (event?.clientId && event.clientId === realtime.clientId) return;
       fetchSummary();
     },
   });
