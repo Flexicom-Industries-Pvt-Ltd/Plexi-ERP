@@ -3,12 +3,16 @@ import { auth } from "@/auth";
 import path from "path";
 import { writeFile, mkdir } from "fs/promises";
 import { randomUUID } from "crypto";
+import { triggerOpportunisticPhotoPrune } from "@/lib/production/photo-retention";
 
 export async function POST(request: NextRequest) {
   const session = await auth();
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  // Trigger non-blocking opportunistic cleanup of expired photos (> 3 days old)
+  triggerOpportunisticPhotoPrune();
 
   try {
     const formData = await request.formData();
