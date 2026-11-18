@@ -13,14 +13,11 @@ import {
   Unlock,
   Camera,
   Image as ImageIcon,
-  ShieldAlert,
   ChevronDown,
   ChevronUp,
   Trash2,
   Clock,
-  Sparkles,
   Printer,
-  FileSpreadsheet,
 } from "lucide-react";
 import dynamic from "next/dynamic";
 import { SpreadsheetTable, ColumnDef } from "./SpreadsheetTable";
@@ -32,7 +29,6 @@ import { RealtimeSyncBadge } from "@/components/production/RealtimeSyncBadge";
 import {
   generateShiftTimeSlots,
   isTimeSlotLocked,
-  canUserOverrideLock,
 } from "@/lib/tape-plant/telemetry-time-slots";
 
 const TemperaturePrintPreviewModal = dynamic(
@@ -384,7 +380,7 @@ export function ProcessTemperatureSection({
   const [readings, setReadings] = useState<TemperatureReading[]>([]);
 
   // Shift Master integration
-  const { shifts, allowDayNight } = useProductionShifts();
+  const { shifts } = useProductionShifts();
   const isDayNight = shiftId === "ALL" || shiftName.toLowerCase().includes("day + night");
   const activeShift = useMemo(() => {
     return shifts.find((s) => s.id === shiftId);
@@ -401,8 +397,8 @@ export function ProcessTemperatureSection({
   }, [activeShift, isDayNight]);
 
   // Auth & RBAC State
-  const [userRole, setUserRole] = useState<string>("");
-  const [userPermissions, setUserPermissions] = useState<any[]>([]);
+  const [, setUserRole] = useState<string>("");
+  const [, setUserPermissions] = useState<any[]>([]);
   const [canUploadPhoto, setCanUploadPhoto] = useState<boolean>(true);
   const [canCapturePhoto, setCanCapturePhoto] = useState<boolean>(true);
   const [canUnlockTimeSlots, setCanUnlockTimeSlots] = useState<boolean>(false);
@@ -706,97 +702,113 @@ export function ProcessTemperatureSection({
     setExpandedSlots(new Set());
   };
 
-  const handleFieldChange = (
-    idx: number,
-    field: keyof TemperatureReading,
-    rawVal: string,
-    isNumber = true
-  ) => {
-    realtime.markLocalEdit();
-    hasUnsavedLocalEditsRef.current = true;
-    lastUserEditTimeRef.current = Date.now();
-    const val = isNumber && rawVal !== "" ? (isNaN(Number(rawVal)) ? rawVal : Number(rawVal)) : rawVal;
-    setReadings((prev) => {
-      const next = [...prev];
-      next[idx] = { ...next[idx], [field]: val };
-      return next;
-    });
-  };
-
-  const handleDeleteReading = (idx: number) => {
-    realtime.markLocalEdit();
-    hasUnsavedLocalEditsRef.current = true;
-    lastUserEditTimeRef.current = Date.now();
-    const target = readings[idx];
-    if (target?.time) {
-      deletedTimesRef.current.add(normalizeTimeSlot(target.time));
-    }
-    setReadings((prev) => prev.filter((_, i) => i !== idx));
-    setExpandedSlots((prev) => {
-      const next = new Set<number>();
-      prev.forEach((val) => {
-        if (val < idx) next.add(val);
-        else if (val > idx) next.add(val - 1);
+  const handleFieldChange = useCallback(
+    (
+      idx: number,
+      field: keyof TemperatureReading,
+      rawVal: string,
+      isNumber = true
+    ) => {
+      realtime.markLocalEdit();
+      hasUnsavedLocalEditsRef.current = true;
+      lastUserEditTimeRef.current = Date.now();
+      const val = isNumber && rawVal !== "" ? (isNaN(Number(rawVal)) ? rawVal : Number(rawVal)) : rawVal;
+      setReadings((prev) => {
+        const next = [...prev];
+        next[idx] = { ...next[idx], [field]: val };
+        return next;
       });
-      return next;
-    });
-  };
+    },
+    [realtime]
+  );
 
-  const handleAddReading = () => {
+  const handleDeleteReading = useCallback(
+    (idx: number) => {
+      realtime.markLocalEdit();
+      hasUnsavedLocalEditsRef.current = true;
+      lastUserEditTimeRef.current = Date.now();
+      setReadings((prev) => {
+        const target = prev[idx];
+        if (target?.time) {
+          deletedTimesRef.current.add(normalizeTimeSlot(target.time));
+        }
+        return prev.filter((_, i) => i !== idx);
+      });
+      setExpandedSlots((prev) => {
+        const next = new Set<number>();
+        prev.forEach((val) => {
+          if (val < idx) next.add(val);
+          else if (val > idx) next.add(val - 1);
+        });
+        return next;
+      });
+    },
+    [realtime]
+  );
+
+  const handleAddReading = useCallback(() => {
     realtime.markLocalEdit();
     hasUnsavedLocalEditsRef.current = true;
     lastUserEditTimeRef.current = Date.now();
     const now = new Date();
     const timeStr = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-    const newIdx = readings.length;
-    setReadings([
-      ...readings,
-      {
-        time: timeStr,
-        photoUrl: undefined,
-        b1: "",
-        b2: "",
-        b3: "",
-        b4: "",
-        b5: "",
-        b6: "",
-        b7: "",
-        screenChanger: "",
-        ad1: "",
-        ad2: "",
-        meltPump: "",
-        d1: "",
-        d2: "",
-        d3: "",
-        d4: "",
-        d5: "",
-        d6: "",
-        d7: "",
-        meltTemp: "",
-        h1: "",
-        h2: "",
-        hotAirTemp: "",
-      },
-    ]);
-    setExpandedSlots((prev) => new Set([...prev, newIdx]));
-  };
+    setReadings((prev) => {
+      const newIdx = prev.length;
+      setExpandedSlots((old) => new Set([...old, newIdx]));
+      return [
+        ...prev,
+        {
+          time: timeStr,
+          photoUrl: undefined,
+          b1: "",
+          b2: "",
+          b3: "",
+          b4: "",
+          b5: "",
+          b6: "",
+          b7: "",
+          screenChanger: "",
+          ad1: "",
+          ad2: "",
+          meltPump: "",
+          d1: "",
+          d2: "",
+          d3: "",
+          d4: "",
+          d5: "",
+          d6: "",
+          d7: "",
+          meltTemp: "",
+          h1: "",
+          h2: "",
+          hotAirTemp: "",
+        },
+      ];
+    });
+  }, [realtime]);
 
-  const handleCopyPrevious = (idx: number) => {
-    if (idx <= 0) return;
-    realtime.markLocalEdit();
-    hasUnsavedLocalEditsRef.current = true;
-    lastUserEditTimeRef.current = Date.now();
-    const prev = readings[idx - 1];
-    const updated = [...readings];
-    updated[idx] = {
-      ...prev,
-      time: updated[idx].time || prev.time,
-      photoUrl: undefined, // Do not copy photo across rows
-      id: undefined,
-    };
-    setReadings(updated);
-    toast.success("Copied values from previous row");
-  };
+  const handleCopyPrevious = useCallback(
+    (idx: number) => {
+      if (idx <= 0) return;
+      realtime.markLocalEdit();
+      hasUnsavedLocalEditsRef.current = true;
+      lastUserEditTimeRef.current = Date.now();
+      setReadings((prevReadings) => {
+        const prev = prevReadings[idx - 1];
+        if (!prev) return prevReadings;
+        const updated = [...prevReadings];
+        updated[idx] = {
+          ...prev,
+          time: updated[idx]?.time || prev.time,
+          photoUrl: undefined, // Do not copy photo across rows
+          id: undefined,
+        };
+        return updated;
+      });
+      toast.success("Copied values from previous row");
+    },
+    [realtime]
+  );
 
   // Row Lock Determination
   const isRowLocked = useCallback(

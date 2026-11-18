@@ -4,18 +4,11 @@ import React, { useState, useEffect, useTransition, useMemo, useRef, useCallback
 import { format } from "date-fns";
 import {
   Calendar as CalendarIcon,
-  Clock,
   User,
   Save,
   Printer,
   FileSpreadsheet,
-  RefreshCw,
-  Minus,
-  Equal,
   CheckCircle2,
-  AlertTriangle,
-  Layers,
-  ArrowRight,
   FlaskConical,
   Maximize2,
   Minimize2,
@@ -63,7 +56,7 @@ export function LaminationRawMaterialEntryClient() {
 
   // Line items
   const [entries, setEntries] = useState<RawMaterialEntryItem[]>([]);
-  const [masterMaterials, setMasterMaterials] = useState<any[]>([]);
+  const [, setMasterMaterials] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isPending, startTransition] = useTransition();
   const [isAutoSaving, setIsAutoSaving] = useState<boolean>(false);
@@ -75,7 +68,7 @@ export function LaminationRawMaterialEntryClient() {
   const activeFocusedCellRef = useRef<FocusedRawMaterialCell | null>(null);
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  const [focusedCell, setFocusedCellState] = useState<FocusedRawMaterialCell | null>(null);
+  const [, setFocusedCellState] = useState<FocusedRawMaterialCell | null>(null);
 
   const setFocusedCell = useCallback((rowKey: string, field: keyof RawMaterialEntryItem) => {
     const next = { rowKey, field };
@@ -380,44 +373,8 @@ export function LaminationRawMaterialEntryClient() {
   };
 
   // Sync with Data Centre Master (keeps entered machine readings if matching)
-  const handleSyncWithMaster = () => {
-    if (!masterMaterials || masterMaterials.length === 0) {
-      toast.info("No active materials found in Data Centre Master");
-      return;
-    }
-
-    hasUnsavedLocalEditsRef.current = true;
-    const numManualTotal = parseFloat(manualTotalInput) || 0;
-
-    const mergedEntries: RawMaterialEntryItem[] = masterMaterials.map(
-      (m, idx) => {
-        const existing = entries.find(
-          (e) => e.rawMaterialId === m.id || e.materialName === m.name
-        );
-        const machineKg = existing ? existing.machineKg : 0;
-        const { manualKg, diffKg } = calculateRawMaterialRow(
-          numManualTotal,
-          machineKg,
-          m.percentage
-        );
-
-        return {
-          rawMaterialId: m.id,
-          materialName: m.name,
-          percentage: m.percentage,
-          manualKg,
-          machineKg,
-          diffKg,
-          sequence: m.sequence || idx + 1,
-          remarks: existing?.remarks || "",
-        };
-      }
-    );
-
-    setEntries(mergedEntries);
-    triggerAutoSave(mergedEntries);
-    toast.success("Synchronized with Data Centre Master percentages");
-  };
+  // Can be hooked up to a manual sync button if needed:
+  // const handleSyncWithMaster = () => { ... }
 
   // Computed totals
   const numManual = parseFloat(manualTotalInput) || 0;

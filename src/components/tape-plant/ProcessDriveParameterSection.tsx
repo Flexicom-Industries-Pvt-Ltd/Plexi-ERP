@@ -13,13 +13,11 @@ import {
   Unlock,
   Camera,
   Image as ImageIcon,
-  ShieldAlert,
   ChevronDown,
   ChevronUp,
   Trash2,
   Clock,
   Printer,
-  Sparkles,
 } from "lucide-react";
 import dynamic from "next/dynamic";
 import { SpreadsheetTable, ColumnDef } from "./SpreadsheetTable";
@@ -31,7 +29,6 @@ import { RealtimeSyncBadge } from "@/components/production/RealtimeSyncBadge";
 import {
   generateShiftTimeSlots,
   isTimeSlotLocked,
-  canUserOverrideLock,
   normalizeTimeSlot,
 } from "@/lib/tape-plant/telemetry-time-slots";
 
@@ -385,8 +382,8 @@ export function ProcessDriveParameterSection({
   }, [activeShift, isDayNight]);
 
   // Auth & RBAC State
-  const [userRole, setUserRole] = useState<string>("");
-  const [userPermissions, setUserPermissions] = useState<any[]>([]);
+  const [, setUserRole] = useState<string>("");
+  const [, setUserPermissions] = useState<any[]>([]);
   const [canUploadPhoto, setCanUploadPhoto] = useState<boolean>(true);
   const [canCapturePhoto, setCanCapturePhoto] = useState<boolean>(true);
   const [canUnlockTimeSlots, setCanUnlockTimeSlots] = useState<boolean>(false);
@@ -682,7 +679,7 @@ export function ProcessDriveParameterSection({
     setExpandedSlots(new Set());
   };
 
-  const handleFieldChange = (
+  const handleFieldChange = useCallback((
     idx: number,
     field: keyof DriveParameterReading,
     rawVal: string,
@@ -697,17 +694,19 @@ export function ProcessDriveParameterSection({
       next[idx] = { ...next[idx], [field]: val };
       return next;
     });
-  };
+  }, [realtime]);
 
-  const handleDeleteReading = (idx: number) => {
+  const handleDeleteReading = useCallback((idx: number) => {
     realtime.markLocalEdit();
     hasUnsavedLocalEditsRef.current = true;
     lastUserEditTimeRef.current = Date.now();
-    const target = records[idx];
-    if (target?.time) {
-      deletedTimesRef.current.add(normalizeTimeSlot(target.time));
-    }
-    setRecords((prev) => prev.filter((_, i) => i !== idx));
+    setRecords((prev) => {
+      const target = prev[idx];
+      if (target?.time) {
+        deletedTimesRef.current.add(normalizeTimeSlot(target.time));
+      }
+      return prev.filter((_, i) => i !== idx);
+    });
     setExpandedSlots((prev) => {
       const next = new Set<number>();
       prev.forEach((val) => {
@@ -716,61 +715,65 @@ export function ProcessDriveParameterSection({
       });
       return next;
     });
-  };
+  }, [realtime]);
 
-  const handleAddReading = () => {
+  const handleAddReading = useCallback(() => {
     realtime.markLocalEdit();
     hasUnsavedLocalEditsRef.current = true;
     lastUserEditTimeRef.current = Date.now();
     const now = new Date();
     const timeStr = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-    const newIdx = records.length;
-    setRecords([
-      ...records,
-      {
-        time: timeStr,
-        photoUrl: undefined,
-        extruderRpm: "",
-        meltPumpRpm: "",
-        takeUpMpm: "",
-        nipRollMpm: "",
-        isuMpm: "",
-        pauMpm: "",
-        stretchingMpm: "",
-        annealingMpm: "",
-        stretchingRatio: "",
-        meltPressureP1: "",
-        meltPressureP2: "",
-        meltPressureP3: "",
-        waterBath: "",
-        colour: "",
-        denier: "",
-        tapeWidth: "",
-        strength: "",
-        eloPercent: "",
-        spacerWidth: "",
-        numberOfTape: "",
-      },
-    ]);
-    setExpandedSlots((prev) => new Set([...prev, newIdx]));
-  };
+    setRecords((prev) => {
+      const newIdx = prev.length;
+      setExpandedSlots((old) => new Set([...old, newIdx]));
+      return [
+        ...prev,
+        {
+          time: timeStr,
+          photoUrl: undefined,
+          extruderRpm: "",
+          meltPumpRpm: "",
+          takeUpMpm: "",
+          nipRollMpm: "",
+          isuMpm: "",
+          pauMpm: "",
+          stretchingMpm: "",
+          annealingMpm: "",
+          stretchingRatio: "",
+          meltPressureP1: "",
+          meltPressureP2: "",
+          meltPressureP3: "",
+          waterBath: "",
+          colour: "",
+          denier: "",
+          tapeWidth: "",
+          strength: "",
+          eloPercent: "",
+          spacerWidth: "",
+          numberOfTape: "",
+        },
+      ];
+    });
+  }, [realtime]);
 
-  const handleCopyPrevious = (idx: number) => {
+  const handleCopyPrevious = useCallback((idx: number) => {
     if (idx <= 0) return;
     realtime.markLocalEdit();
     hasUnsavedLocalEditsRef.current = true;
     lastUserEditTimeRef.current = Date.now();
-    const prev = records[idx - 1];
-    const updated = [...records];
-    updated[idx] = {
-      ...prev,
-      time: updated[idx].time || prev.time,
-      photoUrl: undefined, // Do not copy photo across rows
-      id: undefined,
-    };
-    setRecords(updated);
+    setRecords((prevRecords) => {
+      const prev = prevRecords[idx - 1];
+      const updated = [...prevRecords];
+      updated[idx] = {
+        ...prev,
+        time: updated[idx].time || prev.time,
+        photoUrl: undefined, // Do not copy photo across rows
+        id: undefined,
+      };
+      return updated;
+    });
     toast.success("Copied parameters from previous row");
-  };
+  }, [realtime]);
 
   // Row Lock Determination
   const isRowLocked = useCallback(
