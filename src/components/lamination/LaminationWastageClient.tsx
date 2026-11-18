@@ -364,8 +364,8 @@ export function LaminationWastageClient() {
                     status === "APPROVED"
                       ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                       : status === "SUBMITTED"
-                      ? "bg-sky-50 text-sky-700 border-sky-200"
-                      : "bg-amber-50 text-amber-700 border-amber-200"
+                        ? "bg-sky-50 text-sky-700 border-sky-200"
+                        : "bg-amber-50 text-amber-700 border-amber-200"
                   }
                 >
                   {status}
