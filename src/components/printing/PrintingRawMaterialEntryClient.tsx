@@ -65,6 +65,8 @@ export function PrintingRawMaterialEntryClient() {
 
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isInitialLoadRef = useRef<boolean>(true);
+  const isDirtyRef = useRef<boolean>(false);
+  const lastUserEditTimeRef = useRef<number>(0);
 
   // 1. Fetch Master Materials from Data Centre
   useEffect(() => {
@@ -131,6 +133,7 @@ export function PrintingRawMaterialEntryClient() {
       toast.error(err.message || "Failed to load raw material report");
     } finally {
       setLoading(false);
+      isDirtyRef.current = false;
       setTimeout(() => {
         isInitialLoadRef.current = false;
       }, 500);
@@ -147,12 +150,16 @@ export function PrintingRawMaterialEntryClient() {
     date,
     shift: shiftName,
     onSync: () => {
+      if (Date.now() - lastUserEditTimeRef.current < 3500) return;
       loadReport();
     },
   });
 
   // Handle row change
   const handleEntryChange = (index: number, field: keyof PrintingRawMaterialEntryItem, value: any) => {
+    isDirtyRef.current = true;
+    lastUserEditTimeRef.current = Date.now();
+    realtime.markLocalEdit();
     setEntries((prev) => {
       const next = [...prev];
       const row = { ...next[index], [field]: value };
@@ -175,6 +182,9 @@ export function PrintingRawMaterialEntryClient() {
   };
 
   const addRow = (presetMaterial?: PrintingRawMaterialMasterItem) => {
+    isDirtyRef.current = true;
+    lastUserEditTimeRef.current = Date.now();
+    realtime.markLocalEdit();
     setEntries((prev) => [
       ...prev,
       {
@@ -193,6 +203,9 @@ export function PrintingRawMaterialEntryClient() {
   };
 
   const removeRow = (index: number) => {
+    isDirtyRef.current = true;
+    lastUserEditTimeRef.current = Date.now();
+    realtime.markLocalEdit();
     setEntries((prev) => prev.filter((_, i) => i !== index));
   };
 
@@ -254,6 +267,7 @@ export function PrintingRawMaterialEntryClient() {
 
         setStatus(newStatus);
         setLastSavedAt(format(new Date(), "hh:mm:ss a"));
+        isDirtyRef.current = false;
         realtime.broadcastSync({
           action: newStatus === "SUBMITTED" ? "SUBMIT" : "SAVE",
           date,
@@ -282,7 +296,7 @@ export function PrintingRawMaterialEntryClient() {
 
   // Debounced Auto-Save Trigger (auto save as draft)
   useEffect(() => {
-    if (isInitialLoadRef.current || loading) return;
+    if (isInitialLoadRef.current || loading || !isDirtyRef.current) return;
     const hasAnyData =
       entries.some((e) => Boolean(e.materialName?.trim() || Number(e.consumedLitre) > 0 || Number(e.consumedKg) > 0)) ||
       Boolean(remarks.trim()) ||
@@ -294,7 +308,9 @@ export function PrintingRawMaterialEntryClient() {
     if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
 
     autoSaveTimerRef.current = setTimeout(() => {
-      handleSave("DRAFT", true);
+      if (isDirtyRef.current) {
+        handleSave("DRAFT", true);
+      }
     }, 1200);
 
     return () => {
@@ -441,7 +457,12 @@ export function PrintingRawMaterialEntryClient() {
               type="operator"
               section="PRINTING"
               value={operatorName}
-              onChange={(name) => setOperatorName(name)}
+              onChange={(name) => {
+                isDirtyRef.current = true;
+                lastUserEditTimeRef.current = Date.now();
+                realtime.markLocalEdit();
+                setOperatorName(name);
+              }}
               placeholder="e.g. Ramesh Kumar"
             />
           </div>
@@ -453,7 +474,12 @@ export function PrintingRawMaterialEntryClient() {
             <UniversalPersonnelInput
               type="supervisor"
               value={supervisorName}
-              onChange={(name) => setSupervisorName(name)}
+              onChange={(name) => {
+                isDirtyRef.current = true;
+                lastUserEditTimeRef.current = Date.now();
+                realtime.markLocalEdit();
+                setSupervisorName(name);
+              }}
               placeholder="e.g. Anil Verma"
             />
           </div>
@@ -1011,7 +1037,12 @@ export function PrintingRawMaterialEntryClient() {
           rows={2}
           placeholder="State any temperature / viscosity adjustments, shade changeover flushing, or machine idle remarks..."
           value={remarks}
-          onChange={(e) => setRemarks(e.target.value)}
+          onChange={(e) => {
+            isDirtyRef.current = true;
+            lastUserEditTimeRef.current = Date.now();
+            realtime.markLocalEdit();
+            setRemarks(e.target.value);
+          }}
           className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary"
         />
       </div>

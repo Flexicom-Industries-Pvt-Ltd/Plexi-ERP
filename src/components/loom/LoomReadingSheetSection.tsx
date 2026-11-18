@@ -132,6 +132,7 @@ export function LoomReadingSheetSection() {
   const lastSavedPayloadRef = useRef<string>("");
   const latestPayloadRef = useRef<any>(null);
   const isInitialMountRef = useRef<boolean>(true);
+  const lastUserEditTimeRef = useRef<number>(0);
 
   const [data, setData] = useState<ReadingSheetData | null>(null);
   const [entries, setEntries] = useState<LoomReadingEntryItem[]>([]);
@@ -336,7 +337,7 @@ export function LoomReadingSheetSection() {
     date: selectedDate,
     shift: selectedShift,
     onSync: () => {
-      if (!isSavingRef.current && !pendingSaveRef.current) {
+      if (!isSavingRef.current && !pendingSaveRef.current && Date.now() - lastUserEditTimeRef.current >= 3500) {
         fetchSheetData(selectedDate, selectedShift);
       }
     },
@@ -476,6 +477,8 @@ export function LoomReadingSheetSection() {
     field: keyof LoomReadingEntryItem,
     value: any
   ) => {
+    lastUserEditTimeRef.current = Date.now();
+    realtime.markLocalEdit();
     setEntries((prev) =>
       prev.map((item) => {
         if (item.loomNumber !== loomNumber || (item.rowSequence || 1) !== (rowSequence || 1)) {

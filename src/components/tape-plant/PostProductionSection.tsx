@@ -56,6 +56,7 @@ export function PostProductionSection({ date, shiftId, shiftName }: PostProducti
   const [lastAutoSavedAt, setLastAutoSavedAt] = useState<Date | null>(null);
   const isInitialLoadedRef = useRef(false);
   const lastSavedPayloadRef = useRef("");
+  const lastUserEditTimeRef = useRef<number>(0);
   const [status, setStatus] = useState("SAVED");
   const [operatorName, setOperatorName] = useState("");
   const [operatorId, setOperatorId] = useState("");
@@ -135,7 +136,7 @@ export function PostProductionSection({ date, shiftId, shiftName }: PostProducti
     date,
     shift: shiftId,
     onSync: () => {
-      if (!autoSaving) {
+      if (!autoSaving && Date.now() - lastUserEditTimeRef.current >= 3500) {
         fetchPostProductionData();
       }
     },
@@ -182,6 +183,7 @@ export function PostProductionSection({ date, shiftId, shiftName }: PostProducti
 
   const updateEntryField = (index: number, field: keyof RecipePostProductionEntry, value: any) => {
     realtime.markLocalEdit();
+    lastUserEditTimeRef.current = Date.now();
     setEntries((prev) => {
       const copy = [...prev];
       const item = { ...copy[index], [field]: value };
@@ -320,6 +322,8 @@ export function PostProductionSection({ date, shiftId, shiftName }: PostProducti
               value={operatorName}
               operatorId={operatorId}
               onChange={(name, id) => {
+                lastUserEditTimeRef.current = Date.now();
+                realtime.markLocalEdit();
                 setOperatorName(name);
                 setOperatorId(id || "");
               }}
@@ -391,6 +395,8 @@ export function PostProductionSection({ date, shiftId, shiftName }: PostProducti
               value={operatorName}
               operatorId={operatorId}
               onChange={(name, id) => {
+                lastUserEditTimeRef.current = Date.now();
+                realtime.markLocalEdit();
                 setOperatorName(name);
                 setOperatorId(id || "");
               }}

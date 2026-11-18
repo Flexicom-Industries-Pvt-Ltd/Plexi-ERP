@@ -107,6 +107,7 @@ export function ValvomaticDailyReportClient() {
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isInitialLoadRef = useRef<boolean>(true);
   const isDirtyRef = useRef<boolean>(false);
+  const lastUserEditTimeRef = useRef<number>(0);
 
   // Keep a reference to the latest data to prevent stale closures during auto-save
   const latestDataRef = useRef({
@@ -246,6 +247,7 @@ export function ValvomaticDailyReportClient() {
     date,
     shift: shiftName,
     onSync: () => {
+      if (Date.now() - lastUserEditTimeRef.current < 3500) return;
       fetchReportData();
     },
   });
@@ -253,6 +255,8 @@ export function ValvomaticDailyReportClient() {
   // Handle cell edits with live recalculation and dirty flagging
   const handleCellChange = (index: number, field: keyof ValvomaticReportItem, value: any) => {
     isDirtyRef.current = true;
+    lastUserEditTimeRef.current = Date.now();
+    realtime.markLocalEdit();
     setEntries((prev) => {
       const next = [...prev];
       const updatedRow = { ...next[index], [field]: value };
