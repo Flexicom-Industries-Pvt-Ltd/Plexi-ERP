@@ -2004,6 +2004,10 @@ export function LoomRollCuttingSection() {
             handleUpdateEntry(photoModalIndex, "photoUrl", url);
             setPhotoModalIndex(null);
           }}
+          onRemovePhoto={() => {
+            handleUpdateEntry(photoModalIndex, "photoUrl", null);
+            setPhotoModalIndex(null);
+          }}
         />
       )}
 
