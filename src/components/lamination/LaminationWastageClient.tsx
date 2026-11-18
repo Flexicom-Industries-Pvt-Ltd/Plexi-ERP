@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useTransition, useMemo } from "react";
+import React, { useState, useEffect, useTransition, useMemo, useRef, useCallback } from "react";
 import { format } from "date-fns";
 import {
   Calendar as CalendarIcon,
@@ -55,6 +55,14 @@ export function LaminationWastageClient() {
   const [lumpsWastageKg, setLumpsWastageKg] = useState<string>("");
   const [fabricWastageKg, setFabricWastageKg] = useState<string>("");
 
+  // Google Docs Concurrent Sync & Typing Isolation Refs
+  const [isAutoSaving, setIsAutoSaving] = useState(false);
+  const [lastAutoSavedAt, setLastAutoSavedAt] = useState<Date | null>(null);
+  const lastSavedPayloadRef = useRef<string>("");
+  const hasUnsavedLocalEditsRef = useRef<boolean>(false);
+  const activeFieldRef = useRef<string | null>(null);
+  const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
+
   // Sources status
   const [sources, setSources] = useState<{
     hasRawMaterialReport: boolean;
@@ -96,14 +104,14 @@ export function LaminationWastageClient() {
       .catch((err) => console.error("Error fetching contractors:", err));
   }, []);
 
-  // Fetch report for Date + Shift
-  const fetchReport = async () => {
+  // Fetch report for Date + Shift with non-destructive typing isolation
+  const fetchReport = useCallback(async () => {
     setIsLoading(true);
     try {
       const res = await fetch(
         `/api/production/lamination/wastage?date=${encodeURIComponent(
           date
-        )}&shiftName=${encodeURIComponent(shiftName)}`
+        )}&shiftName=${encodeURIComponent(shiftName)}&_t=${Date.now()}`
       );
       const data = await res.json();
 
@@ -125,16 +133,29 @@ export function LaminationWastageClient() {
           setRemarks(rep.remarks || "");
           setRawMaterialUsedKg(String(rep.rawMaterialUsedKg || 0));
           setFabricNetWeightKg(String(rep.fabricNetWeightKg || 0));
-          setLumpsWastageKg(rep.lumpsWastageKg > 0 ? String(rep.lumpsWastageKg) : "");
-          setFabricWastageKg(rep.fabricWastageKg > 0 ? String(rep.fabricWastageKg) : "");
+          if (activeFieldRef.current !== "lumpsWastageKg") {
+            setLumpsWastageKg(rep.lumpsWastageKg > 0 ? String(rep.lumpsWastageKg) : "");
+          }
+          if (activeFieldRef.current !== "fabricWastageKg") {
+            setFabricWastageKg(rep.fabricWastageKg > 0 ? String(rep.fabricWastageKg) : "");
+          }
+          lastSavedPayloadRef.current = JSON.stringify({
+            date,
+            shiftName,
+            operatorName: rep.operatorName || "",
+            contractorName: rep.contractorName || "",
+            lumpsWastageKg: rep.lumpsWastageKg || 0,
+            fabricWastageKg: rep.fabricWastageKg || 0,
+            remarks: rep.remarks || "",
+          });
         } else {
           // Reactive hydration from shift reports if new draft
           setOperatorName("");
           setContractorName("");
           setStatus("DRAFT");
           setRemarks("");
-          setLumpsWastageKg("");
-          setFabricWastageKg("");
+          if (activeFieldRef.current !== "lumpsWastageKg") setLumpsWastageKg("");
+          if (activeFieldRef.current !== "fabricWastageKg") setFabricWastageKg("");
           if (data.sources) {
             setRawMaterialUsedKg(data.sources.sourceRawMaterialKg > 0 ? String(data.sources.sourceRawMaterialKg) : "");
             setFabricNetWeightKg(data.sources.sourceFabricNetWtKg > 0 ? String(data.sources.sourceFabricNetWtKg) : "");
@@ -142,6 +163,7 @@ export function LaminationWastageClient() {
             setRawMaterialUsedKg("");
             setFabricNetWeightKg("");
           }
+          lastSavedPayloadRef.current = "";
         }
       } else {
         toast.error(data.error || "Failed to load wastage report");
@@ -152,21 +174,106 @@ export function LaminationWastageClient() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [date, shiftName]);
 
   useEffect(() => {
     fetchReport();
-  }, [date, shiftName]);
+  }, [fetchReport]);
 
   const realtime = useProductionRealtime({
     module: "lamination",
     sheet: "wastage",
     date,
     shift: shiftName,
-    onSync: () => {
+    onSync: (event) => {
+      // Echo suppression: ignore updates sent by this client
+      if (event?.clientId === realtime.clientId) return;
       fetchReport();
     },
   });
+
+  // Tab switch / sleep wake-up listeners to pull latest edits immediately upon return
+  useEffect(() => {
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === "visible" && date && shiftName) {
+        fetchReport();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityOrFocus);
+    window.addEventListener("focus", handleVisibilityOrFocus);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityOrFocus);
+      window.removeEventListener("focus", handleVisibilityOrFocus);
+    };
+  }, [date, shiftName, fetchReport]);
+
+  // Debounced auto-save handler (1500ms) with zero-loop echo broadcast
+  const triggerAutoSave = useCallback(
+    (
+      currentLumps: string = lumpsWastageKg,
+      currentFabric: string = fabricWastageKg,
+      currentStatus: "DRAFT" | "SUBMITTED" | "APPROVED" = status
+    ) => {
+      if (!date || !shiftName) return;
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+
+      autoSaveTimerRef.current = setTimeout(async () => {
+        const calc = calculateWastage(
+          parseFloat(rawMaterialUsedKg) || 0,
+          parseFloat(currentLumps) || 0,
+          parseFloat(fabricNetWeightKg) || 0,
+          parseFloat(currentFabric) || 0
+        );
+
+        const payload = {
+          date,
+          shiftName,
+          operatorName: operatorName.trim() || null,
+          contractorName: contractorName.trim() || null,
+          rawMaterialUsedKg: calc.rawMaterialUsedKg,
+          lumpsWastageKg: calc.lumpsWastageKg,
+          fabricNetWeightKg: calc.fabricNetWeightKg,
+          fabricWastageKg: calc.fabricWastageKg,
+          status: currentStatus,
+          remarks: remarks.trim() || null,
+          clientId: realtime.clientId,
+        };
+
+        const payloadString = JSON.stringify(payload);
+        if (payloadString === lastSavedPayloadRef.current) {
+          hasUnsavedLocalEditsRef.current = false;
+          return;
+        }
+
+        setIsAutoSaving(true);
+        try {
+          const res = await fetch("/api/production/lamination/wastage", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: payloadString,
+          });
+          const data = await res.json();
+          if (res.ok && data.success) {
+            lastSavedPayloadRef.current = payloadString;
+            hasUnsavedLocalEditsRef.current = false;
+            setLastAutoSavedAt(new Date());
+            realtime.broadcastSync({
+              action: currentStatus === "SUBMITTED" ? "SUBMIT" : "SAVE",
+              date,
+              shift: shiftName,
+            });
+          }
+        } catch (err) {
+          console.error("Wastage auto-save failed:", err);
+        } finally {
+          setIsAutoSaving(false);
+        }
+      }, 1500);
+    },
+    [date, shiftName, operatorName, contractorName, rawMaterialUsedKg, fabricNetWeightKg, remarks, status, realtime, lumpsWastageKg, fabricWastageKg]
+  );
 
   // Real-time calculation
   const calculated = useMemo(() => {
@@ -180,6 +287,7 @@ export function LaminationWastageClient() {
 
   const handleSave = (targetStatus?: "DRAFT" | "SUBMITTED") => {
     const finalStatus = targetStatus || status;
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     startTransition(async () => {
       try {
         const payload = {
@@ -193,6 +301,7 @@ export function LaminationWastageClient() {
           fabricWastageKg: calculated.fabricWastageKg,
           status: finalStatus,
           remarks: remarks.trim() || null,
+          clientId: realtime.clientId,
         };
 
         const res = await fetch("/api/production/lamination/wastage", {
@@ -204,6 +313,8 @@ export function LaminationWastageClient() {
         const data = await res.json();
         if (data.success) {
           setStatus(finalStatus);
+          hasUnsavedLocalEditsRef.current = false;
+          setLastAutoSavedAt(new Date());
           realtime.broadcastSync({
             action: finalStatus === "SUBMITTED" ? "SUBMIT" : "SAVE",
             date,
@@ -599,7 +710,17 @@ export function LaminationWastageClient() {
                         step="0.1"
                         min="0"
                         value={lumpsWastageKg}
-                        onChange={(e) => setLumpsWastageKg(e.target.value)}
+                        onChange={(e) => {
+                          hasUnsavedLocalEditsRef.current = true;
+                          setLumpsWastageKg(e.target.value);
+                          triggerAutoSave(e.target.value, fabricWastageKg);
+                        }}
+                        onFocus={() => {
+                          activeFieldRef.current = "lumpsWastageKg";
+                        }}
+                        onBlur={() => {
+                          activeFieldRef.current = null;
+                        }}
                         placeholder="Enter kg"
                         className="h-8 text-right font-bold text-xs pr-6 bg-sky-50/40 border-sky-300 focus-visible:ring-sky-500 text-sky-950"
                       />
@@ -653,7 +774,17 @@ export function LaminationWastageClient() {
                         step="0.1"
                         min="0"
                         value={fabricWastageKg}
-                        onChange={(e) => setFabricWastageKg(e.target.value)}
+                        onChange={(e) => {
+                          hasUnsavedLocalEditsRef.current = true;
+                          setFabricWastageKg(e.target.value);
+                          triggerAutoSave(lumpsWastageKg, e.target.value);
+                        }}
+                        onFocus={() => {
+                          activeFieldRef.current = "fabricWastageKg";
+                        }}
+                        onBlur={() => {
+                          activeFieldRef.current = null;
+                        }}
                         placeholder="Enter kg"
                         className="h-8 text-right font-bold text-xs pr-6 bg-purple-50/40 border-purple-300 focus-visible:ring-purple-500 text-purple-950"
                       />
@@ -694,6 +825,26 @@ export function LaminationWastageClient() {
       {/* MOBILE VIEW: Touch-Friendly Wastage Input Cards                            */}
       {/* ========================================================================= */}
       <div className="block md:hidden space-y-4">
+        {/* Mobile Realtime Status Header */}
+        <div className="flex items-center justify-between gap-2 p-2 bg-white rounded-xl border border-slate-200">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="text-xs font-bold text-slate-800 truncate">Wastage Sheet</span>
+            {isAutoSaving ? (
+              <span className="text-[10px] text-amber-600 font-semibold animate-pulse flex items-center gap-0.5">
+                <Loader2 className="h-2.5 w-2.5 animate-spin" /> Saving...
+              </span>
+            ) : lastAutoSavedAt ? (
+              <span className="text-[10px] text-slate-400">• Saved</span>
+            ) : null}
+          </div>
+          <RealtimeSyncBadge
+            isConnected={realtime.isConnected}
+            lastUpdatedBy={realtime.lastUpdatedBy}
+            lastUpdatedAt={realtime.lastUpdatedAt}
+            lastAction={realtime.lastAction}
+            isSelfUpdate={realtime.isSelfUpdate}
+          />
+        </div>
         {/* CARD 1: Lumps Wastage */}
         <Card className="border-slate-200 shadow-2xs overflow-hidden">
           <div className="bg-sky-50/80 px-3.5 py-2.5 border-b border-sky-100 flex items-center justify-between">
@@ -748,7 +899,17 @@ export function LaminationWastageClient() {
                   step="0.1"
                   min="0"
                   value={lumpsWastageKg}
-                  onChange={(e) => setLumpsWastageKg(e.target.value)}
+                  onChange={(e) => {
+                    hasUnsavedLocalEditsRef.current = true;
+                    setLumpsWastageKg(e.target.value);
+                    triggerAutoSave(e.target.value, fabricWastageKg);
+                  }}
+                  onFocus={() => {
+                    activeFieldRef.current = "lumpsWastageKg";
+                  }}
+                  onBlur={() => {
+                    activeFieldRef.current = null;
+                  }}
                   placeholder="Enter lump waste kg"
                   className="h-10 text-sm font-extrabold text-sky-950 pr-7 bg-sky-50/40 border-sky-300 focus-visible:ring-sky-500"
                 />
@@ -817,7 +978,17 @@ export function LaminationWastageClient() {
                   step="0.1"
                   min="0"
                   value={fabricWastageKg}
-                  onChange={(e) => setFabricWastageKg(e.target.value)}
+                  onChange={(e) => {
+                    hasUnsavedLocalEditsRef.current = true;
+                    setFabricWastageKg(e.target.value);
+                    triggerAutoSave(lumpsWastageKg, e.target.value);
+                  }}
+                  onFocus={() => {
+                    activeFieldRef.current = "fabricWastageKg";
+                  }}
+                  onBlur={() => {
+                    activeFieldRef.current = null;
+                  }}
                   placeholder="Enter fabric waste kg"
                   className="h-10 text-sm font-extrabold text-purple-950 pr-7 bg-purple-50/40 border-purple-300 focus-visible:ring-purple-500"
                 />

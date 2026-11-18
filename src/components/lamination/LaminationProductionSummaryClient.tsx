@@ -136,10 +136,28 @@ export function LaminationProductionSummaryClient() {
   const realtime = useProductionRealtime({
     module: "lamination",
     sheet: "summary",
-    onSync: () => {
+    onSync: (event) => {
+      if (event?.clientId === realtime.clientId) return;
       fetchSummary();
     },
   });
+
+  // Tab switch / sleep wake-up listeners to pull latest edits immediately upon return
+  useEffect(() => {
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === "visible") {
+        fetchSummary();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityOrFocus);
+    window.addEventListener("focus", handleVisibilityOrFocus);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityOrFocus);
+      window.removeEventListener("focus", handleVisibilityOrFocus);
+    };
+  }, [dateFrom, dateTo, shiftFilter, contractorFilter]);
 
   const handleExportExcel = () => {
     exportProductionSummaryExcel(
