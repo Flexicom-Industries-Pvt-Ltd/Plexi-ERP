@@ -20,6 +20,7 @@ interface UseProductionRealtimeOptions {
 
 interface UseProductionRealtimeResult {
   isConnected: boolean;
+  clientId: string;
   lastUpdatedBy: ProductionSyncUser | null;
   lastUpdatedAt: Date | null;
   lastAction: string | null;
@@ -317,6 +318,7 @@ export function useProductionRealtime({
 
   return {
     isConnected,
+    clientId: clientIdRef.current,
     lastUpdatedBy,
     lastUpdatedAt,
     lastAction,
