@@ -120,10 +120,26 @@ export function LoomChangeoverSection() {
     fetchData();
   }, [fetchData]);
 
+  // Google Docs-grade sleep wake-up and tab backgrounding catch-up
+  useEffect(() => {
+    const handleVisibilityOrFocus = () => {
+      if (typeof document !== "undefined" && document.visibilityState === "visible") {
+        fetchData();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityOrFocus);
+    window.addEventListener("focus", handleVisibilityOrFocus);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityOrFocus);
+      window.removeEventListener("focus", handleVisibilityOrFocus);
+    };
+  }, [fetchData]);
+
   const realtime = useProductionRealtime({
     module: "loom",
     sheet: "changeover",
-    onSync: () => {
+    onSync: (event) => {
+      if (event?.clientId && event.clientId === realtime.clientId) return;
       fetchData();
     },
   });

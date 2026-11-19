@@ -30,11 +30,16 @@ import {
   History,
   Calendar,
   Trash2,
+  Eye,
+  Camera,
+  RotateCw,
 } from "lucide-react";
 import { GateEntryStatus } from "@/generated/prisma";
 import { TransportSlipModal } from "@/components/gate/TransportSlipModal";
 import { printTransportSlip } from "@/lib/gate/print-transport-slip";
 import { GateBlockerModal, GateBlockerModalData } from "@/components/gate/GateBlockerModal";
+import { GateDocumentUploadModal } from "@/components/gate/GateDocumentUploadModal";
+import { GateDocumentLightbox } from "@/components/gate/GateDocumentLightbox";
 
 const LIFECYCLE_STEPS = [
   { id: "ARRIVED", label: "Arrived" },
@@ -93,6 +98,8 @@ export function GateDetailsClient({ entryId }: { entryId: string }) {
   // Modals & Menus state
   const [showStockModal, setShowStockModal] = useState(false);
   const [showDocModal, setShowDocModal] = useState(false);
+  const [defaultDocType, setDefaultDocType] = useState("Truck / Vehicle Photo");
+  const [selectedLightboxDoc, setSelectedLightboxDoc] = useState<any | null>(null);
   const [showSlipModal, setShowSlipModal] = useState(false);
   const [showStatusMenu, setShowStatusMenu] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -734,11 +741,72 @@ export function GateDetailsClient({ entryId }: { entryId: string }) {
           {activeTab === "overview" && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-8">
               <div className="space-y-3 sm:space-y-4">
-                <h3 className="text-xs sm:text-sm font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-                  <ShieldCheck className="h-4 w-4 text-slate-400" />
-                  Arrival Information
-                </h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs sm:text-sm font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                    <ShieldCheck className="h-4 w-4 text-slate-400" />
+                    Arrival Information
+                  </h3>
+                  {entry.status !== "GATE_OUT" && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDefaultDocType("Truck / Vehicle Photo");
+                        setShowDocModal(true);
+                      }}
+                      className="inline-flex items-center gap-1 text-[11px] font-bold text-primary hover:text-primary/80 bg-primary/5 hover:bg-primary/10 px-2.5 py-1 rounded-md border border-primary/20 transition-all cursor-pointer"
+                    >
+                      <Camera className="h-3.5 w-3.5" />
+                      <span>Take Photo</span>
+                    </button>
+                  )}
+                </div>
                 <div className="bg-slate-50 rounded-xl p-3.5 sm:p-4 space-y-3 border border-slate-100">
+                  {(() => {
+                    const truckDoc = (entry.documents || []).find((d: any) => {
+                      const norm = (d.documentType || "").toLowerCase();
+                      return (norm.includes("truck") || norm.includes("vehicle")) && Boolean(d.fileUrl && d.fileUrl !== "local-check");
+                    }) || (entry.documents || []).find((d: any) => {
+                      const norm = (d.documentType || "").toLowerCase();
+                      return norm.includes("photo") && Boolean(d.fileUrl && d.fileUrl !== "local-check");
+                    });
+
+                    if (truckDoc) {
+                      return (
+                        <div
+                          onClick={() => setSelectedLightboxDoc(truckDoc)}
+                          className="flex items-center gap-3 p-2.5 bg-white border border-slate-200 rounded-xl cursor-pointer hover:border-primary/40 hover:shadow-xs transition-all mb-2"
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={truckDoc.fileUrl}
+                            alt="Truck Photo"
+                            className="w-16 h-12 rounded-lg object-cover border border-slate-200 shrink-0"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-bold text-slate-900 truncate">Vehicle Photo</span>
+                              <span
+                                className={`text-[9px] uppercase font-bold px-1.5 py-0.5 rounded-full ${
+                                  truckDoc.status === "VERIFIED"
+                                    ? "bg-emerald-100 text-emerald-800"
+                                    : truckDoc.status === "REJECTED"
+                                    ? "bg-red-100 text-red-800"
+                                    : "bg-amber-100 text-amber-800"
+                                }`}
+                              >
+                                {truckDoc.status}
+                              </span>
+                            </div>
+                            <span className="text-[11px] text-slate-500 font-mono block truncate">
+                              {entry.truckNumber} • Tap to enlarge
+                            </span>
+                          </div>
+                          <Eye className="h-4 w-4 text-slate-400 shrink-0" />
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
                   <DetailRow icon={<Clock />} label="Arrived At" value={new Date(entry.arrivalTime).toLocaleString()} />
                   <DetailRow icon={<User />} label="Driver Name" value={entry.driverName} />
                   <DetailRow icon={<Phone />} label="Driver Contact" value={entry.driverContact || "—"} />
@@ -911,114 +979,213 @@ export function GateDetailsClient({ entryId }: { entryId: string }) {
           {/* TAB 3: DOCUMENTS */}
           {activeTab === "documents" && (
             <div className="space-y-4">
-               <div className="flex justify-between items-center">
-                <h3 className="text-xs sm:text-sm font-bold text-slate-500 uppercase tracking-wider">
-                  Documents ({entry.documents?.length || 0})
-                </h3>
-                <button 
-                  onClick={() => setShowDocModal(true)}
-                  className="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-primary hover:bg-primary/90 px-3 py-2 rounded-lg shadow-xs active:scale-95 transition-all"
-                >
-                  <Upload className="h-4 w-4" /> Add Document
-                </button>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                <div>
+                  <h3 className="text-xs sm:text-sm font-bold text-slate-700 uppercase tracking-wider">
+                    Documents & Verification ({entry.documents?.length || 0})
+                  </h3>
+                  <p className="text-[11px] text-slate-500">
+                    Truck photos, weighbridge slips & challans with 3-day retention policy
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDefaultDocType("Truck / Vehicle Photo");
+                      setShowDocModal(true);
+                    }}
+                    className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 px-3 py-2 rounded-xl shadow-2xs active:scale-95 transition-all cursor-pointer"
+                  >
+                    <Camera className="h-4 w-4 text-primary" />
+                    <span>Take Photo</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDefaultDocType("Gross Weighbridge Slip");
+                      setShowDocModal(true);
+                    }}
+                    className="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-primary hover:bg-primary/90 px-3.5 py-2 rounded-xl shadow-xs active:scale-95 transition-all cursor-pointer"
+                  >
+                    <Upload className="h-4 w-4" />
+                    <span>Attach Document</span>
+                  </button>
+                </div>
               </div>
 
               {entry.documents?.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
-                  {entry.documents.map((doc: any) => (
-                    <div key={doc.id} className="p-3.5 sm:p-4 bg-white border border-slate-200 rounded-xl shadow-xs flex items-start gap-3">
-                       <div className="p-2.5 bg-blue-50 text-blue-600 rounded-lg shrink-0 mt-0.5">
-                         <FileText className="h-5 w-5" />
-                       </div>
-                       <div className="flex-1 min-w-0">
-                         <div className="flex items-center justify-between gap-2 mb-1">
-                           <h4 className="font-bold text-slate-800 text-sm truncate">{doc.documentType}</h4>
-                           <div className="flex items-center gap-1.5 shrink-0">
-                             <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full ${
-                               doc.status === 'VERIFIED' ? 'bg-emerald-100 text-emerald-700' :
-                               doc.status === 'REJECTED' ? 'bg-red-100 text-red-700' :
-                               'bg-amber-100 text-amber-700'
-                             }`}>
-                               {doc.status}
-                             </span>
-                             {entry.status !== "GATE_OUT" && (
-                               <button
-                                 type="button"
-                                 onClick={() => handleDeleteDocument(doc.id, doc.documentType)}
-                                 className="text-slate-400 hover:text-red-600 p-1 rounded-md hover:bg-red-50 transition-colors cursor-pointer"
-                                 title="Delete Document"
-                               >
-                                 <Trash2 className="h-3.5 w-3.5" />
-                               </button>
-                             )}
-                           </div>
-                         </div>
-                         <p className="text-xs text-slate-500 truncate mb-1">{doc.remarks || "No remarks"}</p>
-                         {doc.verifier && (
-                           <p className="text-[10px] text-slate-400 mb-2">
-                             {doc.status === "VERIFIED" ? "Verified" : "Reviewed"} by {doc.verifier.name}
-                             {doc.verifiedAt ? ` • ${new Date(doc.verifiedAt).toLocaleString()}` : ""}
-                           </p>
-                         )}
-                         {doc.fileUrl && doc.fileUrl !== "local-check" ? (
-                           <a
-                             href={doc.fileUrl}
-                             target="_blank"
-                             rel="noreferrer"
-                             className="inline-flex items-center gap-1.5 text-xs text-primary font-semibold hover:underline mb-2 bg-primary/5 hover:bg-primary/10 px-2.5 py-1 rounded-md border border-primary/20 transition-colors"
-                           >
-                             <FileText className="h-3.5 w-3.5" />
-                             <span>View Attached Document</span>
-                           </a>
-                         ) : (
-                           <span className="text-[11px] text-slate-400 italic block mb-2">No file attached</span>
-                         )}
-                         {entry.status !== "GATE_OUT" && (
-                           <div className="flex items-center justify-between gap-1.5 mt-2 pt-2 border-t border-slate-100">
-                             {doc.status !== "VERIFIED" && doc.status !== "REJECTED" ? (
-                               <div className="flex flex-wrap gap-1.5">
-                                 <button
-                                   onClick={() => updateDocumentStatus(doc.id, "VERIFIED")}
-                                   className="text-xs px-3 py-1.5 bg-emerald-100 text-emerald-800 rounded-lg font-bold hover:bg-emerald-200 active:scale-95 transition-all cursor-pointer"
-                                 >
-                                   Verify
-                                 </button>
-                                 <button
-                                   onClick={() => updateDocumentStatus(doc.id, "REJECTED")}
-                                   className="text-xs px-3 py-1.5 bg-red-100 text-red-800 rounded-lg font-bold hover:bg-red-200 active:scale-95 transition-all cursor-pointer"
-                                 >
-                                   Reject
-                                 </button>
-                                 <button
-                                   onClick={() => updateDocumentStatus(doc.id, "UNDER_VERIFICATION")}
-                                   className="text-xs px-3 py-1.5 bg-amber-100 text-amber-800 rounded-lg font-bold hover:bg-amber-200 active:scale-95 transition-all cursor-pointer"
-                                 >
-                                   Reviewing
-                                 </button>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 sm:gap-4">
+                  {entry.documents.map((doc: any) => {
+                    const isImg = doc.fileUrl && (/\.(jpg|jpeg|png|webp|gif|heic)/i.test(doc.fileUrl) || doc.fileUrl.startsWith("data:image/"));
+                    const isPdf = doc.fileUrl && (/\.pdf/i.test(doc.fileUrl) || doc.fileUrl.startsWith("data:application/pdf"));
+
+                    return (
+                      <div
+                        key={doc.id}
+                        className="p-3.5 sm:p-4 bg-white border border-slate-200 rounded-2xl shadow-xs hover:border-slate-300 transition-all flex flex-col justify-between gap-3"
+                      >
+                        <div className="flex items-start gap-3">
+                          {/* Visual Media Thumbnail or Badge */}
+                          <div
+                            onClick={() => setSelectedLightboxDoc(doc)}
+                            className="relative w-16 h-16 rounded-xl overflow-hidden shrink-0 border border-slate-200 bg-slate-100 flex items-center justify-center cursor-pointer group hover:opacity-90 transition-all"
+                            title="Click to view full image in lightbox"
+                          >
+                            {isImg ? (
+                              <>
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                  src={doc.fileUrl}
+                                  alt={doc.documentType}
+                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                                />
+                                <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                  <Eye className="h-5 w-5 text-white drop-shadow-md" />
                                 </div>
-                              ) : (
-                                <span className="text-[11px] text-slate-400 font-medium">Status finalized</span>
-                              )}
-                             <button
-                               type="button"
-                               onClick={() => handleDeleteDocument(doc.id, doc.documentType)}
-                               className="text-xs px-2.5 py-1.5 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg font-semibold inline-flex items-center gap-1 transition-all cursor-pointer ml-auto"
-                               title="Delete Document"
-                             >
-                               <Trash2 className="h-3.5 w-3.5" />
-                               <span>Delete</span>
-                             </button>
-                           </div>
-                         )}
-                       </div>
-                    </div>
-                  ))}
+                              </>
+                            ) : isPdf ? (
+                              <div className="p-2 text-center text-red-600 flex flex-col items-center justify-center">
+                                <FileText className="h-6 w-6 mb-0.5" />
+                                <span className="text-[9px] font-bold uppercase tracking-wider">PDF</span>
+                              </div>
+                            ) : (
+                              <div className="p-2 text-center text-slate-400 flex flex-col items-center justify-center">
+                                <FileText className="h-6 w-6 mb-0.5" />
+                                <span className="text-[8px] uppercase">Pruned</span>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Details */}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-1.5 mb-1">
+                              <h4
+                                onClick={() => setSelectedLightboxDoc(doc)}
+                                className="font-bold text-slate-900 text-sm truncate cursor-pointer hover:text-primary transition-colors"
+                              >
+                                {doc.documentType}
+                              </h4>
+                              <div className="flex items-center gap-1 shrink-0">
+                                <span
+                                  className={`text-[9px] uppercase font-bold px-2 py-0.5 rounded-full ${
+                                    doc.status === "VERIFIED"
+                                      ? "bg-emerald-100 text-emerald-800"
+                                      : doc.status === "REJECTED"
+                                      ? "bg-red-100 text-red-800"
+                                      : "bg-amber-100 text-amber-800"
+                                  }`}
+                                >
+                                  {doc.status}
+                                </span>
+                                {entry.status !== "GATE_OUT" && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteDocument(doc.id, doc.documentType)}
+                                    className="text-slate-400 hover:text-red-600 p-1 rounded-md hover:bg-red-50 transition-colors cursor-pointer"
+                                    title="Delete Document"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+
+                            <p className="text-xs text-slate-600 truncate mb-1">
+                              {doc.remarks || "No remarks provided"}
+                            </p>
+
+                            {doc.verifier ? (
+                              <p className="text-[10px] text-slate-400">
+                                {doc.status === "VERIFIED" ? "Verified" : "Reviewed"} by {doc.verifier.name}
+                                {doc.verifiedAt ? ` • ${new Date(doc.verifiedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ""}
+                              </p>
+                            ) : (
+                              <p className="text-[10px] text-slate-400">
+                                Added {new Date(doc.createdAt).toLocaleDateString()}
+                              </p>
+                            )}
+
+                            {/* View link / button */}
+                            {doc.fileUrl && doc.fileUrl !== "local-check" && (
+                              <button
+                                type="button"
+                                onClick={() => setSelectedLightboxDoc(doc)}
+                                className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary hover:text-primary/80 mt-1.5 cursor-pointer"
+                              >
+                                <Eye className="h-3 w-3" />
+                                <span>Inspect Fullscreen</span>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Inline Verification Controls */}
+                        {entry.status !== "GATE_OUT" && (
+                          <div className="flex items-center justify-between gap-1.5 pt-2 border-t border-slate-100">
+                            {doc.status !== "VERIFIED" && doc.status !== "REJECTED" ? (
+                              <div className="flex flex-wrap gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => updateDocumentStatus(doc.id, "VERIFIED")}
+                                  className="text-[11px] px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-lg font-bold hover:bg-emerald-200 active:scale-95 transition-all cursor-pointer"
+                                >
+                                  Verify
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => updateDocumentStatus(doc.id, "REJECTED")}
+                                  className="text-[11px] px-2.5 py-1 bg-red-100 text-red-800 rounded-lg font-bold hover:bg-red-200 active:scale-95 transition-all cursor-pointer"
+                                >
+                                  Reject
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => updateDocumentStatus(doc.id, "UNDER_VERIFICATION")}
+                                  className="text-[11px] px-2.5 py-1 bg-amber-100 text-amber-800 rounded-lg font-bold hover:bg-amber-200 active:scale-95 transition-all cursor-pointer"
+                                >
+                                  Reviewing
+                                </button>
+                              </div>
+                            ) : (
+                              <span className="text-[11px] text-slate-400 font-medium">Status finalized</span>
+                            )}
+
+                            <button
+                              type="button"
+                              onClick={() => setSelectedLightboxDoc(doc)}
+                              className="text-[11px] px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-semibold inline-flex items-center gap-1 transition-all cursor-pointer ml-auto"
+                            >
+                              <Eye className="h-3.5 w-3.5" />
+                              <span>View</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               ) : (
-                <div className="text-center py-8 bg-slate-50 rounded-xl border border-slate-200 border-dashed text-slate-500 text-sm flex flex-col items-center gap-2">
-                  <Upload className="h-8 w-8 text-slate-300" />
-                  <p className="font-medium">No documents uploaded.</p>
-                  <p className="text-xs text-slate-400">Click &apos;Add Document&apos; to attach invoice, weighbridge slip, or challan.</p>
+                <div className="text-center py-10 bg-slate-50 rounded-2xl border border-slate-200 border-dashed text-slate-500 text-sm flex flex-col items-center gap-2.5">
+                  <div className="p-3 bg-slate-100 text-slate-400 rounded-full">
+                    <Camera className="h-7 w-7" />
+                  </div>
+                  <p className="font-bold text-slate-700">No documents or truck photos attached</p>
+                  <p className="text-xs text-slate-400 max-w-sm">
+                    Snap a photo of the truck license plate, gross weighbridge slip, or attach the delivery challan.
+                  </p>
+                  <div className="flex gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDefaultDocType("Truck / Vehicle Photo");
+                        setShowDocModal(true);
+                      }}
+                      className="px-4 py-2 bg-primary text-white text-xs font-bold rounded-xl shadow-xs hover:bg-primary/90 transition-all cursor-pointer flex items-center gap-1.5"
+                    >
+                      <Camera className="h-3.5 w-3.5" /> Take Truck Photo
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -1329,142 +1496,33 @@ export function GateDetailsClient({ entryId }: { entryId: string }) {
       )}
 
       {/* ========================================================================= */}
-      {/* DOCUMENT MODAL                                                            */}
+      {/* GATE DOCUMENT & VEHICLE PHOTO UPLOAD MODAL                                 */}
       {/* ========================================================================= */}
-      {showDocModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/50 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
-            <div className="px-5 py-4 border-b border-slate-100 flex justify-between items-center sticky top-0 bg-white z-10">
-              <h3 className="font-bold text-slate-800 text-base">Add Document</h3>
-              <button onClick={() => { setShowDocModal(false); setDocFile(null); }} className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer">
-                <XCircle className="h-5 w-5" />
-              </button>
-            </div>
-            <form onSubmit={handleAddDoc} className="p-5 space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Document Type *</label>
-                <select 
-                  required 
-                  value={docForm.documentType} 
-                  onChange={e => setDocForm({...docForm, documentType: e.target.value})} 
-                  className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-primary/20 outline-none"
-                >
-                  <option value="">Select Type</option>
-                  <option value="Weighbridge Slip">Weighbridge Slip</option>
-                  <option value="Invoice">Invoice</option>
-                  <option value="Delivery Challan">Delivery Challan</option>
-                  <option value="Purchase Order">Purchase Order</option>
-                  <option value="Other">Other</option>
-                </select>
-              </div>
+      <GateDocumentUploadModal
+        isOpen={showDocModal}
+        onClose={() => setShowDocModal(false)}
+        entryId={entryId}
+        defaultDocumentType={defaultDocType}
+        onSuccess={() => fetchEntry()}
+      />
 
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  Document File Attachment
-                </label>
-                <div
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    setFileDragActive(true);
-                  }}
-                  onDragLeave={() => setFileDragActive(false)}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    setFileDragActive(false);
-                    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-                      setDocFile(e.dataTransfer.files[0]);
-                    }
-                  }}
-                  onClick={() => fileInputRef.current?.click()}
-                  className={`border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-all ${
-                    fileDragActive
-                      ? "border-primary bg-primary/5"
-                      : docFile
-                      ? "border-emerald-300 bg-emerald-50/50"
-                      : "border-slate-200 hover:border-slate-300 hover:bg-slate-50/50"
-                  }`}
-                >
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept=".pdf,.png,.jpg,.jpeg,.webp"
-                    className="hidden"
-                    onChange={(e) => {
-                      if (e.target.files && e.target.files[0]) {
-                        setDocFile(e.target.files[0]);
-                      }
-                    }}
-                  />
-                  {docFile ? (
-                    <div className="flex items-center justify-between gap-2 text-left">
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="p-2 bg-emerald-100 text-emerald-700 rounded-lg shrink-0">
-                          <FileText className="h-5 w-5" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-xs font-bold text-slate-800 truncate">{docFile.name}</p>
-                          <p className="text-[11px] text-slate-500">{(docFile.size / 1024).toFixed(1)} KB</p>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setDocFile(null);
-                        }}
-                        className="text-slate-400 hover:text-red-500 p-1 shrink-0"
-                        title="Remove file"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-center gap-1.5 py-1">
-                      <div className="p-2 rounded-full bg-slate-100 text-slate-500">
-                        <Upload className="h-5 w-5" />
-                      </div>
-                      <p className="text-xs font-bold text-slate-700">
-                        Click to browse or drag file here
-                      </p>
-                      <p className="text-[11px] text-slate-400">
-                        PDF, JPG, PNG or WEBP (up to 10MB)
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Remarks / Reference No.</label>
-                <textarea 
-                  value={docForm.remarks} 
-                  onChange={e => setDocForm({...docForm, remarks: e.target.value})} 
-                  className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-primary/20 outline-none resize-none" 
-                  placeholder="e.g. Challan #12345" 
-                  rows={3}
-                />
-              </div>
-
-              <div className="pt-3 flex justify-end gap-2 border-t border-slate-100">
-                <button 
-                  type="button" 
-                  onClick={() => { setShowDocModal(false); setDocFile(null); }} 
-                  className="px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 rounded-lg border border-slate-200 cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button 
-                  type="submit" 
-                  disabled={submitting} 
-                  className="px-4 py-2.5 text-sm font-bold bg-primary text-white rounded-lg hover:bg-primary/90 disabled:opacity-50 shadow-sm cursor-pointer"
-                >
-                  {submitting ? "Attaching..." : "Add Document"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* ========================================================================= */}
+      {/* GATE DOCUMENT & VEHICLE PHOTO FULLSCREEN LIGHTBOX                          */}
+      {/* ========================================================================= */}
+      <GateDocumentLightbox
+        isOpen={Boolean(selectedLightboxDoc)}
+        onClose={() => setSelectedLightboxDoc(null)}
+        document={selectedLightboxDoc}
+        canVerify={entry?.status !== "GATE_OUT"}
+        onUpdateStatus={async (docId, status) => {
+          await updateDocumentStatus(docId, status);
+          setSelectedLightboxDoc((prev: any) => (prev ? { ...prev, status } : null));
+        }}
+        onDelete={async (docId, docType) => {
+          await handleDeleteDocument(docId, docType);
+          setSelectedLightboxDoc(null);
+        }}
+      />
 
       {/* ========================================================================= */}
       {/* TRANSPORT SLIP / GATE PASS PRINT PREVIEW MODAL                            */}

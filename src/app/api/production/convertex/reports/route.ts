@@ -137,22 +137,13 @@ export async function POST(request: NextRequest) {
       status = "DRAFT",
       remarks,
       entries = [],
+      deletedEntryIds = [],
+      clientId,
     } = body;
 
     if (!date || !shiftName) {
       return NextResponse.json({ error: "Date and Shift are required" }, { status: 400 });
     }
-
-    // Calculate month-to-date wastage
-    const monthStart = date.slice(0, 7) + "-01";
-    const priorMtdRecords = await db.convertexDailyReport.findMany({
-      where: {
-        date: { gte: monthStart, lt: date },
-        machineNo,
-      },
-      select: { totalWastageKg: true },
-    });
-    const priorMtdKg = priorMtdRecords.reduce((acc, r) => acc + (r.totalWastageKg || 0), 0);
 
     // Safely filter rows that have content
     const hasRowContent = (e: any) =>
@@ -243,37 +234,67 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      // Clear existing entries and recreate atomically
-      await tx.convertexDailyReportEntry.deleteMany({
+      // Handle explicit deletions if provided
+      if (Array.isArray(deletedEntryIds) && deletedEntryIds.length > 0) {
+        await tx.convertexDailyReportEntry.deleteMany({
+          where: {
+            reportId: report.id,
+            id: { in: deletedEntryIds },
+          },
+        });
+      }
+
+      // Fetch existing entries to perform non-destructive upserts
+      const existingEntries = await tx.convertexDailyReportEntry.findMany({
         where: { reportId: report.id },
       });
+      const existingById = new Map(existingEntries.map((e) => [e.id, e]));
+      const existingByRoll = new Map(
+        existingEntries
+          .filter((e) => e.rollNumber && e.rollNumber.trim())
+          .map((e) => [e.rollNumber.trim().toUpperCase(), e])
+      );
 
-      if (calculatedEntries.length > 0) {
-        await tx.convertexDailyReportEntry.createMany({
-          data: calculatedEntries.map((e) => ({
-            reportId: report.id,
-            sequence: e.sequence,
-            companyName: e.companyName?.trim() || null,
-            unitName: e.unitName?.trim() || null,
-            grade: e.grade?.trim() || null,
-            targetProductionPcs: e.targetProductionPcs ? Number(e.targetProductionPcs) : null,
-            quality: e.quality?.trim() || e.partyName?.trim() || null,
-            partyName: e.quality?.trim() || e.partyName?.trim() || null,
-            rollNumber: String(e.rollNumber || "").trim(),
-            loomNumber: e.loomNumber?.trim() || null,
-            rollMtr: Number(e.rollMtr) || 0,
-            netWeight: Number(e.netWeight) || 0,
-            avgWeight: Number(e.avgWeight) || 0,
-            openingMeterReading: Number(e.openingMeterReading) || 0,
-            closingMeterReading: Number(e.closingMeterReading) || 0,
-            coverPatchOs: Number(e.coverPatchOs) || 0,
-            coverPatchDs: Number(e.coverPatchDs) || 0,
-            valvePatch: Number(e.valvePatch) || 0,
-            productionPcs: Number(e.productionPcs) || 0,
-            productionKg: Number(e.productionKg) || 0,
-            remarks: e.remarks?.trim() || null,
-          })),
-        });
+      for (const e of calculatedEntries) {
+        const rollKey = String(e.rollNumber || "").trim().toUpperCase();
+        const matched = (e.id && existingById.get(e.id)) || (rollKey && existingByRoll.get(rollKey));
+
+        const entryData = {
+          sequence: e.sequence,
+          companyName: e.companyName?.trim() || null,
+          unitName: e.unitName?.trim() || null,
+          grade: e.grade?.trim() || null,
+          targetProductionPcs: e.targetProductionPcs ? Number(e.targetProductionPcs) : null,
+          quality: e.quality?.trim() || e.partyName?.trim() || null,
+          partyName: e.quality?.trim() || e.partyName?.trim() || null,
+          rollNumber: String(e.rollNumber || "").trim(),
+          loomNumber: e.loomNumber?.trim() || null,
+          rollMtr: Number(e.rollMtr) || 0,
+          netWeight: Number(e.netWeight) || 0,
+          avgWeight: Number(e.avgWeight) || 0,
+          openingMeterReading: Number(e.openingMeterReading) || 0,
+          closingMeterReading: Number(e.closingMeterReading) || 0,
+          coverPatchOs: Number(e.coverPatchOs) || 0,
+          coverPatchDs: Number(e.coverPatchDs) || 0,
+          valvePatch: Number(e.valvePatch) || 0,
+          productionPcs: Number(e.productionPcs) || 0,
+          productionKg: Number(e.productionKg) || 0,
+          remarks: e.remarks?.trim() || null,
+        };
+
+        if (matched) {
+          await tx.convertexDailyReportEntry.update({
+            where: { id: matched.id },
+            data: entryData,
+          });
+        } else {
+          await tx.convertexDailyReportEntry.create({
+            data: {
+              reportId: report.id,
+              ...entryData,
+            },
+          });
+        }
       }
 
       return tx.convertexDailyReport.findUnique({
@@ -314,6 +335,7 @@ export async function POST(request: NextRequest) {
       action: status === "SUBMITTED" ? "SUBMIT" : "SAVE",
       date,
       shift: shiftName,
+      clientId: clientId || null,
       user: {
         name: authResult.session?.user?.name || "Convertex Operator",
         email: authResult.session?.user?.email || undefined,
