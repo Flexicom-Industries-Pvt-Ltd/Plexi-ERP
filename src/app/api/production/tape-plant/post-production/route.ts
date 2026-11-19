@@ -374,6 +374,7 @@ export async function POST(request: NextRequest) {
         action: status === "SUBMITTED" ? "SUBMIT" : "SAVE",
         date,
         shift: shiftId,
+        clientId: body.clientId,
         user: {
           name: authResult.session?.user?.name || "Floor Admin",
           email: authResult.session?.user?.email || undefined,
@@ -484,6 +485,7 @@ export async function POST(request: NextRequest) {
       action: status === "SUBMITTED" ? "SUBMIT" : "SAVE",
       date,
       shift: shiftId,
+      clientId: body.clientId,
       user: {
         name: authResult.session?.user?.name || "Floor Admin",
         email: authResult.session?.user?.email || undefined,

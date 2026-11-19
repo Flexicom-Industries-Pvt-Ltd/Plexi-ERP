@@ -3,8 +3,10 @@ import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { logEvent } from "@/lib/logging";
 import { findGateEntryByIdOrNumber } from "@/lib/gate/resolve-gate-entry";
+import { triggerOpportunisticGatePhotoPrune } from "@/lib/gate/gate-photo-retention";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
+import { randomUUID } from "crypto";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +22,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   if (!hasAccess) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
+  // Trigger non-blocking opportunistic prune of temporary gate photos (>3 days old)
+  triggerOpportunisticGatePhotoPrune();
+
   try {
     const entry = await findGateEntryByIdOrNumber(id);
     if (!entry) return NextResponse.json({ error: "Gate Entry not found" }, { status: 404 });
@@ -30,11 +35,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     let remarks = "";
     let fileUrl: string | null = null;
 
+    const uploadDir = path.join(process.cwd(), "public", "uploads", "gate-documents");
+
     if (contentType.includes("multipart/form-data")) {
       const formData = await request.formData();
       documentType = ((formData.get("documentType") as string) || "").trim();
       remarks = ((formData.get("remarks") as string) || "").trim();
       const file = formData.get("file") as File | null;
+      const base64Payload = (formData.get("base64") as string) || null;
 
       if (file && file.size > 0) {
         const allowedTypes = [
@@ -61,16 +69,39 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         const bytes = await file.arrayBuffer();
         const buffer = Buffer.from(bytes);
 
-        const uploadDir = path.join(process.cwd(), "public", "uploads", "gate-documents");
-        await mkdir(uploadDir, { recursive: true });
+        const ext = path.extname(file.name) || (file.type === "application/pdf" ? ".pdf" : ".jpg");
+        const baseName = path.basename(file.name, ext).replace(/[^a-zA-Z0-9_-]/g, "_") || "doc";
+        const safeFileName = `${Date.now()}-${baseName}-${randomUUID().slice(0, 6)}${ext}`;
 
-        const ext = path.extname(file.name) || ".bin";
-        const baseName = path.basename(file.name, ext).replace(/[^a-zA-Z0-9_-]/g, "_");
-        const safeFileName = `${Date.now()}-${baseName}${ext}`;
-        const filePath = path.join(uploadDir, safeFileName);
-        await writeFile(filePath, buffer);
+        try {
+          await mkdir(uploadDir, { recursive: true });
+          const filePath = path.join(uploadDir, safeFileName);
+          await writeFile(filePath, buffer);
+          fileUrl = `/uploads/gate-documents/${safeFileName}`;
+        } catch (fsErr) {
+          console.warn("Filesystem write failed, falling back to data URL:", fsErr);
+          fileUrl = `data:${file.type};base64,${buffer.toString("base64")}`;
+        }
+      } else if (base64Payload) {
+        const matches = base64Payload.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+        if (matches && matches.length === 3) {
+          const mime = matches[1];
+          const buffer = Buffer.from(matches[2], "base64");
+          const ext = mime === "application/pdf" ? ".pdf" : mime.includes("webp") ? ".webp" : mime.includes("png") ? ".png" : ".jpg";
+          const safeFileName = `scan-${Date.now()}-${randomUUID().slice(0, 8)}${ext}`;
 
-        fileUrl = `/uploads/gate-documents/${safeFileName}`;
+          try {
+            await mkdir(uploadDir, { recursive: true });
+            const filePath = path.join(uploadDir, safeFileName);
+            await writeFile(filePath, buffer);
+            fileUrl = `/uploads/gate-documents/${safeFileName}`;
+          } catch (fsErr) {
+            console.warn("Filesystem write failed, falling back to base64:", fsErr);
+            fileUrl = base64Payload;
+          }
+        } else {
+          fileUrl = base64Payload;
+        }
       } else {
         fileUrl = (formData.get("fileUrl") as string) || null;
       }
@@ -78,7 +109,31 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       const data = await request.json();
       documentType = (data.documentType || "").trim();
       remarks = (data.remarks || "").trim();
-      fileUrl = data.fileUrl || null;
+      const base64Data = data.base64 || null;
+
+      if (base64Data && typeof base64Data === "string" && base64Data.startsWith("data:")) {
+        const matches = base64Data.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+        if (matches && matches.length === 3) {
+          const mime = matches[1];
+          const buffer = Buffer.from(matches[2], "base64");
+          const ext = mime === "application/pdf" ? ".pdf" : mime.includes("webp") ? ".webp" : mime.includes("png") ? ".png" : ".jpg";
+          const safeFileName = `scan-${Date.now()}-${randomUUID().slice(0, 8)}${ext}`;
+
+          try {
+            await mkdir(uploadDir, { recursive: true });
+            const filePath = path.join(uploadDir, safeFileName);
+            await writeFile(filePath, buffer);
+            fileUrl = `/uploads/gate-documents/${safeFileName}`;
+          } catch (fsErr) {
+            console.warn("Filesystem write failed, keeping inline data URL:", fsErr);
+            fileUrl = base64Data;
+          }
+        } else {
+          fileUrl = base64Data;
+        }
+      } else {
+        fileUrl = data.fileUrl || null;
+      }
     }
 
     if (!documentType) {

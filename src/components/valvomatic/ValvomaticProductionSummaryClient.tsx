@@ -8,17 +8,8 @@ import {
   Printer,
   FileSpreadsheet,
   RefreshCw,
-  Calendar,
-  Clock,
-  Layers,
   Search,
-  Filter,
-  TrendingDown,
-  TrendingUp,
-  Tag,
   CheckCircle2,
-  Trash2,
-  ShieldAlert,
 } from "lucide-react";
 import { ValvomaticSummaryResult } from "@/lib/valvomatic/valvomatic-types";
 import { ValvomaticSummaryPrintModal } from "./ValvomaticSummaryPrintModal";
@@ -78,10 +69,32 @@ export function ValvomaticProductionSummaryClient() {
   const realtime = useProductionRealtime({
     module: "valvomatic",
     sheet: "summary",
-    onSync: () => {
+    onSync: (event?: { clientId?: string | null }) => {
+      // Echo suppression: Ignore notifications originating from this client session
+      if (event?.clientId && event.clientId === realtime.clientId) return;
       fetchSummary();
     },
   });
+
+  // Catch-up upon tab wake-up (e.g., user returns after lock or tab switch)
+  useEffect(() => {
+    const handleVisibilityCatchup = () => {
+      if (document.visibilityState === "visible") {
+        fetchSummary();
+      }
+    };
+    const handleFocusCatchup = () => {
+      fetchSummary();
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityCatchup);
+    window.addEventListener("focus", handleFocusCatchup);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityCatchup);
+      window.removeEventListener("focus", handleFocusCatchup);
+    };
+  }, [fetchSummary]);
 
   const dateRangeLabel = useMemo(() => {
     if (dateFrom && dateTo) return `${dateFrom} to ${dateTo}`;

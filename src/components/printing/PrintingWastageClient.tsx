@@ -61,6 +61,11 @@ export function PrintingWastageClient() {
   const isDirtyRef = useRef<boolean>(false);
   const lastUserEditTimeRef = useRef<number>(0);
 
+  // Google Docs Concurrent Sync & Focus Refs
+  const lastSavedPayloadRef = useRef<string>("");
+  const hasUnsavedLocalEditsRef = useRef<boolean>(false);
+  const activeFocusedFieldRef = useRef<string | null>(null);
+
   // Fetch Report for Date & Shift
   const loadReport = useCallback(async () => {
     if (!date || !shiftName) return;
@@ -75,36 +80,50 @@ export function PrintingWastageClient() {
 
       if (data.report) {
         const rep = data.report;
-        setOperatorName(rep.operatorName || "");
-        setSupervisorName(rep.supervisorName || "");
+        if (activeFocusedFieldRef.current !== "operatorName") setOperatorName(rep.operatorName || "");
+        if (activeFocusedFieldRef.current !== "supervisorName") setSupervisorName(rep.supervisorName || "");
         setStatus(rep.status || "DRAFT");
-        setRemarks(rep.remarks || "");
+        if (activeFocusedFieldRef.current !== "remarks") setRemarks(rep.remarks || "");
         setTotalProductionKg(rep.totalProductionKg || data.dailyReportTotals?.totalProductionKg || 0);
         setTotalProductionMtrs(rep.totalProductionMtrs || data.dailyReportTotals?.totalProductionMtrs || 0);
-        setLaminationFabricWasteKg(rep.laminationFabricWasteKg ? String(rep.laminationFabricWasteKg) : "");
-        setPrintFabricWasteKg(rep.printFabricWasteKg ? String(rep.printFabricWasteKg) : "");
-      } else {
-        // Auto-resolve base production from Daily Report
-        if (data.dailyReportTotals) {
-          setTotalProductionKg(data.dailyReportTotals.totalProductionKg || 0);
-          setTotalProductionMtrs(data.dailyReportTotals.totalProductionMtrs || 0);
-          if (data.dailyReportTotals.operatorName) {
-            setOperatorName(data.dailyReportTotals.operatorName);
-          }
-          if (data.dailyReportTotals.supervisorName) {
-            setSupervisorName(data.dailyReportTotals.supervisorName);
-          }
-        } else {
-          setTotalProductionKg(0);
-          setTotalProductionMtrs(0);
+        if (activeFocusedFieldRef.current !== "laminationFabricWasteKg") {
+          setLaminationFabricWasteKg(rep.laminationFabricWasteKg ? String(rep.laminationFabricWasteKg) : "");
         }
-        setStatus("DRAFT");
-        setRemarks("");
-        setLaminationFabricWasteKg("");
-        setPrintFabricWasteKg("");
+        if (activeFocusedFieldRef.current !== "printFabricWasteKg") {
+          setPrintFabricWasteKg(rep.printFabricWasteKg ? String(rep.printFabricWasteKg) : "");
+        }
+        setLastSavedAt(format(new Date(rep.updatedAt || Date.now()), "hh:mm a"));
+        lastSavedPayloadRef.current = JSON.stringify({
+          laminationFabricWasteKg: rep.laminationFabricWasteKg ? String(rep.laminationFabricWasteKg) : "",
+          printFabricWasteKg: rep.printFabricWasteKg ? String(rep.printFabricWasteKg) : "",
+          remarks: rep.remarks || "",
+          status: rep.status || "DRAFT",
+        });
+      } else {
+        if (!hasUnsavedLocalEditsRef.current) {
+          // Auto-resolve base production from Daily Report
+          if (data.dailyReportTotals) {
+            setTotalProductionKg(data.dailyReportTotals.totalProductionKg || 0);
+            setTotalProductionMtrs(data.dailyReportTotals.totalProductionMtrs || 0);
+            if (data.dailyReportTotals.operatorName) {
+              setOperatorName(data.dailyReportTotals.operatorName);
+            }
+            if (data.dailyReportTotals.supervisorName) {
+              setSupervisorName(data.dailyReportTotals.supervisorName);
+            }
+          } else {
+            setTotalProductionKg(0);
+            setTotalProductionMtrs(0);
+          }
+          setStatus("DRAFT");
+          setRemarks("");
+          setLaminationFabricWasteKg("");
+          setPrintFabricWasteKg("");
+          setLastSavedAt(null);
+        }
       }
-    } catch (err: any) {
-      toast.error(err.message || "Failed to load wastage data");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to load wastage data");
     } finally {
       setLoading(false);
       isDirtyRef.current = false;
@@ -118,13 +137,29 @@ export function PrintingWastageClient() {
     loadReport();
   }, [loadReport]);
 
+  // Sleep wake-up catch-up
+  useEffect(() => {
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === "visible") {
+        loadReport();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityOrFocus);
+    window.addEventListener("focus", handleVisibilityOrFocus);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityOrFocus);
+      window.removeEventListener("focus", handleVisibilityOrFocus);
+    };
+  }, [loadReport]);
+
   const realtime = useProductionRealtime({
     module: "printing",
     sheet: "wastage",
     date,
     shift: shiftName,
-    onSync: () => {
-      if (Date.now() - lastUserEditTimeRef.current < 3500) return;
+    onSync: (event?: { clientId?: string | null }) => {
+      if (event?.clientId && event.clientId === realtime.clientId) return;
+      if (Date.now() - lastUserEditTimeRef.current < 2500) return;
       loadReport();
     },
   });
@@ -140,40 +175,62 @@ export function PrintingWastageClient() {
 
   // Save handler (manual submit or silent auto-save)
   const handleSave = useCallback(
-    async (targetStatus?: "DRAFT" | "SUBMITTED" | "APPROVED", silent = false) => {
+    async (
+      targetStatus?: "DRAFT" | "SUBMITTED" | "APPROVED",
+      silent = false,
+      overrideLaminationWaste?: string,
+      overridePrintWaste?: string,
+      overrideRemarks?: string
+    ) => {
       if (!date || !shiftName) return;
 
+      const currentLaminationWaste =
+        overrideLaminationWaste !== undefined ? overrideLaminationWaste : laminationFabricWasteKg;
+      const currentPrintWaste =
+        overridePrintWaste !== undefined ? overridePrintWaste : printFabricWasteKg;
+      const currentRemarks = overrideRemarks !== undefined ? overrideRemarks : remarks;
+
       const hasAnyData =
-        Boolean(laminationFabricWasteKg) ||
-        Boolean(printFabricWasteKg) ||
-        Boolean(remarks.trim()) ||
+        Boolean(currentLaminationWaste) ||
+        Boolean(currentPrintWaste) ||
+        Boolean(currentRemarks.trim()) ||
         Boolean(operatorName.trim()) ||
         Boolean(supervisorName.trim());
 
       if (!hasAnyData && (!targetStatus || targetStatus === "DRAFT")) return;
 
+      const newStatus = targetStatus || status;
+
+      const serialized = JSON.stringify({
+        laminationFabricWasteKg: currentLaminationWaste,
+        printFabricWasteKg: currentPrintWaste,
+        remarks: currentRemarks.trim(),
+        status: newStatus,
+      });
+
+      if (silent && serialized === lastSavedPayloadRef.current) return;
+
       if (!silent) setSaving(true);
       else setIsAutoSaving(true);
       setAutoSaveError(null);
 
-      const newStatus = targetStatus || status;
-
       try {
-        const payload: PrintingWastageReportData = {
+        const payload: PrintingWastageReportData & { clientId?: string } = {
           date,
           shiftName,
           operatorName: operatorName.trim() || undefined,
           supervisorName: supervisorName.trim() || undefined,
           totalProductionMtrs,
           totalProductionKg,
-          laminationFabricWasteKg: parseFloat(laminationFabricWasteKg) || 0,
+          laminationFabricWasteKg: parseFloat(currentLaminationWaste) || 0,
           laminationFabricWastePct: calc.laminationFabricWastePct,
-          printFabricWasteKg: parseFloat(printFabricWasteKg) || 0,
+          printFabricWasteKg: parseFloat(currentPrintWaste) || 0,
           printFabricWastePct: calc.printFabricWastePct,
           totalWastageKg: calc.totalWastageKg,
           totalWastagePct: calc.totalWastagePct,
           status: newStatus,
-          remarks: remarks.trim() || undefined,
+          remarks: currentRemarks.trim() || undefined,
+          clientId: realtime.clientId,
         };
 
         const res = await fetch("/api/production/printing/wastage", {
@@ -188,8 +245,11 @@ export function PrintingWastageClient() {
         }
 
         setStatus(newStatus);
-        setLastSavedAt(format(new Date(), "hh:mm:ss a"));
+        setLastSavedAt(format(new Date(), "hh:mm a"));
+        lastSavedPayloadRef.current = serialized;
+        hasUnsavedLocalEditsRef.current = false;
         isDirtyRef.current = false;
+
         realtime.broadcastSync({
           action: newStatus === "SUBMITTED" ? "SUBMIT" : "SAVE",
           date,
@@ -203,10 +263,11 @@ export function PrintingWastageClient() {
               : "Printing wastage report saved successfully"
           );
         }
-      } catch (err: any) {
+      } catch (err) {
         console.error("Printing wastage auto-save error:", err);
-        setAutoSaveError(err.message || "Auto-save failed");
-        if (!silent) toast.error(err.message || "Failed to save wastage report");
+        const errMsg = err instanceof Error ? err.message : "Auto-save failed";
+        setAutoSaveError(errMsg);
+        if (!silent) toast.error(errMsg);
       } finally {
         setSaving(false);
         setIsAutoSaving(false);
@@ -224,7 +285,19 @@ export function PrintingWastageClient() {
       calc,
       status,
       remarks,
+      realtime,
     ]
+  );
+
+  // Debounced Auto-Save Trigger
+  const triggerAutoSave = useCallback(
+    (nextLaminationWaste?: string, nextPrintWaste?: string, nextRemarks?: string) => {
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+      autoSaveTimerRef.current = setTimeout(() => {
+        handleSave("DRAFT", true, nextLaminationWaste, nextPrintWaste, nextRemarks);
+      }, 1500);
+    },
+    [handleSave]
   );
 
   // Debounced Auto-Save Trigger (auto save as draft)
@@ -449,7 +522,7 @@ export function PrintingWastageClient() {
             </label>
             <select
               value={status}
-              onChange={(e) => setStatus(e.target.value as any)}
+              onChange={(e) => setStatus(e.target.value as "DRAFT" | "SUBMITTED" | "APPROVED")}
               className="w-full h-9 px-3 py-1.5 text-xs border border-slate-200 rounded-md focus:ring-1 focus:ring-primary bg-white font-medium"
             >
               <option value="DRAFT">Draft</option>
@@ -469,9 +542,17 @@ export function PrintingWastageClient() {
               value={remarks}
               onChange={(e) => {
                 isDirtyRef.current = true;
+                hasUnsavedLocalEditsRef.current = true;
                 lastUserEditTimeRef.current = Date.now();
                 realtime.markLocalEdit();
                 setRemarks(e.target.value);
+                triggerAutoSave(laminationFabricWasteKg, printFabricWasteKg, e.target.value);
+              }}
+              onFocus={() => {
+                activeFocusedFieldRef.current = "remarks";
+              }}
+              onBlur={() => {
+                activeFocusedFieldRef.current = null;
               }}
               className="h-8 text-xs bg-slate-50/50 w-full rounded-md border border-slate-200 px-3"
             />
@@ -633,9 +714,17 @@ export function PrintingWastageClient() {
                       value={laminationFabricWasteKg}
                       onChange={(e) => {
                         isDirtyRef.current = true;
+                        hasUnsavedLocalEditsRef.current = true;
                         lastUserEditTimeRef.current = Date.now();
                         realtime.markLocalEdit();
                         setLaminationFabricWasteKg(e.target.value);
+                        triggerAutoSave(e.target.value, printFabricWasteKg, remarks);
+                      }}
+                      onFocus={() => {
+                        activeFocusedFieldRef.current = "laminationFabricWasteKg";
+                      }}
+                      onBlur={() => {
+                        activeFocusedFieldRef.current = null;
                       }}
                       placeholder="Enter kg"
                       className="w-full h-8 px-3 text-right font-bold text-xs pr-6 bg-amber-50/40 border border-amber-300 rounded-md focus:ring-1 focus:ring-amber-500 text-amber-950"
@@ -692,9 +781,17 @@ export function PrintingWastageClient() {
                       value={printFabricWasteKg}
                       onChange={(e) => {
                         isDirtyRef.current = true;
+                        hasUnsavedLocalEditsRef.current = true;
                         lastUserEditTimeRef.current = Date.now();
                         realtime.markLocalEdit();
                         setPrintFabricWasteKg(e.target.value);
+                        triggerAutoSave(laminationFabricWasteKg, e.target.value, remarks);
+                      }}
+                      onFocus={() => {
+                        activeFocusedFieldRef.current = "printFabricWasteKg";
+                      }}
+                      onBlur={() => {
+                        activeFocusedFieldRef.current = null;
                       }}
                       placeholder="Enter kg"
                       className="w-full h-8 px-3 text-right font-bold text-xs pr-6 bg-purple-50/40 border border-purple-300 rounded-md focus:ring-1 focus:ring-purple-500 text-purple-950"
@@ -793,9 +890,17 @@ export function PrintingWastageClient() {
                   value={laminationFabricWasteKg}
                   onChange={(e) => {
                     isDirtyRef.current = true;
+                    hasUnsavedLocalEditsRef.current = true;
                     lastUserEditTimeRef.current = Date.now();
                     realtime.markLocalEdit();
                     setLaminationFabricWasteKg(e.target.value);
+                    triggerAutoSave(e.target.value, printFabricWasteKg, remarks);
+                  }}
+                  onFocus={() => {
+                    activeFocusedFieldRef.current = "laminationFabricWasteKg";
+                  }}
+                  onBlur={() => {
+                    activeFocusedFieldRef.current = null;
                   }}
                   placeholder="Enter wastage kg"
                   className="w-full h-10 px-3 text-sm font-extrabold text-amber-950 pr-7 bg-amber-50/40 border border-amber-300 rounded-lg focus:ring-1 focus:ring-amber-500"
@@ -873,9 +978,17 @@ export function PrintingWastageClient() {
                   value={printFabricWasteKg}
                   onChange={(e) => {
                     isDirtyRef.current = true;
+                    hasUnsavedLocalEditsRef.current = true;
                     lastUserEditTimeRef.current = Date.now();
                     realtime.markLocalEdit();
                     setPrintFabricWasteKg(e.target.value);
+                    triggerAutoSave(laminationFabricWasteKg, e.target.value, remarks);
+                  }}
+                  onFocus={() => {
+                    activeFocusedFieldRef.current = "printFabricWasteKg";
+                  }}
+                  onBlur={() => {
+                    activeFocusedFieldRef.current = null;
                   }}
                   placeholder="Enter wastage kg"
                   className="w-full h-10 px-3 text-sm font-extrabold text-purple-950 pr-7 bg-purple-50/40 border border-purple-300 rounded-lg focus:ring-1 focus:ring-purple-500"

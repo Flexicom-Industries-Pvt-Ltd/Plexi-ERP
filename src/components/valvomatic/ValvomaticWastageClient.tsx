@@ -15,14 +15,8 @@ import {
   CheckCircle2,
   Loader2,
   Layers,
-  Calendar,
-  Clock,
-  User,
-  Scale,
-  Sparkles,
   FileCheck,
   AlertCircle,
-  Download,
   ArrowDownToLine,
 } from "lucide-react";
 import {
@@ -31,6 +25,12 @@ import {
   calculateValvomaticWastageRow,
   computeValvomaticWastageTotals,
 } from "@/lib/valvomatic/valvomatic-types";
+import {
+  FocusedValvomaticWastageCell,
+  getValvomaticWastageRowKey,
+  reconcileServerValvomaticWastageEntries,
+  serializeValvomaticWastagePayload,
+} from "@/lib/valvomatic/valvomatic-wastage-google-docs-sync";
 import dynamic from "next/dynamic";
 import { exportValvomaticWastageReportExcel } from "@/lib/valvomatic/valvomatic-export";
 import { UniversalQualityInput } from "@/components/ui/UniversalQualityInput";
@@ -102,6 +102,30 @@ export function ValvomaticWastageClient() {
   const isDirtyRef = useRef<boolean>(false);
   const lastUserEditTimeRef = useRef<number>(0);
 
+  // Google Docs Concurrent Sync & Typing Isolation Refs
+  const lastSavedPayloadRef = useRef<string>("");
+  const hasUnsavedLocalEditsRef = useRef<boolean>(false);
+  const activeFocusedCellRef = useRef<FocusedValvomaticWastageCell | null>(null);
+  const deletedEntryIdsRef = useRef<Set<string>>(new Set());
+
+  const [, setFocusedCellState] = useState<FocusedValvomaticWastageCell | null>(null);
+
+  const setFocusedCell = useCallback((rowKey: string, field: keyof ValvomaticWastageEntryItem) => {
+    const next = { rowKey, field };
+    activeFocusedCellRef.current = next;
+    setFocusedCellState(next);
+  }, []);
+
+  const clearFocusedCell = useCallback((rowKey: string, field: keyof ValvomaticWastageEntryItem) => {
+    if (
+      activeFocusedCellRef.current?.rowKey === rowKey &&
+      activeFocusedCellRef.current?.field === field
+    ) {
+      activeFocusedCellRef.current = null;
+      setFocusedCellState(null);
+    }
+  }, []);
+
   // Ref to hold latest state for debounced auto-save
   const latestDataRef = useRef({
     date,
@@ -161,27 +185,48 @@ export function ValvomaticWastageClient() {
           if (!supervisorName && json.linkedProduction.supervisorName) {
             setSupervisorName(json.linkedProduction.supervisorName);
           }
+        } else {
+          setLinkedProductionEntries([]);
         }
 
         if (json.report) {
           const rep = json.report;
           setStatus(rep.status || "DRAFT");
-          setOperatorName(rep.operatorName || "");
-          setSupervisorName(rep.supervisorName || "");
+          if (rep.operatorName) setOperatorName(rep.operatorName);
+          if (rep.supervisorName) setSupervisorName(rep.supervisorName);
           setRemarks(rep.remarks || "");
 
-          if (Array.isArray(rep.entries) && rep.entries.length > 0) {
-            const parsed = rep.entries.map((e: any, idx: number) =>
-              calculateValvomaticWastageRow({
-                ...e,
-                sequence: idx + 1,
-              })
-            );
-            while (parsed.length < 5) {
-              parsed.push(createEmptyWastageRow(parsed.length + 1));
+          const incomingEntries: ValvomaticWastageEntryItem[] =
+            Array.isArray(rep.entries) && rep.entries.length > 0
+              ? rep.entries.map((e: any, idx: number) =>
+                  calculateValvomaticWastageRow({
+                    ...e,
+                    sequence: idx + 1,
+                  })
+                )
+              : [];
+
+          setEntries((prev) => {
+            const reconciled = reconcileServerValvomaticWastageEntries({
+              localEntries: prev,
+              incomingEntries,
+              focusedCell: activeFocusedCellRef.current,
+              hasUnsavedLocalEdits: hasUnsavedLocalEditsRef.current,
+              deletedEntryIds: deletedEntryIdsRef.current,
+            });
+            while (reconciled.length < 5) {
+              reconciled.push(createEmptyWastageRow(reconciled.length + 1));
             }
-            setEntries(parsed);
-          } else {
+            lastSavedPayloadRef.current = serializeValvomaticWastagePayload(rep, incomingEntries);
+            return reconciled;
+          });
+
+          setLastSavedAt(format(new Date(rep.updatedAt || Date.now()), "hh:mm a"));
+        } else {
+          // No report yet
+          if (!hasUnsavedLocalEditsRef.current) {
+            setStatus("DRAFT");
+            setRemarks("");
             setEntries([
               createEmptyWastageRow(1),
               createEmptyWastageRow(2),
@@ -189,20 +234,8 @@ export function ValvomaticWastageClient() {
               createEmptyWastageRow(4),
               createEmptyWastageRow(5),
             ]);
+            setLastSavedAt(null);
           }
-          setLastSavedAt(format(new Date(rep.updatedAt || Date.now()), "hh:mm a"));
-        } else {
-          // No report yet
-          setStatus("DRAFT");
-          setRemarks("");
-          setEntries([
-            createEmptyWastageRow(1),
-            createEmptyWastageRow(2),
-            createEmptyWastageRow(3),
-            createEmptyWastageRow(4),
-            createEmptyWastageRow(5),
-          ]);
-          setLastSavedAt(null);
         }
       }
     } catch (err: any) {
@@ -213,7 +246,7 @@ export function ValvomaticWastageClient() {
         isInitialLoadRef.current = false;
       }, 400);
     }
-  }, [date, shiftName, machineNo]);
+  }, [date, shiftName, machineNo, operatorName, supervisorName]);
 
   useEffect(() => {
     fetchWastageData();
@@ -224,32 +257,151 @@ export function ValvomaticWastageClient() {
     sheet: "wastage",
     date,
     shift: shiftName,
-    onSync: () => {
-      // Don't overwrite active typing on mobile/desktop
-      if (Date.now() - lastUserEditTimeRef.current < 3500) return;
+    onSync: (event?: { clientId?: string | null }) => {
+      // Echo suppression: Ignore notifications originating from this client session
+      if (event?.clientId && event.clientId === realtime.clientId) return;
+      if (Date.now() - lastUserEditTimeRef.current < 2500 && activeFocusedCellRef.current) return;
       fetchWastageData();
     },
   });
 
-  // Cell edit
-  const handleCellChange = (
-    index: number,
-    field: keyof ValvomaticWastageEntryItem,
-    value: any
-  ) => {
+  // Catch-up upon tab wake-up (e.g., user returns after lock or tab switch)
+  useEffect(() => {
+    const handleVisibilityCatchup = () => {
+      if (document.visibilityState === "visible") {
+        fetchWastageData();
+      }
+    };
+    const handleFocusCatchup = () => {
+      fetchWastageData();
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityCatchup);
+    window.addEventListener("focus", handleFocusCatchup);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityCatchup);
+      window.removeEventListener("focus", handleFocusCatchup);
+    };
+  }, [fetchWastageData]);
+
+  // Check if row has data
+  const hasRowData = useCallback((e: ValvomaticWastageEntryItem) => {
+    return Boolean(
+      (e.quality && e.quality.trim()) ||
+      (e.rollNumber && e.rollNumber.trim()) ||
+      Number(e.productionKg) > 0 ||
+      Number(e.loomWasteKg) > 0 ||
+      Number(e.lamWasteKg) > 0 ||
+      Number(e.printWasteKg) > 0 ||
+      Number(e.machineWasteKg) > 0 ||
+      Number(e.coverPatchWasteKg) > 0 ||
+      (e.remarks && e.remarks.trim())
+    );
+  }, []);
+
+  // Save handler
+  const executeSave = useCallback(
+    async (targetStatus?: "DRAFT" | "SUBMITTED" | "APPROVED", silent = false) => {
+      const current = latestDataRef.current;
+      if (!current.date || !current.shiftName) return;
+
+      const filledEntries = current.entries.filter(hasRowData);
+
+      const hasAnyData =
+        filledEntries.length > 0 ||
+        Boolean(current.operatorName.trim()) ||
+        Boolean(current.supervisorName.trim()) ||
+        Boolean(current.remarks.trim());
+
+      if (!hasAnyData && (!targetStatus || targetStatus === "DRAFT")) return;
+
+      if (targetStatus === "SUBMITTED" && filledEntries.length === 0) {
+        toast.error("Please add at least one entry before submitting for approval");
+        return;
+      }
+
+      if (!silent) setSaving(true);
+      else setIsAutoSaving(true);
+      setAutoSaveError(null);
+
+      const newStatus = targetStatus || current.status;
+
+      try {
+        const payload = {
+          date: current.date,
+          shiftName: current.shiftName,
+          machineNo: current.machineNo,
+          operatorName: current.operatorName.trim() || undefined,
+          supervisorName: current.supervisorName.trim() || undefined,
+          status: newStatus,
+          remarks: current.remarks.trim() || undefined,
+          clientId: realtime.clientId,
+          deletedEntryIds: Array.from(deletedEntryIdsRef.current),
+          ...computeValvomaticWastageTotals(current.entries),
+          entries: filledEntries.map((e, idx) => ({ ...e, sequence: idx + 1 })),
+        };
+
+        const res = await fetch("/api/production/valvomatic/wastage", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.error || "Failed to save Valvomatic wastage report");
+        }
+
+        lastSavedPayloadRef.current = serializeValvomaticWastagePayload(current, filledEntries);
+        hasUnsavedLocalEditsRef.current = false;
+        deletedEntryIdsRef.current.clear();
+        setStatus(newStatus);
+        setLastSavedAt(format(new Date(), "hh:mm:ss a"));
+        isDirtyRef.current = false;
+
+        realtime.broadcastSync({
+          action: newStatus === "SUBMITTED" ? "SUBMIT" : "SAVE",
+          date: current.date,
+          shift: current.shiftName,
+        });
+
+        if (!silent) {
+          toast.success(
+            newStatus === "SUBMITTED"
+              ? "Valvomatic wastage report submitted successfully!"
+              : "Valvomatic wastage report saved successfully"
+          );
+        }
+      } catch (err: any) {
+        console.error("Valvomatic wastage save error:", err);
+        setAutoSaveError(err.message || "Auto-save failed");
+        if (!silent) toast.error(err.message || "Failed to save Valvomatic wastage report");
+      } finally {
+        setSaving(false);
+        setIsAutoSaving(false);
+      }
+    },
+    [hasRowData, realtime]
+  );
+
+  const triggerAutoSave = useCallback(() => {
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    autoSaveTimerRef.current = setTimeout(() => {
+      executeSave("DRAFT", true);
+    }, 1500);
+  }, [executeSave]);
+
+  const markDirtyAndTriggerAutoSave = useCallback(() => {
     isDirtyRef.current = true;
+    hasUnsavedLocalEditsRef.current = true;
     lastUserEditTimeRef.current = Date.now();
     realtime.markLocalEdit();
-    setEntries((prev) => {
-      const next = [...prev];
-      const updatedRow = { ...next[index], [field]: value };
-      next[index] = calculateValvomaticWastageRow(updatedRow);
-      return next;
-    });
-  };
+    triggerAutoSave();
+  }, [realtime, triggerAutoSave]);
 
   // 1-Click Sync Rolls from Daily Production
-  const handleSyncFromDailyProduction = () => {
+  const handleSyncFromDailyProduction = useCallback(() => {
     if (!linkedProductionEntries || linkedProductionEntries.length === 0) {
       toast.error("No daily production rolls found for this Date, Shift, and Machine.");
       return;
@@ -262,7 +414,6 @@ export function ValvomaticWastageClient() {
       return;
     }
 
-    isDirtyRef.current = true;
     const synced = linkedProductionEntries.map((prod, idx) => {
       const existing = entries.find((e) => e.rollNumber === prod.rollNumber);
       return calculateValvomaticWastageRow({
@@ -284,18 +435,36 @@ export function ValvomaticWastageClient() {
     }
 
     setEntries(synced);
+    markDirtyAndTriggerAutoSave();
     toast.success(`Synced ${linkedProductionEntries.length} rolls from Daily Production!`);
-  };
+  }, [linkedProductionEntries, entries, markDirtyAndTriggerAutoSave]);
+
+  // Cell edit
+  const handleCellChange = useCallback(
+    (
+      index: number,
+      field: keyof ValvomaticWastageEntryItem,
+      value: any
+    ) => {
+      setEntries((prev) => {
+        const next = [...prev];
+        const updatedRow = { ...next[index], [field]: value };
+        next[index] = calculateValvomaticWastageRow(updatedRow);
+        return next;
+      });
+      markDirtyAndTriggerAutoSave();
+    },
+    [markDirtyAndTriggerAutoSave]
+  );
 
   // Add row
-  const handleAddRow = () => {
-    isDirtyRef.current = true;
+  const handleAddRow = useCallback(() => {
     setEntries((prev) => [...prev, createEmptyWastageRow(prev.length + 1)]);
-  };
+    markDirtyAndTriggerAutoSave();
+  }, [markDirtyAndTriggerAutoSave]);
 
   // Add 5 rows
-  const handleAdd5Rows = () => {
-    isDirtyRef.current = true;
+  const handleAdd5Rows = useCallback(() => {
     setEntries((prev) => {
       const start = prev.length + 1;
       return [
@@ -307,12 +476,12 @@ export function ValvomaticWastageClient() {
         createEmptyWastageRow(start + 4),
       ];
     });
-  };
+    markDirtyAndTriggerAutoSave();
+  }, [markDirtyAndTriggerAutoSave]);
 
   // Reset
-  const handleResetToBlank = () => {
+  const handleResetToBlank = useCallback(() => {
     if (confirm("Reset wastage sheet to 5 blank rows? Unsaved changes will be discarded.")) {
-      isDirtyRef.current = true;
       setEntries([
         createEmptyWastageRow(1),
         createEmptyWastageRow(2),
@@ -321,117 +490,31 @@ export function ValvomaticWastageClient() {
         createEmptyWastageRow(5),
       ]);
       setRemarks("");
+      markDirtyAndTriggerAutoSave();
     }
-  };
+  }, [markDirtyAndTriggerAutoSave]);
 
   // Delete row
-  const handleDeleteRow = (index: number) => {
-    isDirtyRef.current = true;
-    setEntries((prev) => {
-      const filtered = prev.filter((_, i) => i !== index);
-      if (filtered.length === 0) {
-        return [createEmptyWastageRow(1)];
-      }
-      return filtered.map((row, i) => ({ ...row, sequence: i + 1 }));
-    });
-  };
-
-  // Core Save
-  const saveWastageReport = async (
-    overrideStatus?: "DRAFT" | "SUBMITTED" | "APPROVED",
-    isSilent = false
-  ) => {
-    const currentData = latestDataRef.current;
-    const finalStatus = overrideStatus || currentData.status;
-
-    if (!isSilent) setSaving(true);
-    else setIsAutoSaving(true);
-    setAutoSaveError(null);
-
-    try {
-      const payload: ValvomaticWastageReportData = {
-        date: currentData.date,
-        shiftName: currentData.shiftName,
-        machineNo: currentData.machineNo,
-        operatorName: currentData.operatorName,
-        supervisorName: currentData.supervisorName,
-        status: finalStatus,
-        remarks: currentData.remarks,
-        totalProductionKg: 0,
-        totalLoomWasteKg: 0,
-        totalLoomWastePct: 0,
-        totalLamWasteKg: 0,
-        totalLamWastePct: 0,
-        totalPrintWasteKg: 0,
-        totalPrintWastePct: 0,
-        totalMachineWasteKg: 0,
-        totalMachineWastePct: 0,
-        totalCoverPatchWasteKg: 0,
-        totalCoverPatchWastePct: 0,
-        totalWastageKg: 0,
-        totalWastagePct: 0,
-        totalNetProductionKg: 0,
-        entries: currentData.entries,
-      };
-
-      const res = await fetch("/api/production/valvomatic/wastage", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+  const handleDeleteRow = useCallback(
+    (index: number) => {
+      setEntries((prev) => {
+        const target = prev[index];
+        if (target?.id) {
+          deletedEntryIdsRef.current.add(target.id);
+        }
+        if (target?.rollNumber?.trim()) {
+          deletedEntryIdsRef.current.add(target.rollNumber.trim().toUpperCase());
+        }
+        const filtered = prev.filter((_, i) => i !== index);
+        if (filtered.length === 0) {
+          return [createEmptyWastageRow(1)];
+        }
+        return filtered.map((row, i) => ({ ...row, sequence: i + 1 }));
       });
-
-      const json = await res.json();
-      if (!res.ok || !json.success) {
-        throw new Error(json.error || "Failed to save wastage report");
-      }
-
-      setLastSavedAt(format(new Date(), "hh:mm a"));
-      isDirtyRef.current = false;
-
-      realtime.broadcastSync({
-        action: finalStatus === "SUBMITTED" ? "SUBMIT" : "SAVE",
-        date: currentData.date,
-        shift: currentData.shiftName,
-      });
-
-      if (!isSilent) {
-        toast.success(
-          finalStatus === "SUBMITTED"
-            ? "Wastage report submitted successfully!"
-            : "Wastage report saved successfully!"
-        );
-      }
-    } catch (err: any) {
-      console.error("Valvomatic wastage save error:", err);
-      setAutoSaveError(err.message || "Auto-save failed");
-      if (!isSilent) {
-        toast.error(err.message || "Failed to save wastage report");
-      }
-    } finally {
-      if (!isSilent) setSaving(false);
-      else setIsAutoSaving(false);
-    }
-  };
-
-  // Debounced auto-save
-  useEffect(() => {
-    if (isInitialLoadRef.current) return;
-    if (!isDirtyRef.current) return;
-
-    if (autoSaveTimerRef.current) {
-      clearTimeout(autoSaveTimerRef.current);
-    }
-
-    autoSaveTimerRef.current = setTimeout(() => {
-      if (isDirtyRef.current) {
-        saveWastageReport(undefined, true);
-      }
-    }, 1000);
-
-    return () => {
-      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
-    };
-  }, [entries, operatorName, supervisorName, remarks, status]);
+      markDirtyAndTriggerAutoSave();
+    },
+    [markDirtyAndTriggerAutoSave]
+  );
 
   // Totals
   const totals = useMemo(() => computeValvomaticWastageTotals(entries), [entries]);
@@ -453,31 +536,33 @@ export function ValvomaticWastageClient() {
 
   return (
     <div
-      className={`space-y-4 pb-16 ${isFullscreen
+      className={`space-y-4 pb-16 ${
+        isFullscreen
           ? "fixed inset-0 z-50 bg-slate-100 p-4 overflow-y-auto"
           : "max-w-[100vw] overflow-x-hidden"
-        }`}
+      }`}
     >
-      {/* Main Header Card */}
+      {/* Header Panel */}
       <div className="bg-white border border-slate-200 rounded-xl p-4 sm:p-5 shadow-xs">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2.5">
-              <div className="p-2 bg-rose-50 text-rose-600 rounded-lg">
+              <div className="p-2 bg-amber-500/10 text-amber-700 rounded-lg">
                 <Layers className="h-6 w-6" />
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-rose-600">
-                    Wastage Accounting
+                  <span className="text-xs font-semibold uppercase tracking-wider text-amber-700">
+                    Cutting &amp; Bag Making
                   </span>
                   <span
-                    className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${status === "APPROVED"
+                    className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
+                      status === "APPROVED"
                         ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                         : status === "SUBMITTED"
-                          ? "bg-blue-50 text-blue-700 border border-blue-200"
-                          : "bg-amber-50 text-amber-700 border border-amber-200"
-                      }`}
+                        ? "bg-blue-50 text-blue-700 border border-blue-200"
+                        : "bg-amber-50 text-amber-700 border border-amber-200"
+                    }`}
                   >
                     {status}
                   </span>
@@ -504,16 +589,16 @@ export function ValvomaticWastageClient() {
                   ) : null}
                 </div>
                 <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight mt-1">
-                  Valvomatic Wastage & Scrap Accounting
+                  Valvomatic Machine Wastage Report
                 </h1>
                 <p className="text-xs sm:text-sm text-slate-500">
-                  Granular roll-by-roll wastage accounting, scrap categorization, & net good production
+                  Track roll-wise scrap: loom, lamination, printing, machine, &amp; cover patch wastage
                 </p>
               </div>
             </div>
           </div>
 
-          {/* Action Buttons Strip */}
+          {/* Action Buttons */}
           <div className="flex flex-wrap items-center gap-2">
             <RealtimeSyncBadge
               isConnected={realtime.isConnected}
@@ -523,18 +608,19 @@ export function ValvomaticWastageClient() {
               isSelfUpdate={realtime.isSelfUpdate}
             />
 
-            {/* Sync Rolls from Daily Production */}
+            {/* 1-Click Sync from Daily Production */}
             <button
               onClick={handleSyncFromDailyProduction}
-              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg bg-sky-50 text-sky-700 hover:bg-sky-100 border border-sky-300 transition-colors shadow-xs"
-              title="Populate roll numbers and production kg from the matching Daily Production sheet"
+              disabled={linkedProductionEntries.length === 0}
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-300 transition-colors shadow-2xs disabled:opacity-40"
+              title="Populate roll numbers and production weights from saved daily report"
             >
               <ArrowDownToLine className="h-3.5 w-3.5 text-sky-600" />
-              Sync Rolls ({linkedProductionEntries.length})
+              <span>Sync Rolls ({linkedProductionEntries.length})</span>
             </button>
 
             <button
-              onClick={() => saveWastageReport("DRAFT")}
+              onClick={() => executeSave("DRAFT")}
               disabled={saving}
               className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-lg border border-slate-300 hover:bg-slate-100 text-slate-700 transition-colors shadow-xs disabled:opacity-50"
             >
@@ -543,7 +629,7 @@ export function ValvomaticWastageClient() {
             </button>
 
             <button
-              onClick={() => saveWastageReport("SUBMITTED")}
+              onClick={() => executeSave("SUBMITTED")}
               disabled={saving}
               className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition-colors shadow-xs disabled:opacity-50"
             >
@@ -577,8 +663,8 @@ export function ValvomaticWastageClient() {
           </div>
         </div>
 
-        {/* Header Metadata Selectors */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mt-4 pt-4 border-t border-slate-200">
+        {/* Filter Toolbar */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3 mt-4 pt-4 border-t border-slate-200">
           <div>
             <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">Date</label>
             <input
@@ -619,11 +705,11 @@ export function ValvomaticWastageClient() {
               type="operator"
               section="VALVOMATIC"
               value={operatorName}
-              onChange={(name) => {
-                isDirtyRef.current = true;
-                setOperatorName(name);
+              onChange={(val) => {
+                setOperatorName(val);
+                markDirtyAndTriggerAutoSave();
               }}
-              placeholder="Operator name"
+              placeholder="Select operator..."
             />
           </div>
 
@@ -631,47 +717,23 @@ export function ValvomaticWastageClient() {
             <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">Supervisor</label>
             <UniversalPersonnelInput
               type="supervisor"
+              section="VALVOMATIC"
               value={supervisorName}
-              onChange={(name) => {
-                isDirtyRef.current = true;
-                setSupervisorName(name);
+              onChange={(val) => {
+                setSupervisorName(val);
+                markDirtyAndTriggerAutoSave();
               }}
-              placeholder="Supervisor name"
+              placeholder="Select supervisor..."
             />
-          </div>
-
-          <div>
-            <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">Status</label>
-            <select
-              value={status}
-              onChange={(e) => {
-                isDirtyRef.current = true;
-                setStatus(e.target.value as any);
-              }}
-              className={`w-full text-xs px-2.5 py-1.5 font-bold rounded-lg border focus:outline-hidden ${status === "APPROVED"
-                  ? "bg-emerald-50 text-emerald-800 border-emerald-300"
-                  : status === "SUBMITTED"
-                    ? "bg-blue-50 text-blue-800 border-blue-300"
-                    : "bg-amber-50 text-amber-800 border-amber-300"
-                }`}
-            >
-              <option value="DRAFT">DRAFT</option>
-              <option value="SUBMITTED">SUBMITTED</option>
-              <option value="APPROVED">APPROVED</option>
-            </select>
           </div>
         </div>
       </div>
 
-      {/* KPI Cards Strip */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 lg:grid-cols-10 gap-2.5">
+      {/* Aggregate KPI Summary Strip */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-8 gap-2.5">
         <div className="bg-white border border-slate-200 rounded-xl p-2.5 shadow-2xs text-center">
-          <div className="text-[10px] uppercase font-bold text-slate-500">Rolls</div>
-          <div className="text-base font-black text-slate-900 font-mono mt-0.5">{entries.length}</div>
-        </div>
-        <div className="bg-teal-50/80 border border-teal-200 rounded-xl p-2.5 shadow-2xs text-center">
-          <div className="text-[10px] uppercase font-bold text-teal-800">Gross (Kg)</div>
-          <div className="text-base font-black text-teal-700 font-mono mt-0.5">
+          <div className="text-[10px] uppercase font-bold text-slate-500">Gross Prod</div>
+          <div className="text-base font-black text-slate-900 font-mono mt-0.5">
             {totals.totalProductionKg.toFixed(1)}
           </div>
         </div>
@@ -709,12 +771,6 @@ export function ValvomaticWastageClient() {
           <div className="text-[10px] uppercase font-bold text-rose-800">Total Waste</div>
           <div className="text-base font-black text-rose-700 font-mono mt-0.5">
             {totals.totalWastageKg.toFixed(1)}
-          </div>
-        </div>
-        <div className="bg-amber-50/80 border border-amber-200 rounded-xl p-2.5 shadow-2xs text-center">
-          <div className="text-[10px] uppercase font-bold text-amber-800">Waste %</div>
-          <div className="text-base font-black text-amber-700 font-mono mt-0.5">
-            {totals.totalWastagePct.toFixed(2)}%
           </div>
         </div>
         <div className="bg-emerald-50/80 border border-emerald-200 rounded-xl p-2.5 shadow-2xs text-center">
@@ -815,175 +871,196 @@ export function ValvomaticWastageClient() {
                   </td>
                 </tr>
               ) : (
-                entries.map((entry, index) => (
-                  <tr key={index} className="hover:bg-slate-50/80 transition-colors group">
-                    <td className="p-1 border-r border-slate-200 text-center font-bold text-slate-500 bg-slate-50/50">
-                      {index + 1}
-                    </td>
+                entries.map((entry, index) => {
+                  const rowKey = getValvomaticWastageRowKey(entry, index);
+                  return (
+                    <tr key={index} className="hover:bg-slate-50/80 transition-colors group">
+                      <td className="p-1 border-r border-slate-200 text-center font-bold text-slate-500 bg-slate-50/50">
+                        {index + 1}
+                      </td>
 
-                    {/* Quality */}
-                    <td className="p-1 border-r border-slate-200 bg-amber-50/40 min-w-[200px]">
-                      <UniversalQualityInput
-                        value={entry.quality || ""}
-                        onChange={(newVal) => handleCellChange(index, "quality", newVal)}
-                        placeholder="— Quality —"
-                        compact={true}
-                        inputClassName="h-7 text-xs font-bold text-slate-900 border-amber-300"
-                      />
-                    </td>
+                      {/* Quality */}
+                      <td className="p-1 border-r border-slate-200 bg-amber-50/40 min-w-[200px]">
+                        <UniversalQualityInput
+                          value={entry.quality || ""}
+                          onChange={(newVal) => handleCellChange(index, "quality", newVal)}
+                          onFocus={() => setFocusedCell(rowKey, "quality")}
+                          onBlur={() => clearFocusedCell(rowKey, "quality")}
+                          placeholder="— Quality —"
+                          compact={true}
+                          inputClassName="h-7 text-xs font-bold text-slate-900 border-amber-300"
+                        />
+                      </td>
 
-                    {/* Roll No */}
-                    <td className="p-1 border-r border-slate-200 bg-slate-50/50">
-                      <input
-                        type="text"
-                        value={entry.rollNumber || ""}
-                        onChange={(e) => handleCellChange(index, "rollNumber", e.target.value)}
-                        placeholder="Roll #"
-                        className="w-full px-2 py-1 text-xs font-mono font-bold text-center border border-transparent hover:border-slate-300 focus:border-primary rounded focus:outline-hidden bg-transparent"
-                      />
-                    </td>
+                      {/* Roll No */}
+                      <td className="p-1 border-r border-slate-200 bg-slate-50/50">
+                        <input
+                          type="text"
+                          value={entry.rollNumber || ""}
+                          onChange={(e) => handleCellChange(index, "rollNumber", e.target.value)}
+                          onFocus={() => setFocusedCell(rowKey, "rollNumber")}
+                          onBlur={() => clearFocusedCell(rowKey, "rollNumber")}
+                          placeholder="Roll #"
+                          className="w-full px-2 py-1 text-xs font-mono font-bold text-center border border-transparent hover:border-slate-300 focus:border-primary rounded focus:outline-hidden bg-transparent"
+                        />
+                      </td>
 
-                    {/* Production (Kg) */}
-                    <td className="p-1 border-r border-slate-200 bg-teal-50/50">
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.1"
-                        value={entry.productionKg || ""}
-                        onChange={(e) =>
-                          handleCellChange(index, "productionKg", parseFloat(e.target.value) || 0)
-                        }
-                        placeholder="0.0"
-                        className="w-full px-2 py-1 text-xs font-mono font-black text-teal-800 border border-transparent hover:border-teal-300 focus:border-teal-500 rounded focus:outline-hidden bg-transparent text-right"
-                      />
-                    </td>
+                      {/* Production (Kg) */}
+                      <td className="p-1 border-r border-slate-200 bg-teal-50/50">
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.1"
+                          value={entry.productionKg || ""}
+                          onChange={(e) =>
+                            handleCellChange(index, "productionKg", parseFloat(e.target.value) || 0)
+                          }
+                          onFocus={() => setFocusedCell(rowKey, "productionKg")}
+                          onBlur={() => clearFocusedCell(rowKey, "productionKg")}
+                          placeholder="0.0"
+                          className="w-full px-2 py-1 text-xs font-mono font-black text-teal-800 border border-transparent hover:border-teal-300 focus:border-teal-500 rounded focus:outline-hidden bg-transparent text-right"
+                        />
+                      </td>
 
-                    {/* Loom Waste Kg & Pct */}
-                    <td className="p-1 border-r border-slate-200">
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={entry.loomWasteKg || ""}
-                        onChange={(e) =>
-                          handleCellChange(index, "loomWasteKg", parseFloat(e.target.value) || 0)
-                        }
-                        placeholder="0.00"
-                        className="w-full px-1.5 py-1 text-xs border border-transparent hover:border-slate-300 focus:border-primary rounded focus:outline-hidden bg-transparent text-right font-mono"
-                      />
-                    </td>
-                    <td className="p-1 border-r border-slate-200 text-right font-mono text-[10px] text-slate-500 px-1.5">
-                      {entry.loomWastePct > 0 ? `${entry.loomWastePct.toFixed(1)}%` : "—"}
-                    </td>
+                      {/* Loom Waste Kg & Pct */}
+                      <td className="p-1 border-r border-slate-200">
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={entry.loomWasteKg || ""}
+                          onChange={(e) =>
+                            handleCellChange(index, "loomWasteKg", parseFloat(e.target.value) || 0)
+                          }
+                          onFocus={() => setFocusedCell(rowKey, "loomWasteKg")}
+                          onBlur={() => clearFocusedCell(rowKey, "loomWasteKg")}
+                          placeholder="0.00"
+                          className="w-full px-1.5 py-1 text-xs border border-transparent hover:border-slate-300 focus:border-primary rounded focus:outline-hidden bg-transparent text-right font-mono"
+                        />
+                      </td>
+                      <td className="p-1 border-r border-slate-200 text-right font-mono text-[10px] text-slate-500 px-1.5">
+                        {entry.loomWastePct > 0 ? `${entry.loomWastePct.toFixed(1)}%` : "—"}
+                      </td>
 
-                    {/* Lam Waste Kg & Pct */}
-                    <td className="p-1 border-r border-slate-200">
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={entry.lamWasteKg || ""}
-                        onChange={(e) =>
-                          handleCellChange(index, "lamWasteKg", parseFloat(e.target.value) || 0)
-                        }
-                        placeholder="0.00"
-                        className="w-full px-1.5 py-1 text-xs border border-transparent hover:border-slate-300 focus:border-primary rounded focus:outline-hidden bg-transparent text-right font-mono"
-                      />
-                    </td>
-                    <td className="p-1 border-r border-slate-200 text-right font-mono text-[10px] text-slate-500 px-1.5">
-                      {entry.lamWastePct > 0 ? `${entry.lamWastePct.toFixed(1)}%` : "—"}
-                    </td>
+                      {/* Lam Waste Kg & Pct */}
+                      <td className="p-1 border-r border-slate-200">
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={entry.lamWasteKg || ""}
+                          onChange={(e) =>
+                            handleCellChange(index, "lamWasteKg", parseFloat(e.target.value) || 0)
+                          }
+                          onFocus={() => setFocusedCell(rowKey, "lamWasteKg")}
+                          onBlur={() => clearFocusedCell(rowKey, "lamWasteKg")}
+                          placeholder="0.00"
+                          className="w-full px-1.5 py-1 text-xs border border-transparent hover:border-slate-300 focus:border-primary rounded focus:outline-hidden bg-transparent text-right font-mono"
+                        />
+                      </td>
+                      <td className="p-1 border-r border-slate-200 text-right font-mono text-[10px] text-slate-500 px-1.5">
+                        {entry.lamWastePct > 0 ? `${entry.lamWastePct.toFixed(1)}%` : "—"}
+                      </td>
 
-                    {/* Print Waste Kg & Pct */}
-                    <td className="p-1 border-r border-slate-200">
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={entry.printWasteKg || ""}
-                        onChange={(e) =>
-                          handleCellChange(index, "printWasteKg", parseFloat(e.target.value) || 0)
-                        }
-                        placeholder="0.00"
-                        className="w-full px-1.5 py-1 text-xs border border-transparent hover:border-slate-300 focus:border-primary rounded focus:outline-hidden bg-transparent text-right font-mono"
-                      />
-                    </td>
-                    <td className="p-1 border-r border-slate-200 text-right font-mono text-[10px] text-slate-500 px-1.5">
-                      {entry.printWastePct > 0 ? `${entry.printWastePct.toFixed(1)}%` : "—"}
-                    </td>
+                      {/* Print Waste Kg & Pct */}
+                      <td className="p-1 border-r border-slate-200">
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={entry.printWasteKg || ""}
+                          onChange={(e) =>
+                            handleCellChange(index, "printWasteKg", parseFloat(e.target.value) || 0)
+                          }
+                          onFocus={() => setFocusedCell(rowKey, "printWasteKg")}
+                          onBlur={() => clearFocusedCell(rowKey, "printWasteKg")}
+                          placeholder="0.00"
+                          className="w-full px-1.5 py-1 text-xs border border-transparent hover:border-slate-300 focus:border-primary rounded focus:outline-hidden bg-transparent text-right font-mono"
+                        />
+                      </td>
+                      <td className="p-1 border-r border-slate-200 text-right font-mono text-[10px] text-slate-500 px-1.5">
+                        {entry.printWastePct > 0 ? `${entry.printWastePct.toFixed(1)}%` : "—"}
+                      </td>
 
-                    {/* Machine Waste Kg & Pct */}
-                    <td className="p-1 border-r border-slate-200">
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={entry.machineWasteKg || ""}
-                        onChange={(e) =>
-                          handleCellChange(index, "machineWasteKg", parseFloat(e.target.value) || 0)
-                        }
-                        placeholder="0.00"
-                        className="w-full px-1.5 py-1 text-xs border border-transparent hover:border-slate-300 focus:border-primary rounded focus:outline-hidden bg-transparent text-right font-mono"
-                      />
-                    </td>
-                    <td className="p-1 border-r border-slate-200 text-right font-mono text-[10px] text-slate-500 px-1.5">
-                      {entry.machineWastePct > 0 ? `${entry.machineWastePct.toFixed(1)}%` : "—"}
-                    </td>
+                      {/* Machine Waste Kg & Pct */}
+                      <td className="p-1 border-r border-slate-200">
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={entry.machineWasteKg || ""}
+                          onChange={(e) =>
+                            handleCellChange(index, "machineWasteKg", parseFloat(e.target.value) || 0)
+                          }
+                          onFocus={() => setFocusedCell(rowKey, "machineWasteKg")}
+                          onBlur={() => clearFocusedCell(rowKey, "machineWasteKg")}
+                          placeholder="0.00"
+                          className="w-full px-1.5 py-1 text-xs border border-transparent hover:border-slate-300 focus:border-primary rounded focus:outline-hidden bg-transparent text-right font-mono"
+                        />
+                      </td>
+                      <td className="p-1 border-r border-slate-200 text-right font-mono text-[10px] text-slate-500 px-1.5">
+                        {entry.machineWastePct > 0 ? `${entry.machineWastePct.toFixed(1)}%` : "—"}
+                      </td>
 
-                    {/* Cover Patch Waste Kg & Pct */}
-                    <td className="p-1 border-r border-slate-200">
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={entry.coverPatchWasteKg || ""}
-                        onChange={(e) =>
-                          handleCellChange(index, "coverPatchWasteKg", parseFloat(e.target.value) || 0)
-                        }
-                        placeholder="0.00"
-                        className="w-full px-1.5 py-1 text-xs border border-transparent hover:border-slate-300 focus:border-primary rounded focus:outline-hidden bg-transparent text-right font-mono text-indigo-700 font-semibold"
-                      />
-                    </td>
-                    <td className="p-1 border-r border-slate-200 text-right font-mono text-[10px] text-indigo-500 px-1.5">
-                      {entry.coverPatchWastePct > 0 ? `${entry.coverPatchWastePct.toFixed(1)}%` : "—"}
-                    </td>
+                      {/* Cover Patch Waste Kg & Pct */}
+                      <td className="p-1 border-r border-slate-200">
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={entry.coverPatchWasteKg || ""}
+                          onChange={(e) =>
+                            handleCellChange(index, "coverPatchWasteKg", parseFloat(e.target.value) || 0)
+                          }
+                          onFocus={() => setFocusedCell(rowKey, "coverPatchWasteKg")}
+                          onBlur={() => clearFocusedCell(rowKey, "coverPatchWasteKg")}
+                          placeholder="0.00"
+                          className="w-full px-1.5 py-1 text-xs border border-transparent hover:border-slate-300 focus:border-primary rounded focus:outline-hidden bg-transparent text-right font-mono text-indigo-700 font-semibold"
+                        />
+                      </td>
+                      <td className="p-1 border-r border-slate-200 text-right font-mono text-[10px] text-indigo-500 px-1.5">
+                        {entry.coverPatchWastePct > 0 ? `${entry.coverPatchWastePct.toFixed(1)}%` : "—"}
+                      </td>
 
-                    {/* Total Waste (Kg & %) Auto-calculated */}
-                    <td className="p-1 border-r border-slate-200 bg-rose-50/60 text-right font-mono font-bold text-rose-700 px-2">
-                      {entry.totalWasteKg > 0 ? entry.totalWasteKg.toFixed(2) : "0.00"}
-                    </td>
-                    <td className="p-1 border-r border-slate-200 bg-rose-50/40 text-right font-mono text-[10px] text-rose-600 px-1.5">
-                      {entry.totalWastePct > 0 ? `${entry.totalWastePct.toFixed(1)}%` : "0.0%"}
-                    </td>
+                      {/* Total Waste (Kg & %) Auto-calculated */}
+                      <td className="p-1 border-r border-slate-200 bg-rose-50/60 text-right font-mono font-bold text-rose-700 px-2">
+                        {entry.totalWasteKg > 0 ? entry.totalWasteKg.toFixed(2) : "0.00"}
+                      </td>
+                      <td className="p-1 border-r border-slate-200 bg-rose-50/40 text-right font-mono text-[10px] text-rose-600 px-1.5">
+                        {entry.totalWastePct > 0 ? `${entry.totalWastePct.toFixed(1)}%` : "0.0%"}
+                      </td>
 
-                    {/* Net Production (Kg) Auto-calculated */}
-                    <td className="p-1 border-r border-slate-200 bg-emerald-50/60 text-right font-mono font-black text-emerald-800 px-2">
-                      {entry.netProductionKg > 0 ? entry.netProductionKg.toFixed(1) : "0.0"}
-                    </td>
+                      {/* Net Production (Kg) Auto-calculated */}
+                      <td className="p-1 border-r border-slate-200 bg-emerald-50/60 text-right font-mono font-black text-emerald-800 px-2">
+                        {entry.netProductionKg > 0 ? entry.netProductionKg.toFixed(1) : "0.0"}
+                      </td>
 
-                    {/* Remarks */}
-                    <td className="p-1 border-r border-slate-200">
-                      <input
-                        type="text"
-                        value={entry.remarks || ""}
-                        onChange={(e) => handleCellChange(index, "remarks", e.target.value)}
-                        placeholder="Notes..."
-                        className="w-full px-2 py-1 text-xs border border-transparent hover:border-slate-300 focus:border-primary rounded focus:outline-hidden bg-transparent text-slate-600"
-                      />
-                    </td>
+                      {/* Remarks */}
+                      <td className="p-1 border-r border-slate-200">
+                        <input
+                          type="text"
+                          value={entry.remarks || ""}
+                          onChange={(e) => handleCellChange(index, "remarks", e.target.value)}
+                          onFocus={() => setFocusedCell(rowKey, "remarks")}
+                          onBlur={() => clearFocusedCell(rowKey, "remarks")}
+                          placeholder="Notes..."
+                          className="w-full px-2 py-1 text-xs border border-transparent hover:border-slate-300 focus:border-primary rounded focus:outline-hidden bg-transparent text-slate-600"
+                        />
+                      </td>
 
-                    {/* Action */}
-                    <td className="p-1 text-center">
-                      <button
-                        onClick={() => handleDeleteRow(index)}
-                        className="p-1 text-slate-400 hover:text-rose-600 rounded transition-colors opacity-70 group-hover:opacity-100"
-                        title="Delete Row"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </td>
-                  </tr>
-                ))
+                      {/* Action */}
+                      <td className="p-1 text-center">
+                        <button
+                          onClick={() => handleDeleteRow(index)}
+                          className="p-1 text-slate-400 hover:text-rose-600 rounded transition-colors opacity-70 group-hover:opacity-100"
+                          title="Delete Row"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
             {/* Totals Footer Row */}
@@ -1050,29 +1127,26 @@ export function ValvomaticWastageClient() {
             rows={2}
             value={remarks}
             onChange={(e) => {
-              isDirtyRef.current = true;
               setRemarks(e.target.value);
+              markDirtyAndTriggerAutoSave();
             }}
-            placeholder="Add any specific observations for this shift's scrap generation (e.g. edge trimming variation, printing defect rolls sent to recycling)..."
-            className="w-full text-xs p-2 border border-slate-300 rounded-lg focus:outline-hidden focus:ring-1 focus:ring-primary bg-white"
+            placeholder="Add any specific observations for this shift's scrap generation..."
+            className="w-full text-xs p-2.5 border border-slate-200 rounded-lg focus:outline-hidden focus:ring-1 focus:ring-primary bg-white"
           />
         </div>
       </div>
 
-      {/* ========================================================================= */}
-      {/* MOBILE TOUCH FEED (<md) - ZERO DESKTOP REGRESSION                        */}
-      {/* ========================================================================= */}
-      <div className="block md:hidden space-y-4">
-        {/* Mobile Toolbar */}
-        <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-2xs flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-1.5">
+      {/* Mobile Cards View */}
+      <div className="md:hidden space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={handleSyncFromDailyProduction}
+              disabled={linkedProductionEntries.length === 0}
               className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-sky-50 text-sky-700 border border-sky-300 text-xs font-semibold active:scale-95 transition-all"
-              title="Populate roll numbers and production kg from daily report"
             >
-              <ArrowDownToLine className="h-3.5 w-3.5 text-sky-600" />
+              <ArrowDownToLine className="w-3.5 h-3.5" />
               <span>Sync ({linkedProductionEntries.length})</span>
             </button>
             <button
@@ -1080,7 +1154,7 @@ export function ValvomaticWastageClient() {
               onClick={handleAddRow}
               className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-primary text-white text-xs font-bold shadow-xs active:scale-95 transition-all"
             >
-              <Plus className="h-3.5 w-3.5" />
+              <Plus className="w-3.5 h-3.5" />
               <span>Add</span>
             </button>
             <button
@@ -1088,14 +1162,13 @@ export function ValvomaticWastageClient() {
               onClick={handleAdd5Rows}
               className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg border border-slate-200 bg-slate-50 text-slate-700 text-xs font-semibold active:scale-95 transition-all"
             >
-              <Plus className="h-3.5 w-3.5 text-slate-400" />
               <span>+5</span>
             </button>
             <button
               type="button"
               onClick={handleResetToBlank}
               className="p-1.5 rounded-lg border border-slate-200 bg-slate-50 text-slate-600 hover:text-rose-600 active:scale-95 transition-all"
-              title="Reset blank"
+              title="Reset"
             >
               <RotateCcw className="h-3.5 w-3.5" />
             </button>
@@ -1112,199 +1185,220 @@ export function ValvomaticWastageClient() {
               No wastage entries. Tap &quot;Sync&quot; or &quot;Add&quot; to begin.
             </div>
           ) : (
-            entries.map((entry, index) => (
-              <div
-                key={index}
-                className="bg-white border border-slate-200/90 rounded-xl shadow-2xs overflow-hidden"
-              >
-                {/* Card Header Strip */}
-                <div className="bg-slate-50/90 px-3.5 py-2 border-b border-slate-100 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="h-5 w-5 rounded-md bg-slate-900 text-white font-bold text-[10px] flex items-center justify-center">
-                      {entry.sequence}
-                    </span>
-                    <span className="text-xs font-mono font-bold text-slate-900">
-                      {entry.rollNumber ? entry.rollNumber : `Roll ${index + 1}`}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {entry.totalWasteKg > 0 && (
-                      <span className="text-xs font-black font-mono text-rose-700 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200">
-                        {entry.totalWasteKg.toFixed(2)} kg ({entry.totalWastePct.toFixed(1)}%)
+            entries.map((entry, index) => {
+              const rowKey = getValvomaticWastageRowKey(entry, index);
+              return (
+                <div
+                  key={index}
+                  className="bg-white border border-slate-200/90 rounded-xl shadow-2xs overflow-hidden"
+                >
+                  {/* Card Header Strip */}
+                  <div className="bg-slate-50/90 px-3.5 py-2 border-b border-slate-100 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="h-5 w-5 rounded-md bg-slate-900 text-white font-bold text-[10px] flex items-center justify-center">
+                        {entry.sequence}
                       </span>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteRow(index)}
-                      className="p-1 text-slate-400 hover:text-rose-600 rounded active:scale-90 transition-all"
-                      title="Delete row"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                      <span className="text-xs font-mono font-bold text-slate-900">
+                        {entry.rollNumber ? entry.rollNumber : `Roll ${index + 1}`}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {entry.totalWasteKg > 0 && (
+                        <span className="text-xs font-black font-mono text-rose-700 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200">
+                          {entry.totalWasteKg.toFixed(2)} kg ({entry.totalWastePct.toFixed(1)}%)
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteRow(index)}
+                        className="p-1 text-slate-400 hover:text-rose-600 rounded active:scale-90 transition-all"
+                        title="Delete row"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
-                </div>
 
-                <div className="p-3.5 space-y-3 text-xs">
-                  {/* Quality & Gross Prod */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div className="p-3.5 space-y-3 text-xs">
+                    {/* Quality & Gross Prod */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                          Quality
+                        </label>
+                        <UniversalQualityInput
+                          value={entry.quality || ""}
+                          onChange={(newVal) => handleCellChange(index, "quality", newVal)}
+                          onFocus={() => setFocusedCell(rowKey, "quality")}
+                          onBlur={() => clearFocusedCell(rowKey, "quality")}
+                          placeholder="Select quality..."
+                          compact={false}
+                          inputClassName="h-9 text-xs font-semibold"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
+                            Roll Number
+                          </label>
+                          <input
+                            type="text"
+                            value={entry.rollNumber}
+                            onChange={(e) => handleCellChange(index, "rollNumber", e.target.value)}
+                            onFocus={() => setFocusedCell(rowKey, "rollNumber")}
+                            onBlur={() => clearFocusedCell(rowKey, "rollNumber")}
+                            placeholder="e.g. V-101"
+                            className="w-full h-9 px-2.5 text-xs font-mono font-bold border border-slate-200 rounded-md focus:ring-1 focus:ring-primary"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-teal-800 mb-0.5">
+                            Gross Prod (Kg)
+                          </label>
+                          <input
+                            type="number"
+                            step="0.1"
+                            value={entry.productionKg || ""}
+                            onChange={(e) => handleCellChange(index, "productionKg", parseFloat(e.target.value) || 0)}
+                            onFocus={() => setFocusedCell(rowKey, "productionKg")}
+                            onBlur={() => clearFocusedCell(rowKey, "productionKg")}
+                            placeholder="0.0"
+                            className="w-full h-9 px-2.5 text-xs font-mono font-black text-teal-900 bg-teal-50/40 border border-teal-200 rounded-md focus:ring-1 focus:ring-teal-500"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Scrap Streams Input Grid */}
+                    <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100 space-y-2">
+                      <span className="text-[10px] font-bold uppercase text-slate-600 tracking-wider block">
+                        Scrap Streams (Kg)
+                      </span>
+                      <div className="grid grid-cols-3 gap-2 text-center">
+                        <div>
+                          <span className="text-[9px] uppercase font-bold text-slate-500 block">Loom Waste</span>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={entry.loomWasteKg || ""}
+                            onChange={(e) => handleCellChange(index, "loomWasteKg", parseFloat(e.target.value) || 0)}
+                            onFocus={() => setFocusedCell(rowKey, "loomWasteKg")}
+                            onBlur={() => clearFocusedCell(rowKey, "loomWasteKg")}
+                            placeholder="0.00"
+                            className="w-full h-7 text-center font-mono font-bold text-xs border border-slate-200 rounded bg-white"
+                          />
+                          <span className="text-[9px] text-slate-400 font-mono block mt-0.5">
+                            {entry.loomWastePct > 0 ? `${entry.loomWastePct.toFixed(1)}%` : "—"}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-[9px] uppercase font-bold text-slate-500 block">Lam Waste</span>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={entry.lamWasteKg || ""}
+                            onChange={(e) => handleCellChange(index, "lamWasteKg", parseFloat(e.target.value) || 0)}
+                            onFocus={() => setFocusedCell(rowKey, "lamWasteKg")}
+                            onBlur={() => clearFocusedCell(rowKey, "lamWasteKg")}
+                            placeholder="0.00"
+                            className="w-full h-7 text-center font-mono font-bold text-xs border border-slate-200 rounded bg-white"
+                          />
+                          <span className="text-[9px] text-slate-400 font-mono block mt-0.5">
+                            {entry.lamWastePct > 0 ? `${entry.lamWastePct.toFixed(1)}%` : "—"}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-[9px] uppercase font-bold text-slate-500 block">Print Waste</span>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={entry.printWasteKg || ""}
+                            onChange={(e) => handleCellChange(index, "printWasteKg", parseFloat(e.target.value) || 0)}
+                            onFocus={() => setFocusedCell(rowKey, "printWasteKg")}
+                            onBlur={() => clearFocusedCell(rowKey, "printWasteKg")}
+                            placeholder="0.00"
+                            className="w-full h-7 text-center font-mono font-bold text-xs border border-slate-200 rounded bg-white"
+                          />
+                          <span className="text-[9px] text-slate-400 font-mono block mt-0.5">
+                            {entry.printWastePct > 0 ? `${entry.printWastePct.toFixed(1)}%` : "—"}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 text-center pt-1 border-t border-slate-200/60">
+                        <div>
+                          <span className="text-[9px] uppercase font-bold text-amber-700 block">Machine Waste</span>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={entry.machineWasteKg || ""}
+                            onChange={(e) => handleCellChange(index, "machineWasteKg", parseFloat(e.target.value) || 0)}
+                            onFocus={() => setFocusedCell(rowKey, "machineWasteKg")}
+                            onBlur={() => clearFocusedCell(rowKey, "machineWasteKg")}
+                            placeholder="0.00"
+                            className="w-full h-7 text-center font-mono font-bold text-xs border border-amber-200 rounded bg-white text-amber-800"
+                          />
+                          <span className="text-[9px] text-amber-600 font-mono block mt-0.5">
+                            {entry.machineWastePct > 0 ? `${entry.machineWastePct.toFixed(1)}%` : "—"}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-[9px] uppercase font-bold text-indigo-700 block">Cover Patch Waste</span>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={entry.coverPatchWasteKg || ""}
+                            onChange={(e) => handleCellChange(index, "coverPatchWasteKg", parseFloat(e.target.value) || 0)}
+                            onFocus={() => setFocusedCell(rowKey, "coverPatchWasteKg")}
+                            onBlur={() => clearFocusedCell(rowKey, "coverPatchWasteKg")}
+                            placeholder="0.00"
+                            className="w-full h-7 text-center font-mono font-bold text-xs border border-indigo-200 rounded bg-white text-indigo-800"
+                          />
+                          <span className="text-[9px] text-indigo-600 font-mono block mt-0.5">
+                            {entry.coverPatchWastePct > 0 ? `${entry.coverPatchWastePct.toFixed(1)}%` : "—"}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Waste & Net Yield Summary Pills */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="bg-rose-50/60 p-2 rounded-lg border border-rose-200 flex items-center justify-between">
+                        <div>
+                          <span className="text-[10px] uppercase font-bold text-rose-700 block">Total Waste</span>
+                          <span className="text-[10px] text-rose-600 font-mono">{entry.totalWastePct.toFixed(1)}% of prod</span>
+                        </div>
+                        <span className="font-mono font-black text-rose-800 text-sm">
+                          {entry.totalWasteKg.toFixed(2)} kg
+                        </span>
+                      </div>
+                      <div className="bg-emerald-50/60 p-2 rounded-lg border border-emerald-200 flex items-center justify-between">
+                        <div>
+                          <span className="text-[10px] uppercase font-bold text-emerald-700 block">Net Good Prod</span>
+                          <span className="text-[10px] text-emerald-600">Net yield</span>
+                        </div>
+                        <span className="font-mono font-black text-emerald-800 text-sm">
+                          {entry.netProductionKg.toFixed(1)} kg
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Remarks Input */}
                     <div>
-                      <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                        Quality
-                      </label>
-                      <UniversalQualityInput
-                        value={entry.quality || ""}
-                        onChange={(newVal) => handleCellChange(index, "quality", newVal)}
-                        placeholder="Select quality..."
-                        compact={false}
-                        inputClassName="h-9 text-xs font-semibold"
+                      <input
+                        type="text"
+                        value={entry.remarks || ""}
+                        onChange={(e) => handleCellChange(index, "remarks", e.target.value)}
+                        onFocus={() => setFocusedCell(rowKey, "remarks")}
+                        onBlur={() => clearFocusedCell(rowKey, "remarks")}
+                        placeholder="Scrap observations or recycling notes..."
+                        className="w-full h-8 px-2.5 text-xs border border-slate-200 rounded-md focus:ring-1 focus:ring-primary"
                       />
                     </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
-                          Roll Number
-                        </label>
-                        <input
-                          type="text"
-                          value={entry.rollNumber}
-                          onChange={(e) => handleCellChange(index, "rollNumber", e.target.value)}
-                          placeholder="e.g. V-101"
-                          className="w-full h-9 px-2.5 text-xs font-mono font-bold border border-slate-200 rounded-md focus:ring-1 focus:ring-primary"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-bold text-teal-800 mb-0.5">
-                          Gross Prod (Kg)
-                        </label>
-                        <input
-                          type="number"
-                          step="0.1"
-                          value={entry.productionKg || ""}
-                          onChange={(e) => handleCellChange(index, "productionKg", parseFloat(e.target.value) || 0)}
-                          placeholder="0.0"
-                          className="w-full h-9 px-2.5 text-xs font-mono font-black text-teal-900 bg-teal-50/40 border border-teal-200 rounded-md focus:ring-1 focus:ring-teal-500"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Scrap Streams Input Grid */}
-                  <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100 space-y-2">
-                    <span className="text-[10px] font-bold uppercase text-slate-600 tracking-wider block">
-                      Scrap Streams (Kg)
-                    </span>
-                    <div className="grid grid-cols-3 gap-2 text-center">
-                      <div>
-                        <span className="text-[9px] uppercase font-bold text-slate-500 block">Loom Waste</span>
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={entry.loomWasteKg || ""}
-                          onChange={(e) => handleCellChange(index, "loomWasteKg", parseFloat(e.target.value) || 0)}
-                          placeholder="0.00"
-                          className="w-full h-7 text-center font-mono font-bold text-xs border border-slate-200 rounded bg-white"
-                        />
-                        <span className="text-[9px] text-slate-400 font-mono block mt-0.5">
-                          {entry.loomWastePct > 0 ? `${entry.loomWastePct.toFixed(1)}%` : "—"}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-[9px] uppercase font-bold text-slate-500 block">Lam Waste</span>
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={entry.lamWasteKg || ""}
-                          onChange={(e) => handleCellChange(index, "lamWasteKg", parseFloat(e.target.value) || 0)}
-                          placeholder="0.00"
-                          className="w-full h-7 text-center font-mono font-bold text-xs border border-slate-200 rounded bg-white"
-                        />
-                        <span className="text-[9px] text-slate-400 font-mono block mt-0.5">
-                          {entry.lamWastePct > 0 ? `${entry.lamWastePct.toFixed(1)}%` : "—"}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-[9px] uppercase font-bold text-slate-500 block">Print Waste</span>
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={entry.printWasteKg || ""}
-                          onChange={(e) => handleCellChange(index, "printWasteKg", parseFloat(e.target.value) || 0)}
-                          placeholder="0.00"
-                          className="w-full h-7 text-center font-mono font-bold text-xs border border-slate-200 rounded bg-white"
-                        />
-                        <span className="text-[9px] text-slate-400 font-mono block mt-0.5">
-                          {entry.printWastePct > 0 ? `${entry.printWastePct.toFixed(1)}%` : "—"}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2 text-center pt-1 border-t border-slate-200/60">
-                      <div>
-                        <span className="text-[9px] uppercase font-bold text-amber-700 block">Machine Waste</span>
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={entry.machineWasteKg || ""}
-                          onChange={(e) => handleCellChange(index, "machineWasteKg", parseFloat(e.target.value) || 0)}
-                          placeholder="0.00"
-                          className="w-full h-7 text-center font-mono font-bold text-xs border border-amber-200 rounded bg-white text-amber-800"
-                        />
-                        <span className="text-[9px] text-amber-600 font-mono block mt-0.5">
-                          {entry.machineWastePct > 0 ? `${entry.machineWastePct.toFixed(1)}%` : "—"}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-[9px] uppercase font-bold text-indigo-700 block">Cover Patch Waste</span>
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={entry.coverPatchWasteKg || ""}
-                          onChange={(e) => handleCellChange(index, "coverPatchWasteKg", parseFloat(e.target.value) || 0)}
-                          placeholder="0.00"
-                          className="w-full h-7 text-center font-mono font-bold text-xs border border-indigo-200 rounded bg-white text-indigo-800"
-                        />
-                        <span className="text-[9px] text-indigo-600 font-mono block mt-0.5">
-                          {entry.coverPatchWastePct > 0 ? `${entry.coverPatchWastePct.toFixed(1)}%` : "—"}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Waste & Net Yield Summary Pills */}
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="bg-rose-50/60 p-2 rounded-lg border border-rose-200 flex items-center justify-between">
-                      <div>
-                        <span className="text-[10px] uppercase font-bold text-rose-700 block">Total Waste</span>
-                        <span className="text-[10px] text-rose-600 font-mono">{entry.totalWastePct.toFixed(1)}% of prod</span>
-                      </div>
-                      <span className="font-mono font-black text-rose-800 text-sm">
-                        {entry.totalWasteKg.toFixed(2)} kg
-                      </span>
-                    </div>
-                    <div className="bg-emerald-50/60 p-2 rounded-lg border border-emerald-200 flex items-center justify-between">
-                      <div>
-                        <span className="text-[10px] uppercase font-bold text-emerald-700 block">Net Good Prod</span>
-                        <span className="text-[10px] text-emerald-600">Net yield</span>
-                      </div>
-                      <span className="font-mono font-black text-emerald-800 text-sm">
-                        {entry.netProductionKg.toFixed(1)} kg
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Remarks Input */}
-                  <div>
-                    <input
-                      type="text"
-                      value={entry.remarks || ""}
-                      onChange={(e) => handleCellChange(index, "remarks", e.target.value)}
-                      placeholder="Scrap observations or recycling notes..."
-                      className="w-full h-8 px-2.5 text-xs border border-slate-200 rounded-md focus:ring-1 focus:ring-primary"
-                    />
                   </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
 
@@ -1317,8 +1411,8 @@ export function ValvomaticWastageClient() {
             rows={2}
             value={remarks}
             onChange={(e) => {
-              isDirtyRef.current = true;
               setRemarks(e.target.value);
+              markDirtyAndTriggerAutoSave();
             }}
             placeholder="Add any specific observations for this shift's scrap generation..."
             className="w-full text-xs p-2.5 border border-slate-200 rounded-lg focus:outline-hidden focus:ring-1 focus:ring-primary bg-white"
@@ -1344,7 +1438,7 @@ export function ValvomaticWastageClient() {
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => saveWastageReport("DRAFT")}
+              onClick={() => executeSave("DRAFT")}
               disabled={saving}
               className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold active:scale-95 transition-all flex items-center gap-1.5 border border-slate-700"
             >
@@ -1353,7 +1447,7 @@ export function ValvomaticWastageClient() {
             </button>
             <button
               type="button"
-              onClick={() => saveWastageReport("SUBMITTED")}
+              onClick={() => executeSave("SUBMITTED")}
               disabled={saving}
               className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold active:scale-95 transition-all flex items-center gap-1.5 shadow-lg shadow-emerald-950/40"
             >

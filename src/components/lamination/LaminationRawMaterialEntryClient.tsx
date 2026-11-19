@@ -1,21 +1,14 @@
 "use client";
 
-import React, { useState, useEffect, useTransition, useMemo } from "react";
+import React, { useState, useEffect, useTransition, useMemo, useRef, useCallback } from "react";
 import { format } from "date-fns";
 import {
   Calendar as CalendarIcon,
-  Clock,
   User,
   Save,
   Printer,
   FileSpreadsheet,
-  RefreshCw,
-  Minus,
-  Equal,
   CheckCircle2,
-  AlertTriangle,
-  Layers,
-  ArrowRight,
   FlaskConical,
   Maximize2,
   Minimize2,
@@ -32,6 +25,12 @@ import {
   LaminationRawMaterialReportData,
   RawMaterialEntryItem,
 } from "@/lib/lamination/lamination-raw-material-types";
+import {
+  reconcileServerRawMaterialEntries,
+  serializeRawMaterialPayload,
+  getRawMaterialRowKey,
+  FocusedRawMaterialCell,
+} from "@/lib/lamination/raw-material-google-docs-sync";
 import dynamic from "next/dynamic";
 import { useProductionRealtime } from "@/hooks/useProductionRealtime";
 import { RealtimeSyncBadge } from "@/components/production/RealtimeSyncBadge";
@@ -57,9 +56,29 @@ export function LaminationRawMaterialEntryClient() {
 
   // Line items
   const [entries, setEntries] = useState<RawMaterialEntryItem[]>([]);
-  const [masterMaterials, setMasterMaterials] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isPending, startTransition] = useTransition();
+  const [isAutoSaving, setIsAutoSaving] = useState<boolean>(false);
+  const [lastAutoSavedAt, setLastAutoSavedAt] = useState<Date | null>(null);
+
+  // Google Docs Concurrent Sync & Typing Isolation Refs
+  const lastSavedPayloadRef = useRef<string>("");
+  const hasUnsavedLocalEditsRef = useRef<boolean>(false);
+  const activeFocusedCellRef = useRef<FocusedRawMaterialCell | null>(null);
+  const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const [, setFocusedCellState] = useState<FocusedRawMaterialCell | null>(null);
+
+  const setFocusedCell = useCallback((rowKey: string, field: keyof RawMaterialEntryItem) => {
+    const next = { rowKey, field };
+    activeFocusedCellRef.current = next;
+    setFocusedCellState(next);
+  }, []);
+
+  const clearFocusedCell = useCallback(() => {
+    activeFocusedCellRef.current = null;
+    setFocusedCellState(null);
+  }, []);
 
   // Print Modal
   const [isPrintModalOpen, setIsPrintModalOpen] = useState<boolean>(false);
@@ -76,20 +95,18 @@ export function LaminationRawMaterialEntryClient() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isFullscreen]);
 
-  // Fetch report for Date + Shift
-  const fetchReport = async () => {
+  // Fetch report for Date + Shift with non-destructive 3-way reconciliation
+  const fetchReport = useCallback(async () => {
     setIsLoading(true);
     try {
       const res = await fetch(
         `/api/production/lamination/raw-materials/reports?date=${encodeURIComponent(
           date
-        )}&shiftName=${encodeURIComponent(shiftName)}`
+        )}&shiftName=${encodeURIComponent(shiftName)}&_t=${Date.now()}`
       );
       const data = await res.json();
 
       if (data.success) {
-        setMasterMaterials(data.masterMaterials || []);
-
         if (data.exists && data.report) {
           const rep = data.report;
           setOperatorName(rep.operatorName || "");
@@ -97,12 +114,30 @@ export function LaminationRawMaterialEntryClient() {
           setRemarks(rep.remarks || "");
           setManualTotalInput(String(rep.manualTotalKg || 0));
           setMachineTotalInput(String(rep.machineTotalKg || 0));
-          setEntries(rep.entries || []);
+
+          const incomingEntries = rep.entries || [];
+          const numManual = Number(rep.manualTotalKg) || 0;
+
+          setEntries((prev) => {
+            if (prev.length === 0 && !hasUnsavedLocalEditsRef.current) {
+              lastSavedPayloadRef.current = serializeRawMaterialPayload(rep, incomingEntries);
+              return incomingEntries;
+            }
+            const reconciled = reconcileServerRawMaterialEntries({
+              localEntries: prev,
+              incomingEntries,
+              focusedCell: activeFocusedCellRef.current,
+              hasUnsavedLocalEdits: hasUnsavedLocalEditsRef.current,
+              manualTotalKg: numManual,
+            });
+            lastSavedPayloadRef.current = serializeRawMaterialPayload(rep, incomingEntries);
+            return reconciled;
+          });
         } else {
           // Initialize fresh draft using master materials
           const initialEntries: RawMaterialEntryItem[] = (
             data.templateEntries || []
-          ).map((t: any) => ({
+          ).map((t: { rawMaterialId?: string; materialName: string; percentage: number; sequence: number }) => ({
             rawMaterialId: t.rawMaterialId,
             materialName: t.materialName,
             percentage: t.percentage,
@@ -119,6 +154,7 @@ export function LaminationRawMaterialEntryClient() {
           setOperatorName("");
           setStatus("DRAFT");
           setRemarks("");
+          lastSavedPayloadRef.current = "";
         }
       } else {
         toast.error(data.error || "Failed to load report");
@@ -129,29 +165,122 @@ export function LaminationRawMaterialEntryClient() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [date, shiftName]);
 
   useEffect(() => {
     fetchReport();
-  }, [date, shiftName]);
+  }, [fetchReport]);
 
   const realtime = useProductionRealtime({
     module: "lamination",
     sheet: "raw-materials",
     date,
     shift: shiftName,
-    onSync: () => {
+    onSync: (event) => {
+      // Echo suppression: ignore updates sent by this client session
+      if (event?.clientId === realtime.clientId) return;
       fetchReport();
     },
   });
 
+  // Tab switch / sleep wake-up listeners to pull latest edits immediately upon return
+  useEffect(() => {
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === "visible" && date && shiftName) {
+        fetchReport();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityOrFocus);
+    window.addEventListener("focus", handleVisibilityOrFocus);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityOrFocus);
+      window.removeEventListener("focus", handleVisibilityOrFocus);
+    };
+  }, [date, shiftName, fetchReport]);
+
+  // Debounced auto-save handler (1500ms) with zero-loop echo broadcast
+  const triggerAutoSave = useCallback(
+    (
+      currentEntries: RawMaterialEntryItem[],
+      currentManualTotal: string = manualTotalInput,
+      currentStatus: "DRAFT" | "SUBMITTED" | "APPROVED" = status
+    ) => {
+      if (!date || !shiftName || currentEntries.length === 0) return;
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+
+      autoSaveTimerRef.current = setTimeout(async () => {
+        const numManual = parseFloat(currentManualTotal) || 0;
+        const payloadString = serializeRawMaterialPayload(
+          {
+            date,
+            shiftName,
+            operatorName,
+            supervisorName: null,
+            status: currentStatus,
+            remarks,
+            manualTotalKg: numManual,
+          },
+          currentEntries
+        );
+
+        if (payloadString === lastSavedPayloadRef.current) {
+          hasUnsavedLocalEditsRef.current = false;
+          return;
+        }
+
+        setIsAutoSaving(true);
+        try {
+          const payload = JSON.parse(payloadString);
+          const res = await fetch("/api/production/lamination/raw-materials/reports", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              ...payload,
+              clientId: realtime.clientId,
+            }),
+          });
+          const data = await res.json();
+          if (res.ok && data.success) {
+            lastSavedPayloadRef.current = payloadString;
+            hasUnsavedLocalEditsRef.current = false;
+            setLastAutoSavedAt(new Date());
+            if (Array.isArray(data.report?.entries)) {
+              setEntries((prev) =>
+                reconcileServerRawMaterialEntries({
+                  localEntries: prev,
+                  incomingEntries: data.report.entries,
+                  focusedCell: activeFocusedCellRef.current,
+                  hasUnsavedLocalEdits: hasUnsavedLocalEditsRef.current,
+                  manualTotalKg: numManual,
+                })
+              );
+            }
+            realtime.broadcastSync({
+              action: currentStatus === "SUBMITTED" ? "SUBMIT" : "SAVE",
+              date,
+              shift: shiftName,
+            });
+          }
+        } catch (err) {
+          console.error("Raw material auto-save failed:", err);
+        } finally {
+          setIsAutoSaving(false);
+        }
+      }, 1500);
+    },
+    [date, shiftName, operatorName, status, remarks, realtime, manualTotalInput]
+  );
+
   // Handle Manual Total Input Change
   const handleManualTotalChange = (valStr: string) => {
+    hasUnsavedLocalEditsRef.current = true;
     setManualTotalInput(valStr);
     const numTotal = parseFloat(valStr) || 0;
 
-    setEntries((prev) =>
-      prev.map((entry) => {
+    setEntries((prev) => {
+      const next = prev.map((entry) => {
         const { manualKg, diffKg } = calculateRawMaterialRow(
           numTotal,
           entry.machineKg,
@@ -162,18 +291,21 @@ export function LaminationRawMaterialEntryClient() {
           manualKg,
           diffKg,
         };
-      })
-    );
+      });
+      triggerAutoSave(next, valStr);
+      return next;
+    });
   };
 
   // Handle Machine Total Input Change (auto-distributes to rows)
   const handleMachineTotalChange = (valStr: string) => {
+    hasUnsavedLocalEditsRef.current = true;
     setMachineTotalInput(valStr);
     const numMachineTotal = parseFloat(valStr) || 0;
     const numManualTotal = parseFloat(manualTotalInput) || 0;
 
-    setEntries((prev) =>
-      prev.map((entry) => {
+    setEntries((prev) => {
+      const next = prev.map((entry) => {
         const initialMachine = Number(
           ((numMachineTotal * (entry.percentage || 0)) / 100).toFixed(2)
         );
@@ -188,12 +320,15 @@ export function LaminationRawMaterialEntryClient() {
           machineKg: initialMachine,
           diffKg,
         };
-      })
-    );
+      });
+      triggerAutoSave(next);
+      return next;
+    });
   };
 
   // Handle Individual Machine Row Value Edit
   const handleMachineRowChange = (index: number, valStr: string) => {
+    hasUnsavedLocalEditsRef.current = true;
     const machineVal = parseFloat(valStr) || 0;
     const numManualTotal = parseFloat(manualTotalInput) || 0;
 
@@ -218,57 +353,25 @@ export function LaminationRawMaterialEntryClient() {
         0
       );
       setMachineTotalInput(String(Number(sumMachine.toFixed(2))));
-
+      triggerAutoSave(next);
       return next;
     });
   };
 
   // Handle Remarks Row Edit
   const handleRemarksChange = (index: number, val: string) => {
+    hasUnsavedLocalEditsRef.current = true;
     setEntries((prev) => {
       const next = [...prev];
       next[index] = { ...next[index], remarks: val };
+      triggerAutoSave(next);
       return next;
     });
   };
 
   // Sync with Data Centre Master (keeps entered machine readings if matching)
-  const handleSyncWithMaster = () => {
-    if (!masterMaterials || masterMaterials.length === 0) {
-      toast.info("No active materials found in Data Centre Master");
-      return;
-    }
-
-    const numManualTotal = parseFloat(manualTotalInput) || 0;
-
-    const mergedEntries: RawMaterialEntryItem[] = masterMaterials.map(
-      (m, idx) => {
-        const existing = entries.find(
-          (e) => e.rawMaterialId === m.id || e.materialName === m.name
-        );
-        const machineKg = existing ? existing.machineKg : 0;
-        const { manualKg, diffKg } = calculateRawMaterialRow(
-          numManualTotal,
-          machineKg,
-          m.percentage
-        );
-
-        return {
-          rawMaterialId: m.id,
-          materialName: m.name,
-          percentage: m.percentage,
-          manualKg,
-          machineKg,
-          diffKg,
-          sequence: m.sequence || idx + 1,
-          remarks: existing?.remarks || "",
-        };
-      }
-    );
-
-    setEntries(mergedEntries);
-    toast.success("Synchronized with Data Centre Master percentages");
-  };
+  // Can be hooked up to a manual sync button if needed:
+  // const handleSyncWithMaster = () => { ... }
 
   // Computed totals
   const numManual = parseFloat(manualTotalInput) || 0;
@@ -279,6 +382,7 @@ export function LaminationRawMaterialEntryClient() {
   // Save report (Draft or Submit)
   const handleSave = (targetStatus?: "DRAFT" | "SUBMITTED") => {
     const finalStatus = targetStatus || status;
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     startTransition(async () => {
       try {
         const payload = {
@@ -291,6 +395,7 @@ export function LaminationRawMaterialEntryClient() {
           status: finalStatus,
           remarks: remarks.trim() || null,
           entries,
+          clientId: realtime.clientId,
         };
 
         const res = await fetch("/api/production/lamination/raw-materials/reports", {
@@ -302,6 +407,8 @@ export function LaminationRawMaterialEntryClient() {
         const data = await res.json();
         if (data.success) {
           setStatus(finalStatus);
+          hasUnsavedLocalEditsRef.current = false;
+          setLastAutoSavedAt(new Date());
           realtime.broadcastSync({
             action: finalStatus === "SUBMITTED" ? "SUBMIT" : "SAVE",
             date,
@@ -692,6 +799,8 @@ export function LaminationRawMaterialEntryClient() {
                         min="0"
                         value={entry.machineKg === 0 && !machineTotalInput ? "" : entry.machineKg}
                         onChange={(e) => handleMachineRowChange(idx, e.target.value)}
+                        onFocus={() => setFocusedCell(getRawMaterialRowKey(entry, idx), "machineKg")}
+                        onBlur={clearFocusedCell}
                         placeholder="0.00"
                         className="h-8 text-right font-bold text-slate-900 text-xs pr-6 bg-white border-purple-200 focus-visible:ring-purple-500"
                       />
@@ -813,6 +922,27 @@ export function LaminationRawMaterialEntryClient() {
       {/* MOBILE VIEW: Touch-First Reconciliation & Tabbed Experience               */}
       {/* ========================================================================= */}
       <div className="block md:hidden space-y-4">
+        {/* Mobile Header Bar with Live Realtime Status */}
+        <div className="flex items-center justify-between gap-2 p-2 bg-white rounded-xl border border-slate-200">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="text-xs font-bold text-slate-800 truncate">Raw Materials</span>
+            {isAutoSaving ? (
+              <span className="text-[10px] text-purple-600 font-semibold animate-pulse flex items-center gap-0.5">
+                <Loader2 className="h-2.5 w-2.5 animate-spin" /> Saving...
+              </span>
+            ) : lastAutoSavedAt ? (
+              <span className="text-[10px] text-slate-400">• Saved</span>
+            ) : null}
+          </div>
+          <RealtimeSyncBadge
+            isConnected={realtime.isConnected}
+            lastUpdatedBy={realtime.lastUpdatedBy}
+            lastUpdatedAt={realtime.lastUpdatedAt}
+            lastAction={realtime.lastAction}
+            isSelfUpdate={realtime.isSelfUpdate}
+          />
+        </div>
+
         {/* Mobile Bento KPI Summary */}
         <div className="grid grid-cols-3 gap-2">
           <div className="bg-sky-50 border border-sky-100 rounded-xl p-2.5 text-center">
@@ -998,6 +1128,8 @@ export function LaminationRawMaterialEntryClient() {
                               min="0"
                               value={entry.machineKg === 0 && !machineTotalInput ? "" : entry.machineKg}
                               onChange={(e) => handleMachineRowChange(idx, e.target.value)}
+                              onFocus={() => setFocusedCell(getRawMaterialRowKey(entry, idx), "machineKg")}
+                              onBlur={clearFocusedCell}
                               placeholder="0.0"
                               className="h-8 text-right font-bold text-xs pr-6 border-purple-200 bg-purple-50/20 focus-visible:ring-purple-500"
                             />
@@ -1019,6 +1151,8 @@ export function LaminationRawMaterialEntryClient() {
                         placeholder="Material remarks (lot, grade, hopper note)..."
                         value={entry.remarks || ""}
                         onChange={(e) => handleRemarksChange(idx, e.target.value)}
+                        onFocus={() => setFocusedCell(getRawMaterialRowKey(entry, idx), "remarks")}
+                        onBlur={clearFocusedCell}
                         className="h-7 text-[11px] bg-slate-50/50 border-slate-200"
                       />
                     </CardContent>
@@ -1081,6 +1215,8 @@ export function LaminationRawMaterialEntryClient() {
                     min="0"
                     value={entry.machineKg === 0 && !machineTotalInput ? "" : entry.machineKg}
                     onChange={(e) => handleMachineRowChange(idx, e.target.value)}
+                    onFocus={() => setFocusedCell(getRawMaterialRowKey(entry, idx), "machineKg")}
+                    onBlur={clearFocusedCell}
                     placeholder="0.00"
                     className="h-8 text-right font-bold text-slate-900 text-xs pr-6 bg-purple-50/20 border-purple-200"
                   />

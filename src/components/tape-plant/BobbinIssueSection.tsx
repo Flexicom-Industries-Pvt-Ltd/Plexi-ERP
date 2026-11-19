@@ -297,10 +297,28 @@ export function BobbinIssueSection({ onNavigateToBobbinStock }: BobbinIssueSecti
     fetchAvailableStock();
   }, [fetchIssuesData, fetchLedgerData, fetchAvailableStock]);
 
+  // Google Docs-grade catch-up when tab/browser is minimized, backgrounded, or wakes up from sleep
+  useEffect(() => {
+    const handleVisibilityOrFocus = () => {
+      if (typeof document !== "undefined" && document.visibilityState === "visible") {
+        fetchIssuesData();
+        fetchLedgerData();
+        fetchAvailableStock();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityOrFocus);
+    window.addEventListener("focus", handleVisibilityOrFocus);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityOrFocus);
+      window.removeEventListener("focus", handleVisibilityOrFocus);
+    };
+  }, [fetchIssuesData, fetchLedgerData, fetchAvailableStock]);
+
   const realtime = useProductionRealtime({
     module: "tape-plant",
     sheet: "bobbin-issue",
-    onSync: () => {
+    onSync: (event) => {
+      if (event?.clientId && event.clientId === realtime.clientId) return;
       fetchIssuesData();
       fetchLedgerData();
       fetchAvailableStock();
@@ -358,7 +376,7 @@ export function BobbinIssueSection({ onNavigateToBobbinStock }: BobbinIssueSecti
     }
 
     try {
-      const res = await fetch(`/api/production/tape-plant/bobbin-issue?id=${id}`, {
+      const res = await fetch(`/api/production/tape-plant/bobbin-issue?id=${id}&clientId=${encodeURIComponent(realtime.clientId)}`, {
         method: "DELETE",
       });
       if (!res.ok) throw new Error("Failed to cancel issue");

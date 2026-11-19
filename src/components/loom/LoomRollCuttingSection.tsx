@@ -43,6 +43,12 @@ import dynamic from "next/dynamic";
 import { UniversalQualityInput } from "@/components/ui/UniversalQualityInput";
 import { UniversalPersonnelInput } from "@/components/ui/UniversalPersonnelInput";
 import { useProductionRealtime } from "@/hooks/useProductionRealtime";
+import {
+  serializeRollCuttingPayload,
+  reconcileServerRollCuttingEntries,
+  getRollCuttingEntryKey,
+  ActiveFocusedRollCell,
+} from "@/lib/loom/roll-cutting-google-docs-sync";
 import { RealtimeSyncBadge } from "@/components/production/RealtimeSyncBadge";
 
 const LoomRollCuttingPrintModal = dynamic(
@@ -180,11 +186,16 @@ export function LoomRollCuttingSection() {
   const lastSavedPayloadRef = useRef<string>("");
   const isInitialMountRef = useRef<boolean>(true);
   const lastUserEditTimeRef = useRef<number>(0);
+  const activeFocusedCellRef = useRef<ActiveFocusedRollCell | null>(null);
+  const hasUnsavedLocalEditsRef = useRef<boolean>(false);
+  const deletedRollsRef = useRef<{ ids: Set<string>; numbers: Set<string> }>({
+    ids: new Set(),
+    numbers: new Set(),
+  });
 
-  // Fetch report data
+  // Fetch report data with 3-way Google Docs-grade reconciliation
   const fetchData = useCallback(async () => {
     setLoading(true);
-    isInitialMountRef.current = true;
     try {
       const params = new URLSearchParams({
         date: selectedDate,
@@ -207,10 +218,6 @@ export function LoomRollCuttingSection() {
       const status = report.status || "DRAFT";
       const remarks = report.remarks || "";
 
-      setSupervisorName(supName);
-      setReportStatus(status);
-      setReportRemarks(remarks);
-      setEntries(fetchedEntries);
       setAvailableQualities(json.availableQualities || []);
       setAvailableShifts(json.availableShifts || []);
       setAvailableOperators(json.availableOperators || []);
@@ -221,18 +228,59 @@ export function LoomRollCuttingSection() {
         setSuggestedRollNumber(json.suggestedNextRollNumber);
       }
 
-      const initialPayload = {
-        action: "SAVE_REPORT",
-        date: selectedDate,
-        shiftName: selectedShift,
-        supervisorName: supName,
-        status,
-        remarks,
-        entries: fetchedEntries,
-      };
-      latestPayloadRef.current = initialPayload;
-      lastSavedPayloadRef.current = JSON.stringify(initialPayload);
-      isInitialMountRef.current = false;
+      if (isInitialMountRef.current) {
+        setSupervisorName(supName);
+        setReportStatus(status);
+        setReportRemarks(remarks);
+        setEntries(fetchedEntries);
+
+        const initialPayload = {
+          action: "SAVE_REPORT",
+          date: selectedDate,
+          shiftName: selectedShift,
+          supervisorName: supName,
+          status,
+          remarks,
+          entries: fetchedEntries,
+        };
+        latestPayloadRef.current = initialPayload;
+        lastSavedPayloadRef.current = serializeRollCuttingPayload(
+          selectedDate,
+          selectedShift,
+          fetchedEntries,
+          { supervisorName: supName, status, remarks }
+        );
+        isInitialMountRef.current = false;
+      } else {
+        // Reconcile server data isolating active focused cell typing
+        setEntries((currentLocal) => {
+          const deletedKeys = new Set<string>([
+            ...Array.from(deletedRollsRef.current.ids),
+            ...Array.from(deletedRollsRef.current.numbers),
+          ]);
+          const reconciled = reconcileServerRollCuttingEntries(
+            currentLocal,
+            fetchedEntries,
+            activeFocusedCellRef.current,
+            deletedKeys
+          );
+
+          if (!hasUnsavedLocalEditsRef.current) {
+            setSupervisorName((s) => supName || s);
+            setReportStatus((st) => status || st);
+            setReportRemarks((r) => remarks || r);
+
+            lastSavedPayloadRef.current = serializeRollCuttingPayload(
+              selectedDate,
+              selectedShift,
+              reconciled,
+              { supervisorName: supName, status, remarks }
+            );
+          }
+
+          return reconciled;
+        });
+      }
     } catch {
       toast.error("Failed to load Roll Cutting Report");
     } finally {
@@ -241,7 +289,27 @@ export function LoomRollCuttingSection() {
   }, [selectedDate, selectedShift, search]);
 
   useEffect(() => {
+    isInitialMountRef.current = true;
+    hasUnsavedLocalEditsRef.current = false;
+    deletedRollsRef.current.ids.clear();
+    deletedRollsRef.current.numbers.clear();
     fetchData();
+  }, [fetchData]);
+
+  // Google Docs-grade sleep wake-up and tab backgrounding catch-up
+  useEffect(() => {
+    const handleVisibilityOrFocus = () => {
+      if (typeof document !== "undefined" && document.visibilityState === "visible") {
+        fetchData();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityOrFocus);
+    window.addEventListener("focus", handleVisibilityOrFocus);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityOrFocus);
+      window.removeEventListener("focus", handleVisibilityOrFocus);
+    };
   }, [fetchData]);
 
   const realtime = useProductionRealtime({
@@ -249,7 +317,9 @@ export function LoomRollCuttingSection() {
     sheet: "roll-cutting",
     date: selectedDate,
     shift: selectedShift,
-    onSync: () => {
+    onSync: (event) => {
+      // Echo suppression: ignore broadcasts generated by our own client
+      if (event?.clientId && event.clientId === realtime.clientId) return;
       if (!autoSaving && Date.now() - lastUserEditTimeRef.current >= 3500) {
         fetchData();
       }
@@ -259,23 +329,45 @@ export function LoomRollCuttingSection() {
   // Immediate or debounced auto-save function
   const triggerAutoSave = useCallback(async (isImmediate: boolean = false, keepalive: boolean = false) => {
     if (!latestPayloadRef.current || isInitialMountRef.current) return;
-    const serialized = JSON.stringify(latestPayloadRef.current);
-    if (serialized === lastSavedPayloadRef.current) return;
+    const currentPayload = latestPayloadRef.current;
+    const serialized = serializeRollCuttingPayload(
+      currentPayload.date,
+      currentPayload.shiftName,
+      currentPayload.entries || [],
+      currentPayload
+    );
+    if (
+      serialized === lastSavedPayloadRef.current &&
+      deletedRollsRef.current.ids.size === 0 &&
+      deletedRollsRef.current.numbers.size === 0
+    ) {
+      return;
+    }
 
     if (!isImmediate) {
       setAutoSaving(true);
     }
 
     try {
+      const bodyPayload = {
+        ...currentPayload,
+        clientId: realtime.clientId,
+        deletedRollIds: Array.from(deletedRollsRef.current.ids),
+        deletedRollNumbers: Array.from(deletedRollsRef.current.numbers),
+      };
+
       const res = await fetch("/api/production/loom/roll-cutting", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: serialized,
+        body: JSON.stringify(bodyPayload),
         keepalive,
       });
 
       if (res.ok) {
         lastSavedPayloadRef.current = serialized;
+        hasUnsavedLocalEditsRef.current = false;
+        deletedRollsRef.current.ids.clear();
+        deletedRollsRef.current.numbers.clear();
         setLastAutoSavedAt(new Date());
         realtime.broadcastSync({ action: "SAVE", date: selectedDate, shift: selectedShift });
       }
@@ -287,6 +379,15 @@ export function LoomRollCuttingSection() {
       }
     }
   }, [realtime, selectedDate, selectedShift]);
+
+  const setFocusedCell = useCallback((rollKey: string, field: string) => {
+    activeFocusedCellRef.current = { rollKey, field };
+  }, []);
+
+  const clearFocusedCell = useCallback(() => {
+    activeFocusedCellRef.current = null;
+    triggerAutoSave(true);
+  }, [triggerAutoSave]);
 
   // Sync latestPayloadRef and debounce auto-save (500ms)
   useEffect(() => {
@@ -303,8 +404,19 @@ export function LoomRollCuttingSection() {
     };
 
     latestPayloadRef.current = payload;
-    const serialized = JSON.stringify(payload);
-    if (serialized === lastSavedPayloadRef.current) return;
+    const serialized = serializeRollCuttingPayload(
+      selectedDate,
+      selectedShift,
+      entries,
+      payload
+    );
+    if (
+      serialized === lastSavedPayloadRef.current &&
+      deletedRollsRef.current.ids.size === 0 &&
+      deletedRollsRef.current.numbers.size === 0
+    ) {
+      return;
+    }
 
     const timer = setTimeout(() => {
       triggerAutoSave(false);
@@ -397,6 +509,7 @@ export function LoomRollCuttingSection() {
   // Handle entry field update with live recalculation
   const handleUpdateEntry = (index: number, field: keyof LoomRollCuttingEntryItem, value: any) => {
     lastUserEditTimeRef.current = Date.now();
+    hasUnsavedLocalEditsRef.current = true;
     realtime.markLocalEdit();
     setEntries((prev) => {
       const copy = [...prev];
@@ -533,6 +646,7 @@ export function LoomRollCuttingSection() {
 
   // Add new roll entry
   const handleAddEntry = async () => {
+    hasUnsavedLocalEditsRef.current = true;
     let nextRoll = suggestedRollNumber;
     try {
       const res = await fetch(`/api/production/loom/roll-cutting?action=next-roll&date=${selectedDate}`);
@@ -572,10 +686,12 @@ export function LoomRollCuttingSection() {
 
     setEntries((prev) => [...prev, newEntry]);
     setSuggestedRollNumber(generateNextRollNumber(nextRoll, selectedDate));
+    triggerAutoSave(true);
   };
 
   // Duplicate an entry
   const handleDuplicateEntry = async (index: number) => {
+    hasUnsavedLocalEditsRef.current = true;
     const target = entries[index];
     let nextRoll = generateNextRollNumber(suggestedRollNumber || target.rollNumber, selectedDate);
     try {
@@ -608,12 +724,20 @@ export function LoomRollCuttingSection() {
     setEntries((prev) => [...prev, newEntry]);
     setSuggestedRollNumber(generateNextRollNumber(nextRoll, selectedDate));
     toast.success(`Duplicated entry #${index + 1} with Roll #${nextRoll}`);
+    triggerAutoSave(true);
   };
 
   // Delete an entry
   const handleDeleteEntry = (index: number) => {
+    hasUnsavedLocalEditsRef.current = true;
+    const target = entries[index];
+    if (target) {
+      if (target.id) deletedRollsRef.current.ids.add(target.id);
+      if (target.rollNumber) deletedRollsRef.current.numbers.add(target.rollNumber);
+    }
     setEntries((prev) => prev.filter((_, i) => i !== index));
     toast.info("Roll cutting entry removed");
+    triggerAutoSave(true);
   };
 
   // Submit Report & Sync to Roll Stock
@@ -633,6 +757,9 @@ export function LoomRollCuttingSection() {
         status: "SUBMITTED",
         remarks: reportRemarks,
         entries,
+        clientId: realtime.clientId,
+        deletedRollIds: Array.from(deletedRollsRef.current.ids),
+        deletedRollNumbers: Array.from(deletedRollsRef.current.numbers),
       };
 
       const res = await fetch("/api/production/loom/roll-cutting", {
@@ -645,7 +772,15 @@ export function LoomRollCuttingSection() {
       if (!res.ok) throw new Error(json.error || "Failed to submit report");
 
       setReportStatus("SUBMITTED");
-      lastSavedPayloadRef.current = JSON.stringify(payload);
+      lastSavedPayloadRef.current = serializeRollCuttingPayload(
+        selectedDate,
+        selectedShift,
+        entries,
+        payload
+      );
+      hasUnsavedLocalEditsRef.current = false;
+      deletedRollsRef.current.ids.clear();
+      deletedRollsRef.current.numbers.clear();
       setLastAutoSavedAt(new Date());
       realtime.broadcastSync({ action: "SUBMIT", date: selectedDate, shift: selectedShift });
       toast.success("Daily Roll Cutting Report submitted and synced to Roll Stock!");
@@ -1081,11 +1216,13 @@ export function LoomRollCuttingSection() {
                           const val = e.target.value === "" ? 0 : Number(e.target.value);
                           handleUpdateEntry(idx, "loomNumber", val);
                         }}
+                        onFocus={() => setFocusedCell(entry.id || entry.rollNumber || String(idx), "loomNumber")}
                         onBlur={(e) => {
                           const val = Number(e.target.value);
                           if (!isNaN(val) && val >= 1 && val <= 91) {
                             handleUpdateEntry(idx, "loomNumber", val);
                           }
+                          clearFocusedCell();
                         }}
                         className="w-full text-xs font-mono font-bold text-center px-3 py-2 rounded-lg border bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border-sky-300 dark:border-sky-800 focus:ring-2 focus:ring-sky-500/20 outline-hidden shadow-2xs"
                         placeholder="1-91"
@@ -1099,6 +1236,8 @@ export function LoomRollCuttingSection() {
                         type="text"
                         value={entry.size || ""}
                         onChange={(e) => handleUpdateEntry(idx, "size", e.target.value)}
+                        onFocus={() => setFocusedCell(entry.id || entry.rollNumber || String(idx), "size")}
+                        onBlur={clearFocusedCell}
                         className="w-full text-xs font-mono font-bold text-center px-2 py-2 rounded-lg border bg-background text-foreground focus:ring-2 focus:ring-primary/20 outline-hidden shadow-2xs"
                         placeholder="490"
                       />
@@ -1115,6 +1254,8 @@ export function LoomRollCuttingSection() {
                             handleUpdateEntry(idx, "size", option.size.replace("mm", ""));
                           }
                         }}
+                        onFocus={() => setFocusedCell(entry.id || entry.rollNumber || String(idx), "qualityType")}
+                        onBlur={clearFocusedCell}
                         options={availableQualities}
                         placeholder="— Select / Type Quality —"
                         compact={true}
@@ -1129,6 +1270,8 @@ export function LoomRollCuttingSection() {
                         value={entry.contractor || ""}
                         title={entry.contractor || "In-House / Direct"}
                         onChange={(name) => handleUpdateEntry(idx, "contractor", name)}
+                        onFocus={() => setFocusedCell(entry.id || entry.rollNumber || String(idx), "contractor")}
+                        onBlur={clearFocusedCell}
                         options={availableContractors.map((c) => ({
                           id: c.id,
                           name: c.name,
@@ -1152,6 +1295,8 @@ export function LoomRollCuttingSection() {
                         type="number"
                         value={entry.initialReading !== undefined && entry.initialReading !== null ? entry.initialReading : ""}
                         onChange={(e) => handleUpdateEntry(idx, "initialReading", e.target.value)}
+                        onFocus={() => setFocusedCell(entry.id || entry.rollNumber || String(idx), "initialReading")}
+                        onBlur={clearFocusedCell}
                         className="w-full text-xs font-mono font-semibold text-right px-3 py-2 rounded-lg border bg-background text-foreground focus:ring-2 focus:ring-primary/20 outline-hidden shadow-2xs"
                         placeholder="0"
                       />
@@ -1163,6 +1308,8 @@ export function LoomRollCuttingSection() {
                         type="number"
                         value={entry.finalReading !== undefined && entry.finalReading !== null ? entry.finalReading : ""}
                         onChange={(e) => handleUpdateEntry(idx, "finalReading", e.target.value)}
+                        onFocus={() => setFocusedCell(entry.id || entry.rollNumber || String(idx), "finalReading")}
+                        onBlur={clearFocusedCell}
                         className="w-full text-xs font-mono font-semibold text-right px-3 py-2 rounded-lg border bg-background text-foreground focus:ring-2 focus:ring-primary/20 outline-hidden shadow-2xs"
                         placeholder="0"
                       />
@@ -1182,6 +1329,8 @@ export function LoomRollCuttingSection() {
                         step="0.01"
                         value={entry.grossWeightKg !== undefined && entry.grossWeightKg !== null ? entry.grossWeightKg : ""}
                         onChange={(e) => handleUpdateEntry(idx, "grossWeightKg", e.target.value)}
+                        onFocus={() => setFocusedCell(entry.id || entry.rollNumber || String(idx), "grossWeightKg")}
+                        onBlur={clearFocusedCell}
                         className="w-full text-xs font-mono font-bold text-right px-3 py-2 rounded-lg border bg-background text-foreground focus:ring-2 focus:ring-primary/20 outline-hidden shadow-2xs"
                         placeholder="0.00"
                       />
@@ -1194,6 +1343,8 @@ export function LoomRollCuttingSection() {
                         step="0.01"
                         value={entry.tareWeightKg !== undefined && entry.tareWeightKg !== null ? entry.tareWeightKg : ""}
                         onChange={(e) => handleUpdateEntry(idx, "tareWeightKg", e.target.value)}
+                        onFocus={() => setFocusedCell(entry.id || entry.rollNumber || String(idx), "tareWeightKg")}
+                        onBlur={clearFocusedCell}
                         className="w-full text-xs font-mono font-medium text-right px-3 py-2 rounded-lg border bg-background text-muted-foreground focus:ring-2 focus:ring-primary/20 outline-hidden shadow-2xs"
                         placeholder="1.20"
                       />
@@ -1220,6 +1371,8 @@ export function LoomRollCuttingSection() {
                         list="supervisors-datalist"
                         value={entry.supervisorSign || ""}
                         onChange={(e) => handleUpdateEntry(idx, "supervisorSign", e.target.value)}
+                        onFocus={() => setFocusedCell(entry.id || entry.rollNumber || String(idx), "supervisorSign")}
+                        onBlur={clearFocusedCell}
                         className="w-full text-xs text-center px-3 py-2 rounded-lg border bg-background text-foreground focus:ring-2 focus:ring-primary/20 outline-hidden shadow-2xs font-medium"
                         placeholder={supervisorName || "Sign"}
                       />
@@ -1236,6 +1389,8 @@ export function LoomRollCuttingSection() {
                         type="text"
                         value={entry.remarks || ""}
                         onChange={(e) => handleUpdateEntry(idx, "remarks", e.target.value)}
+                        onFocus={() => setFocusedCell(entry.id || entry.rollNumber || String(idx), "remarks")}
+                        onBlur={clearFocusedCell}
                         className="w-full text-xs px-3 py-2 rounded-lg border bg-background text-foreground focus:ring-2 focus:ring-primary/20 outline-hidden shadow-2xs"
                         placeholder="Notes / remarks..."
                       />
@@ -1645,6 +1800,8 @@ export function LoomRollCuttingSection() {
                             type="text"
                             value={entry.rollNumber}
                             onChange={(e) => handleUpdateEntry(idx, "rollNumber", e.target.value)}
+                            onFocus={() => setFocusedCell(entry.id || entry.rollNumber || String(idx), "rollNumber")}
+                            onBlur={clearFocusedCell}
                             className="w-full !min-h-0 h-9 text-xs font-mono font-bold px-2.5 rounded-xl border border-slate-200 bg-white text-foreground focus:border-slate-800 outline-none"
                           />
                         </div>
@@ -1657,6 +1814,8 @@ export function LoomRollCuttingSection() {
                             max="91"
                             value={entry.loomNumber || ""}
                             onChange={(e) => handleUpdateEntry(idx, "loomNumber", Number(e.target.value))}
+                            onFocus={() => setFocusedCell(entry.id || entry.rollNumber || String(idx), "loomNumber")}
+                            onBlur={clearFocusedCell}
                             className="w-full !min-h-0 h-9 text-xs font-mono font-bold text-center px-1 rounded-xl border bg-sky-50 text-sky-800 border-sky-300 outline-none"
                             placeholder="1-91"
                           />
@@ -1668,6 +1827,8 @@ export function LoomRollCuttingSection() {
                             type="text"
                             value={entry.size}
                             onChange={(e) => handleUpdateEntry(idx, "size", e.target.value)}
+                            onFocus={() => setFocusedCell(entry.id || entry.rollNumber || String(idx), "size")}
+                            onBlur={clearFocusedCell}
                             className="w-full !min-h-0 h-9 text-xs font-mono text-center px-1 rounded-xl border border-slate-200 bg-white outline-none"
                             placeholder="mm"
                           />
@@ -1687,6 +1848,8 @@ export function LoomRollCuttingSection() {
                               handleUpdateEntry(idx, "size", String(matchedOpt.reedSpaceCm * 10));
                             }
                           }}
+                          onFocus={() => setFocusedCell(entry.id || entry.rollNumber || String(idx), "qualityType")}
+                          onBlur={clearFocusedCell}
                           options={availableQualities}
                           placeholder="Select quality..."
                           compact={false}
@@ -1703,6 +1866,8 @@ export function LoomRollCuttingSection() {
                           <select
                             value={entry.supervisorSign || ""}
                             onChange={(e) => handleUpdateEntry(idx, "supervisorSign", e.target.value)}
+                            onFocus={() => setFocusedCell(entry.id || entry.rollNumber || String(idx), "supervisorSign")}
+                            onBlur={clearFocusedCell}
                             className="w-full !min-h-0 h-9 text-xs px-2.5 rounded-xl border border-slate-200 bg-white outline-none font-medium truncate cursor-pointer focus:border-slate-800"
                           >
                             <option value="">-- Select Operator --</option>
@@ -1731,6 +1896,8 @@ export function LoomRollCuttingSection() {
                           <select
                             value={entry.contractor || ""}
                             onChange={(e) => handleUpdateEntry(idx, "contractor", e.target.value)}
+                            onFocus={() => setFocusedCell(entry.id || entry.rollNumber || String(idx), "contractor")}
+                            onBlur={clearFocusedCell}
                             className="w-full !min-h-0 h-9 text-xs px-2.5 rounded-xl border border-slate-200 bg-white outline-none font-medium truncate cursor-pointer focus:border-slate-800"
                           >
                             <option value="">-- Contractor --</option>
@@ -1755,6 +1922,8 @@ export function LoomRollCuttingSection() {
                               type="number"
                               value={entry.initialReading ?? ""}
                               onChange={(e) => handleUpdateEntry(idx, "initialReading", e.target.value)}
+                              onFocus={() => setFocusedCell(entry.id || entry.rollNumber || String(idx), "initialReading")}
+                              onBlur={clearFocusedCell}
                               className="w-full !min-h-0 h-9 text-xs font-mono font-bold text-right px-2.5 bg-white rounded-xl border border-sky-200 outline-none focus:border-sky-500"
                               placeholder="0"
                             />
@@ -1766,6 +1935,8 @@ export function LoomRollCuttingSection() {
                               type="number"
                               value={entry.finalReading ?? ""}
                               onChange={(e) => handleUpdateEntry(idx, "finalReading", e.target.value)}
+                              onFocus={() => setFocusedCell(entry.id || entry.rollNumber || String(idx), "finalReading")}
+                              onBlur={clearFocusedCell}
                               className="w-full !min-h-0 h-9 text-xs font-mono font-bold text-right px-2.5 bg-white rounded-xl border border-sky-200 outline-none focus:border-sky-500"
                               placeholder="0"
                             />
@@ -1793,6 +1964,8 @@ export function LoomRollCuttingSection() {
                               step="0.01"
                               value={entry.grossWeightKg ?? ""}
                               onChange={(e) => handleUpdateEntry(idx, "grossWeightKg", e.target.value)}
+                              onFocus={() => setFocusedCell(entry.id || entry.rollNumber || String(idx), "grossWeightKg")}
+                              onBlur={clearFocusedCell}
                               className="w-full !min-h-0 h-9 text-xs font-mono font-bold text-right px-2 bg-white rounded-xl border border-emerald-200 outline-none focus:border-emerald-500"
                               placeholder="0"
                             />
@@ -1805,6 +1978,8 @@ export function LoomRollCuttingSection() {
                               step="0.01"
                               value={entry.tareWeightKg ?? ""}
                               onChange={(e) => handleUpdateEntry(idx, "tareWeightKg", e.target.value)}
+                              onFocus={() => setFocusedCell(entry.id || entry.rollNumber || String(idx), "tareWeightKg")}
+                              onBlur={clearFocusedCell}
                               className="w-full !min-h-0 h-9 text-xs font-mono font-bold text-right px-2 bg-white rounded-xl border border-emerald-200 outline-none focus:border-emerald-500"
                               placeholder="1.2"
                             />
@@ -1854,6 +2029,8 @@ export function LoomRollCuttingSection() {
                           type="text"
                           value={entry.remarks || ""}
                           onChange={(e) => handleUpdateEntry(idx, "remarks", e.target.value)}
+                          onFocus={() => setFocusedCell(entry.id || entry.rollNumber || String(idx), "remarks")}
+                          onBlur={clearFocusedCell}
                           placeholder="Notes / inspection remarks..."
                           className="flex-1 min-w-0 !min-h-0 h-9 px-3 text-xs bg-white border border-slate-200 rounded-xl outline-none focus:border-slate-800 transition-colors"
                         />

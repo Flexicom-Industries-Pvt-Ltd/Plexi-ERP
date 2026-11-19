@@ -4,7 +4,7 @@ import { PrintingDailyReportData } from "./printing-types";
 export function exportPrintingReportExcel(report: PrintingDailyReportData): void {
   const wb = XLSX.utils.book_new();
 
-  const rows: any[][] = [
+  const rows: (string | number | null)[][] = [
     ["FLEXICOM INDUSTRIES PVT. LIMITED"],
     ["PRINTING MACHINE — DAILY PRODUCTION REPORT"],
     [null, null, null, null, null, null, " "],

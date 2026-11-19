@@ -13,14 +13,11 @@ import {
   Unlock,
   Camera,
   Image as ImageIcon,
-  ShieldAlert,
   ChevronDown,
   ChevronUp,
   Trash2,
   Clock,
-  Sparkles,
   Printer,
-  FileSpreadsheet,
 } from "lucide-react";
 import dynamic from "next/dynamic";
 import { SpreadsheetTable, ColumnDef } from "./SpreadsheetTable";
@@ -32,7 +29,6 @@ import { RealtimeSyncBadge } from "@/components/production/RealtimeSyncBadge";
 import {
   generateShiftTimeSlots,
   isTimeSlotLocked,
-  canUserOverrideLock,
 } from "@/lib/tape-plant/telemetry-time-slots";
 
 const TemperaturePrintPreviewModal = dynamic(
@@ -208,7 +204,7 @@ export function reconcileServerReadings(
       if (activeCell && normalizeTimeSlot(activeCell.time) === t) {
         const fieldKey = activeCell.field as keyof TemperatureReading;
         if (fieldKey && fieldKey in local) {
-          (mergedRow as any)[fieldKey] = (local as any)[fieldKey];
+          (mergedRow as unknown as Record<string, unknown>)[fieldKey] = (local as unknown as Record<string, unknown>)[fieldKey];
         }
       }
 
@@ -229,10 +225,12 @@ export function reconcileServerReadings(
   return merged;
 }
 
-export function mergeTemperatureReadings(data: any[], intervals: string[]): TemperatureReading[] {
+export type RawTemperatureReading = Partial<TemperatureReading & { housingWater?: string | number }>;
+
+export function mergeTemperatureReadings(data: RawTemperatureReading[], intervals: string[]): TemperatureReading[] {
   const normIntervals = intervals.map(normalizeTimeSlot);
-  const dataByTime = new Map<string, any>();
-  const extraItemsByTime = new Map<string, any>();
+  const dataByTime = new Map<string, RawTemperatureReading>();
+  const extraItemsByTime = new Map<string, RawTemperatureReading>();
 
   for (const d of data) {
     const t = normalizeTimeSlot(d.time);
@@ -242,32 +240,36 @@ export function mergeTemperatureReadings(data: any[], intervals: string[]): Temp
         dataByTime.set(t, { ...d, time: t });
       } else {
         const existing = dataByTime.get(t);
-        for (const [key, val] of Object.entries(d)) {
-          if (val !== null && val !== undefined && val !== "") {
-            existing[key] = val;
+        if (existing) {
+          for (const [key, val] of Object.entries(d)) {
+            if (val !== null && val !== undefined && val !== "") {
+              (existing as Record<string, unknown>)[key] = val;
+            }
           }
+          if (d.id) existing.id = d.id;
+          if ("photoUrl" in d) {
+            existing.photoUrl = d.photoUrl || undefined;
+          }
+          dataByTime.set(t, existing);
         }
-        if (d.id) existing.id = d.id;
-        if ("photoUrl" in d) {
-          existing.photoUrl = d.photoUrl || undefined;
-        }
-        dataByTime.set(t, existing);
       }
     } else {
       if (!extraItemsByTime.has(t)) {
         extraItemsByTime.set(t, { ...d, time: t });
       } else {
         const existing = extraItemsByTime.get(t);
-        for (const [key, val] of Object.entries(d)) {
-          if (val !== null && val !== undefined && val !== "") {
-            existing[key] = val;
+        if (existing) {
+          for (const [key, val] of Object.entries(d)) {
+            if (val !== null && val !== undefined && val !== "") {
+              (existing as Record<string, unknown>)[key] = val;
+            }
           }
+          if (d.id) existing.id = d.id;
+          if ("photoUrl" in d) {
+            existing.photoUrl = d.photoUrl || undefined;
+          }
+          extraItemsByTime.set(t, existing);
         }
-        if (d.id) existing.id = d.id;
-        if ("photoUrl" in d) {
-          existing.photoUrl = d.photoUrl || undefined;
-        }
-        extraItemsByTime.set(t, existing);
       }
     }
   }
@@ -384,7 +386,7 @@ export function ProcessTemperatureSection({
   const [readings, setReadings] = useState<TemperatureReading[]>([]);
 
   // Shift Master integration
-  const { shifts, allowDayNight } = useProductionShifts();
+  const { shifts } = useProductionShifts();
   const isDayNight = shiftId === "ALL" || shiftName.toLowerCase().includes("day + night");
   const activeShift = useMemo(() => {
     return shifts.find((s) => s.id === shiftId);
@@ -401,8 +403,8 @@ export function ProcessTemperatureSection({
   }, [activeShift, isDayNight]);
 
   // Auth & RBAC State
-  const [userRole, setUserRole] = useState<string>("");
-  const [userPermissions, setUserPermissions] = useState<any[]>([]);
+  const [, setUserRole] = useState<string>("");
+  const [, setUserPermissions] = useState<unknown[]>([]);
   const [canUploadPhoto, setCanUploadPhoto] = useState<boolean>(true);
   const [canCapturePhoto, setCanCapturePhoto] = useState<boolean>(true);
   const [canUnlockTimeSlots, setCanUnlockTimeSlots] = useState<boolean>(false);
@@ -483,7 +485,7 @@ export function ProcessTemperatureSection({
         }
       );
       if (!res.ok) return;
-      const data: any[] = await res.json();
+      const data: Partial<TemperatureReading & { operatorName?: string; operatorId?: string }>[] = await res.json();
       if (!data) return;
 
       const opName = (data && data[0]?.operatorName) || "";
@@ -548,7 +550,7 @@ export function ProcessTemperatureSection({
 
     fetch(`/api/production/tape-plant/temperature?date=${date}&shiftId=${shiftId}&_t=${Date.now()}`)
       .then((r) => (r.ok ? r.json() : []))
-      .then((data: any[]) => {
+      .then((data: Partial<TemperatureReading & { operatorName?: string; operatorId?: string }>[]) => {
         const opName = (data && data[0]?.operatorName) || "";
         const opId = (data && data[0]?.operatorId) || "";
         setOperatorName(opName);
@@ -677,8 +679,8 @@ export function ProcessTemperatureSection({
       setLastAutoSavedAt(new Date());
       realtime.broadcastSync({ action: "SAVE", date, shift: shiftId });
       toast.success("Process temperature readings saved");
-    } catch (err: any) {
-      toast.error(err.message || "Failed to save readings");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to save readings");
     } finally {
       setSaving(false);
     }
@@ -706,97 +708,113 @@ export function ProcessTemperatureSection({
     setExpandedSlots(new Set());
   };
 
-  const handleFieldChange = (
-    idx: number,
-    field: keyof TemperatureReading,
-    rawVal: string,
-    isNumber = true
-  ) => {
-    realtime.markLocalEdit();
-    hasUnsavedLocalEditsRef.current = true;
-    lastUserEditTimeRef.current = Date.now();
-    const val = isNumber && rawVal !== "" ? (isNaN(Number(rawVal)) ? rawVal : Number(rawVal)) : rawVal;
-    setReadings((prev) => {
-      const next = [...prev];
-      next[idx] = { ...next[idx], [field]: val };
-      return next;
-    });
-  };
-
-  const handleDeleteReading = (idx: number) => {
-    realtime.markLocalEdit();
-    hasUnsavedLocalEditsRef.current = true;
-    lastUserEditTimeRef.current = Date.now();
-    const target = readings[idx];
-    if (target?.time) {
-      deletedTimesRef.current.add(normalizeTimeSlot(target.time));
-    }
-    setReadings((prev) => prev.filter((_, i) => i !== idx));
-    setExpandedSlots((prev) => {
-      const next = new Set<number>();
-      prev.forEach((val) => {
-        if (val < idx) next.add(val);
-        else if (val > idx) next.add(val - 1);
+  const handleFieldChange = useCallback(
+    (
+      idx: number,
+      field: keyof TemperatureReading,
+      rawVal: string,
+      isNumber = true
+    ) => {
+      realtime.markLocalEdit();
+      hasUnsavedLocalEditsRef.current = true;
+      lastUserEditTimeRef.current = Date.now();
+      const val = isNumber && rawVal !== "" ? (isNaN(Number(rawVal)) ? rawVal : Number(rawVal)) : rawVal;
+      setReadings((prev) => {
+        const next = [...prev];
+        next[idx] = { ...next[idx], [field]: val };
+        return next;
       });
-      return next;
-    });
-  };
+    },
+    [realtime]
+  );
 
-  const handleAddReading = () => {
+  const handleDeleteReading = useCallback(
+    (idx: number) => {
+      realtime.markLocalEdit();
+      hasUnsavedLocalEditsRef.current = true;
+      lastUserEditTimeRef.current = Date.now();
+      setReadings((prev) => {
+        const target = prev[idx];
+        if (target?.time) {
+          deletedTimesRef.current.add(normalizeTimeSlot(target.time));
+        }
+        return prev.filter((_, i) => i !== idx);
+      });
+      setExpandedSlots((prev) => {
+        const next = new Set<number>();
+        prev.forEach((val) => {
+          if (val < idx) next.add(val);
+          else if (val > idx) next.add(val - 1);
+        });
+        return next;
+      });
+    },
+    [realtime]
+  );
+
+  const handleAddReading = useCallback(() => {
     realtime.markLocalEdit();
     hasUnsavedLocalEditsRef.current = true;
     lastUserEditTimeRef.current = Date.now();
     const now = new Date();
     const timeStr = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-    const newIdx = readings.length;
-    setReadings([
-      ...readings,
-      {
-        time: timeStr,
-        photoUrl: undefined,
-        b1: "",
-        b2: "",
-        b3: "",
-        b4: "",
-        b5: "",
-        b6: "",
-        b7: "",
-        screenChanger: "",
-        ad1: "",
-        ad2: "",
-        meltPump: "",
-        d1: "",
-        d2: "",
-        d3: "",
-        d4: "",
-        d5: "",
-        d6: "",
-        d7: "",
-        meltTemp: "",
-        h1: "",
-        h2: "",
-        hotAirTemp: "",
-      },
-    ]);
-    setExpandedSlots((prev) => new Set([...prev, newIdx]));
-  };
+    setReadings((prev) => {
+      const newIdx = prev.length;
+      setExpandedSlots((old) => new Set([...old, newIdx]));
+      return [
+        ...prev,
+        {
+          time: timeStr,
+          photoUrl: undefined,
+          b1: "",
+          b2: "",
+          b3: "",
+          b4: "",
+          b5: "",
+          b6: "",
+          b7: "",
+          screenChanger: "",
+          ad1: "",
+          ad2: "",
+          meltPump: "",
+          d1: "",
+          d2: "",
+          d3: "",
+          d4: "",
+          d5: "",
+          d6: "",
+          d7: "",
+          meltTemp: "",
+          h1: "",
+          h2: "",
+          hotAirTemp: "",
+        },
+      ];
+    });
+  }, [realtime]);
 
-  const handleCopyPrevious = (idx: number) => {
-    if (idx <= 0) return;
-    realtime.markLocalEdit();
-    hasUnsavedLocalEditsRef.current = true;
-    lastUserEditTimeRef.current = Date.now();
-    const prev = readings[idx - 1];
-    const updated = [...readings];
-    updated[idx] = {
-      ...prev,
-      time: updated[idx].time || prev.time,
-      photoUrl: undefined, // Do not copy photo across rows
-      id: undefined,
-    };
-    setReadings(updated);
-    toast.success("Copied values from previous row");
-  };
+  const handleCopyPrevious = useCallback(
+    (idx: number) => {
+      if (idx <= 0) return;
+      realtime.markLocalEdit();
+      hasUnsavedLocalEditsRef.current = true;
+      lastUserEditTimeRef.current = Date.now();
+      setReadings((prevReadings) => {
+        const prev = prevReadings[idx - 1];
+        if (!prev) return prevReadings;
+        const updated = [...prevReadings];
+        updated[idx] = {
+          ...prev,
+          time: updated[idx]?.time || prev.time,
+          photoUrl: undefined, // Do not copy photo across rows
+          id: undefined,
+        };
+        return updated;
+      });
+      toast.success("Copied values from previous row");
+    },
+    [realtime]
+  );
 
   // Row Lock Determination
   const isRowLocked = useCallback(
@@ -855,9 +873,9 @@ export function ProcessTemperatureSection({
         setUnlockedSlots(next);
         toast.success(`Slot ${row.time || `#${idx + 1}`} unlocked for all operators`);
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error("Time slot toggle error:", err);
-      toast.error(err.message || "Operation failed");
+      toast.error(err instanceof Error ? err.message : "Operation failed");
     }
   };
 
@@ -1569,6 +1587,7 @@ export function ProcessTemperatureSection({
                   {row.photoUrl && (
                     <div className="flex items-center justify-between p-2 rounded-lg bg-emerald-50/60 border border-emerald-200">
                       <div className="flex items-center gap-2 min-w-0">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           src={row.photoUrl}
                           alt="Evidence"

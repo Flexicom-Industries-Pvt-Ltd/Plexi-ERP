@@ -18,11 +18,8 @@ import {
   Calendar,
   Clock,
   User,
-  Scale,
-  Sparkles,
   FileCheck,
   AlertCircle,
-  Download,
   ArrowDownToLine,
 } from "lucide-react";
 import {
@@ -31,6 +28,12 @@ import {
   calculateConvertexWastageRow,
   computeConvertexWastageTotals,
 } from "@/lib/convertex/convertex-types";
+import {
+  FocusedConvertexWastageCell,
+  getConvertexWastageRowKey,
+  reconcileServerConvertexWastageEntries,
+  serializeConvertexWastagePayload,
+} from "@/lib/convertex/convertex-wastage-google-docs-sync";
 import dynamic from "next/dynamic";
 import { exportConvertexWastageReportExcel } from "@/lib/convertex/convertex-export";
 import { UniversalQualityInput } from "@/components/ui/UniversalQualityInput";
@@ -102,6 +105,30 @@ export function ConvertexWastageClient() {
   const isDirtyRef = useRef<boolean>(false);
   const lastUserEditTimeRef = useRef<number>(0);
 
+  // Google Docs Concurrent Sync & Typing Isolation Refs
+  const lastSavedPayloadRef = useRef<string>("");
+  const hasUnsavedLocalEditsRef = useRef<boolean>(false);
+  const activeFocusedCellRef = useRef<FocusedConvertexWastageCell | null>(null);
+  const deletedEntryIdsRef = useRef<Set<string>>(new Set());
+
+  const [, setFocusedCellState] = useState<FocusedConvertexWastageCell | null>(null);
+
+  const setFocusedCell = useCallback((rowKey: string, field: keyof ConvertexWastageEntryItem) => {
+    const next = { rowKey, field };
+    activeFocusedCellRef.current = next;
+    setFocusedCellState(next);
+  }, []);
+
+  const clearFocusedCell = useCallback((rowKey: string, field: keyof ConvertexWastageEntryItem) => {
+    if (
+      activeFocusedCellRef.current?.rowKey === rowKey &&
+      activeFocusedCellRef.current?.field === field
+    ) {
+      activeFocusedCellRef.current = null;
+      setFocusedCellState(null);
+    }
+  }, []);
+
   // Ref to hold latest state for debounced auto-save
   const latestDataRef = useRef({
     date,
@@ -171,18 +198,37 @@ export function ConvertexWastageClient() {
         if (rep.supervisorName) setSupervisorName(rep.supervisorName);
         setRemarks(rep.remarks || "");
 
-        if (Array.isArray(rep.entries) && rep.entries.length > 0) {
-          const parsed = rep.entries.map((e: any, idx: number) =>
-            calculateConvertexWastageRow({
-              ...e,
-              sequence: idx + 1,
-            })
-          );
-          while (parsed.length < 5) {
-            parsed.push(createEmptyWastageRow(parsed.length + 1));
+        const incomingEntries: ConvertexWastageEntryItem[] =
+          Array.isArray(rep.entries) && rep.entries.length > 0
+            ? rep.entries.map((e: any, idx: number) =>
+                calculateConvertexWastageRow({
+                  ...e,
+                  sequence: idx + 1,
+                })
+              )
+            : [];
+
+        setEntries((prev) => {
+          const reconciled = reconcileServerConvertexWastageEntries({
+            localEntries: prev,
+            incomingEntries,
+            focusedCell: activeFocusedCellRef.current,
+            hasUnsavedLocalEdits: hasUnsavedLocalEditsRef.current,
+            deletedEntryIds: deletedEntryIdsRef.current,
+          });
+          while (reconciled.length < 5) {
+            reconciled.push(createEmptyWastageRow(reconciled.length + 1));
           }
-          setEntries(parsed);
-        } else {
+          lastSavedPayloadRef.current = serializeConvertexWastagePayload(rep, incomingEntries);
+          return reconciled;
+        });
+
+        setLastSavedAt(format(new Date(rep.updatedAt || Date.now()), "hh:mm a"));
+      } else {
+        // No wastage report saved yet
+        if (!hasUnsavedLocalEditsRef.current) {
+          setStatus("DRAFT");
+          setRemarks("");
           setEntries([
             createEmptyWastageRow(1),
             createEmptyWastageRow(2),
@@ -190,20 +236,8 @@ export function ConvertexWastageClient() {
             createEmptyWastageRow(4),
             createEmptyWastageRow(5),
           ]);
+          setLastSavedAt(null);
         }
-        setLastSavedAt(format(new Date(rep.updatedAt || Date.now()), "hh:mm a"));
-      } else {
-        // No wastage report saved yet
-        setStatus("DRAFT");
-        setRemarks("");
-        setEntries([
-          createEmptyWastageRow(1),
-          createEmptyWastageRow(2),
-          createEmptyWastageRow(3),
-          createEmptyWastageRow(4),
-          createEmptyWastageRow(5),
-        ]);
-        setLastSavedAt(null);
       }
     } catch (err: any) {
       toast.error(err.message || "Failed to load Convertex wastage report");
@@ -224,118 +258,36 @@ export function ConvertexWastageClient() {
     sheet: "wastage",
     date,
     shift: shiftName,
-    onSync: () => {
-      if (Date.now() - lastUserEditTimeRef.current < 3500) return;
+    onSync: (event?: { clientId?: string | null }) => {
+      // Echo suppression: Ignore notifications originating from this client session
+      if (event?.clientId && event.clientId === realtime.clientId) return;
+      if (Date.now() - lastUserEditTimeRef.current < 2500 && activeFocusedCellRef.current) return;
       fetchReportData();
     },
   });
 
-  // Import rolls from Daily Production
-  const handleImportFromProduction = () => {
-    if (linkedProductionEntries.length === 0) {
-      toast.info("No production rolls found for this Date, Shift, and Machine.");
-      return;
-    }
-
-    isDirtyRef.current = true;
-    lastUserEditTimeRef.current = Date.now();
-    realtime.markLocalEdit();
-    const importedRows = linkedProductionEntries.map((item, idx) =>
-      calculateConvertexWastageRow({
-        sequence: idx + 1,
-        quality: item.quality || "Standard",
-        rollNumber: item.rollNumber || "",
-        productionKg: item.productionKg || 0,
-        loomWasteKg: 0,
-        lamWasteKg: 0,
-        printWasteKg: 0,
-        machineWasteKg: 0,
-        coverPatchWasteKg: 0,
-      })
-    );
-
-    while (importedRows.length < 5) {
-      importedRows.push(createEmptyWastageRow(importedRows.length + 1));
-    }
-
-    setEntries(importedRows);
-    toast.success(
-      `Imported ${linkedProductionEntries.length} rolls from Daily Production Report!`
-    );
-  };
-
-  // Cell change
-  const handleCellChange = (
-    index: number,
-    field: keyof ConvertexWastageEntryItem,
-    value: any
-  ) => {
-    isDirtyRef.current = true;
-    lastUserEditTimeRef.current = Date.now();
-    realtime.markLocalEdit();
-    setEntries((prev) => {
-      const next = [...prev];
-      const updatedRow = { ...next[index], [field]: value };
-      next[index] = calculateConvertexWastageRow(updatedRow);
-      return next;
-    });
-  };
-
-  // Add row
-  const handleAddRow = () => {
-    isDirtyRef.current = true;
-    setEntries((prev) => [...prev, createEmptyWastageRow(prev.length + 1)]);
-  };
-
-  // Add 5 rows
-  const handleAdd5Rows = () => {
-    isDirtyRef.current = true;
-    setEntries((prev) => {
-      const start = prev.length + 1;
-      return [
-        ...prev,
-        createEmptyWastageRow(start),
-        createEmptyWastageRow(start + 1),
-        createEmptyWastageRow(start + 2),
-        createEmptyWastageRow(start + 3),
-        createEmptyWastageRow(start + 4),
-      ];
-    });
-  };
-
-  // Reset to blank
-  const handleResetToBlank = () => {
-    if (confirm("Reset sheet to 5 blank rows? Unsaved changes will be discarded.")) {
-      isDirtyRef.current = true;
-      setEntries([
-        createEmptyWastageRow(1),
-        createEmptyWastageRow(2),
-        createEmptyWastageRow(3),
-        createEmptyWastageRow(4),
-        createEmptyWastageRow(5),
-      ]);
-      setRemarks("");
-    }
-  };
-
-  // Remove row
-  const handleRemoveRow = (index: number) => {
-    isDirtyRef.current = true;
-    setEntries((prev) => {
-      if (prev.length <= 1) {
-        return [createEmptyWastageRow(1)];
+  // Catch-up upon tab wake-up (e.g., user returns after lock or tab switch)
+  useEffect(() => {
+    const handleVisibilityCatchup = () => {
+      if (document.visibilityState === "visible") {
+        fetchReportData();
       }
-      return prev
-        .filter((_, i) => i !== index)
-        .map((row, i) => ({ ...row, sequence: i + 1 }));
-    });
-  };
+    };
+    const handleFocusCatchup = () => {
+      fetchReportData();
+    };
 
-  // Totals
-  const totals = useMemo(() => computeConvertexWastageTotals(entries), [entries]);
+    document.addEventListener("visibilitychange", handleVisibilityCatchup);
+    window.addEventListener("focus", handleFocusCatchup);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityCatchup);
+      window.removeEventListener("focus", handleFocusCatchup);
+    };
+  }, [fetchReportData]);
 
   // Check if row has data
-  const hasRowData = (e: ConvertexWastageEntryItem) => {
+  const hasRowData = useCallback((e: ConvertexWastageEntryItem) => {
     return Boolean(
       (e.quality && e.quality.trim()) ||
       (e.rollNumber && e.rollNumber.trim()) ||
@@ -347,7 +299,7 @@ export function ConvertexWastageClient() {
       Number(e.coverPatchWasteKg) > 0 ||
       (e.remarks && e.remarks.trim())
     );
-  };
+  }, []);
 
   // Save handler
   const executeSave = useCallback(
@@ -377,7 +329,7 @@ export function ConvertexWastageClient() {
       const newStatus = targetStatus || current.status;
 
       try {
-        const payload: ConvertexWastageReportData = {
+        const payload = {
           date: current.date,
           shiftName: current.shiftName,
           machineNo: current.machineNo,
@@ -385,6 +337,8 @@ export function ConvertexWastageClient() {
           supervisorName: current.supervisorName.trim() || undefined,
           status: newStatus,
           remarks: current.remarks.trim() || undefined,
+          clientId: realtime.clientId,
+          deletedEntryIds: Array.from(deletedEntryIdsRef.current),
           ...computeConvertexWastageTotals(current.entries),
           entries: filledEntries.map((e, idx) => ({ ...e, sequence: idx + 1 })),
         };
@@ -400,6 +354,9 @@ export function ConvertexWastageClient() {
           throw new Error(err.error || "Failed to save Convertex wastage report");
         }
 
+        lastSavedPayloadRef.current = serializeConvertexWastagePayload(current, filledEntries);
+        hasUnsavedLocalEditsRef.current = false;
+        deletedEntryIdsRef.current.clear();
         setStatus(newStatus);
         setLastSavedAt(format(new Date(), "hh:mm:ss a"));
         isDirtyRef.current = false;
@@ -426,10 +383,138 @@ export function ConvertexWastageClient() {
         setIsAutoSaving(false);
       }
     },
-    []
+    [hasRowData, realtime]
   );
 
-  // Debounced auto-save
+  const triggerAutoSave = useCallback(() => {
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    autoSaveTimerRef.current = setTimeout(() => {
+      executeSave("DRAFT", true);
+    }, 1500);
+  }, [executeSave]);
+
+  const markDirtyAndTriggerAutoSave = useCallback(() => {
+    isDirtyRef.current = true;
+    hasUnsavedLocalEditsRef.current = true;
+    lastUserEditTimeRef.current = Date.now();
+    realtime.markLocalEdit();
+    triggerAutoSave();
+  }, [realtime, triggerAutoSave]);
+
+  // Import rolls from Daily Production
+  const handleImportFromProduction = useCallback(() => {
+    if (linkedProductionEntries.length === 0) {
+      toast.info("No production rolls found for this Date, Shift, and Machine.");
+      return;
+    }
+
+    const importedRows = linkedProductionEntries.map((item, idx) =>
+      calculateConvertexWastageRow({
+        sequence: idx + 1,
+        quality: item.quality || "Standard",
+        rollNumber: item.rollNumber || "",
+        productionKg: item.productionKg || 0,
+        loomWasteKg: 0,
+        lamWasteKg: 0,
+        printWasteKg: 0,
+        machineWasteKg: 0,
+        coverPatchWasteKg: 0,
+      })
+    );
+
+    while (importedRows.length < 5) {
+      importedRows.push(createEmptyWastageRow(importedRows.length + 1));
+    }
+
+    setEntries(importedRows);
+    markDirtyAndTriggerAutoSave();
+    toast.success(
+      `Imported ${linkedProductionEntries.length} rolls from Daily Production Report!`
+    );
+  }, [linkedProductionEntries, markDirtyAndTriggerAutoSave]);
+
+  // Cell change
+  const handleCellChange = useCallback(
+    (
+      index: number,
+      field: keyof ConvertexWastageEntryItem,
+      value: any
+    ) => {
+      setEntries((prev) => {
+        const next = [...prev];
+        const updatedRow = { ...next[index], [field]: value };
+        next[index] = calculateConvertexWastageRow(updatedRow);
+        return next;
+      });
+      markDirtyAndTriggerAutoSave();
+    },
+    [markDirtyAndTriggerAutoSave]
+  );
+
+  // Add row
+  const handleAddRow = useCallback(() => {
+    setEntries((prev) => [...prev, createEmptyWastageRow(prev.length + 1)]);
+    markDirtyAndTriggerAutoSave();
+  }, [markDirtyAndTriggerAutoSave]);
+
+  // Add 5 rows
+  const handleAdd5Rows = useCallback(() => {
+    setEntries((prev) => {
+      const start = prev.length + 1;
+      return [
+        ...prev,
+        createEmptyWastageRow(start),
+        createEmptyWastageRow(start + 1),
+        createEmptyWastageRow(start + 2),
+        createEmptyWastageRow(start + 3),
+        createEmptyWastageRow(start + 4),
+      ];
+    });
+    markDirtyAndTriggerAutoSave();
+  }, [markDirtyAndTriggerAutoSave]);
+
+  // Reset to blank
+  const handleResetToBlank = useCallback(() => {
+    if (confirm("Reset sheet to 5 blank rows? Unsaved changes will be discarded.")) {
+      setEntries([
+        createEmptyWastageRow(1),
+        createEmptyWastageRow(2),
+        createEmptyWastageRow(3),
+        createEmptyWastageRow(4),
+        createEmptyWastageRow(5),
+      ]);
+      setRemarks("");
+      markDirtyAndTriggerAutoSave();
+    }
+  }, [markDirtyAndTriggerAutoSave]);
+
+  // Remove row
+  const handleRemoveRow = useCallback(
+    (index: number) => {
+      setEntries((prev) => {
+        const target = prev[index];
+        if (target?.id) {
+          deletedEntryIdsRef.current.add(target.id);
+        }
+        if (target?.rollNumber?.trim()) {
+          deletedEntryIdsRef.current.add(target.rollNumber.trim().toUpperCase());
+        }
+        if (prev.length <= 1) {
+          return [createEmptyWastageRow(1)];
+        }
+        return prev
+          .filter((_, i) => i !== index)
+          .map((row, i) => ({ ...row, sequence: i + 1 }));
+      });
+      markDirtyAndTriggerAutoSave();
+    },
+    [markDirtyAndTriggerAutoSave]
+  );
+
+  // Totals
+  const totals = useMemo(() => computeConvertexWastageTotals(entries), [entries]);
+
+  // Auto-save effect for header fields
   useEffect(() => {
     if (isInitialLoadRef.current || loading) return;
     if (!isDirtyRef.current) return;
@@ -440,12 +525,12 @@ export function ConvertexWastageClient() {
       if (isDirtyRef.current) {
         executeSave("DRAFT", true);
       }
-    }, 1000);
+    }, 1500);
 
     return () => {
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     };
-  }, [entries, remarks, operatorName, supervisorName, loading, executeSave]);
+  }, [remarks, operatorName, supervisorName, loading, executeSave]);
 
   // Flush on tab close
   useEffect(() => {
@@ -817,170 +902,191 @@ export function ConvertexWastageClient() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 font-medium">
-              {entries.map((entry, index) => (
-                <tr
-                  key={index}
-                  className={`hover:bg-rose-50/30 transition-colors ${
-                    index % 2 === 1 ? "bg-slate-50/40" : "bg-white"
-                  }`}
-                >
-                  {/* Sequence */}
-                  <td className="py-1.5 px-2 text-center font-bold text-slate-500 border-r border-slate-200">
-                    {entry.sequence}
-                  </td>
+              {entries.map((entry, index) => {
+                const rowKey = getConvertexWastageRowKey(entry, index);
+                return (
+                  <tr
+                    key={rowKey}
+                    className={`hover:bg-rose-50/30 transition-colors ${
+                      index % 2 === 1 ? "bg-slate-50/40" : "bg-white"
+                    }`}
+                  >
+                    {/* Sequence */}
+                    <td className="py-1.5 px-2 text-center font-bold text-slate-500 border-r border-slate-200">
+                      {entry.sequence}
+                    </td>
 
-                  {/* Quality */}
-                  <td className="py-1 px-1 border-r border-slate-200 bg-amber-50/20 min-w-[200px]">
-                    <UniversalQualityInput
-                      value={entry.quality}
-                      onChange={(newVal) => handleCellChange(index, "quality", newVal)}
-                      placeholder="— Quality —"
-                      compact={true}
-                      inputClassName="h-7 text-xs font-semibold text-slate-800"
-                    />
-                  </td>
+                    {/* Quality */}
+                    <td className="py-1 px-1 border-r border-slate-200 bg-amber-50/20 min-w-[200px]">
+                      <UniversalQualityInput
+                        value={entry.quality}
+                        onChange={(newVal) => handleCellChange(index, "quality", newVal)}
+                        onFocus={() => setFocusedCell(rowKey, "quality")}
+                        onBlur={() => clearFocusedCell(rowKey, "quality")}
+                        placeholder="— Quality —"
+                        compact={true}
+                        inputClassName="h-7 text-xs font-semibold text-slate-800"
+                      />
+                    </td>
 
-                  {/* Roll Number */}
-                  <td className="py-1 px-1 border-r border-slate-200">
-                    <input
-                      type="text"
-                      value={entry.rollNumber}
-                      onChange={(e) => handleCellChange(index, "rollNumber", e.target.value)}
-                      placeholder="e.g. D14332"
-                      className="w-full px-2 py-1 text-xs font-mono font-bold text-slate-900 border border-transparent hover:border-slate-300 focus:border-primary focus:bg-white rounded transition-colors"
-                    />
-                  </td>
+                    {/* Roll Number */}
+                    <td className="py-1 px-1 border-r border-slate-200">
+                      <input
+                        type="text"
+                        value={entry.rollNumber}
+                        onChange={(e) => handleCellChange(index, "rollNumber", e.target.value)}
+                        onFocus={() => setFocusedCell(rowKey, "rollNumber")}
+                        onBlur={() => clearFocusedCell(rowKey, "rollNumber")}
+                        placeholder="e.g. D14332"
+                        className="w-full px-2 py-1 text-xs font-mono font-bold text-slate-900 border border-transparent hover:border-slate-300 focus:border-primary focus:bg-white rounded transition-colors"
+                      />
+                    </td>
 
-                  {/* Production in Kg */}
-                  <td className="py-1 px-1 border-r border-slate-200 bg-teal-50/25">
-                    <input
-                      type="number"
-                      step="any"
-                      value={entry.productionKg || ""}
-                      onChange={(e) => handleCellChange(index, "productionKg", e.target.value)}
-                      placeholder="0.00"
-                      className="w-full px-2 py-1 text-xs text-right font-mono font-bold text-teal-800 bg-transparent border border-transparent hover:border-teal-300 focus:border-teal-500 rounded transition-colors"
-                    />
-                  </td>
+                    {/* Production in Kg */}
+                    <td className="py-1 px-1 border-r border-slate-200 bg-teal-50/25">
+                      <input
+                        type="number"
+                        step="any"
+                        value={entry.productionKg || ""}
+                        onChange={(e) => handleCellChange(index, "productionKg", e.target.value)}
+                        onFocus={() => setFocusedCell(rowKey, "productionKg")}
+                        onBlur={() => clearFocusedCell(rowKey, "productionKg")}
+                        placeholder="0.00"
+                        className="w-full px-2 py-1 text-xs text-right font-mono font-bold text-teal-800 bg-transparent border border-transparent hover:border-teal-300 focus:border-teal-500 rounded transition-colors"
+                      />
+                    </td>
 
-                  {/* Loom Wastage in Kg */}
-                  <td className="py-1 px-1 border-r border-slate-200">
-                    <input
-                      type="number"
-                      step="any"
-                      value={entry.loomWasteKg || ""}
-                      onChange={(e) => handleCellChange(index, "loomWasteKg", e.target.value)}
-                      placeholder="0.00"
-                      className="w-full px-2 py-1 text-xs text-right font-mono text-slate-700 border border-transparent hover:border-slate-300 focus:border-primary focus:bg-white rounded transition-colors"
-                    />
-                  </td>
-                  {/* Loom Wastage % */}
-                  <td className="py-1.5 px-2 border-r border-slate-200 text-right font-mono text-[10px] text-slate-500 bg-slate-50/50">
-                    {entry.loomWastePct ? `${entry.loomWastePct.toFixed(2)}%` : "—"}
-                  </td>
+                    {/* Loom Wastage in Kg */}
+                    <td className="py-1 px-1 border-r border-slate-200">
+                      <input
+                        type="number"
+                        step="any"
+                        value={entry.loomWasteKg || ""}
+                        onChange={(e) => handleCellChange(index, "loomWasteKg", e.target.value)}
+                        onFocus={() => setFocusedCell(rowKey, "loomWasteKg")}
+                        onBlur={() => clearFocusedCell(rowKey, "loomWasteKg")}
+                        placeholder="0.00"
+                        className="w-full px-2 py-1 text-xs text-right font-mono text-slate-700 border border-transparent hover:border-slate-300 focus:border-primary focus:bg-white rounded transition-colors"
+                      />
+                    </td>
+                    {/* Loom Wastage % */}
+                    <td className="py-1.5 px-2 border-r border-slate-200 text-right font-mono text-[10px] text-slate-500 bg-slate-50/50">
+                      {entry.loomWastePct ? `${entry.loomWastePct.toFixed(2)}%` : "—"}
+                    </td>
 
-                  {/* Lam Wastage in Kg */}
-                  <td className="py-1 px-1 border-r border-slate-200">
-                    <input
-                      type="number"
-                      step="any"
-                      value={entry.lamWasteKg || ""}
-                      onChange={(e) => handleCellChange(index, "lamWasteKg", e.target.value)}
-                      placeholder="0.00"
-                      className="w-full px-2 py-1 text-xs text-right font-mono text-slate-700 border border-transparent hover:border-slate-300 focus:border-primary focus:bg-white rounded transition-colors"
-                    />
-                  </td>
-                  {/* Lam Wastage % */}
-                  <td className="py-1.5 px-2 border-r border-slate-200 text-right font-mono text-[10px] text-slate-500 bg-slate-50/50">
-                    {entry.lamWastePct ? `${entry.lamWastePct.toFixed(2)}%` : "—"}
-                  </td>
+                    {/* Lam Wastage in Kg */}
+                    <td className="py-1 px-1 border-r border-slate-200">
+                      <input
+                        type="number"
+                        step="any"
+                        value={entry.lamWasteKg || ""}
+                        onChange={(e) => handleCellChange(index, "lamWasteKg", e.target.value)}
+                        onFocus={() => setFocusedCell(rowKey, "lamWasteKg")}
+                        onBlur={() => clearFocusedCell(rowKey, "lamWasteKg")}
+                        placeholder="0.00"
+                        className="w-full px-2 py-1 text-xs text-right font-mono text-slate-700 border border-transparent hover:border-slate-300 focus:border-primary focus:bg-white rounded transition-colors"
+                      />
+                    </td>
+                    {/* Lam Wastage % */}
+                    <td className="py-1.5 px-2 border-r border-slate-200 text-right font-mono text-[10px] text-slate-500 bg-slate-50/50">
+                      {entry.lamWastePct ? `${entry.lamWastePct.toFixed(2)}%` : "—"}
+                    </td>
 
-                  {/* Print Wastage in Kg */}
-                  <td className="py-1 px-1 border-r border-slate-200">
-                    <input
-                      type="number"
-                      step="any"
-                      value={entry.printWasteKg || ""}
-                      onChange={(e) => handleCellChange(index, "printWasteKg", e.target.value)}
-                      placeholder="0.00"
-                      className="w-full px-2 py-1 text-xs text-right font-mono text-slate-700 border border-transparent hover:border-slate-300 focus:border-primary focus:bg-white rounded transition-colors"
-                    />
-                  </td>
-                  {/* Print Wastage % */}
-                  <td className="py-1.5 px-2 border-r border-slate-200 text-right font-mono text-[10px] text-slate-500 bg-slate-50/50">
-                    {entry.printWastePct ? `${entry.printWastePct.toFixed(2)}%` : "—"}
-                  </td>
+                    {/* Print Wastage in Kg */}
+                    <td className="py-1 px-1 border-r border-slate-200">
+                      <input
+                        type="number"
+                        step="any"
+                        value={entry.printWasteKg || ""}
+                        onChange={(e) => handleCellChange(index, "printWasteKg", e.target.value)}
+                        onFocus={() => setFocusedCell(rowKey, "printWasteKg")}
+                        onBlur={() => clearFocusedCell(rowKey, "printWasteKg")}
+                        placeholder="0.00"
+                        className="w-full px-2 py-1 text-xs text-right font-mono text-slate-700 border border-transparent hover:border-slate-300 focus:border-primary focus:bg-white rounded transition-colors"
+                      />
+                    </td>
+                    {/* Print Wastage % */}
+                    <td className="py-1.5 px-2 border-r border-slate-200 text-right font-mono text-[10px] text-slate-500 bg-slate-50/50">
+                      {entry.printWastePct ? `${entry.printWastePct.toFixed(2)}%` : "—"}
+                    </td>
 
-                  {/* Machine Wastage in Kg */}
-                  <td className="py-1 px-1 border-r border-slate-200">
-                    <input
-                      type="number"
-                      step="any"
-                      value={entry.machineWasteKg || ""}
-                      onChange={(e) => handleCellChange(index, "machineWasteKg", e.target.value)}
-                      placeholder="0.00"
-                      className="w-full px-2 py-1 text-xs text-right font-mono text-slate-700 border border-transparent hover:border-slate-300 focus:border-primary focus:bg-white rounded transition-colors"
-                    />
-                  </td>
-                  {/* Machine Wastage % */}
-                  <td className="py-1.5 px-2 border-r border-slate-200 text-right font-mono text-[10px] text-slate-500 bg-slate-50/50">
-                    {entry.machineWastePct ? `${entry.machineWastePct.toFixed(2)}%` : "—"}
-                  </td>
+                    {/* Machine Wastage in Kg */}
+                    <td className="py-1 px-1 border-r border-slate-200">
+                      <input
+                        type="number"
+                        step="any"
+                        value={entry.machineWasteKg || ""}
+                        onChange={(e) => handleCellChange(index, "machineWasteKg", e.target.value)}
+                        onFocus={() => setFocusedCell(rowKey, "machineWasteKg")}
+                        onBlur={() => clearFocusedCell(rowKey, "machineWasteKg")}
+                        placeholder="0.00"
+                        className="w-full px-2 py-1 text-xs text-right font-mono text-slate-700 border border-transparent hover:border-slate-300 focus:border-primary focus:bg-white rounded transition-colors"
+                      />
+                    </td>
+                    {/* Machine Wastage % */}
+                    <td className="py-1.5 px-2 border-r border-slate-200 text-right font-mono text-[10px] text-slate-500 bg-slate-50/50">
+                      {entry.machineWastePct ? `${entry.machineWastePct.toFixed(2)}%` : "—"}
+                    </td>
 
-                  {/* Cover Patch Wastage in Kg */}
-                  <td className="py-1 px-1 border-r border-slate-200 bg-purple-50/15">
-                    <input
-                      type="number"
-                      step="any"
-                      value={entry.coverPatchWasteKg || ""}
-                      onChange={(e) => handleCellChange(index, "coverPatchWasteKg", e.target.value)}
-                      placeholder="0.00"
-                      className="w-full px-2 py-1 text-xs text-right font-mono text-purple-800 border border-transparent hover:border-purple-300 focus:border-purple-500 rounded transition-colors"
-                    />
-                  </td>
-                  {/* Cover Patch Wastage % */}
-                  <td className="py-1.5 px-2 border-r border-slate-200 text-right font-mono text-[10px] text-purple-700 bg-purple-50/30">
-                    {entry.coverPatchWastePct ? `${entry.coverPatchWastePct.toFixed(2)}%` : "—"}
-                  </td>
+                    {/* Cover Patch Wastage in Kg */}
+                    <td className="py-1 px-1 border-r border-slate-200 bg-purple-50/15">
+                      <input
+                        type="number"
+                        step="any"
+                        value={entry.coverPatchWasteKg || ""}
+                        onChange={(e) => handleCellChange(index, "coverPatchWasteKg", e.target.value)}
+                        onFocus={() => setFocusedCell(rowKey, "coverPatchWasteKg")}
+                        onBlur={() => clearFocusedCell(rowKey, "coverPatchWasteKg")}
+                        placeholder="0.00"
+                        className="w-full px-2 py-1 text-xs text-right font-mono text-purple-800 border border-transparent hover:border-purple-300 focus:border-purple-500 rounded transition-colors"
+                      />
+                    </td>
+                    {/* Cover Patch Wastage % */}
+                    <td className="py-1.5 px-2 border-r border-slate-200 text-right font-mono text-[10px] text-purple-700 bg-purple-50/30">
+                      {entry.coverPatchWastePct ? `${entry.coverPatchWastePct.toFixed(2)}%` : "—"}
+                    </td>
 
-                  {/* Total Waste (Kg) */}
-                  <td className="py-1.5 px-2 border-r border-slate-200 text-right font-mono font-bold text-red-700 bg-red-50/25">
-                    {entry.totalWasteKg ? entry.totalWasteKg.toFixed(2) : "0.00"}
-                  </td>
-                  {/* Total Waste (%) */}
-                  <td className="py-1.5 px-2 border-r border-slate-200 text-right font-mono font-bold text-amber-700 bg-amber-50/25">
-                    {entry.totalWastePct ? `${entry.totalWastePct.toFixed(2)}%` : "0.00%"}
-                  </td>
+                    {/* Total Waste (Kg) */}
+                    <td className="py-1.5 px-2 border-r border-slate-200 text-right font-mono font-bold text-red-700 bg-red-50/25">
+                      {entry.totalWasteKg ? entry.totalWasteKg.toFixed(2) : "0.00"}
+                    </td>
+                    {/* Total Waste (%) */}
+                    <td className="py-1.5 px-2 border-r border-slate-200 text-right font-mono font-bold text-amber-700 bg-amber-50/25">
+                      {entry.totalWastePct ? `${entry.totalWastePct.toFixed(2)}%` : "0.00%"}
+                    </td>
 
-                  {/* Net Production (Kg) */}
-                  <td className="py-1.5 px-2 border-r border-slate-200 text-right font-mono font-bold text-emerald-800 bg-emerald-50/25">
-                    {entry.netProductionKg ? entry.netProductionKg.toFixed(1) : "0.0"}
-                  </td>
+                    {/* Net Production (Kg) */}
+                    <td className="py-1.5 px-2 border-r border-slate-200 text-right font-mono font-bold text-emerald-800 bg-emerald-50/25">
+                      {entry.netProductionKg ? entry.netProductionKg.toFixed(1) : "0.0"}
+                    </td>
 
-                  {/* Remarks */}
-                  <td className="py-1 px-1 border-r border-slate-200">
-                    <input
-                      type="text"
-                      value={entry.remarks || ""}
-                      onChange={(e) => handleCellChange(index, "remarks", e.target.value)}
-                      placeholder="Notes..."
-                      className="w-full px-2 py-1 text-xs text-slate-700 border border-transparent hover:border-slate-300 focus:border-primary focus:bg-white rounded transition-colors"
-                    />
-                  </td>
+                    {/* Remarks */}
+                    <td className="py-1 px-1 border-r border-slate-200">
+                      <input
+                        type="text"
+                        value={entry.remarks || ""}
+                        onChange={(e) => handleCellChange(index, "remarks", e.target.value)}
+                        onFocus={() => setFocusedCell(rowKey, "remarks")}
+                        onBlur={() => clearFocusedCell(rowKey, "remarks")}
+                        placeholder="Notes..."
+                        className="w-full px-2 py-1 text-xs text-slate-700 border border-transparent hover:border-slate-300 focus:border-primary focus:bg-white rounded transition-colors"
+                      />
+                    </td>
 
-                  {/* Delete Action */}
-                  <td className="py-1 px-1 text-center">
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveRow(index)}
-                      className="p-1.5 text-slate-400 hover:text-red-600 rounded hover:bg-red-50 transition-colors"
-                      title="Delete row"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
+                    {/* Delete Action */}
+                    <td className="py-1 px-1 text-center">
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveRow(index)}
+                        className="p-1.5 text-slate-400 hover:text-red-600 rounded hover:bg-red-50 transition-colors"
+                        title="Delete row"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
 
             {/* Totals Summary Footer */}
@@ -1095,213 +1201,234 @@ export function ConvertexWastageClient() {
               No wastage entries recorded. Tap &quot;Add Row&quot; or &quot;Sync&quot; from daily report.
             </div>
           ) : (
-            entries.map((entry, index) => (
-              <div
-                key={index}
-                className="bg-white border border-slate-200/90 rounded-xl shadow-2xs overflow-hidden"
-              >
-                {/* Card Header Strip */}
-                <div className="bg-slate-50/90 px-3.5 py-2.5 border-b border-slate-100 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="h-5 w-5 rounded-md bg-slate-900 text-white font-bold text-[10px] flex items-center justify-center">
-                      {entry.sequence}
-                    </span>
-                    <span className="text-xs font-mono font-bold text-slate-900">
-                      {entry.rollNumber ? entry.rollNumber : `Roll ${index + 1}`}
-                    </span>
+            entries.map((entry, index) => {
+              const rowKey = getConvertexWastageRowKey(entry, index);
+              return (
+                <div
+                  key={rowKey}
+                  className="bg-white border border-slate-200/90 rounded-xl shadow-2xs overflow-hidden"
+                >
+                  {/* Card Header Strip */}
+                  <div className="bg-slate-50/90 px-3.5 py-2.5 border-b border-slate-100 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="h-5 w-5 rounded-md bg-slate-900 text-white font-bold text-[10px] flex items-center justify-center">
+                        {entry.sequence}
+                      </span>
+                      <span className="text-xs font-mono font-bold text-slate-900">
+                        {entry.rollNumber ? entry.rollNumber : `Roll ${index + 1}`}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`text-xs font-black font-mono px-2 py-0.5 rounded-md border ${
+                          entry.totalWastePct <= 1.5
+                            ? "text-emerald-800 bg-emerald-50 border-emerald-200"
+                            : entry.totalWastePct <= 3.0
+                            ? "text-amber-800 bg-amber-50 border-amber-200"
+                            : "text-rose-800 bg-rose-50 border-rose-200"
+                        }`}
+                      >
+                        {entry.totalWastePct.toFixed(2)}% Scrap
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveRow(index)}
+                        className="p-1 text-slate-400 hover:text-rose-600 rounded active:scale-90 transition-all"
+                        title="Delete row"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={`text-xs font-black font-mono px-2 py-0.5 rounded-md border ${
-                        entry.totalWastePct <= 1.5
-                          ? "text-emerald-800 bg-emerald-50 border-emerald-200"
-                          : entry.totalWastePct <= 3.0
-                          ? "text-amber-800 bg-amber-50 border-amber-200"
-                          : "text-rose-800 bg-rose-50 border-rose-200"
-                      }`}
-                    >
-                      {entry.totalWastePct.toFixed(2)}% Scrap
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveRow(index)}
-                      className="p-1 text-slate-400 hover:text-rose-600 rounded active:scale-90 transition-all"
-                      title="Delete row"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
 
-                <div className="p-3.5 space-y-3 text-xs">
-                  {/* Quality & Roll No */}
-                  <div className="space-y-2">
-                    <div>
-                      <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                        Quality
-                      </label>
-                      <UniversalQualityInput
-                        value={entry.quality}
-                        onChange={(newVal) => handleCellChange(index, "quality", newVal)}
-                        placeholder="Select quality..."
-                        compact={false}
-                        inputClassName="h-9 text-xs font-semibold"
-                      />
+                  <div className="p-3.5 space-y-3 text-xs">
+                    {/* Quality & Roll No */}
+                    <div className="space-y-2">
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                          Quality
+                        </label>
+                        <UniversalQualityInput
+                          value={entry.quality}
+                          onChange={(newVal) => handleCellChange(index, "quality", newVal)}
+                          onFocus={() => setFocusedCell(rowKey, "quality")}
+                          onBlur={() => clearFocusedCell(rowKey, "quality")}
+                          placeholder="Select quality..."
+                          compact={false}
+                          inputClassName="h-9 text-xs font-semibold"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">
+                          Roll Number
+                        </label>
+                        <input
+                          type="text"
+                          value={entry.rollNumber}
+                          onChange={(e) => handleCellChange(index, "rollNumber", e.target.value)}
+                          onFocus={() => setFocusedCell(rowKey, "rollNumber")}
+                          onBlur={() => clearFocusedCell(rowKey, "rollNumber")}
+                          placeholder="e.g. D14332"
+                          className="w-full h-8 px-2.5 text-xs font-mono font-bold border border-slate-200 rounded-md focus:ring-1 focus:ring-primary"
+                        />
+                      </div>
                     </div>
 
+                    {/* Production Weights: Input Wt vs Finished Wt */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="bg-teal-50/50 p-2.5 rounded-lg border border-teal-200">
+                        <label className="block text-[10px] font-bold text-teal-800 uppercase mb-0.5">
+                          Production Input (Kg)
+                        </label>
+                        <input
+                          type="number"
+                          step="any"
+                          value={entry.productionKg || ""}
+                          onChange={(e) => handleCellChange(index, "productionKg", e.target.value)}
+                          onFocus={() => setFocusedCell(rowKey, "productionKg")}
+                          onBlur={() => clearFocusedCell(rowKey, "productionKg")}
+                          placeholder="0.00"
+                          className="w-full h-8 px-2 font-mono font-black text-sm text-teal-900 bg-white border border-teal-300 rounded focus:ring-1 focus:ring-teal-500"
+                        />
+                      </div>
+                      <div className="bg-emerald-50/50 p-2.5 rounded-lg border border-emerald-200 flex flex-col justify-between">
+                        <span className="text-[10px] font-bold text-emerald-800 uppercase block">
+                          Net Output (Kg)
+                        </span>
+                        <span className="font-mono font-black text-base text-emerald-900">
+                          {entry.netProductionKg ? entry.netProductionKg.toFixed(1) : "0.0"}{" "}
+                          <span className="text-[10px] font-normal text-slate-500">kg</span>
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Breakdown Wastage Inputs */}
+                    <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100 space-y-2">
+                      <span className="text-[10px] font-bold uppercase text-slate-600 tracking-wider block">
+                        Wastage Breakdown Categories (Kg)
+                      </span>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        {/* Loom Waste */}
+                        <div className="bg-white p-2 rounded border border-slate-200">
+                          <div className="flex items-center justify-between text-[10px] text-slate-500 mb-0.5">
+                            <span>Loom Waste</span>
+                            <span className="font-mono text-slate-400">{entry.loomWastePct.toFixed(2)}%</span>
+                          </div>
+                          <input
+                            type="number"
+                            step="any"
+                            value={entry.loomWasteKg || ""}
+                            onChange={(e) => handleCellChange(index, "loomWasteKg", e.target.value)}
+                            onFocus={() => setFocusedCell(rowKey, "loomWasteKg")}
+                            onBlur={() => clearFocusedCell(rowKey, "loomWasteKg")}
+                            placeholder="0.00"
+                            className="w-full h-7 text-xs font-mono font-bold text-slate-800 border-0 p-0 focus:ring-0"
+                          />
+                        </div>
+
+                        {/* Lam Waste */}
+                        <div className="bg-white p-2 rounded border border-slate-200">
+                          <div className="flex items-center justify-between text-[10px] text-slate-500 mb-0.5">
+                            <span>Lam Waste</span>
+                            <span className="font-mono text-slate-400">{entry.lamWastePct.toFixed(2)}%</span>
+                          </div>
+                          <input
+                            type="number"
+                            step="any"
+                            value={entry.lamWasteKg || ""}
+                            onChange={(e) => handleCellChange(index, "lamWasteKg", e.target.value)}
+                            onFocus={() => setFocusedCell(rowKey, "lamWasteKg")}
+                            onBlur={() => clearFocusedCell(rowKey, "lamWasteKg")}
+                            placeholder="0.00"
+                            className="w-full h-7 text-xs font-mono font-bold text-slate-800 border-0 p-0 focus:ring-0"
+                          />
+                        </div>
+
+                        {/* Print Waste */}
+                        <div className="bg-white p-2 rounded border border-slate-200">
+                          <div className="flex items-center justify-between text-[10px] text-slate-500 mb-0.5">
+                            <span>Print Waste</span>
+                            <span className="font-mono text-slate-400">{entry.printWastePct.toFixed(2)}%</span>
+                          </div>
+                          <input
+                            type="number"
+                            step="any"
+                            value={entry.printWasteKg || ""}
+                            onChange={(e) => handleCellChange(index, "printWasteKg", e.target.value)}
+                            onFocus={() => setFocusedCell(rowKey, "printWasteKg")}
+                            onBlur={() => clearFocusedCell(rowKey, "printWasteKg")}
+                            placeholder="0.00"
+                            className="w-full h-7 text-xs font-mono font-bold text-slate-800 border-0 p-0 focus:ring-0"
+                          />
+                        </div>
+
+                        {/* Machine Waste */}
+                        <div className="bg-white p-2 rounded border border-slate-200">
+                          <div className="flex items-center justify-between text-[10px] text-slate-500 mb-0.5">
+                            <span>Machine Waste</span>
+                            <span className="font-mono text-slate-400">{entry.machineWastePct.toFixed(2)}%</span>
+                          </div>
+                          <input
+                            type="number"
+                            step="any"
+                            value={entry.machineWasteKg || ""}
+                            onChange={(e) => handleCellChange(index, "machineWasteKg", e.target.value)}
+                            onFocus={() => setFocusedCell(rowKey, "machineWasteKg")}
+                            onBlur={() => clearFocusedCell(rowKey, "machineWasteKg")}
+                            placeholder="0.00"
+                            className="w-full h-7 text-xs font-mono font-bold text-slate-800 border-0 p-0 focus:ring-0"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Cover Patch Wastage */}
+                      <div className="bg-purple-50/40 p-2 rounded border border-purple-200">
+                        <div className="flex items-center justify-between text-[10px] text-purple-700 mb-0.5">
+                          <span className="font-bold">Cover Patch Waste</span>
+                          <span className="font-mono">{entry.coverPatchWastePct.toFixed(2)}%</span>
+                        </div>
+                        <input
+                          type="number"
+                          step="any"
+                          value={entry.coverPatchWasteKg || ""}
+                          onChange={(e) => handleCellChange(index, "coverPatchWasteKg", e.target.value)}
+                          onFocus={() => setFocusedCell(rowKey, "coverPatchWasteKg")}
+                          onBlur={() => clearFocusedCell(rowKey, "coverPatchWasteKg")}
+                          placeholder="0.00"
+                          className="w-full h-7 text-xs font-mono font-bold text-purple-900 bg-transparent border-0 p-0 focus:ring-0"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Total Roll Scrap Summary Strip */}
+                    <div className="p-2 rounded-lg bg-rose-50/50 border border-rose-200 flex items-center justify-between">
+                      <span className="text-[11px] font-bold text-rose-800">Roll Total Wastage:</span>
+                      <span className="text-sm font-black font-mono text-rose-900">
+                        {entry.totalWasteKg ? entry.totalWasteKg.toFixed(2) : "0.00"} kg{" "}
+                        <span className="text-xs text-rose-600 font-semibold">
+                          ({entry.totalWastePct ? entry.totalWastePct.toFixed(2) : "0.00"}%)
+                        </span>
+                      </span>
+                    </div>
+
+                    {/* Remarks Input */}
                     <div>
-                      <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">
-                        Roll Number
-                      </label>
                       <input
                         type="text"
-                        value={entry.rollNumber}
-                        onChange={(e) => handleCellChange(index, "rollNumber", e.target.value)}
-                        placeholder="e.g. D14332"
-                        className="w-full h-8 px-2.5 text-xs font-mono font-bold border border-slate-200 rounded-md focus:ring-1 focus:ring-primary"
+                        value={entry.remarks || ""}
+                        onChange={(e) => handleCellChange(index, "remarks", e.target.value)}
+                        onFocus={() => setFocusedCell(rowKey, "remarks")}
+                        onBlur={() => clearFocusedCell(rowKey, "remarks")}
+                        placeholder="Scrap rationale or defect notes..."
+                        className="w-full h-8 px-2.5 text-xs border border-slate-200 rounded-md focus:ring-1 focus:ring-primary"
                       />
                     </div>
-                  </div>
-
-                  {/* Production Weights: Input Wt vs Finished Wt */}
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="bg-teal-50/50 p-2.5 rounded-lg border border-teal-200">
-                      <label className="block text-[10px] font-bold text-teal-800 uppercase mb-0.5">
-                        Production Input (Kg)
-                      </label>
-                      <input
-                        type="number"
-                        step="any"
-                        value={entry.productionKg || ""}
-                        onChange={(e) => handleCellChange(index, "productionKg", e.target.value)}
-                        placeholder="0.00"
-                        className="w-full h-8 px-2 font-mono font-black text-sm text-teal-900 bg-white border border-teal-300 rounded focus:ring-1 focus:ring-teal-500"
-                      />
-                    </div>
-                    <div className="bg-emerald-50/50 p-2.5 rounded-lg border border-emerald-200 flex flex-col justify-between">
-                      <span className="text-[10px] font-bold text-emerald-800 uppercase block">
-                        Net Output (Kg)
-                      </span>
-                      <span className="font-mono font-black text-base text-emerald-900">
-                        {entry.netProductionKg ? entry.netProductionKg.toFixed(1) : "0.0"}{" "}
-                        <span className="text-[10px] font-normal text-slate-500">kg</span>
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Breakdown Wastage Inputs */}
-                  <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100 space-y-2">
-                    <span className="text-[10px] font-bold uppercase text-slate-600 tracking-wider block">
-                      Wastage Breakdown Categories (Kg)
-                    </span>
-
-                    <div className="grid grid-cols-2 gap-2">
-                      {/* Loom Waste */}
-                      <div className="bg-white p-2 rounded border border-slate-200">
-                        <div className="flex items-center justify-between text-[10px] text-slate-500 mb-0.5">
-                          <span>Loom Waste</span>
-                          <span className="font-mono text-slate-400">{entry.loomWastePct.toFixed(2)}%</span>
-                        </div>
-                        <input
-                          type="number"
-                          step="any"
-                          value={entry.loomWasteKg || ""}
-                          onChange={(e) => handleCellChange(index, "loomWasteKg", e.target.value)}
-                          placeholder="0.00"
-                          className="w-full h-7 text-xs font-mono font-bold text-slate-800 border-0 p-0 focus:ring-0"
-                        />
-                      </div>
-
-                      {/* Lam Waste */}
-                      <div className="bg-white p-2 rounded border border-slate-200">
-                        <div className="flex items-center justify-between text-[10px] text-slate-500 mb-0.5">
-                          <span>Lam Waste</span>
-                          <span className="font-mono text-slate-400">{entry.lamWastePct.toFixed(2)}%</span>
-                        </div>
-                        <input
-                          type="number"
-                          step="any"
-                          value={entry.lamWasteKg || ""}
-                          onChange={(e) => handleCellChange(index, "lamWasteKg", e.target.value)}
-                          placeholder="0.00"
-                          className="w-full h-7 text-xs font-mono font-bold text-slate-800 border-0 p-0 focus:ring-0"
-                        />
-                      </div>
-
-                      {/* Print Waste */}
-                      <div className="bg-white p-2 rounded border border-slate-200">
-                        <div className="flex items-center justify-between text-[10px] text-slate-500 mb-0.5">
-                          <span>Print Waste</span>
-                          <span className="font-mono text-slate-400">{entry.printWastePct.toFixed(2)}%</span>
-                        </div>
-                        <input
-                          type="number"
-                          step="any"
-                          value={entry.printWasteKg || ""}
-                          onChange={(e) => handleCellChange(index, "printWasteKg", e.target.value)}
-                          placeholder="0.00"
-                          className="w-full h-7 text-xs font-mono font-bold text-slate-800 border-0 p-0 focus:ring-0"
-                        />
-                      </div>
-
-                      {/* Machine Waste */}
-                      <div className="bg-white p-2 rounded border border-slate-200">
-                        <div className="flex items-center justify-between text-[10px] text-slate-500 mb-0.5">
-                          <span>Machine Waste</span>
-                          <span className="font-mono text-slate-400">{entry.machineWastePct.toFixed(2)}%</span>
-                        </div>
-                        <input
-                          type="number"
-                          step="any"
-                          value={entry.machineWasteKg || ""}
-                          onChange={(e) => handleCellChange(index, "machineWasteKg", e.target.value)}
-                          placeholder="0.00"
-                          className="w-full h-7 text-xs font-mono font-bold text-slate-800 border-0 p-0 focus:ring-0"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Cover Patch Wastage */}
-                    <div className="bg-purple-50/40 p-2 rounded border border-purple-200">
-                      <div className="flex items-center justify-between text-[10px] text-purple-700 mb-0.5">
-                        <span className="font-bold">Cover Patch Waste</span>
-                        <span className="font-mono">{entry.coverPatchWastePct.toFixed(2)}%</span>
-                      </div>
-                      <input
-                        type="number"
-                        step="any"
-                        value={entry.coverPatchWasteKg || ""}
-                        onChange={(e) => handleCellChange(index, "coverPatchWasteKg", e.target.value)}
-                        placeholder="0.00"
-                        className="w-full h-7 text-xs font-mono font-bold text-purple-900 bg-transparent border-0 p-0 focus:ring-0"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Total Roll Scrap Summary Strip */}
-                  <div className="p-2 rounded-lg bg-rose-50/50 border border-rose-200 flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-rose-800">Roll Total Wastage:</span>
-                    <span className="text-sm font-black font-mono text-rose-900">
-                      {entry.totalWasteKg ? entry.totalWasteKg.toFixed(2) : "0.00"} kg{" "}
-                      <span className="text-xs text-rose-600 font-semibold">
-                        ({entry.totalWastePct ? entry.totalWastePct.toFixed(2) : "0.00"}%)
-                      </span>
-                    </span>
-                  </div>
-
-                  {/* Remarks Input */}
-                  <div>
-                    <input
-                      type="text"
-                      value={entry.remarks || ""}
-                      onChange={(e) => handleCellChange(index, "remarks", e.target.value)}
-                      placeholder="Scrap rationale or defect notes..."
-                      className="w-full h-8 px-2.5 text-xs border border-slate-200 rounded-md focus:ring-1 focus:ring-primary"
-                    />
                   </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
 
