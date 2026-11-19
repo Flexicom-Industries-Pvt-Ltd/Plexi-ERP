@@ -105,6 +105,32 @@
     @apply font-sans;
   }
 
+  /* Native App Shell & Touch Polish */
+  html, body {
+    overscroll-behavior-y: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  button, a, input, select, textarea {
+    touch-action: manipulation;
+  }
+
+  /* PWA Standalone Mode Native Feel */
+  @media all and (display-mode: standalone), (display-mode: fullscreen), (display-mode: minimal-ui) {
+    body {
+      -webkit-user-select: none;
+      user-select: none;
+      padding-top: env(safe-area-inset-top);
+      padding-bottom: env(safe-area-inset-bottom);
+      padding-left: env(safe-area-inset-left);
+      padding-right: env(safe-area-inset-right);
+    }
+    input, textarea, [contenteditable="true"] {
+      -webkit-user-select: text;
+      user-select: text;
+    }
+  }
+
   /* PWA & Mobile Touch Improvements */
   @media (max-width: 768px) {
     input[type="text"], 
