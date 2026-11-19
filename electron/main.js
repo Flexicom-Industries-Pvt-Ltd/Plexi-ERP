@@ -12,7 +12,7 @@ let mainWindow = null;
 
 // Determine target central CRM URL
 const DEFAULT_URL = app.isPackaged
-  ? "https://plexi-erp-plascom.vercel.app"
+  ? "https://plexi-erp-two.vercel.app"
   : "http://localhost:3000";
 
 function getServerConfigPath() {
@@ -118,6 +118,7 @@ function createWindow() {
       // If external destination (not Plexi domain), launch in default browser
       if (
         !url.includes("localhost") &&
+        !url.includes("plexi-erp-two.vercel.app") &&
         !url.includes("plexi-erp-plascom.vercel.app") &&
         !url.includes("plexi-erp.flexicom.in") &&
         !url.includes("vercel.app")
