@@ -145,17 +145,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Date and Shift are required" }, { status: 400 });
     }
 
-    // Calculate month-to-date wastage
-    const monthStart = date.slice(0, 7) + "-01";
-    const priorMtdRecords = await db.convertexDailyReport.findMany({
-      where: {
-        date: { gte: monthStart, lt: date },
-        machineNo,
-      },
-      select: { totalWastageKg: true },
-    });
-    const priorMtdKg = priorMtdRecords.reduce((acc, r) => acc + (r.totalWastageKg || 0), 0);
-
     // Safely filter rows that have content
     const hasRowContent = (e: any) =>
       Boolean(
