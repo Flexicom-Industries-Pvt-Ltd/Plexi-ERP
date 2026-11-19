@@ -15,15 +15,8 @@ import {
   CheckCircle2,
   Loader2,
   Layers,
-  Search,
-  Calendar,
-  Clock,
-  User,
-  Scale,
-  Sparkles,
   FileCheck,
   AlertCircle,
-  Tag,
 } from "lucide-react";
 import {
   ValvomaticReportItem,
@@ -31,6 +24,12 @@ import {
   calculateValvomaticRow,
   computeValvomaticTotals,
 } from "@/lib/valvomatic/valvomatic-types";
+import {
+  FocusedValvomaticReportCell,
+  getValvomaticReportRowKey,
+  reconcileServerValvomaticReportEntries,
+  serializeValvomaticReportPayload,
+} from "@/lib/valvomatic/valvomatic-daily-report-google-docs-sync";
 import dynamic from "next/dynamic";
 import { exportValvomaticReportExcel } from "@/lib/valvomatic/valvomatic-export";
 import { UniversalQualityInput } from "@/components/ui/UniversalQualityInput";
@@ -108,6 +107,30 @@ export function ValvomaticDailyReportClient() {
   const isInitialLoadRef = useRef<boolean>(true);
   const isDirtyRef = useRef<boolean>(false);
   const lastUserEditTimeRef = useRef<number>(0);
+
+  // Google Docs Concurrent Sync & Typing Isolation Refs
+  const lastSavedPayloadRef = useRef<string>("");
+  const hasUnsavedLocalEditsRef = useRef<boolean>(false);
+  const activeFocusedCellRef = useRef<FocusedValvomaticReportCell | null>(null);
+  const deletedEntryIdsRef = useRef<Set<string>>(new Set());
+
+  const [, setFocusedCellState] = useState<FocusedValvomaticReportCell | null>(null);
+
+  const setFocusedCell = useCallback((rowKey: string, field: keyof ValvomaticReportItem) => {
+    const next = { rowKey, field };
+    activeFocusedCellRef.current = next;
+    setFocusedCellState(next);
+  }, []);
+
+  const clearFocusedCell = useCallback((rowKey: string, field: keyof ValvomaticReportItem) => {
+    if (
+      activeFocusedCellRef.current?.rowKey === rowKey &&
+      activeFocusedCellRef.current?.field === field
+    ) {
+      activeFocusedCellRef.current = null;
+      setFocusedCellState(null);
+    }
+  }, []);
 
   // Keep a reference to the latest data to prevent stale closures during auto-save
   const latestDataRef = useRef({
@@ -191,20 +214,39 @@ export function ValvomaticDailyReportClient() {
         setUnitName(rep.unitName || "Unit-1");
         setRemarks(rep.remarks || "");
 
-        if (Array.isArray(rep.entries) && rep.entries.length > 0) {
-          const parsed = rep.entries.map((e: any, idx: number) =>
-            calculateValvomaticRow({
-              ...e,
-              quality: e.quality || e.partyName || "",
-              partyName: e.quality || e.partyName || "",
-              sequence: idx + 1,
-            })
-          );
-          while (parsed.length < 5) {
-            parsed.push(createEmptyValvomaticRow(parsed.length + 1));
+        const incomingEntries: ValvomaticReportItem[] =
+          Array.isArray(rep.entries) && rep.entries.length > 0
+            ? rep.entries.map((e: any, idx: number) =>
+                calculateValvomaticRow({
+                  ...e,
+                  quality: e.quality || e.partyName || "",
+                  partyName: e.quality || e.partyName || "",
+                  sequence: idx + 1,
+                })
+              )
+            : [];
+
+        setEntries((prev) => {
+          const reconciled = reconcileServerValvomaticReportEntries({
+            localEntries: prev,
+            incomingEntries,
+            focusedCell: activeFocusedCellRef.current,
+            hasUnsavedLocalEdits: hasUnsavedLocalEditsRef.current,
+            deletedEntryIds: deletedEntryIdsRef.current,
+          });
+          while (reconciled.length < 5) {
+            reconciled.push(createEmptyValvomaticRow(reconciled.length + 1));
           }
-          setEntries(parsed);
-        } else {
+          lastSavedPayloadRef.current = serializeValvomaticReportPayload(rep, incomingEntries);
+          return reconciled;
+        });
+
+        setLastSavedAt(format(new Date(rep.updatedAt || Date.now()), "hh:mm a"));
+      } else {
+        // No report exists for this shift
+        if (!hasUnsavedLocalEditsRef.current) {
+          setStatus("DRAFT");
+          setRemarks("");
           setEntries([
             createEmptyValvomaticRow(1),
             createEmptyValvomaticRow(2),
@@ -212,20 +254,8 @@ export function ValvomaticDailyReportClient() {
             createEmptyValvomaticRow(4),
             createEmptyValvomaticRow(5),
           ]);
+          setLastSavedAt(null);
         }
-        setLastSavedAt(format(new Date(rep.updatedAt || Date.now()), "hh:mm a"));
-      } else {
-        // No report exists for this shift
-        setStatus("DRAFT");
-        setRemarks("");
-        setEntries([
-          createEmptyValvomaticRow(1),
-          createEmptyValvomaticRow(2),
-          createEmptyValvomaticRow(3),
-          createEmptyValvomaticRow(4),
-          createEmptyValvomaticRow(5),
-        ]);
-        setLastSavedAt(null);
       }
     } catch (err: any) {
       toast.error(err.message || "Failed to load Valvomatic production report");
@@ -246,34 +276,199 @@ export function ValvomaticDailyReportClient() {
     sheet: "daily-report",
     date,
     shift: shiftName,
-    onSync: () => {
-      if (Date.now() - lastUserEditTimeRef.current < 3500) return;
+    onSync: (event?: { clientId?: string | null }) => {
+      // Echo suppression: Ignore notifications originating from this client session
+      if (event?.clientId && event.clientId === realtime.clientId) return;
+      if (Date.now() - lastUserEditTimeRef.current < 2500 && activeFocusedCellRef.current) return;
       fetchReportData();
     },
   });
 
-  // Handle cell edits with live recalculation and dirty flagging
-  const handleCellChange = (index: number, field: keyof ValvomaticReportItem, value: any) => {
+  // Catch-up upon tab wake-up (e.g., user returns after lock or tab switch)
+  useEffect(() => {
+    const handleVisibilityCatchup = () => {
+      if (document.visibilityState === "visible") {
+        fetchReportData();
+      }
+    };
+    const handleFocusCatchup = () => {
+      fetchReportData();
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityCatchup);
+    window.addEventListener("focus", handleFocusCatchup);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityCatchup);
+      window.removeEventListener("focus", handleFocusCatchup);
+    };
+  }, [fetchReportData]);
+
+  // Helper to determine if a row has any user entered data
+  const hasRowData = useCallback((e: ValvomaticReportItem) => {
+    return Boolean(
+      (e.companyName && e.companyName.trim()) ||
+      (e.unitName && e.unitName.trim()) ||
+      (e.rollNumber && e.rollNumber.trim()) ||
+      (e.quality && e.quality.trim()) ||
+      (e.partyName && e.partyName.trim()) ||
+      (e.grade && e.grade.trim()) ||
+      (e.loomNumber && e.loomNumber.trim()) ||
+      Number(e.productionPcs) > 0 ||
+      Number(e.productionKg) > 0 ||
+      Number(e.coverPatchOs) > 0 ||
+      Number(e.coverPatchDs) > 0 ||
+      Number(e.valvePatch) > 0 ||
+      Number(e.rollMtr) > 0 ||
+      Number(e.netWeight) > 0 ||
+      Number(e.openingMeterReading) > 0 ||
+      Number(e.closingMeterReading) > 0 ||
+      (e.remarks && e.remarks.trim())
+    );
+  }, []);
+
+  // Save handler (manual submit or silent auto-save)
+  const executeSave = useCallback(
+    async (targetStatus?: "DRAFT" | "SUBMITTED" | "APPROVED", silent = false) => {
+      const current = latestDataRef.current;
+      if (!current.date || !current.shiftName) return;
+
+      const filledEntries = current.entries.filter(hasRowData);
+
+      const hasAnyData =
+        filledEntries.length > 0 ||
+        Boolean(current.operatorName.trim()) ||
+        Boolean(current.supervisorName.trim()) ||
+        Boolean(current.remarks.trim());
+
+      if (!hasAnyData && (!targetStatus || targetStatus === "DRAFT")) return;
+
+      // When submitting for final approval, require at least 1 entry with a valid Roll Number
+      if (targetStatus === "SUBMITTED") {
+        if (filledEntries.length === 0) {
+          toast.error("Please add at least one entry before submitting for approval");
+          return;
+        }
+        const hasMissingRolls = filledEntries.some((e) => !e.rollNumber?.trim());
+        if (hasMissingRolls) {
+          toast.error("All production entries must have a valid Roll Number before submission");
+          return;
+        }
+      }
+
+      if (!silent) setSaving(true);
+      else setIsAutoSaving(true);
+      setAutoSaveError(null);
+
+      const newStatus = targetStatus || current.status;
+      const currentTotals = computeValvomaticTotals(current.entries);
+
+      try {
+        const payload = {
+          date: current.date,
+          shiftName: current.shiftName,
+          machineNo: current.machineNo,
+          companyName: current.companyName,
+          unitName: current.unitName,
+          operatorName: current.operatorName.trim() || undefined,
+          supervisorName: current.supervisorName.trim() || undefined,
+          status: newStatus,
+          remarks: current.remarks.trim() || undefined,
+          clientId: realtime.clientId,
+          deletedEntryIds: Array.from(deletedEntryIdsRef.current),
+          totalRolls: currentTotals.totalRolls,
+          totalRollMtr: currentTotals.totalRollMtr,
+          totalNetWt: currentTotals.totalNetWt,
+          avgWeightGsm: currentTotals.avgWeightGsm,
+          totalCoverPatchOs: currentTotals.totalCoverPatchOs,
+          totalCoverPatchDs: currentTotals.totalCoverPatchDs,
+          totalValvePatch: currentTotals.totalValvePatch,
+          totalProductionPcs: currentTotals.totalProductionPcs,
+          totalProductionKg: currentTotals.totalProductionKg,
+          totalTargetPcs: currentTotals.totalTargetPcs,
+          entries: filledEntries.map((e, idx) => ({ ...e, sequence: idx + 1 })),
+        };
+
+        const res = await fetch("/api/production/valvomatic/reports", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.error || "Failed to save Valvomatic report");
+        }
+
+        lastSavedPayloadRef.current = serializeValvomaticReportPayload(current, filledEntries);
+        hasUnsavedLocalEditsRef.current = false;
+        deletedEntryIdsRef.current.clear();
+        setStatus(newStatus);
+        setLastSavedAt(format(new Date(), "hh:mm:ss a"));
+        isDirtyRef.current = false;
+
+        realtime.broadcastSync({
+          action: newStatus === "SUBMITTED" ? "SUBMIT" : "SAVE",
+          date: current.date,
+          shift: current.shiftName,
+        });
+
+        if (!silent) {
+          toast.success(
+            newStatus === "SUBMITTED"
+              ? "Valvomatic production report submitted successfully!"
+              : "Valvomatic report saved successfully"
+          );
+        }
+      } catch (err: any) {
+        console.error("Valvomatic save error:", err);
+        setAutoSaveError(err.message || "Auto-save failed");
+        if (!silent) toast.error(err.message || "Failed to save Valvomatic report");
+      } finally {
+        setSaving(false);
+        setIsAutoSaving(false);
+      }
+    },
+    [hasRowData, realtime]
+  );
+
+  const triggerAutoSave = useCallback(() => {
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    autoSaveTimerRef.current = setTimeout(() => {
+      executeSave("DRAFT", true);
+    }, 1500);
+  }, [executeSave]);
+
+  const markDirtyAndTriggerAutoSave = useCallback(() => {
     isDirtyRef.current = true;
+    hasUnsavedLocalEditsRef.current = true;
     lastUserEditTimeRef.current = Date.now();
     realtime.markLocalEdit();
-    setEntries((prev) => {
-      const next = [...prev];
-      const updatedRow = { ...next[index], [field]: value };
-      next[index] = calculateValvomaticRow(updatedRow);
-      return next;
-    });
-  };
+    triggerAutoSave();
+  }, [realtime, triggerAutoSave]);
+
+  // Handle cell edits with live recalculation and dirty flagging
+  const handleCellChange = useCallback(
+    (index: number, field: keyof ValvomaticReportItem, value: any) => {
+      setEntries((prev) => {
+        const next = [...prev];
+        const updatedRow = { ...next[index], [field]: value };
+        next[index] = calculateValvomaticRow(updatedRow);
+        return next;
+      });
+      markDirtyAndTriggerAutoSave();
+    },
+    [markDirtyAndTriggerAutoSave]
+  );
 
   // Add row
-  const handleAddRow = () => {
-    isDirtyRef.current = true;
+  const handleAddRow = useCallback(() => {
     setEntries((prev) => [...prev, createEmptyValvomaticRow(prev.length + 1)]);
-  };
+    markDirtyAndTriggerAutoSave();
+  }, [markDirtyAndTriggerAutoSave]);
 
   // Add 5 rows
-  const handleAdd5Rows = () => {
-    isDirtyRef.current = true;
+  const handleAdd5Rows = useCallback(() => {
     setEntries((prev) => {
       const start = prev.length + 1;
       return [
@@ -285,12 +480,12 @@ export function ValvomaticDailyReportClient() {
         createEmptyValvomaticRow(start + 4),
       ];
     });
-  };
+    markDirtyAndTriggerAutoSave();
+  }, [markDirtyAndTriggerAutoSave]);
 
   // Reset to blank
-  const handleResetToBlank = () => {
+  const handleResetToBlank = useCallback(() => {
     if (confirm("Reset sheet to 5 blank rows? Unsaved changes will be discarded.")) {
-      isDirtyRef.current = true;
       setEntries([
         createEmptyValvomaticRow(1),
         createEmptyValvomaticRow(2),
@@ -299,138 +494,56 @@ export function ValvomaticDailyReportClient() {
         createEmptyValvomaticRow(5),
       ]);
       setRemarks("");
+      markDirtyAndTriggerAutoSave();
     }
-  };
+  }, [markDirtyAndTriggerAutoSave]);
 
   // Delete row
-  const handleDeleteRow = (index: number) => {
-    isDirtyRef.current = true;
-    setEntries((prev) => {
-      const filtered = prev.filter((_, i) => i !== index);
-      if (filtered.length === 0) {
-        return [createEmptyValvomaticRow(1)];
-      }
-      return filtered.map((row, i) => ({ ...row, sequence: i + 1 }));
-    });
-  };
+  const handleDeleteRow = useCallback(
+    (index: number) => {
+      setEntries((prev) => {
+        const rowToDelete = prev[index];
+        if (rowToDelete?.id) {
+          deletedEntryIdsRef.current.add(rowToDelete.id);
+        }
+        const filtered = prev.filter((_, i) => i !== index);
+        if (filtered.length === 0) {
+          return [createEmptyValvomaticRow(1)];
+        }
+        return filtered.map((row, i) => ({ ...row, sequence: i + 1 }));
+      });
+      markDirtyAndTriggerAutoSave();
+    },
+    [markDirtyAndTriggerAutoSave]
+  );
 
   // Fill from suggested roll
-  const handleSelectSuggestedRoll = (rowIndex: number, roll: any) => {
-    isDirtyRef.current = true;
-    setEntries((prev) => {
-      const next = [...prev];
-      const target = next[rowIndex];
-      const updated = calculateValvomaticRow({
-        ...target,
-        rollNumber: roll.rollNumber,
-        companyName: roll.companyName || target.companyName,
-        unitName: roll.unitName || target.unitName,
-        grade: roll.grade || target.grade,
-        quality: roll.quality || roll.partyName || target.quality,
-        partyName: roll.quality || roll.partyName || target.partyName,
-        loomNumber: roll.loomNumber || target.loomNumber,
-        rollMtr: Number(roll.rollMtr) || target.rollMtr,
-        netWeight: Number(roll.netWeight) || target.netWeight,
-        targetProductionPcs: Number(roll.targetProductionPcs) || target.targetProductionPcs,
+  const handleSelectSuggestedRoll = useCallback(
+    (rowIndex: number, roll: any) => {
+      setEntries((prev) => {
+        const next = [...prev];
+        const target = next[rowIndex];
+        const updated = calculateValvomaticRow({
+          ...target,
+          rollNumber: roll.rollNumber,
+          companyName: roll.companyName || target.companyName,
+          unitName: roll.unitName || target.unitName,
+          grade: roll.grade || target.grade,
+          quality: roll.quality || roll.partyName || target.quality,
+          partyName: roll.quality || roll.partyName || target.partyName,
+          loomNumber: roll.loomNumber || target.loomNumber,
+          rollMtr: Number(roll.rollMtr) || target.rollMtr,
+          netWeight: Number(roll.netWeight) || target.netWeight,
+          targetProductionPcs: Number(roll.targetProductionPcs) || target.targetProductionPcs,
+        });
+        next[rowIndex] = updated;
+        return next;
       });
-      next[rowIndex] = updated;
-      return next;
-    });
-    setActiveRollSearchRow(null);
-  };
-
-  // Core save function
-  const saveReport = async (overrideStatus?: "DRAFT" | "SUBMITTED" | "APPROVED", isSilent = false) => {
-    const currentData = latestDataRef.current;
-    const finalStatus = overrideStatus || currentData.status;
-
-    if (!isSilent) setSaving(true);
-    else setIsAutoSaving(true);
-    setAutoSaveError(null);
-
-    try {
-      const currentTotals = computeValvomaticTotals(currentData.entries);
-      const payload: ValvomaticDailyReportData = {
-        date: currentData.date,
-        shiftName: currentData.shiftName,
-        machineNo: currentData.machineNo,
-        companyName: currentData.companyName,
-        unitName: currentData.unitName,
-        operatorName: currentData.operatorName,
-        supervisorName: currentData.supervisorName,
-        status: finalStatus,
-        remarks: currentData.remarks,
-        totalRolls: currentTotals.totalRolls,
-        totalRollMtr: currentTotals.totalRollMtr,
-        totalNetWt: currentTotals.totalNetWt,
-        avgWeightGsm: currentTotals.avgWeightGsm,
-        totalCoverPatchOs: currentTotals.totalCoverPatchOs,
-        totalCoverPatchDs: currentTotals.totalCoverPatchDs,
-        totalValvePatch: currentTotals.totalValvePatch,
-        totalProductionPcs: currentTotals.totalProductionPcs,
-        totalProductionKg: currentTotals.totalProductionKg,
-        totalTargetPcs: currentTotals.totalTargetPcs,
-        entries: currentData.entries,
-      };
-
-      const res = await fetch("/api/production/valvomatic/reports", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      const json = await res.json();
-      if (!res.ok || !json.success) {
-        throw new Error(json.error || "Failed to save production report");
-      }
-
-      setLastSavedAt(format(new Date(), "hh:mm:ss a"));
-      isDirtyRef.current = false;
-
-      realtime.broadcastSync({
-        action: finalStatus === "SUBMITTED" ? "SUBMIT" : "SAVE",
-        date: currentData.date,
-        shift: currentData.shiftName,
-      });
-
-      if (!isSilent) {
-        toast.success(
-          finalStatus === "SUBMITTED"
-            ? "Report submitted successfully!"
-            : "Production report saved successfully!"
-        );
-      }
-    } catch (err: any) {
-      console.error("Valvomatic save error:", err);
-      setAutoSaveError(err.message || "Auto-save failed");
-      if (!isSilent) {
-        toast.error(err.message || "Failed to save report");
-      }
-    } finally {
-      if (!isSilent) setSaving(false);
-      else setIsAutoSaving(false);
-    }
-  };
-
-  // Debounced auto-save hook
-  useEffect(() => {
-    if (isInitialLoadRef.current) return;
-    if (!isDirtyRef.current) return;
-
-    if (autoSaveTimerRef.current) {
-      clearTimeout(autoSaveTimerRef.current);
-    }
-
-    autoSaveTimerRef.current = setTimeout(() => {
-      if (isDirtyRef.current) {
-        saveReport(undefined, true);
-      }
-    }, 1000);
-
-    return () => {
-      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
-    };
-  }, [entries, operatorName, supervisorName, remarks, status, companyName, unitName]);
+      setActiveRollSearchRow(null);
+      markDirtyAndTriggerAutoSave();
+    },
+    [markDirtyAndTriggerAutoSave]
+  );
 
   // Totals
   const totals = useMemo(() => computeValvomaticTotals(entries), [entries]);
@@ -449,7 +562,7 @@ export function ValvomaticDailyReportClient() {
       .slice(0, 15);
   }, [availableRolls, rollSearchQuery]);
 
-  // Current report data object for print and export
+  // Prepare full data for printing
   const currentReportData: ValvomaticDailyReportData = useMemo(() => {
     return {
       date,
@@ -506,7 +619,7 @@ export function ValvomaticDailyReportClient() {
               <div>
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-semibold uppercase tracking-wider text-primary">
-                    Cutting & Bag Making
+                    Cutting &amp; Bag Making
                   </span>
                   <span
                     className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
@@ -545,7 +658,7 @@ export function ValvomaticDailyReportClient() {
                   Valvomatic Machine Daily Production
                 </h1>
                 <p className="text-xs sm:text-sm text-slate-500">
-                  Daily production tracking: meters, pieces, kg, cover & valve patch consumption
+                  Daily production tracking: meters, pieces, kg, cover &amp; valve patch consumption
                 </p>
               </div>
             </div>
@@ -562,7 +675,7 @@ export function ValvomaticDailyReportClient() {
             />
 
             <button
-              onClick={() => saveReport("DRAFT")}
+              onClick={() => executeSave("DRAFT")}
               disabled={saving}
               className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-lg border border-slate-300 hover:bg-slate-100 text-slate-700 transition-colors shadow-xs disabled:opacity-50"
             >
@@ -571,7 +684,7 @@ export function ValvomaticDailyReportClient() {
             </button>
 
             <button
-              onClick={() => saveReport("SUBMITTED")}
+              onClick={() => executeSave("SUBMITTED")}
               disabled={saving}
               className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition-colors shadow-xs disabled:opacity-50"
             >
@@ -649,11 +762,11 @@ export function ValvomaticDailyReportClient() {
               type="operator"
               section="VALVOMATIC"
               value={operatorName}
-              onChange={(name) => {
-                isDirtyRef.current = true;
-                setOperatorName(name);
+              onChange={(val) => {
+                setOperatorName(val);
+                markDirtyAndTriggerAutoSave();
               }}
-              placeholder="Operator name"
+              placeholder="Select operator..."
             />
           </div>
 
@@ -661,40 +774,45 @@ export function ValvomaticDailyReportClient() {
             <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">Supervisor</label>
             <UniversalPersonnelInput
               type="supervisor"
+              section="VALVOMATIC"
               value={supervisorName}
-              onChange={(name) => {
-                isDirtyRef.current = true;
-                setSupervisorName(name);
+              onChange={(val) => {
+                setSupervisorName(val);
+                markDirtyAndTriggerAutoSave();
               }}
-              placeholder="Supervisor name"
+              placeholder="Select supervisor..."
             />
           </div>
 
           <div>
-            <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">Status</label>
-            <select
-              value={status}
-              onChange={(e) => {
-                isDirtyRef.current = true;
-                setStatus(e.target.value as any);
-              }}
-              className={`w-full text-xs px-2.5 py-1.5 font-bold rounded-lg border focus:outline-hidden ${
-                status === "APPROVED"
-                  ? "bg-emerald-50 text-emerald-800 border-emerald-300"
-                  : status === "SUBMITTED"
-                  ? "bg-blue-50 text-blue-800 border-blue-300"
-                  : "bg-amber-50 text-amber-800 border-amber-300"
-              }`}
-            >
-              <option value="DRAFT">DRAFT</option>
-              <option value="SUBMITTED">SUBMITTED</option>
-              <option value="APPROVED">APPROVED</option>
-            </select>
+            <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">Company / Unit</label>
+            <div className="flex gap-1.5">
+              <input
+                type="text"
+                value={companyName}
+                onChange={(e) => {
+                  setCompanyName(e.target.value);
+                  markDirtyAndTriggerAutoSave();
+                }}
+                placeholder="Company"
+                className="w-3/5 text-xs px-2 py-1.5 border border-slate-300 rounded-lg focus:outline-hidden focus:ring-1 focus:ring-primary font-medium"
+              />
+              <input
+                type="text"
+                value={unitName}
+                onChange={(e) => {
+                  setUnitName(e.target.value);
+                  markDirtyAndTriggerAutoSave();
+                }}
+                placeholder="Unit"
+                className="w-2/5 text-xs px-2 py-1.5 border border-slate-300 rounded-lg focus:outline-hidden focus:ring-1 focus:ring-primary font-medium text-center"
+              />
+            </div>
           </div>
         </div>
       </div>
 
-      {/* KPI Cards Strip */}
+      {/* Production Aggregate Summary Tiles */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-9 gap-2.5">
         <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-2xs text-center">
           <div className="text-[10px] uppercase font-bold text-slate-500">Total Rolls</div>
@@ -819,301 +937,338 @@ export function ValvomaticDailyReportClient() {
                   </td>
                 </tr>
               ) : (
-                entries.map((entry, index) => (
-                  <tr key={index} className="hover:bg-slate-50/80 transition-colors group">
-                    <td className="p-1 border-r border-slate-200 text-center font-bold text-slate-500 bg-slate-50/50">
-                      {index + 1}
-                    </td>
+                entries.map((entry, index) => {
+                  const rowKey = getValvomaticReportRowKey(entry, index);
+                  return (
+                    <tr key={index} className="hover:bg-slate-50/80 transition-colors group">
+                      <td className="p-1 border-r border-slate-200 text-center font-bold text-slate-500 bg-slate-50/50">
+                        {index + 1}
+                      </td>
 
-                    {/* Company Name */}
-                    <td className="p-1 border-r border-slate-200">
-                      <input
-                        type="text"
-                        value={entry.companyName || ""}
-                        onChange={(e) => handleCellChange(index, "companyName", e.target.value)}
-                        placeholder="e.g. Ambuja"
-                        className="w-full px-2 py-1 text-xs border border-transparent hover:border-slate-300 focus:border-primary rounded focus:outline-hidden bg-transparent"
-                      />
-                    </td>
-
-                    {/* Unit Name */}
-                    <td className="p-1 border-r border-slate-200">
-                      <input
-                        type="text"
-                        value={entry.unitName || ""}
-                        onChange={(e) => handleCellChange(index, "unitName", e.target.value)}
-                        placeholder="Ropar"
-                        className="w-full px-2 py-1 text-xs border border-transparent hover:border-slate-300 focus:border-primary rounded focus:outline-hidden bg-transparent text-center"
-                      />
-                    </td>
-
-                    {/* Grade */}
-                    <td className="p-1 border-r border-slate-200">
-                      <input
-                        type="text"
-                        value={entry.grade || ""}
-                        onChange={(e) => handleCellChange(index, "grade", e.target.value)}
-                        placeholder="PPC"
-                        className="w-full px-2 py-1 text-xs border border-transparent hover:border-slate-300 focus:border-primary rounded focus:outline-hidden bg-transparent text-center"
-                      />
-                    </td>
-
-                    {/* Target Production Pcs */}
-                    <td className="p-1 border-r border-slate-200">
-                      <input
-                        type="number"
-                        min="0"
-                        value={entry.targetProductionPcs || ""}
-                        onChange={(e) =>
-                          handleCellChange(index, "targetProductionPcs", parseFloat(e.target.value) || 0)
-                        }
-                        placeholder="0"
-                        className="w-full px-2 py-1 text-xs border border-transparent hover:border-slate-300 focus:border-primary rounded focus:outline-hidden bg-transparent text-right font-mono"
-                      />
-                    </td>
-
-                    {/* Quality Name */}
-                    <td className="p-1 border-r border-slate-200 bg-amber-50/40 min-w-[200px]">
-                      <UniversalQualityInput
-                        value={entry.quality || entry.partyName || ""}
-                        onChange={(newVal) => {
-                          handleCellChange(index, "quality", newVal);
-                          handleCellChange(index, "partyName", newVal);
-                        }}
-                        placeholder="— Quality —"
-                        compact={true}
-                        inputClassName="h-7 text-xs font-bold text-slate-900 border-amber-300"
-                      />
-                    </td>
-
-                    {/* Roll Number with Autocomplete */}
-                    <td className="p-1 border-r border-slate-200 relative bg-slate-50/50">
-                      <div className="flex items-center">
+                      {/* Company Name */}
+                      <td className="p-1 border-r border-slate-200">
                         <input
                           type="text"
-                          value={entry.rollNumber || ""}
-                          onChange={(e) => {
-                            handleCellChange(index, "rollNumber", e.target.value);
-                            setRollSearchQuery(e.target.value);
-                            setActiveRollSearchRow(index);
-                          }}
-                          onFocus={() => {
-                            setRollSearchQuery(entry.rollNumber || "");
-                            setActiveRollSearchRow(index);
-                          }}
-                          placeholder="Roll #"
-                          className="w-full px-2 py-1 text-xs font-mono font-bold text-center border border-transparent hover:border-slate-300 focus:border-primary rounded focus:outline-hidden bg-transparent"
+                          value={entry.companyName || ""}
+                          onChange={(e) => handleCellChange(index, "companyName", e.target.value)}
+                          onFocus={() => setFocusedCell(rowKey, "companyName")}
+                          onBlur={() => clearFocusedCell(rowKey, "companyName")}
+                          placeholder="e.g. Ambuja"
+                          className="w-full px-2 py-1 text-xs border border-transparent hover:border-slate-300 focus:border-primary rounded focus:outline-hidden bg-transparent"
                         />
-                      </div>
+                      </td>
 
-                      {/* Autocomplete Suggestions Dropdown */}
-                      {activeRollSearchRow === index && (
-                        <>
-                          <div
-                            className="fixed inset-0 z-20"
-                            onClick={() => setActiveRollSearchRow(null)}
+                      {/* Unit Name */}
+                      <td className="p-1 border-r border-slate-200">
+                        <input
+                          type="text"
+                          value={entry.unitName || ""}
+                          onChange={(e) => handleCellChange(index, "unitName", e.target.value)}
+                          onFocus={() => setFocusedCell(rowKey, "unitName")}
+                          onBlur={() => clearFocusedCell(rowKey, "unitName")}
+                          placeholder="Ropar"
+                          className="w-full px-2 py-1 text-xs border border-transparent hover:border-slate-300 focus:border-primary rounded focus:outline-hidden bg-transparent text-center"
+                        />
+                      </td>
+
+                      {/* Grade */}
+                      <td className="p-1 border-r border-slate-200">
+                        <input
+                          type="text"
+                          value={entry.grade || ""}
+                          onChange={(e) => handleCellChange(index, "grade", e.target.value)}
+                          onFocus={() => setFocusedCell(rowKey, "grade")}
+                          onBlur={() => clearFocusedCell(rowKey, "grade")}
+                          placeholder="PPC"
+                          className="w-full px-2 py-1 text-xs border border-transparent hover:border-slate-300 focus:border-primary rounded focus:outline-hidden bg-transparent text-center"
+                        />
+                      </td>
+
+                      {/* Target Production Pcs */}
+                      <td className="p-1 border-r border-slate-200">
+                        <input
+                          type="number"
+                          min="0"
+                          value={entry.targetProductionPcs || ""}
+                          onChange={(e) =>
+                            handleCellChange(index, "targetProductionPcs", parseFloat(e.target.value) || 0)
+                          }
+                          onFocus={() => setFocusedCell(rowKey, "targetProductionPcs")}
+                          onBlur={() => clearFocusedCell(rowKey, "targetProductionPcs")}
+                          placeholder="0"
+                          className="w-full px-2 py-1 text-xs border border-transparent hover:border-slate-300 focus:border-primary rounded focus:outline-hidden bg-transparent text-right font-mono"
+                        />
+                      </td>
+
+                      {/* Quality Name */}
+                      <td className="p-1 border-r border-slate-200 bg-amber-50/40 min-w-[200px]">
+                        <UniversalQualityInput
+                          value={entry.quality || entry.partyName || ""}
+                          onChange={(newVal) => {
+                            handleCellChange(index, "quality", newVal);
+                            handleCellChange(index, "partyName", newVal);
+                          }}
+                          onFocus={() => setFocusedCell(rowKey, "quality")}
+                          onBlur={() => clearFocusedCell(rowKey, "quality")}
+                          placeholder="— Quality —"
+                          compact={true}
+                          inputClassName="h-7 text-xs font-bold text-slate-900 border-amber-300"
+                        />
+                      </td>
+
+                      {/* Roll Number with Autocomplete */}
+                      <td className="p-1 border-r border-slate-200 relative bg-slate-50/50">
+                        <div className="flex items-center">
+                          <input
+                            type="text"
+                            value={entry.rollNumber || ""}
+                            onChange={(e) => {
+                              handleCellChange(index, "rollNumber", e.target.value);
+                              setRollSearchQuery(e.target.value);
+                              setActiveRollSearchRow(index);
+                            }}
+                            onFocus={() => {
+                              setFocusedCell(rowKey, "rollNumber");
+                              setRollSearchQuery(entry.rollNumber || "");
+                              setActiveRollSearchRow(index);
+                            }}
+                            onBlur={() => clearFocusedCell(rowKey, "rollNumber")}
+                            placeholder="Roll #"
+                            className="w-full px-2 py-1 text-xs font-mono font-bold text-center border border-transparent hover:border-slate-300 focus:border-primary rounded focus:outline-hidden bg-transparent"
                           />
-                          <div className="absolute left-0 top-full mt-1 w-64 bg-white border border-slate-300 rounded-lg shadow-xl z-30 max-h-52 overflow-y-auto">
-                            <div className="p-1.5 bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-500 uppercase flex items-center justify-between">
-                              <span>Available Printing Rolls</span>
-                              <span className="text-primary font-mono">{filteredRollSuggestions.length} found</span>
-                            </div>
-                            {filteredRollSuggestions.length > 0 ? (
-                              filteredRollSuggestions.map((roll) => (
-                                <div
-                                  key={roll.id}
-                                  onClick={() => handleSelectSuggestedRoll(index, roll)}
-                                  className="p-2 text-xs hover:bg-primary/10 cursor-pointer border-b border-slate-100 last:border-0 transition-colors"
-                                >
-                                  <div className="flex items-center justify-between font-bold font-mono text-slate-900">
-                                    <span>{roll.rollNumber}</span>
-                                    <span className="text-[10px] text-slate-500 font-sans font-normal">
-                                      {roll.netWeight} kg • {roll.rollMtr} m
-                                    </span>
-                                  </div>
-                                  <div className="text-[10.5px] text-slate-600 truncate mt-0.5">
-                                    {roll.quality || roll.companyName || "Standard Quality"}
-                                  </div>
-                                </div>
-                              ))
-                            ) : (
-                              <div className="p-3 text-center text-xs text-slate-400 italic">
-                                No matching rolls found
+                        </div>
+
+                        {/* Autocomplete Suggestions Dropdown */}
+                        {activeRollSearchRow === index && (
+                          <>
+                            <div
+                              className="fixed inset-0 z-20"
+                              onClick={() => setActiveRollSearchRow(null)}
+                            />
+                            <div className="absolute left-0 top-full mt-1 w-64 bg-white border border-slate-300 rounded-lg shadow-xl z-30 max-h-52 overflow-y-auto">
+                              <div className="p-1.5 bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-500 uppercase flex items-center justify-between">
+                                <span>Available Printing Rolls</span>
+                                <span className="text-primary font-mono">{filteredRollSuggestions.length} found</span>
                               </div>
-                            )}
-                          </div>
-                        </>
-                      )}
-                    </td>
+                              {filteredRollSuggestions.length > 0 ? (
+                                filteredRollSuggestions.map((roll) => (
+                                  <div
+                                    key={roll.id}
+                                    onClick={() => handleSelectSuggestedRoll(index, roll)}
+                                    className="p-2 text-xs hover:bg-primary/10 cursor-pointer border-b border-slate-100 last:border-0 transition-colors"
+                                  >
+                                    <div className="flex items-center justify-between font-bold font-mono text-slate-900">
+                                      <span>{roll.rollNumber}</span>
+                                      <span className="text-[10px] text-slate-500 font-sans font-normal">
+                                        {roll.netWeight} kg • {roll.rollMtr} m
+                                      </span>
+                                    </div>
+                                    <div className="text-[10.5px] text-slate-600 truncate mt-0.5">
+                                      {roll.quality || roll.companyName || "Standard Quality"}
+                                    </div>
+                                  </div>
+                                ))
+                              ) : (
+                                <div className="p-3 text-center text-xs text-slate-400 italic">
+                                  No matching rolls found
+                                </div>
+                              )}
+                            </div>
+                          </>
+                        )}
+                      </td>
 
-                    {/* Loom # */}
-                    <td className="p-1 border-r border-slate-200">
-                      <input
-                        type="text"
-                        value={entry.loomNumber || ""}
-                        onChange={(e) => handleCellChange(index, "loomNumber", e.target.value)}
-                        placeholder="Loom"
-                        className="w-full px-2 py-1 text-xs border border-transparent hover:border-slate-300 focus:border-primary rounded focus:outline-hidden bg-transparent text-center font-mono text-sky-700"
-                      />
-                    </td>
+                      {/* Loom # */}
+                      <td className="p-1 border-r border-slate-200">
+                        <input
+                          type="text"
+                          value={entry.loomNumber || ""}
+                          onChange={(e) => handleCellChange(index, "loomNumber", e.target.value)}
+                          onFocus={() => setFocusedCell(rowKey, "loomNumber")}
+                          onBlur={() => clearFocusedCell(rowKey, "loomNumber")}
+                          placeholder="Loom"
+                          className="w-full px-2 py-1 text-xs border border-transparent hover:border-slate-300 focus:border-primary rounded focus:outline-hidden bg-transparent text-center font-mono text-sky-700"
+                        />
+                      </td>
 
-                    {/* Roll Mtr */}
-                    <td className="p-1 border-r border-slate-200">
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={entry.rollMtr || ""}
-                        onChange={(e) =>
-                          handleCellChange(index, "rollMtr", parseFloat(e.target.value) || 0)
-                        }
-                        placeholder="0"
-                        className="w-full px-2 py-1 text-xs border border-transparent hover:border-slate-300 focus:border-primary rounded focus:outline-hidden bg-transparent text-right font-mono font-semibold"
-                      />
-                    </td>
+                      {/* Roll Mtr */}
+                      <td className="p-1 border-r border-slate-200">
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={entry.rollMtr || ""}
+                          onChange={(e) =>
+                            handleCellChange(index, "rollMtr", parseFloat(e.target.value) || 0)
+                          }
+                          onFocus={() => setFocusedCell(rowKey, "rollMtr")}
+                          onBlur={() => clearFocusedCell(rowKey, "rollMtr")}
+                          placeholder="0"
+                          className="w-full px-2 py-1 text-xs border border-transparent hover:border-slate-300 focus:border-primary rounded focus:outline-hidden bg-transparent text-right font-mono font-semibold"
+                        />
+                      </td>
 
-                    {/* Net Wt */}
-                    <td className="p-1 border-r border-slate-200">
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.1"
-                        value={entry.netWeight || ""}
-                        onChange={(e) =>
-                          handleCellChange(index, "netWeight", parseFloat(e.target.value) || 0)
-                        }
-                        placeholder="0.0"
-                        className="w-full px-2 py-1 text-xs border border-transparent hover:border-slate-300 focus:border-primary rounded focus:outline-hidden bg-transparent text-right font-mono"
-                      />
-                    </td>
+                      {/* Net Wt */}
+                      <td className="p-1 border-r border-slate-200">
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.1"
+                          value={entry.netWeight || ""}
+                          onChange={(e) =>
+                            handleCellChange(index, "netWeight", parseFloat(e.target.value) || 0)
+                          }
+                          onFocus={() => setFocusedCell(rowKey, "netWeight")}
+                          onBlur={() => clearFocusedCell(rowKey, "netWeight")}
+                          placeholder="0.0"
+                          className="w-full px-2 py-1 text-xs border border-transparent hover:border-slate-300 focus:border-primary rounded focus:outline-hidden bg-transparent text-right font-mono"
+                        />
+                      </td>
 
-                    {/* Avg (g/m) Auto Computed */}
-                    <td className="p-1 border-r border-slate-200 bg-sky-50/50 text-right font-mono text-sky-800 font-bold px-2">
-                      {entry.avgWeight > 0 ? entry.avgWeight.toFixed(1) : "—"}
-                    </td>
+                      {/* Avg (g/m) Auto Computed */}
+                      <td className="p-1 border-r border-slate-200 bg-sky-50/50 text-right font-mono text-sky-800 font-bold px-2">
+                        {entry.avgWeight > 0 ? entry.avgWeight.toFixed(1) : "—"}
+                      </td>
 
-                    {/* Opening Meter Reading */}
-                    <td className="p-1 border-r border-slate-200">
-                      <input
-                        type="number"
-                        min="0"
-                        value={entry.openingMeterReading || ""}
-                        onChange={(e) =>
-                          handleCellChange(index, "openingMeterReading", parseFloat(e.target.value) || 0)
-                        }
-                        placeholder="0"
-                        className="w-full px-2 py-1 text-xs border border-transparent hover:border-slate-300 focus:border-primary rounded focus:outline-hidden bg-transparent text-right font-mono"
-                      />
-                    </td>
+                      {/* Opening Meter Reading */}
+                      <td className="p-1 border-r border-slate-200">
+                        <input
+                          type="number"
+                          min="0"
+                          value={entry.openingMeterReading || ""}
+                          onChange={(e) =>
+                            handleCellChange(index, "openingMeterReading", parseFloat(e.target.value) || 0)
+                          }
+                          onFocus={() => setFocusedCell(rowKey, "openingMeterReading")}
+                          onBlur={() => clearFocusedCell(rowKey, "openingMeterReading")}
+                          placeholder="0"
+                          className="w-full px-2 py-1 text-xs border border-transparent hover:border-slate-300 focus:border-primary rounded focus:outline-hidden bg-transparent text-right font-mono"
+                        />
+                      </td>
 
-                    {/* Closing Meter Reading */}
-                    <td className="p-1 border-r border-slate-200">
-                      <input
-                        type="number"
-                        min="0"
-                        value={entry.closingMeterReading || ""}
-                        onChange={(e) =>
-                          handleCellChange(index, "closingMeterReading", parseFloat(e.target.value) || 0)
-                        }
-                        placeholder="0"
-                        className="w-full px-2 py-1 text-xs border border-transparent hover:border-slate-300 focus:border-primary rounded focus:outline-hidden bg-transparent text-right font-mono"
-                      />
-                    </td>
+                      {/* Closing Meter Reading */}
+                      <td className="p-1 border-r border-slate-200">
+                        <input
+                          type="number"
+                          min="0"
+                          value={entry.closingMeterReading || ""}
+                          onChange={(e) =>
+                            handleCellChange(index, "closingMeterReading", parseFloat(e.target.value) || 0)
+                          }
+                          onFocus={() => setFocusedCell(rowKey, "closingMeterReading")}
+                          onBlur={() => clearFocusedCell(rowKey, "closingMeterReading")}
+                          placeholder="0"
+                          className="w-full px-2 py-1 text-xs border border-transparent hover:border-slate-300 focus:border-primary rounded focus:outline-hidden bg-transparent text-right font-mono"
+                        />
+                      </td>
 
-                    {/* Cover Patch OS */}
-                    <td className="p-1 border-r border-slate-200">
-                      <input
-                        type="number"
-                        min="0"
-                        value={entry.coverPatchOs || ""}
-                        onChange={(e) =>
-                          handleCellChange(index, "coverPatchOs", parseFloat(e.target.value) || 0)
-                        }
-                        placeholder="0"
-                        className="w-full px-2 py-1 text-xs border border-transparent hover:border-slate-300 focus:border-primary rounded focus:outline-hidden bg-transparent text-right font-mono text-indigo-700 font-semibold"
-                      />
-                    </td>
+                      {/* Cover Patch OS */}
+                      <td className="p-1 border-r border-slate-200">
+                        <input
+                          type="number"
+                          min="0"
+                          value={entry.coverPatchOs || ""}
+                          onChange={(e) =>
+                            handleCellChange(index, "coverPatchOs", parseFloat(e.target.value) || 0)
+                          }
+                          onFocus={() => setFocusedCell(rowKey, "coverPatchOs")}
+                          onBlur={() => clearFocusedCell(rowKey, "coverPatchOs")}
+                          placeholder="0"
+                          className="w-full px-2 py-1 text-xs border border-transparent hover:border-slate-300 focus:border-primary rounded focus:outline-hidden bg-transparent text-right font-mono text-indigo-700 font-semibold"
+                        />
+                      </td>
 
-                    {/* Cover Patch DS */}
-                    <td className="p-1 border-r border-slate-200">
-                      <input
-                        type="number"
-                        min="0"
-                        value={entry.coverPatchDs || ""}
-                        onChange={(e) =>
-                          handleCellChange(index, "coverPatchDs", parseFloat(e.target.value) || 0)
-                        }
-                        placeholder="0"
-                        className="w-full px-2 py-1 text-xs border border-transparent hover:border-slate-300 focus:border-primary rounded focus:outline-hidden bg-transparent text-right font-mono text-indigo-700 font-semibold"
-                      />
-                    </td>
+                      {/* Cover Patch DS */}
+                      <td className="p-1 border-r border-slate-200">
+                        <input
+                          type="number"
+                          min="0"
+                          value={entry.coverPatchDs || ""}
+                          onChange={(e) =>
+                            handleCellChange(index, "coverPatchDs", parseFloat(e.target.value) || 0)
+                          }
+                          onFocus={() => setFocusedCell(rowKey, "coverPatchDs")}
+                          onBlur={() => clearFocusedCell(rowKey, "coverPatchDs")}
+                          placeholder="0"
+                          className="w-full px-2 py-1 text-xs border border-transparent hover:border-slate-300 focus:border-primary rounded focus:outline-hidden bg-transparent text-right font-mono text-indigo-700 font-semibold"
+                        />
+                      </td>
 
-                    {/* Valve Patch */}
-                    <td className="p-1 border-r border-slate-200">
-                      <input
-                        type="number"
-                        min="0"
-                        value={entry.valvePatch || ""}
-                        onChange={(e) =>
-                          handleCellChange(index, "valvePatch", parseFloat(e.target.value) || 0)
-                        }
-                        placeholder="0"
-                        className="w-full px-2 py-1 text-xs border border-transparent hover:border-slate-300 focus:border-primary rounded focus:outline-hidden bg-transparent text-right font-mono text-purple-700 font-semibold"
-                      />
-                    </td>
+                      {/* Valve Patch */}
+                      <td className="p-1 border-r border-slate-200">
+                        <input
+                          type="number"
+                          min="0"
+                          value={entry.valvePatch || ""}
+                          onChange={(e) =>
+                            handleCellChange(index, "valvePatch", parseFloat(e.target.value) || 0)
+                          }
+                          onFocus={() => setFocusedCell(rowKey, "valvePatch")}
+                          onBlur={() => clearFocusedCell(rowKey, "valvePatch")}
+                          placeholder="0"
+                          className="w-full px-2 py-1 text-xs border border-transparent hover:border-slate-300 focus:border-primary rounded focus:outline-hidden bg-transparent text-right font-mono text-purple-700 font-semibold"
+                        />
+                      </td>
 
-                    {/* Production Pcs (Auto/Editable) */}
-                    <td className="p-1 border-r border-slate-200 bg-emerald-50/50">
-                      <input
-                        type="number"
-                        min="0"
-                        value={entry.productionPcs || ""}
-                        onChange={(e) =>
-                          handleCellChange(index, "productionPcs", parseFloat(e.target.value) || 0)
-                        }
-                        placeholder="0"
-                        className="w-full px-2 py-1 text-xs font-mono font-black text-emerald-800 border border-transparent hover:border-emerald-300 focus:border-emerald-500 rounded focus:outline-hidden bg-transparent text-right"
-                      />
-                    </td>
+                      {/* Production Pcs (Auto/Editable) */}
+                      <td className="p-1 border-r border-slate-200 bg-emerald-50/50">
+                        <input
+                          type="number"
+                          min="0"
+                          value={entry.productionPcs || ""}
+                          onChange={(e) =>
+                            handleCellChange(index, "productionPcs", parseFloat(e.target.value) || 0)
+                          }
+                          onFocus={() => setFocusedCell(rowKey, "productionPcs")}
+                          onBlur={() => clearFocusedCell(rowKey, "productionPcs")}
+                          placeholder="0"
+                          className="w-full px-2 py-1 text-xs font-mono font-black text-emerald-800 border border-transparent hover:border-emerald-300 focus:border-emerald-500 rounded focus:outline-hidden bg-transparent text-right"
+                        />
+                      </td>
 
-                    {/* Production Kg */}
-                    <td className="p-1 border-r border-slate-200 bg-teal-50/50">
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.1"
-                        value={entry.productionKg || ""}
-                        onChange={(e) =>
-                          handleCellChange(index, "productionKg", parseFloat(e.target.value) || 0)
-                        }
-                        placeholder="0.0"
-                        className="w-full px-2 py-1 text-xs font-mono font-black text-teal-800 border border-transparent hover:border-teal-300 focus:border-teal-500 rounded focus:outline-hidden bg-transparent text-right"
-                      />
-                    </td>
+                      {/* Production Kg */}
+                      <td className="p-1 border-r border-slate-200 bg-teal-50/50">
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.1"
+                          value={entry.productionKg || ""}
+                          onChange={(e) =>
+                            handleCellChange(index, "productionKg", parseFloat(e.target.value) || 0)
+                          }
+                          onFocus={() => setFocusedCell(rowKey, "productionKg")}
+                          onBlur={() => clearFocusedCell(rowKey, "productionKg")}
+                          placeholder="0.0"
+                          className="w-full px-2 py-1 text-xs font-mono font-black text-teal-800 border border-transparent hover:border-teal-300 focus:border-teal-500 rounded focus:outline-hidden bg-transparent text-right"
+                        />
+                      </td>
 
-                    {/* Remarks */}
-                    <td className="p-1 border-r border-slate-200">
-                      <input
-                        type="text"
-                        value={entry.remarks || ""}
-                        onChange={(e) => handleCellChange(index, "remarks", e.target.value)}
-                        placeholder="Notes..."
-                        className="w-full px-2 py-1 text-xs border border-transparent hover:border-slate-300 focus:border-primary rounded focus:outline-hidden bg-transparent text-slate-600"
-                      />
-                    </td>
+                      {/* Remarks */}
+                      <td className="p-1 border-r border-slate-200">
+                        <input
+                          type="text"
+                          value={entry.remarks || ""}
+                          onChange={(e) => handleCellChange(index, "remarks", e.target.value)}
+                          onFocus={() => setFocusedCell(rowKey, "remarks")}
+                          onBlur={() => clearFocusedCell(rowKey, "remarks")}
+                          placeholder="Notes..."
+                          className="w-full px-2 py-1 text-xs border border-transparent hover:border-slate-300 focus:border-primary rounded focus:outline-hidden bg-transparent text-slate-600"
+                        />
+                      </td>
 
-                    {/* Delete Action */}
-                    <td className="p-1 text-center">
-                      <button
-                        onClick={() => handleDeleteRow(index)}
-                        className="p-1 text-slate-400 hover:text-rose-600 rounded transition-colors opacity-70 group-hover:opacity-100"
-                        title="Delete Row"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </td>
-                  </tr>
-                ))
+                      {/* Delete Action */}
+                      <td className="p-1 text-center">
+                        <button
+                          onClick={() => handleDeleteRow(index)}
+                          className="p-1 text-slate-400 hover:text-rose-600 rounded transition-colors opacity-70 group-hover:opacity-100"
+                          title="Delete Row"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
             {/* Totals Footer Row */}
@@ -1140,19 +1295,19 @@ export function ValvomaticDailyReportClient() {
                   {totals.avgWeightGsm.toFixed(1)}
                 </td>
                 <td colSpan={2} className="p-2 border-r border-slate-300"></td>
-                <td className="p-2 border-r border-slate-300 text-right font-mono text-indigo-800">
+                <td className="p-2 border-r border-slate-300 text-right font-mono text-indigo-900 bg-indigo-50/50">
                   {totals.totalCoverPatchOs}
                 </td>
-                <td className="p-2 border-r border-slate-300 text-right font-mono text-indigo-800">
+                <td className="p-2 border-r border-slate-300 text-right font-mono text-indigo-900 bg-indigo-50/50">
                   {totals.totalCoverPatchDs}
                 </td>
-                <td className="p-2 border-r border-slate-300 text-right font-mono text-purple-800">
+                <td className="p-2 border-r border-slate-300 text-right font-mono text-purple-900 bg-purple-50/50">
                   {totals.totalValvePatch}
                 </td>
-                <td className="p-2 border-r border-slate-300 text-right font-mono text-emerald-800 bg-emerald-100">
+                <td className="p-2 border-r border-slate-300 text-right font-mono text-emerald-900 bg-emerald-100">
                   {totals.totalProductionPcs.toLocaleString()}
                 </td>
-                <td className="p-2 border-r border-slate-300 text-right font-mono text-teal-800 bg-teal-100">
+                <td className="p-2 border-r border-slate-300 text-right font-mono text-teal-900 bg-teal-100">
                   {totals.totalProductionKg.toFixed(1)}
                 </td>
                 <td colSpan={2} className="p-2"></td>
@@ -1160,332 +1315,362 @@ export function ValvomaticDailyReportClient() {
             </tfoot>
           </table>
         </div>
-
-        {/* Remarks Section */}
-        <div className="p-3 bg-slate-50 border-t border-slate-200">
-          <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
-            Shift Observations / Downtime / Maintenance Notes
-          </label>
-          <textarea
-            rows={2}
-            value={remarks}
-            onChange={(e) => {
-              isDirtyRef.current = true;
-              setRemarks(e.target.value);
-            }}
-            placeholder="Add any specific observations for this shift (machine speed, temperature, maintenance alerts)..."
-            className="w-full text-xs p-2 border border-slate-300 rounded-lg focus:outline-hidden focus:ring-1 focus:ring-primary bg-white"
-          />
-        </div>
       </div>
 
-      {/* ========================================================================= */}
-      {/* MOBILE TOUCH FEED (<md) - ZERO DESKTOP REGRESSION                        */}
-      {/* ========================================================================= */}
-      <div className="block md:hidden space-y-4">
-        {/* Mobile Toolbar */}
-        <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-2xs flex items-center justify-between gap-2">
+      {/* General Remarks Textarea */}
+      <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs">
+        <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+          Shift Remarks &amp; Observations
+        </label>
+        <textarea
+          value={remarks}
+          onChange={(e) => {
+            setRemarks(e.target.value);
+            markDirtyAndTriggerAutoSave();
+          }}
+          rows={2}
+          placeholder="Any machine downtime, maintenance, quality issues, or shift notes..."
+          className="w-full text-xs p-2.5 border border-slate-300 rounded-lg focus:outline-hidden focus:ring-1 focus:ring-primary"
+        />
+      </div>
+
+      {/* Mobile Card View (shown below md screen) */}
+      <div className="md:hidden space-y-4">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
+            Rolls ({entries.length})
+          </span>
           <div className="flex items-center gap-1.5">
             <button
               type="button"
               onClick={handleAddRow}
               className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-primary text-white text-xs font-bold shadow-xs active:scale-95 transition-all"
             >
-              <Plus className="h-3.5 w-3.5" />
-              <span>Add Row</span>
+              <Plus className="w-3.5 h-3.5" />
+              <span>Add</span>
             </button>
             <button
               type="button"
               onClick={handleAdd5Rows}
               className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-slate-50 text-slate-700 text-xs font-semibold active:scale-95 transition-all"
             >
-              <Plus className="h-3.5 w-3.5 text-slate-400" />
               <span>+5</span>
             </button>
             <button
               type="button"
               onClick={handleResetToBlank}
               className="p-1.5 rounded-lg border border-slate-200 bg-slate-50 text-slate-600 hover:text-rose-600 active:scale-95 transition-all"
-              title="Reset blank"
+              title="Reset"
             >
-              <RotateCcw className="h-3.5 w-3.5" />
+              <RotateCcw className="w-3.5 h-3.5" />
             </button>
           </div>
-          <span className="text-xs font-bold font-mono text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
-            {totals.totalProductionPcs.toLocaleString()} pcs
-          </span>
         </div>
 
-        {/* Mobile Cards List */}
         <div className="space-y-3">
           {entries.length === 0 ? (
             <div className="bg-white rounded-xl border border-dashed border-slate-300 p-8 text-center text-slate-400 text-xs">
               No entries in this report. Tap &quot;Add Row&quot; to begin.
             </div>
           ) : (
-            entries.map((entry, index) => (
-              <div
-                key={index}
-                className="bg-white border border-slate-200/90 rounded-xl shadow-2xs overflow-hidden"
-              >
-                {/* Card Header Strip */}
-                <div className="bg-slate-50/90 px-3.5 py-2 border-b border-slate-100 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="h-5 w-5 rounded-md bg-slate-900 text-white font-bold text-[10px] flex items-center justify-center">
-                      {entry.sequence}
-                    </span>
-                    <span className="text-xs font-mono font-bold text-slate-900">
-                      {entry.rollNumber ? entry.rollNumber : `Row ${index + 1}`}
-                    </span>
-                    {entry.loomNumber && (
-                      <span className="text-[10px] text-sky-700 bg-sky-50 px-1.5 py-0.5 rounded border border-sky-200 font-mono">
-                        Loom #{entry.loomNumber}
+            entries.map((entry, index) => {
+              const rowKey = getValvomaticReportRowKey(entry, index);
+              return (
+                <div
+                  key={index}
+                  className="bg-white border border-slate-200/90 rounded-xl shadow-2xs overflow-hidden"
+                >
+                  {/* Card Header Strip */}
+                  <div className="bg-slate-50/90 px-3.5 py-2 border-b border-slate-100 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="h-5 w-5 rounded-md bg-slate-900 text-white font-bold text-[10px] flex items-center justify-center">
+                        {entry.sequence}
                       </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {entry.productionPcs > 0 && (
-                      <span className="text-xs font-black font-mono text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
-                        {entry.productionPcs.toLocaleString()} pcs
+                      <span className="text-xs font-mono font-bold text-slate-900">
+                        {entry.rollNumber ? entry.rollNumber : `Row ${index + 1}`}
                       </span>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteRow(index)}
-                      className="p-1 text-slate-400 hover:text-rose-600 rounded active:scale-90 transition-all"
-                      title="Delete row"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                      {entry.loomNumber && (
+                        <span className="text-[10px] text-sky-700 bg-sky-50 px-1.5 py-0.5 rounded border border-sky-200 font-mono">
+                          Loom #{entry.loomNumber}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {entry.productionPcs > 0 && (
+                        <span className="text-xs font-black font-mono text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                          {entry.productionPcs.toLocaleString()} pcs
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteRow(index)}
+                        className="p-1 text-slate-400 hover:text-rose-600 rounded active:scale-90 transition-all"
+                        title="Delete row"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
-                </div>
 
-                <div className="p-3.5 space-y-3 text-xs">
-                  {/* Quality & Company */}
-                  <div className="space-y-2">
+                  <div className="p-3.5 space-y-3 text-xs">
+                    {/* Quality & Company */}
+                    <div className="space-y-2">
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                          Quality
+                        </label>
+                        <UniversalQualityInput
+                          value={entry.quality || entry.partyName || ""}
+                          onChange={(newVal) => {
+                            handleCellChange(index, "quality", newVal);
+                            handleCellChange(index, "partyName", newVal);
+                          }}
+                          onFocus={() => setFocusedCell(rowKey, "quality")}
+                          onBlur={() => clearFocusedCell(rowKey, "quality")}
+                          placeholder="Select quality..."
+                          compact={false}
+                          inputClassName="h-9 text-xs font-semibold"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">
+                            Company Name
+                          </label>
+                          <input
+                            type="text"
+                            value={entry.companyName || ""}
+                            onChange={(e) => handleCellChange(index, "companyName", e.target.value)}
+                            onFocus={() => setFocusedCell(rowKey, "companyName")}
+                            onBlur={() => clearFocusedCell(rowKey, "companyName")}
+                            placeholder="e.g. Flexicom"
+                            className="w-full h-8 px-2.5 text-xs border border-slate-200 rounded-md focus:ring-1 focus:ring-primary"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">
+                            Unit / Grade
+                          </label>
+                          <div className="grid grid-cols-2 gap-1">
+                            <input
+                              type="text"
+                              value={entry.unitName || ""}
+                              onChange={(e) => handleCellChange(index, "unitName", e.target.value)}
+                              onFocus={() => setFocusedCell(rowKey, "unitName")}
+                              onBlur={() => clearFocusedCell(rowKey, "unitName")}
+                              placeholder="Unit"
+                              className="w-full h-8 px-2 text-xs border border-slate-200 rounded-md focus:ring-1 focus:ring-primary"
+                            />
+                            <input
+                              type="text"
+                              value={entry.grade || ""}
+                              onChange={(e) => handleCellChange(index, "grade", e.target.value)}
+                              onFocus={() => setFocusedCell(rowKey, "grade")}
+                              onBlur={() => clearFocusedCell(rowKey, "grade")}
+                              placeholder="Grade"
+                              className="w-full h-8 px-2 text-xs border border-slate-200 rounded-md focus:ring-1 focus:ring-primary"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Roll No & Loom Details */}
+                    <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100 space-y-2">
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
+                            Roll Number
+                          </label>
+                          <input
+                            type="text"
+                            value={entry.rollNumber}
+                            onChange={(e) => handleCellChange(index, "rollNumber", e.target.value)}
+                            onFocus={() => setFocusedCell(rowKey, "rollNumber")}
+                            onBlur={() => clearFocusedCell(rowKey, "rollNumber")}
+                            placeholder="e.g. V-1021"
+                            className="w-full h-8 px-2.5 text-xs font-mono font-bold border border-slate-200 rounded-md bg-white focus:ring-1 focus:ring-primary"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
+                            Loom Number
+                          </label>
+                          <input
+                            type="text"
+                            value={entry.loomNumber || ""}
+                            onChange={(e) => handleCellChange(index, "loomNumber", e.target.value)}
+                            onFocus={() => setFocusedCell(rowKey, "loomNumber")}
+                            onBlur={() => clearFocusedCell(rowKey, "loomNumber")}
+                            placeholder="e.g. 15"
+                            className="w-full h-8 px-2.5 text-xs font-mono border border-slate-200 rounded-md bg-white focus:ring-1 focus:ring-primary"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2 text-center pt-1">
+                        <div>
+                          <span className="text-[9px] uppercase font-bold text-slate-400 block">Roll Mtr</span>
+                          <input
+                            type="number"
+                            step="any"
+                            value={entry.rollMtr || ""}
+                            onChange={(e) => handleCellChange(index, "rollMtr", parseFloat(e.target.value) || 0)}
+                            onFocus={() => setFocusedCell(rowKey, "rollMtr")}
+                            onBlur={() => clearFocusedCell(rowKey, "rollMtr")}
+                            placeholder="0"
+                            className="w-full h-7 text-center font-mono font-bold text-xs border border-slate-200 rounded bg-white"
+                          />
+                        </div>
+                        <div>
+                          <span className="text-[9px] uppercase font-bold text-slate-400 block">Net Wt (Kg)</span>
+                          <input
+                            type="number"
+                            step="any"
+                            value={entry.netWeight || ""}
+                            onChange={(e) => handleCellChange(index, "netWeight", parseFloat(e.target.value) || 0)}
+                            onFocus={() => setFocusedCell(rowKey, "netWeight")}
+                            onBlur={() => clearFocusedCell(rowKey, "netWeight")}
+                            placeholder="0"
+                            className="w-full h-7 text-center font-mono font-bold text-xs border border-slate-200 rounded bg-white"
+                          />
+                        </div>
+                        <div>
+                          <span className="text-[9px] uppercase font-bold text-slate-400 block">Avg (g/m)</span>
+                          <div className="h-7 flex items-center justify-center font-mono font-bold text-sky-800 bg-sky-50 rounded border border-sky-200 text-xs">
+                            {entry.avgWeight ? entry.avgWeight.toFixed(1) : "—"}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Meter Readings & Patches */}
+                    <div className="p-2.5 rounded-lg bg-indigo-50/30 border border-indigo-100 space-y-2">
+                      <span className="text-[10px] font-bold uppercase text-indigo-900 tracking-wider block">
+                        Meter Readings &amp; Patches
+                      </span>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <span className="text-[10px] text-slate-500 block">Opening Reading</span>
+                          <input
+                            type="number"
+                            step="any"
+                            value={entry.openingMeterReading || ""}
+                            onChange={(e) => handleCellChange(index, "openingMeterReading", parseFloat(e.target.value) || 0)}
+                            onFocus={() => setFocusedCell(rowKey, "openingMeterReading")}
+                            onBlur={() => clearFocusedCell(rowKey, "openingMeterReading")}
+                            placeholder="0"
+                            className="w-full h-7 px-2 text-xs font-mono border border-slate-200 rounded bg-white"
+                          />
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-slate-500 block">Closing Reading</span>
+                          <input
+                            type="number"
+                            step="any"
+                            value={entry.closingMeterReading || ""}
+                            onChange={(e) => handleCellChange(index, "closingMeterReading", parseFloat(e.target.value) || 0)}
+                            onFocus={() => setFocusedCell(rowKey, "closingMeterReading")}
+                            onBlur={() => clearFocusedCell(rowKey, "closingMeterReading")}
+                            placeholder="0"
+                            className="w-full h-7 px-2 text-xs font-mono border border-slate-200 rounded bg-white"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2 text-center pt-1">
+                        <div>
+                          <span className="text-[9px] uppercase font-bold text-indigo-700 block">Cover OS</span>
+                          <input
+                            type="number"
+                            step="any"
+                            value={entry.coverPatchOs || ""}
+                            onChange={(e) => handleCellChange(index, "coverPatchOs", parseFloat(e.target.value) || 0)}
+                            onFocus={() => setFocusedCell(rowKey, "coverPatchOs")}
+                            onBlur={() => clearFocusedCell(rowKey, "coverPatchOs")}
+                            placeholder="0"
+                            className="w-full h-7 text-center font-mono font-bold text-xs border border-indigo-200 rounded bg-white text-indigo-800"
+                          />
+                        </div>
+                        <div>
+                          <span className="text-[9px] uppercase font-bold text-indigo-700 block">Cover DS</span>
+                          <input
+                            type="number"
+                            step="any"
+                            value={entry.coverPatchDs || ""}
+                            onChange={(e) => handleCellChange(index, "coverPatchDs", parseFloat(e.target.value) || 0)}
+                            onFocus={() => setFocusedCell(rowKey, "coverPatchDs")}
+                            onBlur={() => clearFocusedCell(rowKey, "coverPatchDs")}
+                            placeholder="0"
+                            className="w-full h-7 text-center font-mono font-bold text-xs border border-indigo-200 rounded bg-white text-indigo-800"
+                          />
+                        </div>
+                        <div>
+                          <span className="text-[9px] uppercase font-bold text-indigo-800 block">Valve</span>
+                          <input
+                            type="number"
+                            step="any"
+                            value={entry.valvePatch || ""}
+                            onChange={(e) => handleCellChange(index, "valvePatch", parseFloat(e.target.value) || 0)}
+                            onFocus={() => setFocusedCell(rowKey, "valvePatch")}
+                            onBlur={() => clearFocusedCell(rowKey, "valvePatch")}
+                            placeholder="0"
+                            className="w-full h-7 text-center font-mono font-bold text-xs border border-indigo-200 rounded bg-white text-indigo-900"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Production Output Highlights */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="bg-emerald-50/50 p-2.5 rounded-lg border border-emerald-200">
+                        <label className="block text-[10px] font-bold text-emerald-800 uppercase mb-0.5">
+                          Production (Pcs)
+                        </label>
+                        <input
+                          type="number"
+                          value={entry.productionPcs || ""}
+                          onChange={(e) => handleCellChange(index, "productionPcs", parseInt(e.target.value, 10) || 0)}
+                          onFocus={() => setFocusedCell(rowKey, "productionPcs")}
+                          onBlur={() => clearFocusedCell(rowKey, "productionPcs")}
+                          placeholder="0"
+                          className="w-full h-8 px-2 font-mono font-black text-sm text-emerald-900 bg-white border border-emerald-300 rounded focus:ring-1 focus:ring-emerald-500"
+                        />
+                      </div>
+                      <div className="bg-teal-50/50 p-2.5 rounded-lg border border-teal-200">
+                        <label className="block text-[10px] font-bold text-teal-800 uppercase mb-0.5">
+                          Production (Kg)
+                        </label>
+                        <input
+                          type="number"
+                          step="any"
+                          value={entry.productionKg || ""}
+                          onChange={(e) => handleCellChange(index, "productionKg", parseFloat(e.target.value) || 0)}
+                          onFocus={() => setFocusedCell(rowKey, "productionKg")}
+                          onBlur={() => clearFocusedCell(rowKey, "productionKg")}
+                          placeholder="0.00"
+                          className="w-full h-8 px-2 font-mono font-black text-sm text-teal-900 bg-white border border-teal-300 rounded focus:ring-1 focus:ring-teal-500"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Remarks Input */}
                     <div>
-                      <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                        Quality
-                      </label>
-                      <UniversalQualityInput
-                        value={entry.quality || entry.partyName || ""}
-                        onChange={(newVal) => {
-                          handleCellChange(index, "quality", newVal);
-                          handleCellChange(index, "partyName", newVal);
-                        }}
-                        placeholder="Select quality..."
-                        compact={false}
-                        inputClassName="h-9 text-xs font-semibold"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">
-                          Company Name
-                        </label>
-                        <input
-                          type="text"
-                          value={entry.companyName || ""}
-                          onChange={(e) => handleCellChange(index, "companyName", e.target.value)}
-                          placeholder="e.g. Flexicom"
-                          className="w-full h-8 px-2.5 text-xs border border-slate-200 rounded-md focus:ring-1 focus:ring-primary"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">
-                          Unit / Grade
-                        </label>
-                        <div className="grid grid-cols-2 gap-1">
-                          <input
-                            type="text"
-                            value={entry.unitName || ""}
-                            onChange={(e) => handleCellChange(index, "unitName", e.target.value)}
-                            placeholder="Unit"
-                            className="w-full h-8 px-2 text-xs border border-slate-200 rounded-md focus:ring-1 focus:ring-primary"
-                          />
-                          <input
-                            type="text"
-                            value={entry.grade || ""}
-                            onChange={(e) => handleCellChange(index, "grade", e.target.value)}
-                            placeholder="Grade"
-                            className="w-full h-8 px-2 text-xs border border-slate-200 rounded-md focus:ring-1 focus:ring-primary"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Roll No & Loom Details */}
-                  <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100 space-y-2">
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
-                          Roll Number
-                        </label>
-                        <input
-                          type="text"
-                          value={entry.rollNumber}
-                          onChange={(e) => handleCellChange(index, "rollNumber", e.target.value)}
-                          placeholder="e.g. V-1021"
-                          className="w-full h-8 px-2.5 text-xs font-mono font-bold border border-slate-200 rounded-md bg-white focus:ring-1 focus:ring-primary"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-bold text-slate-600 mb-0.5">
-                          Loom Number
-                        </label>
-                        <input
-                          type="text"
-                          value={entry.loomNumber || ""}
-                          onChange={(e) => handleCellChange(index, "loomNumber", e.target.value)}
-                          placeholder="e.g. 15"
-                          className="w-full h-8 px-2.5 text-xs font-mono border border-slate-200 rounded-md bg-white focus:ring-1 focus:ring-primary"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-2 text-center pt-1">
-                      <div>
-                        <span className="text-[9px] uppercase font-bold text-slate-400 block">Roll Mtr</span>
-                        <input
-                          type="number"
-                          step="any"
-                          value={entry.rollMtr || ""}
-                          onChange={(e) => handleCellChange(index, "rollMtr", parseFloat(e.target.value) || 0)}
-                          placeholder="0"
-                          className="w-full h-7 text-center font-mono font-bold text-xs border border-slate-200 rounded bg-white"
-                        />
-                      </div>
-                      <div>
-                        <span className="text-[9px] uppercase font-bold text-slate-400 block">Net Wt (Kg)</span>
-                        <input
-                          type="number"
-                          step="any"
-                          value={entry.netWeight || ""}
-                          onChange={(e) => handleCellChange(index, "netWeight", parseFloat(e.target.value) || 0)}
-                          placeholder="0"
-                          className="w-full h-7 text-center font-mono font-bold text-xs border border-slate-200 rounded bg-white"
-                        />
-                      </div>
-                      <div>
-                        <span className="text-[9px] uppercase font-bold text-slate-400 block">Avg (g/m)</span>
-                        <div className="h-7 flex items-center justify-center font-mono font-bold text-sky-800 bg-sky-50 rounded border border-sky-200 text-xs">
-                          {entry.avgWeight ? entry.avgWeight.toFixed(1) : "—"}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Meter Readings & Patches */}
-                  <div className="p-2.5 rounded-lg bg-indigo-50/30 border border-indigo-100 space-y-2">
-                    <span className="text-[10px] font-bold uppercase text-indigo-900 tracking-wider block">
-                      Meter Readings &amp; Patches
-                    </span>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <span className="text-[10px] text-slate-500 block">Opening Reading</span>
-                        <input
-                          type="number"
-                          step="any"
-                          value={entry.openingMeterReading || ""}
-                          onChange={(e) => handleCellChange(index, "openingMeterReading", parseFloat(e.target.value) || 0)}
-                          placeholder="0"
-                          className="w-full h-7 px-2 text-xs font-mono border border-slate-200 rounded bg-white"
-                        />
-                      </div>
-                      <div>
-                        <span className="text-[10px] text-slate-500 block">Closing Reading</span>
-                        <input
-                          type="number"
-                          step="any"
-                          value={entry.closingMeterReading || ""}
-                          onChange={(e) => handleCellChange(index, "closingMeterReading", parseFloat(e.target.value) || 0)}
-                          placeholder="0"
-                          className="w-full h-7 px-2 text-xs font-mono border border-slate-200 rounded bg-white"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-2 text-center pt-1">
-                      <div>
-                        <span className="text-[9px] uppercase font-bold text-indigo-700 block">Cover OS</span>
-                        <input
-                          type="number"
-                          step="any"
-                          value={entry.coverPatchOs || ""}
-                          onChange={(e) => handleCellChange(index, "coverPatchOs", parseFloat(e.target.value) || 0)}
-                          placeholder="0"
-                          className="w-full h-7 text-center font-mono font-bold text-xs border border-indigo-200 rounded bg-white text-indigo-800"
-                        />
-                      </div>
-                      <div>
-                        <span className="text-[9px] uppercase font-bold text-indigo-700 block">Cover DS</span>
-                        <input
-                          type="number"
-                          step="any"
-                          value={entry.coverPatchDs || ""}
-                          onChange={(e) => handleCellChange(index, "coverPatchDs", parseFloat(e.target.value) || 0)}
-                          placeholder="0"
-                          className="w-full h-7 text-center font-mono font-bold text-xs border border-indigo-200 rounded bg-white text-indigo-800"
-                        />
-                      </div>
-                      <div>
-                        <span className="text-[9px] uppercase font-bold text-indigo-800 block">Valve</span>
-                        <input
-                          type="number"
-                          step="any"
-                          value={entry.valvePatch || ""}
-                          onChange={(e) => handleCellChange(index, "valvePatch", parseFloat(e.target.value) || 0)}
-                          placeholder="0"
-                          className="w-full h-7 text-center font-mono font-bold text-xs border border-indigo-200 rounded bg-white text-indigo-900"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Production Output Highlights */}
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="bg-emerald-50/50 p-2.5 rounded-lg border border-emerald-200">
-                      <label className="block text-[10px] font-bold text-emerald-800 uppercase mb-0.5">
-                        Production (Pcs)
-                      </label>
                       <input
-                        type="number"
-                        value={entry.productionPcs || ""}
-                        onChange={(e) => handleCellChange(index, "productionPcs", parseInt(e.target.value, 10) || 0)}
-                        placeholder="0"
-                        className="w-full h-8 px-2 font-mono font-black text-sm text-emerald-900 bg-white border border-emerald-300 rounded focus:ring-1 focus:ring-emerald-500"
+                        type="text"
+                        value={entry.remarks || ""}
+                        onChange={(e) => handleCellChange(index, "remarks", e.target.value)}
+                        onFocus={() => setFocusedCell(rowKey, "remarks")}
+                        onBlur={() => clearFocusedCell(rowKey, "remarks")}
+                        placeholder="Row remarks or notes..."
+                        className="w-full h-8 px-2.5 text-xs border border-slate-200 rounded-md focus:ring-1 focus:ring-primary"
                       />
                     </div>
-                    <div className="bg-teal-50/50 p-2.5 rounded-lg border border-teal-200">
-                      <label className="block text-[10px] font-bold text-teal-800 uppercase mb-0.5">
-                        Production (Kg)
-                      </label>
-                      <input
-                        type="number"
-                        step="any"
-                        value={entry.productionKg || ""}
-                        onChange={(e) => handleCellChange(index, "productionKg", parseFloat(e.target.value) || 0)}
-                        placeholder="0.00"
-                        className="w-full h-8 px-2 font-mono font-black text-sm text-teal-900 bg-white border border-teal-300 rounded focus:ring-1 focus:ring-teal-500"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Remarks Input */}
-                  <div>
-                    <input
-                      type="text"
-                      value={entry.remarks || ""}
-                      onChange={(e) => handleCellChange(index, "remarks", e.target.value)}
-                      placeholder="Row remarks or notes..."
-                      className="w-full h-8 px-2.5 text-xs border border-slate-200 rounded-md focus:ring-1 focus:ring-primary"
-                    />
                   </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
 
@@ -1498,8 +1683,8 @@ export function ValvomaticDailyReportClient() {
             rows={2}
             value={remarks}
             onChange={(e) => {
-              isDirtyRef.current = true;
               setRemarks(e.target.value);
+              markDirtyAndTriggerAutoSave();
             }}
             placeholder="Add any specific observations for this shift..."
             className="w-full text-xs p-2.5 border border-slate-200 rounded-lg focus:outline-hidden focus:ring-1 focus:ring-primary bg-white"
@@ -1522,7 +1707,7 @@ export function ValvomaticDailyReportClient() {
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => saveReport("DRAFT")}
+              onClick={() => executeSave("DRAFT")}
               disabled={saving}
               className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold active:scale-95 transition-all flex items-center gap-1.5 border border-slate-700"
             >
@@ -1531,7 +1716,7 @@ export function ValvomaticDailyReportClient() {
             </button>
             <button
               type="button"
-              onClick={() => saveReport("SUBMITTED")}
+              onClick={() => executeSave("SUBMITTED")}
               disabled={saving}
               className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold active:scale-95 transition-all flex items-center gap-1.5 shadow-lg shadow-emerald-950/40"
             >
