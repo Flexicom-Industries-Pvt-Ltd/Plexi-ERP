@@ -123,6 +123,8 @@ export interface UniversalPersonnelInputProps {
   id?: string;
   onAddNew?: () => void;
   addNewLabel?: string;
+  onFocus?: () => void;
+  onBlur?: () => void;
 }
 
 export function UniversalPersonnelInput({
@@ -144,6 +146,8 @@ export function UniversalPersonnelInput({
   id,
   onAddNew,
   addNewLabel,
+  onFocus,
+  onBlur,
 }: UniversalPersonnelInputProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [openUpward, setOpenUpward] = useState(false);
@@ -381,6 +385,7 @@ export function UniversalPersonnelInput({
           onFocus={() => {
             setIsOpen(true);
             setHighlightedIndex(0);
+            onFocus?.();
           }}
           onClick={() => {
             if (!isOpen) {
@@ -389,7 +394,10 @@ export function UniversalPersonnelInput({
             }
           }}
           onChange={handleInputChange}
-          onBlur={handleInputBlur}
+          onBlur={() => {
+            handleInputBlur();
+            onBlur?.();
+          }}
           onKeyDown={handleKeyDown}
           className={`w-full outline-none transition-colors ${
             compact ? "h-7 text-xs px-2 pr-12" : "h-8.5 text-xs px-2.5 pr-14"

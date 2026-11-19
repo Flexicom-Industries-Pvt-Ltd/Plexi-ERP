@@ -15,15 +15,26 @@ import {
   AlertTriangle,
   Info,
   Loader2,
+  Camera,
+  Upload,
+  Eye,
+  Trash2,
+  Sparkles,
 } from "lucide-react";
 import Link from "next/link";
 import { GatePurpose } from "@/generated/prisma";
 import { cn } from "@/lib/utils";
+import { GateDocumentUploadModal, LocalAttachedDoc } from "@/components/gate/GateDocumentUploadModal";
+import { GateDocumentLightbox } from "@/components/gate/GateDocumentLightbox";
 
 export function NewGateClient() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [redirecting, setRedirecting] = useState(false);
+  const [attachedDocs, setAttachedDocs] = useState<LocalAttachedDoc[]>([]);
+  const [showDocModal, setShowDocModal] = useState(false);
+  const [defaultDocType, setDefaultDocType] = useState("Truck / Vehicle Photo");
+  const [selectedLightboxDoc, setSelectedLightboxDoc] = useState<any | null>(null);
   const isSubmittingRef = useRef(false);
   const navigationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -164,6 +175,35 @@ export function NewGateClient() {
       const entryNum = responseJson?.data?.entryNumber || responseJson?.entryNumber;
       if (!entryNum) {
         throw new Error("Gate entry was registered, but did not return a valid entry number.");
+      }
+
+      // If initial documents / truck photos were attached, upload them now
+      if (attachedDocs.length > 0) {
+        try {
+          await Promise.allSettled(
+            attachedDocs.map(async (doc) => {
+              const formData = new FormData();
+              formData.append("documentType", doc.documentType);
+              if (doc.remarks) formData.append("remarks", doc.remarks);
+
+              if (doc.blob) {
+                const ext = doc.blob.type.includes("pdf") ? ".pdf" : doc.blob.type.includes("webp") ? ".webp" : ".jpg";
+                formData.append("file", doc.blob, `initial-${doc.documentType.toLowerCase().replace(/[^a-z0-9]/g, "_")}${ext}`);
+              } else if (doc.dataUrl && doc.dataUrl.startsWith("data:")) {
+                formData.append("base64", doc.dataUrl);
+              } else if (doc.file) {
+                formData.append("file", doc.file);
+              }
+
+              return fetch(`/api/gate/${entryNum}/documents`, {
+                method: "POST",
+                body: formData,
+              });
+            })
+          );
+        } catch (uploadDocErr) {
+          console.warn("Non-fatal: Initial documents upload had partial failure:", uploadDocErr);
+        }
       }
 
       toast.success(`Gate entry ${entryNum} created successfully`);
@@ -385,6 +425,101 @@ export function NewGateClient() {
           </div>
         </div>
 
+        {/* Initial Photos & Documents (Optional Check-in Attachment) */}
+        <div className="space-y-3 sm:space-y-4 pt-4 sm:pt-6 border-t border-slate-100">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                <Camera className="h-4 w-4 text-primary" /> Initial Photos & Evidence (Optional)
+              </h3>
+              <p className="text-[11px] text-slate-400">
+                Snap truck license plate or weighbridge slip on check-in. Auto-compressed & subject to 3-day retention.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setDefaultDocType("Truck / Vehicle Photo");
+                  setShowDocModal(true);
+                }}
+                className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 px-3 py-1.5 rounded-xl shadow-2xs active:scale-95 transition-all cursor-pointer"
+              >
+                <Camera className="h-3.5 w-3.5 text-primary" />
+                <span>Take Truck Photo</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setDefaultDocType("Gross Weighbridge Slip");
+                  setShowDocModal(true);
+                }}
+                className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 px-3 py-1.5 rounded-xl shadow-2xs active:scale-95 transition-all cursor-pointer"
+              >
+                <Upload className="h-3.5 w-3.5" />
+                <span>Attach Slip/Challan</span>
+              </button>
+            </div>
+          </div>
+
+          {attachedDocs.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+              {attachedDocs.map((doc, idx) => (
+                <div
+                  key={idx}
+                  className="p-3 bg-white border border-slate-200 rounded-xl shadow-2xs flex items-center gap-2.5"
+                >
+                  {doc.previewUrl && !doc.file?.name.endsWith(".pdf") ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={doc.previewUrl}
+                      alt={doc.documentType}
+                      onClick={() =>
+                        setSelectedLightboxDoc({
+                          id: `temp-${idx}`,
+                          documentType: doc.documentType,
+                          fileUrl: doc.previewUrl,
+                          status: "PENDING",
+                          remarks: doc.remarks,
+                        })
+                      }
+                      className="w-12 h-12 rounded-lg object-cover border border-slate-200 shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
+                    />
+                  ) : (
+                    <div className="w-12 h-12 rounded-lg bg-red-50 text-red-600 border border-red-200 flex flex-col items-center justify-center shrink-0">
+                      <FileText className="h-5 w-5" />
+                      <span className="text-[8px] font-bold">PDF</span>
+                    </div>
+                  )}
+
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-bold text-slate-800 truncate">{doc.documentType}</p>
+                    <p className="text-[11px] text-slate-500 truncate">{doc.remarks || "No remarks"}</p>
+                    {doc.sizeKb ? (
+                      <span className="text-[10px] text-emerald-700 font-mono font-medium block">
+                        {doc.sizeKb} KB (compressed)
+                      </span>
+                    ) : null}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setAttachedDocs((prev) => prev.filter((_, i) => i !== idx))}
+                    className="p-1 text-slate-400 hover:text-red-500 rounded transition-colors"
+                    title="Remove attachment"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-4 bg-slate-50/60 rounded-xl border border-dashed border-slate-200 text-[11px] text-slate-400">
+              No photos or slips attached yet. You can also attach documents after vehicle registration.
+            </div>
+          )}
+        </div>
+
         {/* Submit Actions */}
         <div className="pt-4 sm:pt-6 border-t border-slate-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-3 sm:gap-4">
           <div className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-3 w-full sm:w-auto">
@@ -419,6 +554,25 @@ export function NewGateClient() {
           </div>
         </div>
       </form>
+
+      {/* Gate Document & Vehicle Photo Upload Modal */}
+      <GateDocumentUploadModal
+        isOpen={showDocModal}
+        onClose={() => setShowDocModal(false)}
+        defaultDocumentType={defaultDocType}
+        title="Attach Check-In Document or Truck Photo"
+        onAttachLocalDoc={(doc) => {
+          setAttachedDocs((prev) => [...prev, doc]);
+        }}
+      />
+
+      {/* Lightbox Preview */}
+      <GateDocumentLightbox
+        isOpen={Boolean(selectedLightboxDoc)}
+        onClose={() => setSelectedLightboxDoc(null)}
+        document={selectedLightboxDoc}
+        canVerify={false}
+      />
     </div>
   );
 }

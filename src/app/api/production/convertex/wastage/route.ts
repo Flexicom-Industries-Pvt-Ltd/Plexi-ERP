@@ -146,6 +146,8 @@ export async function POST(request: NextRequest) {
       status = "DRAFT",
       remarks,
       entries = [],
+      deletedEntryIds = [],
+      clientId,
     } = body;
 
     if (!date || !shiftName) {
@@ -238,35 +240,65 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      // Clear existing entries and recreate atomically
-      await tx.convertexWastageReportEntry.deleteMany({
+      // Handle explicit deletions if provided
+      if (Array.isArray(deletedEntryIds) && deletedEntryIds.length > 0) {
+        await tx.convertexWastageReportEntry.deleteMany({
+          where: {
+            reportId: report.id,
+            id: { in: deletedEntryIds },
+          },
+        });
+      }
+
+      // Fetch existing entries to perform non-destructive upserts
+      const existingEntries = await tx.convertexWastageReportEntry.findMany({
         where: { reportId: report.id },
       });
+      const existingById = new Map(existingEntries.map((e) => [e.id, e]));
+      const existingByRoll = new Map(
+        existingEntries
+          .filter((e) => e.rollNumber && e.rollNumber.trim())
+          .map((e) => [e.rollNumber.trim().toUpperCase(), e])
+      );
 
-      if (calculatedEntries.length > 0) {
-        await tx.convertexWastageReportEntry.createMany({
-          data: calculatedEntries.map((e) => ({
-            reportId: report.id,
-            sequence: e.sequence,
-            quality: e.quality || "Standard",
-            rollNumber: e.rollNumber || "",
-            productionKg: Number(e.productionKg) || 0,
-            loomWasteKg: Number(e.loomWasteKg) || 0,
-            loomWastePct: Number(e.loomWastePct) || 0,
-            lamWasteKg: Number(e.lamWasteKg) || 0,
-            lamWastePct: Number(e.lamWastePct) || 0,
-            printWasteKg: Number(e.printWasteKg) || 0,
-            printWastePct: Number(e.printWastePct) || 0,
-            machineWasteKg: Number(e.machineWasteKg) || 0,
-            machineWastePct: Number(e.machineWastePct) || 0,
-            coverPatchWasteKg: Number(e.coverPatchWasteKg) || 0,
-            coverPatchWastePct: Number(e.coverPatchWastePct) || 0,
-            totalWasteKg: Number(e.totalWasteKg) || 0,
-            totalWastePct: Number(e.totalWastePct) || 0,
-            netProductionKg: Number(e.netProductionKg) || 0,
-            remarks: e.remarks?.trim() || null,
-          })),
-        });
+      for (const e of calculatedEntries) {
+        const rollKey = String(e.rollNumber || "").trim().toUpperCase();
+        const matched = (e.id && existingById.get(e.id)) || (rollKey && existingByRoll.get(rollKey));
+
+        const entryData = {
+          sequence: e.sequence,
+          quality: e.quality || "Standard",
+          rollNumber: e.rollNumber || "",
+          productionKg: Number(e.productionKg) || 0,
+          loomWasteKg: Number(e.loomWasteKg) || 0,
+          loomWastePct: Number(e.loomWastePct) || 0,
+          lamWasteKg: Number(e.lamWasteKg) || 0,
+          lamWastePct: Number(e.lamWastePct) || 0,
+          printWasteKg: Number(e.printWasteKg) || 0,
+          printWastePct: Number(e.printWastePct) || 0,
+          machineWasteKg: Number(e.machineWasteKg) || 0,
+          machineWastePct: Number(e.machineWastePct) || 0,
+          coverPatchWasteKg: Number(e.coverPatchWasteKg) || 0,
+          coverPatchWastePct: Number(e.coverPatchWastePct) || 0,
+          totalWasteKg: Number(e.totalWasteKg) || 0,
+          totalWastePct: Number(e.totalWastePct) || 0,
+          netProductionKg: Number(e.netProductionKg) || 0,
+          remarks: e.remarks?.trim() || null,
+        };
+
+        if (matched) {
+          await tx.convertexWastageReportEntry.update({
+            where: { id: matched.id },
+            data: entryData,
+          });
+        } else {
+          await tx.convertexWastageReportEntry.create({
+            data: {
+              reportId: report.id,
+              ...entryData,
+            },
+          });
+        }
       }
 
       return tx.convertexWastageReport.findUnique({
@@ -304,6 +336,7 @@ export async function POST(request: NextRequest) {
       action: status === "SUBMITTED" ? "SUBMIT" : "SAVE",
       date,
       shift: shiftName,
+      clientId: clientId || null,
       user: {
         id: authResult.session.user.id,
         name: authResult.session.user.name || "Operator",
