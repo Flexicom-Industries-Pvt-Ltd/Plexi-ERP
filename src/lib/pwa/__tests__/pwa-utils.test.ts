@@ -5,6 +5,7 @@ import {
   markPromptDismissed,
   markPwaInstalled,
   isMobileOrIos,
+  isElectron,
   PWA_STORAGE_KEYS,
 } from "../pwa-utils";
 import fs from "fs";
@@ -202,7 +203,60 @@ describe("PWA Utilities & Standalone Suppression Engine", () => {
     });
   });
 
-  describe("Production Manifest Asset Contract", () => {
+  describe("isElectron() Desktop Environment Detection", () => {
+    it("returns false for standard web browsers", () => {
+      const mockWin = {
+        navigator: {
+          userAgent:
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0 Safari/537.36",
+        },
+      } as unknown as Window;
+
+      expect(isElectron(mockWin)).toBe(false);
+    });
+
+    it("returns true when User-Agent includes Electron", () => {
+      const mockWin = {
+        navigator: {
+          userAgent:
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0 Safari/537.36 Electron/34.2.0 PlexiERP-Desktop/0.1.0",
+        },
+      } as unknown as Window;
+
+      expect(isElectron(mockWin)).toBe(true);
+    });
+
+    it("returns true when __IS_ELECTRON__ runtime marker is set on window", () => {
+      const mockWin = {
+        __IS_ELECTRON__: true,
+        navigator: {
+          userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+        },
+      } as unknown as Window;
+
+      expect(isElectron(mockWin)).toBe(true);
+    });
+  });
+
+  describe("Desktop Electron & Production Manifest Asset Contract", () => {
+    it("ensures public/icon.ico exists for Windows desktop executable & installer", () => {
+      const icoPath = path.resolve(process.cwd(), "public/icon.ico");
+      expect(fs.existsSync(icoPath)).toBe(true);
+      const stat = fs.statSync(icoPath);
+      expect(stat.size).toBeGreaterThan(5000);
+    });
+
+    it("ensures electron wrapper files and configuration exist", () => {
+      const mainPath = path.resolve(process.cwd(), "electron/main.js");
+      const preloadPath = path.resolve(process.cwd(), "electron/preload.js");
+      const offlinePath = path.resolve(process.cwd(), "electron/offline.html");
+      const builderConfigPath = path.resolve(process.cwd(), "electron-builder.json");
+
+      expect(fs.existsSync(mainPath)).toBe(true);
+      expect(fs.existsSync(preloadPath)).toBe(true);
+      expect(fs.existsSync(offlinePath)).toBe(true);
+      expect(fs.existsSync(builderConfigPath)).toBe(true);
+    });
     it("ensures public/manifest.json conforms to modern PWA specification", () => {
       const manifestPath = path.resolve(process.cwd(), "public/manifest.json");
       expect(fs.existsSync(manifestPath)).toBe(true);
