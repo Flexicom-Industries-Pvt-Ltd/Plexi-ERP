@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { pruneExpiredEvidencePhotos } from "@/lib/production/photo-retention";
+import { pruneExpiredGatePhotos } from "@/lib/gate/gate-photo-retention";
 
 export const dynamic = "force-dynamic";
 
@@ -14,12 +15,18 @@ export async function GET(request: Request) {
   }
 
   try {
-    const result = await pruneExpiredEvidencePhotos(3);
+    const [productionResult, gateResult] = await Promise.all([
+      pruneExpiredEvidencePhotos(3),
+      pruneExpiredGatePhotos(3),
+    ]);
+
+    const totalPruned = (productionResult.totalPruned || 0) + (gateResult.totalPruned || 0);
 
     return NextResponse.json({
       success: true,
-      message: `Pruned ${result.totalPruned} evidence photos older than 3 days.`,
-      result,
+      message: `Pruned ${totalPruned} photos older than 3 days (${productionResult.totalPruned || 0} production, ${gateResult.totalPruned || 0} gate entry).`,
+      production: productionResult,
+      gate: gateResult,
     });
   } catch (error: any) {
     console.error("Cron photo pruning failed:", error);
