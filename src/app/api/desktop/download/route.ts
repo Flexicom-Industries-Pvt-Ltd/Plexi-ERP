@@ -4,27 +4,6 @@ import path from "path";
 
 export async function GET(req: NextRequest) {
   try {
-    const downloadsDir = path.join(process.cwd(), "public", "downloads");
-    const installerCandidates = [
-      path.join(downloadsDir, "Plexi-ERP-Setup.exe"),
-      path.join(downloadsDir, "Plexi-ERP-Setup-0.1.0.exe"),
-    ];
-
-    for (const candidate of installerCandidates) {
-      if (fs.existsSync(candidate)) {
-        const fileBuffer = fs.readFileSync(candidate);
-        return new NextResponse(fileBuffer, {
-          status: 200,
-          headers: {
-            "Content-Type": "application/vnd.microsoft.portable-executable",
-            "Content-Disposition": 'attachment; filename="Plexi-ERP-Setup.exe"',
-            "Content-Length": fileBuffer.length.toString(),
-          },
-        });
-      }
-    }
-
-    // If binary not placed in public/downloads yet, check for release redirection or return manifest metadata
     const releaseUrl =
       process.env.ELECTRON_RELEASE_URL ||
       "https://github.com/Flexicom-Industries-Pvt-Ltd/Plexi-ERP/releases/latest/download/Plexi-ERP-Setup.exe";
@@ -40,6 +19,29 @@ export async function GET(req: NextRequest) {
         url: releaseUrl,
         publisher: "Flexicom Industries Pvt. Ltd.",
       });
+    }
+
+    const downloadsDir = path.join(process.cwd(), "public", "downloads");
+    const distElectronDir = path.join(process.cwd(), "dist-electron");
+    const installerCandidates = [
+      path.join(downloadsDir, "Plexi-ERP-Setup.exe"),
+      path.join(downloadsDir, "Plexi-ERP-Setup-0.1.0.exe"),
+      path.join(distElectronDir, "Plexi-ERP-Setup.exe"),
+      path.join(distElectronDir, "Plexi-ERP-Setup-0.1.0.exe"),
+    ];
+
+    for (const candidate of installerCandidates) {
+      if (fs.existsSync(candidate)) {
+        const fileBuffer = fs.readFileSync(candidate);
+        return new NextResponse(fileBuffer, {
+          status: 200,
+          headers: {
+            "Content-Type": "application/vnd.microsoft.portable-executable",
+            "Content-Disposition": 'attachment; filename="Plexi-ERP-Setup.exe"',
+            "Content-Length": fileBuffer.length.toString(),
+          },
+        });
+      }
     }
 
     // Redirect to direct release binary download
