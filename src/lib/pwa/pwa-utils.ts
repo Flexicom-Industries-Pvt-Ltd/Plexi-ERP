@@ -111,3 +111,17 @@ export function isMobileOrIos(win?: Window): { isMobile: boolean; isIos: boolean
   const isMobile = (w.innerWidth ?? 1024) <= 768 || /Mobi|Android|iPhone|iPad/i.test(ua);
   return { isMobile, isIos };
 }
+
+/**
+ * Detects whether the current window/environment is running inside the dedicated Electron desktop shell.
+ */
+export function isElectron(win?: Window): boolean {
+  if (typeof window === "undefined" && !win) return false;
+  const w = win || window;
+  const ua = w.navigator?.userAgent || "";
+  const hasElectronUa = /electron/i.test(ua);
+  const hasElectronFlag = Boolean(
+    (w as unknown as { __IS_ELECTRON__?: boolean }).__IS_ELECTRON__
+  );
+  return hasElectronUa || hasElectronFlag;
+}

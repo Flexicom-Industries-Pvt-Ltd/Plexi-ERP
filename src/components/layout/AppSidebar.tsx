@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
@@ -38,6 +38,7 @@ import {
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DesktopDownloadButton } from "@/components/desktop/DesktopDownloadButton";
 
 const navItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard, module: null },
@@ -128,7 +129,7 @@ type AppSidebarProps = {
   allowedModules: Record<string, boolean>;
 };
 
-export function AppSidebar({ user, allowedModules, ...props }: AppSidebarProps) {
+export function AppSidebar({ user, allowedModules }: AppSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [inventoryOpen, setInventoryOpen] = useState(pathname.startsWith("/dashboard/inventory"));
@@ -508,6 +509,9 @@ export function AppSidebar({ user, allowedModules, ...props }: AppSidebarProps) 
         </SidebarMenu>
       </SidebarContent>
       <SidebarFooter className="border-t p-4">
+        <div className="mb-2 group-data-[collapsible=icon]:hidden">
+          <DesktopDownloadButton />
+        </div>
         <SidebarMenu>
           <SidebarMenuItem>
             <DropdownMenu>
