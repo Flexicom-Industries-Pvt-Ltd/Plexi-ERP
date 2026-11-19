@@ -160,7 +160,7 @@
         Target Server: <strong id="server-display" style="color: #38bdf8;">Loading...</strong>
       </div>
       <div id="settings-panel" style="display: none; margin-top: 0.75rem;">
-        <input id="server-url-input" class="server-input" type="url" placeholder="https://plexi-erp-plascom.vercel.app">
+        <input id="server-url-input" class="server-input" type="url" placeholder="https://plexi-erp-two.vercel.app">
         <div class="actions-row">
           <button class="btn btn-secondary" onclick="saveCustomServer()">Save & Connect</button>
           <button class="btn btn-secondary" onclick="resetDefaultServer()">Reset to Cloud</button>
@@ -180,10 +180,10 @@
           document.getElementById("server-display").textContent = url;
           document.getElementById("server-url-input").value = url;
         } catch {
-          document.getElementById("server-display").textContent = "https://plexi-erp-plascom.vercel.app";
+          document.getElementById("server-display").textContent = "https://plexi-erp-two.vercel.app";
         }
       } else {
-        document.getElementById("server-display").textContent = "https://plexi-erp-plascom.vercel.app";
+        document.getElementById("server-display").textContent = "https://plexi-erp-two.vercel.app";
       }
     }
 
