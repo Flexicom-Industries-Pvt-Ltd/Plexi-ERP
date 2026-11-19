@@ -11,11 +11,33 @@ if (!gotTheLock) {
 let mainWindow = null;
 
 // Determine target central CRM URL
-const TARGET_URL =
-  process.env.PLEXI_APP_URL ||
-  (app.isPackaged
-    ? "https://plexi-erp.flexicom.in"
-    : "http://localhost:3000");
+const DEFAULT_URL = app.isPackaged
+  ? "https://plexi-erp-plascom.vercel.app"
+  : "http://localhost:3000";
+
+function getServerConfigPath() {
+  return path.join(app.getPath("userData"), "server-config.json");
+}
+
+function getTargetUrl() {
+  if (process.env.PLEXI_APP_URL) return process.env.PLEXI_APP_URL;
+  try {
+    const raw = fs.readFileSync(getServerConfigPath(), "utf-8");
+    const parsed = JSON.parse(raw);
+    if (parsed.serverUrl && typeof parsed.serverUrl === "string") {
+      return parsed.serverUrl.trim();
+    }
+  } catch {}
+  return DEFAULT_URL;
+}
+
+function setTargetUrl(newUrl) {
+  try {
+    fs.writeFileSync(getServerConfigPath(), JSON.stringify({ serverUrl: newUrl }), "utf-8");
+  } catch (err) {
+    console.error("Failed to save server config:", err);
+  }
+}
 
 // Path to persist window bounds between sessions
 function getWindowStatePath() {
@@ -94,7 +116,12 @@ function createWindow() {
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     if (url.startsWith("http:") || url.startsWith("https:")) {
       // If external destination (not Plexi domain), launch in default browser
-      if (!url.includes("localhost") && !url.includes("plexi-erp.flexicom.in")) {
+      if (
+        !url.includes("localhost") &&
+        !url.includes("plexi-erp-plascom.vercel.app") &&
+        !url.includes("plexi-erp.flexicom.in") &&
+        !url.includes("vercel.app")
+      ) {
         shell.openExternal(url);
         return { action: "deny" };
       }
@@ -103,11 +130,12 @@ function createWindow() {
   });
 
   // Handle network failure or unreachable server with offline recovery page
-  mainWindow.webContents.on("did-fail-load", (event, errorCode, errorDescription) => {
+  mainWindow.webContents.on("did-fail-load", (event, errorCode, errorDescription, validatedURL) => {
     // Ignore aborted loads (e.g. user navigation or redirect)
     if (errorCode === -3) return;
+    if (validatedURL && validatedURL.includes("offline.html")) return;
 
-    console.warn(`Plexi ERP failed to load (${errorCode}): ${errorDescription}`);
+    console.warn(`Plexi ERP failed to load (${errorCode}): ${errorDescription} for ${validatedURL}`);
     const offlinePath = path.join(__dirname, "offline.html");
     if (fs.existsSync(offlinePath)) {
       mainWindow.loadFile(offlinePath);
@@ -118,7 +146,7 @@ function createWindow() {
   const baseUa = mainWindow.webContents.getUserAgent();
   mainWindow.webContents.setUserAgent(`${baseUa} PlexiERP-Desktop/${app.getVersion()}`);
 
-  mainWindow.loadURL(TARGET_URL);
+  mainWindow.loadURL(getTargetUrl());
 }
 
 // Ensure single instance activation
@@ -147,8 +175,21 @@ app.on("window-all-closed", () => {
 
 // IPC communication endpoints for desktop integration
 ipcMain.handle("get-app-version", () => app.getVersion());
+ipcMain.handle("get-server-url", () => getTargetUrl());
+ipcMain.handle("get-default-server-url", () => DEFAULT_URL);
+ipcMain.handle("set-server-url", (event, newUrl) => {
+  if (newUrl && typeof newUrl === "string") {
+    const sanitized = newUrl.trim();
+    setTargetUrl(sanitized);
+    if (mainWindow) {
+      mainWindow.loadURL(sanitized);
+    }
+    return true;
+  }
+  return false;
+});
 ipcMain.handle("retry-connection", () => {
   if (mainWindow) {
-    mainWindow.loadURL(TARGET_URL);
+    mainWindow.loadURL(getTargetUrl());
   }
 });
