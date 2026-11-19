@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Download, Monitor, CheckCircle, X } from "lucide-react";
 import Image from "next/image";
@@ -16,6 +17,7 @@ export function DesktopDownloadButton({ variant = "sidebar", className = "" }: D
   const [isMobile, setIsMobile] = useState(true);
   const [inElectron, setInElectron] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -23,6 +25,23 @@ export function DesktopDownloadButton({ variant = "sidebar", className = "" }: D
     setIsMobile(mobile);
     setInElectron(isElectron());
   }, []);
+
+  const closeModal = useCallback(() => {
+    setIsModalOpen(false);
+    setIsDownloading(false);
+  }, []);
+
+  // Close modal on Escape key press
+  useEffect(() => {
+    if (!isModalOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        closeModal();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isModalOpen, closeModal]);
 
   // Strict enforcement: NEVER render on mobile devices, tablets, or if already inside Electron
   if (!mounted || isMobile || inElectron) {
@@ -34,14 +53,97 @@ export function DesktopDownloadButton({ variant = "sidebar", className = "" }: D
   };
 
   const handleDirectDownload = () => {
+    setIsDownloading(true);
     const link = document.createElement("a");
     link.href = "/api/desktop/download";
     link.setAttribute("download", "Plexi-ERP-Setup.exe");
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    setIsModalOpen(false);
+
+    // Auto-close after download is triggered
+    setTimeout(() => {
+      closeModal();
+    }, 1800);
   };
+
+  const modalContent = isModalOpen && typeof document !== "undefined" ? (
+    <div
+      className="fixed inset-0 z-[99999] bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200"
+      onClick={closeModal}
+    >
+      <div
+        className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full p-6 space-y-5 animate-in zoom-in-95 duration-200 relative z-[100000]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between">
+          <div className="flex items-center space-x-3">
+            <div className="bg-slate-50 p-1.5 rounded-xl border border-slate-200/80 shadow-2xs h-12 w-12 flex items-center justify-center relative">
+              <Image
+                src="/icon-192x192.png"
+                alt="Plexi ERP Logo"
+                width={40}
+                height={40}
+                className="object-contain"
+              />
+            </div>
+            <div>
+              <h3 className="font-bold text-base text-slate-900 tracking-tight">Plexi ERP for Windows</h3>
+              <p className="text-xs text-slate-500">Dedicated factory desktop application</p>
+            </div>
+          </div>
+          <button
+            onClick={closeModal}
+            className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition-colors"
+            aria-label="Close"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="space-y-2.5 text-xs text-slate-600 bg-slate-50/80 p-3.5 rounded-xl border border-slate-200/60">
+          <div className="flex items-start gap-2.5">
+            <CheckCircle className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
+            <span>
+              <strong className="text-slate-900 font-semibold">True Native Software Shell:</strong> Browser menu strip (File/Edit/View) stripped for a clean software experience.
+            </span>
+          </div>
+          <div className="flex items-start gap-2.5">
+            <CheckCircle className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
+            <span>
+              <strong className="text-slate-900 font-semibold">Direct Peripheral Support:</strong> Optimized for factory receipt, gate pass, and report printing.
+            </span>
+          </div>
+          <div className="flex items-start gap-2.5">
+            <CheckCircle className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
+            <span>
+              <strong className="text-slate-900 font-semibold">Offline Network Resilience:</strong> Automatic background reconnection if the factory intranet drops.
+            </span>
+          </div>
+        </div>
+
+        <div className="pt-2 flex items-center justify-end gap-2.5">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={closeModal}
+            className="h-9 px-4 text-xs font-medium text-slate-600 hover:text-slate-900"
+          >
+            Cancel
+          </Button>
+          <Button
+            size="sm"
+            onClick={handleDirectDownload}
+            disabled={isDownloading}
+            className="h-9 px-4 text-xs font-semibold bg-sky-500 hover:bg-sky-600 text-white flex items-center gap-1.5 shadow-sm"
+          >
+            <Download className="h-4 w-4" />
+            <span>{isDownloading ? "Starting Download..." : "Download Installer (.exe)"}</span>
+          </Button>
+        </div>
+      </div>
+    </div>
+  ) : null;
 
   return (
     <>
@@ -86,77 +188,8 @@ export function DesktopDownloadButton({ variant = "sidebar", className = "" }: D
         </Button>
       )}
 
-      {/* Desktop App Download Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-[10000] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full p-6 space-y-5 animate-in zoom-in-95 duration-200">
-            <div className="flex items-start justify-between">
-              <div className="flex items-center space-x-3">
-                <div className="bg-slate-50 p-1.5 rounded-xl border border-slate-200/80 shadow-2xs h-12 w-12 flex items-center justify-center relative">
-                  <Image
-                    src="/icon-192x192.png"
-                    alt="Plexi ERP Logo"
-                    width={40}
-                    height={40}
-                    className="object-contain"
-                  />
-                </div>
-                <div>
-                  <h3 className="font-bold text-base text-slate-900 tracking-tight">Plexi ERP for Windows</h3>
-                  <p className="text-xs text-slate-500">Dedicated factory desktop application</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setIsModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition-colors"
-                aria-label="Close"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            <div className="space-y-2.5 text-xs text-slate-600 bg-slate-50/80 p-3.5 rounded-xl border border-slate-200/60">
-              <div className="flex items-start gap-2.5">
-                <CheckCircle className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
-                <span>
-                  <strong className="text-slate-900 font-semibold">True Native Software Shell:</strong> Browser menu strip (File/Edit/View) stripped for a clean software experience.
-                </span>
-              </div>
-              <div className="flex items-start gap-2.5">
-                <CheckCircle className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
-                <span>
-                  <strong className="text-slate-900 font-semibold">Direct Peripheral Support:</strong> Optimized for factory receipt, gate pass, and report printing.
-                </span>
-              </div>
-              <div className="flex items-start gap-2.5">
-                <CheckCircle className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
-                <span>
-                  <strong className="text-slate-900 font-semibold">Offline Network Resilience:</strong> Automatic background reconnection if the factory intranet drops.
-                </span>
-              </div>
-            </div>
-
-            <div className="pt-2 flex items-center justify-end gap-2.5">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setIsModalOpen(false)}
-                className="h-9 px-4 text-xs font-medium text-slate-600 hover:text-slate-900"
-              >
-                Cancel
-              </Button>
-              <Button
-                size="sm"
-                onClick={handleDirectDownload}
-                className="h-9 px-4 text-xs font-semibold bg-sky-500 hover:bg-sky-600 text-white flex items-center gap-1.5 shadow-sm"
-              >
-                <Download className="h-4 w-4" />
-                <span>Download Installer (.exe)</span>
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Render modal directly in document.body via Portal to escape all stacking contexts */}
+      {modalContent && createPortal(modalContent, document.body)}
     </>
   );
 }

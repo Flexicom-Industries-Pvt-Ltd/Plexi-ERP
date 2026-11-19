@@ -47,5 +47,8 @@ next-env.d.ts
 /public/sw*
 /public/workbox*
 
+# Electron packaging output
+/dist-electron
+
 # scratch & temporary files
 /scratch/
