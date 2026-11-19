@@ -97,6 +97,17 @@ export function TransportSlipModal({ open, onClose, entry }: TransportSlipModalP
     0
   );
 
+  const truckPhotoDoc = (entry.documents || []).find((d: any) => {
+    const norm = (d.documentType || "").toLowerCase();
+    return (
+      (norm.includes("truck") || norm.includes("vehicle")) &&
+      Boolean(d.fileUrl && d.fileUrl !== "local-check")
+    );
+  }) || (entry.documents || []).find((d: any) => {
+    const norm = (d.documentType || "").toLowerCase();
+    return norm.includes("photo") && Boolean(d.fileUrl && d.fileUrl !== "local-check");
+  });
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/70 backdrop-blur-xs overflow-y-auto">
       {/* Modal Container */}
@@ -190,84 +201,103 @@ export function TransportSlipModal({ open, onClose, entry }: TransportSlipModalP
               <div className="text-[11px] font-bold text-slate-900 uppercase tracking-wider border-b border-slate-900 pb-1 mb-2">
                 1. Vehicle & Movement Overview
               </div>
-              <table className="w-full border-collapse border border-slate-300 text-[11px]">
-                <tbody>
-                  <tr className="border-b border-slate-200">
-                    <td className="w-1/6 bg-slate-50 p-2 font-semibold text-slate-600 border-r border-slate-200 uppercase text-[10px]">
-                      Truck / Vehicle No
-                    </td>
-                    <td className="w-2/6 p-2 font-mono font-bold text-slate-950 border-r border-slate-200 text-xs">
-                      {entry.truckNumber || "—"}
-                    </td>
-                    <td className="w-1/6 bg-slate-50 p-2 font-semibold text-slate-600 border-r border-slate-200 uppercase text-[10px]">
-                      Gate In Date/Time
-                    </td>
-                    <td className="w-2/6 p-2 text-slate-800">
-                      {formatDateTime(entry.arrivalTime)}
-                    </td>
-                  </tr>
-                  <tr className="border-b border-slate-200">
-                    <td className="bg-slate-50 p-2 font-semibold text-slate-600 border-r border-slate-200 uppercase text-[10px]">
-                      Driver Name
-                    </td>
-                    <td className="p-2 font-bold text-slate-900 border-r border-slate-200">
-                      {entry.driverName || "—"}
-                    </td>
-                    <td className="bg-slate-50 p-2 font-semibold text-slate-600 border-r border-slate-200 uppercase text-[10px]">
-                      Gate Out Date/Time
-                    </td>
-                    <td className="p-2 text-slate-800">
-                      {entry.exitTime ? formatDateTime(entry.exitTime) : "Currently In Factory"}
-                    </td>
-                  </tr>
-                  <tr className="border-b border-slate-200">
-                    <td className="bg-slate-50 p-2 font-semibold text-slate-600 border-r border-slate-200 uppercase text-[10px]">
-                      Driver Contact
-                    </td>
-                    <td className="p-2 text-slate-800 border-r border-slate-200">
-                      {entry.driverContact || "—"}
-                    </td>
-                    <td className="bg-slate-50 p-2 font-semibold text-slate-600 border-r border-slate-200 uppercase text-[10px]">
-                      License Number
-                    </td>
-                    <td className="p-2 font-mono text-slate-800">
-                      {entry.driverLicenseNumber || "—"}
-                    </td>
-                  </tr>
-                  <tr className="border-b border-slate-200">
-                    <td className="bg-slate-50 p-2 font-semibold text-slate-600 border-r border-slate-200 uppercase text-[10px]">
-                      Transporter
-                    </td>
-                    <td className="p-2 text-slate-800 border-r border-slate-200">
-                      {entry.transporter || "—"}
-                    </td>
-                    <td className="bg-slate-50 p-2 font-semibold text-slate-600 border-r border-slate-200 uppercase text-[10px]">
-                      Parking / Bay
-                    </td>
-                    <td className="p-2 font-semibold text-slate-900">
-                      {entry.parkingLocation || "Waiting Area"}
-                    </td>
-                  </tr>
-                  <tr>
-                    <td className="bg-slate-50 p-2 font-semibold text-slate-600 border-r border-slate-200 uppercase text-[10px]">
-                      Supplier / Party
-                    </td>
-                    <td colSpan={3} className="p-2 font-bold text-slate-900">
-                      {entry.supplierCustomer || "—"}
-                    </td>
-                  </tr>
-                  {entry.waitingReason && (
-                    <tr className="border-t border-slate-200">
-                      <td className="bg-slate-50 p-2 font-semibold text-slate-600 border-r border-slate-200 uppercase text-[10px]">
-                        Waiting Reason
+              <div className="flex flex-col md:flex-row gap-2.5 items-stretch">
+                <table className="flex-1 border-collapse border border-slate-300 text-[11px]">
+                  <tbody>
+                    <tr className="border-b border-slate-200">
+                      <td className="w-1/6 bg-slate-50 p-2 font-semibold text-slate-600 border-r border-slate-200 uppercase text-[10px]">
+                        Truck / Vehicle No
                       </td>
-                      <td colSpan={3} className="p-2 italic text-slate-700">
-                        {entry.waitingReason}
+                      <td className="w-2/6 p-2 font-mono font-bold text-slate-950 border-r border-slate-200 text-xs">
+                        {entry.truckNumber || "—"}
+                      </td>
+                      <td className="w-1/6 bg-slate-50 p-2 font-semibold text-slate-600 border-r border-slate-200 uppercase text-[10px]">
+                        Gate In Date/Time
+                      </td>
+                      <td className="w-2/6 p-2 text-slate-800">
+                        {formatDateTime(entry.arrivalTime)}
                       </td>
                     </tr>
-                  )}
-                </tbody>
-              </table>
+                    <tr className="border-b border-slate-200">
+                      <td className="bg-slate-50 p-2 font-semibold text-slate-600 border-r border-slate-200 uppercase text-[10px]">
+                        Driver Name
+                      </td>
+                      <td className="p-2 font-bold text-slate-900 border-r border-slate-200">
+                        {entry.driverName || "—"}
+                      </td>
+                      <td className="bg-slate-50 p-2 font-semibold text-slate-600 border-r border-slate-200 uppercase text-[10px]">
+                        Gate Out Date/Time
+                      </td>
+                      <td className="p-2 text-slate-800">
+                        {entry.exitTime ? formatDateTime(entry.exitTime) : "Currently In Factory"}
+                      </td>
+                    </tr>
+                    <tr className="border-b border-slate-200">
+                      <td className="bg-slate-50 p-2 font-semibold text-slate-600 border-r border-slate-200 uppercase text-[10px]">
+                        Driver Contact
+                      </td>
+                      <td className="p-2 text-slate-800 border-r border-slate-200">
+                        {entry.driverContact || "—"}
+                      </td>
+                      <td className="bg-slate-50 p-2 font-semibold text-slate-600 border-r border-slate-200 uppercase text-[10px]">
+                        License Number
+                      </td>
+                      <td className="p-2 font-mono text-slate-800">
+                        {entry.driverLicenseNumber || "—"}
+                      </td>
+                    </tr>
+                    <tr className="border-b border-slate-200">
+                      <td className="bg-slate-50 p-2 font-semibold text-slate-600 border-r border-slate-200 uppercase text-[10px]">
+                        Transporter
+                      </td>
+                      <td className="p-2 text-slate-800 border-r border-slate-200">
+                        {entry.transporter || "—"}
+                      </td>
+                      <td className="bg-slate-50 p-2 font-semibold text-slate-600 border-r border-slate-200 uppercase text-[10px]">
+                        Parking / Bay
+                      </td>
+                      <td className="p-2 font-semibold text-slate-900">
+                        {entry.parkingLocation || "Waiting Area"}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="bg-slate-50 p-2 font-semibold text-slate-600 border-r border-slate-200 uppercase text-[10px]">
+                        Supplier / Party
+                      </td>
+                      <td colSpan={3} className="p-2 font-bold text-slate-900">
+                        {entry.supplierCustomer || "—"}
+                      </td>
+                    </tr>
+                    {entry.waitingReason && (
+                      <tr className="border-t border-slate-200">
+                        <td className="bg-slate-50 p-2 font-semibold text-slate-600 border-r border-slate-200 uppercase text-[10px]">
+                          Waiting Reason
+                        </td>
+                        <td colSpan={3} className="p-2 italic text-slate-700">
+                          {entry.waitingReason}
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+
+                {truckPhotoDoc && (
+                  <div className="w-full md:w-36 shrink-0 bg-slate-50 border border-slate-300 rounded p-2 text-center flex flex-col items-center justify-center">
+                    <span className="text-[9px] font-bold uppercase text-slate-500 tracking-wider mb-1 block">
+                      Vehicle Photo
+                    </span>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={truckPhotoDoc.fileUrl}
+                      alt={`Truck ${entry.truckNumber}`}
+                      className="w-full h-24 object-cover rounded border border-slate-200 shadow-2xs"
+                    />
+                    <span className="text-[9px] font-mono font-bold text-slate-700 mt-1 block truncate w-full">
+                      {entry.truckNumber}
+                    </span>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* 3. SECTION 2: CONSIGNMENT MATERIAL & STOCK MANIFEST */}
@@ -366,7 +396,19 @@ export function TransportSlipModal({ open, onClose, entry }: TransportSlipModalP
                     entry.documents.map((doc: any, idx: number) => (
                       <tr key={doc.id || idx}>
                         <td className="p-2 text-center font-mono text-slate-500 border-r border-slate-200">{idx + 1}</td>
-                        <td className="p-2 font-bold text-slate-900 border-r border-slate-200">{doc.documentType}</td>
+                        <td className="p-2 font-bold text-slate-900 border-r border-slate-200">
+                          <div className="flex items-center gap-1.5">
+                            {doc.fileUrl && /\.(jpg|jpeg|png|webp|gif|heic)/i.test(doc.fileUrl) && (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={doc.fileUrl}
+                                alt={doc.documentType}
+                                className="w-5 h-5 rounded object-cover border border-slate-200 shrink-0"
+                              />
+                            )}
+                            <span className="truncate">{doc.documentType}</span>
+                          </div>
+                        </td>
                         <td className="p-2 text-slate-700 border-r border-slate-200 text-[10px]">{doc.remarks || "—"}</td>
                         <td className="p-2 text-center font-bold text-[10px] border-r border-slate-200">
                           {doc.status}

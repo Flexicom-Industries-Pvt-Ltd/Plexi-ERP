@@ -116,17 +116,36 @@ export function generateTransportSlipHtml(entry: GatePrintEntry): string {
       </tr>
     `;
 
+  const truckPhotoDoc = (entry.documents || []).find((d: any) => {
+    const norm = (d.documentType || "").toLowerCase();
+    return (
+      (norm.includes("truck") || norm.includes("vehicle")) &&
+      Boolean(d.fileUrl && d.fileUrl !== "local-check")
+    );
+  }) || (entry.documents || []).find((d: any) => {
+    const norm = (d.documentType || "").toLowerCase();
+    return norm.includes("photo") && Boolean(d.fileUrl && d.fileUrl !== "local-check");
+  });
+
   const docRows = (entry.documents && entry.documents.length > 0)
-    ? entry.documents.map((doc, idx) => `
+    ? entry.documents.map((doc, idx) => {
+      const isImg = doc.fileUrl && /\.(jpg|jpeg|png|webp|gif|heic)/i.test(doc.fileUrl);
+      return `
       <tr>
         <td style="text-align: center; width: 30px;">${idx + 1}</td>
-        <td style="font-weight: 600;">${doc.documentType || "Document"}</td>
+        <td style="font-weight: 600;">
+          <div style="display: flex; align-items: center; gap: 6px;">
+            ${isImg ? `<img src="${doc.fileUrl}" style="width: 22px; height: 22px; object-fit: cover; border-radius: 3px; border: 1px solid #cbd5e1;" />` : ""}
+            <span>${doc.documentType || "Document"}</span>
+          </div>
+        </td>
         <td>${doc.remarks || "—"}</td>
         <td style="text-align: center; font-weight: 600;">${doc.status || "PENDING"}</td>
         <td>${doc.verifier?.name || "Security Desk"}</td>
         <td style="text-align: right; font-family: monospace; font-size: 8pt;">${doc.verifiedAt ? formatDateTime(doc.verifiedAt) : formatDateTime(doc.createdAt)}</td>
       </tr>
-    `).join("")
+    `;
+    }).join("")
     : `
       <tr>
         <td colspan="6" style="text-align: center; color: #64748b; font-style: italic; padding: 6px;">
@@ -350,40 +369,52 @@ export function generateTransportSlipHtml(entry: GatePrintEntry): string {
 
     <!-- 1. VEHICLE & TRIP DETAILS -->
     <div class="section-title">1. Vehicle & Movement Overview</div>
-    <table class="info-table">
+    <table style="width: 100%; border-collapse: collapse; margin-bottom: 8px;">
       <tr>
-        <td class="info-label">Truck No</td>
-        <td class="info-val info-val-strong" style="font-family: monospace; font-size: 9.5pt;">${entry.truckNumber || "—"}</td>
-        <td class="info-label">Gate In Date/Time</td>
-        <td class="info-val">${formatDateTime(entry.arrivalTime)}</td>
+        <td style="vertical-align: top; padding-right: ${truckPhotoDoc ? "8px" : "0"};">
+          <table class="info-table" style="margin-bottom: 0;">
+            <tr>
+              <td class="info-label" style="width: 20%;">Truck No</td>
+              <td class="info-val info-val-strong" style="width: 30%; font-family: monospace; font-size: 9.5pt;">${entry.truckNumber || "—"}</td>
+              <td class="info-label" style="width: 22%;">Gate In Date/Time</td>
+              <td class="info-val" style="width: 28%;">${formatDateTime(entry.arrivalTime)}</td>
+            </tr>
+            <tr>
+              <td class="info-label">Driver Name</td>
+              <td class="info-val info-val-strong">${entry.driverName || "—"}</td>
+              <td class="info-label">Gate Out Date/Time</td>
+              <td class="info-val">${entry.exitTime ? formatDateTime(entry.exitTime) : "Currently In Factory"}</td>
+            </tr>
+            <tr>
+              <td class="info-label">Driver Contact</td>
+              <td class="info-val">${entry.driverContact || "—"}</td>
+              <td class="info-label">License Number</td>
+              <td class="info-val" style="font-family: monospace;">${entry.driverLicenseNumber || "—"}</td>
+            </tr>
+            <tr>
+              <td class="info-label">Transporter</td>
+              <td class="info-val">${entry.transporter || "—"}</td>
+              <td class="info-label">Parking / Bay</td>
+              <td class="info-val">${entry.parkingLocation || "Waiting Area"}</td>
+            </tr>
+            <tr>
+              <td class="info-label">Supplier / Party</td>
+              <td class="info-val" colspan="3">${entry.supplierCustomer || "—"}</td>
+            </tr>
+            ${entry.waitingReason ? `
+            <tr>
+              <td class="info-label">Hold / Waiting Reason</td>
+              <td class="info-val" colspan="3" style="font-style: italic;">${entry.waitingReason}</td>
+            </tr>` : ""}
+          </table>
+        </td>
+        ${truckPhotoDoc ? `
+        <td style="width: 130px; vertical-align: top; text-align: center; border: 1px solid #94a3b8; background: #f8fafc; padding: 5px;">
+          <div style="font-size: 6.5pt; font-weight: 800; text-transform: uppercase; color: #475569; margin-bottom: 3px; letter-spacing: 0.5px;">Vehicle Photo</div>
+          <img src="${truckPhotoDoc.fileUrl}" alt="Truck ${entry.truckNumber}" style="width: 118px; height: 86px; object-fit: cover; border-radius: 3px; border: 1px solid #cbd5e1; display: block; margin: 0 auto;" onerror="this.style.display='none'" />
+          <div style="font-size: 6pt; color: #64748b; font-family: monospace; margin-top: 3px;">${entry.truckNumber}</div>
+        </td>` : ""}
       </tr>
-      <tr>
-        <td class="info-label">Driver Name</td>
-        <td class="info-val info-val-strong">${entry.driverName || "—"}</td>
-        <td class="info-label">Gate Out Date/Time</td>
-        <td class="info-val">${entry.exitTime ? formatDateTime(entry.exitTime) : "Currently In Factory"}</td>
-      </tr>
-      <tr>
-        <td class="info-label">Driver Contact</td>
-        <td class="info-val">${entry.driverContact || "—"}</td>
-        <td class="info-label">License Number</td>
-        <td class="info-val" style="font-family: monospace;">${entry.driverLicenseNumber || "—"}</td>
-      </tr>
-      <tr>
-        <td class="info-label">Transporter</td>
-        <td class="info-val">${entry.transporter || "—"}</td>
-        <td class="info-label">Parking / Bay</td>
-        <td class="info-val">${entry.parkingLocation || "Waiting Area"}</td>
-      </tr>
-      <tr>
-        <td class="info-label">Supplier / Party</td>
-        <td class="info-val" colspan="3">${entry.supplierCustomer || "—"}</td>
-      </tr>
-      ${entry.waitingReason ? `
-      <tr>
-        <td class="info-label">Hold / Waiting Reason</td>
-        <td class="info-val" colspan="3" style="font-style: italic;">${entry.waitingReason}</td>
-      </tr>` : ""}
     </table>
 
     <!-- 2. STOCK MANIFEST -->
