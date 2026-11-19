@@ -1,0 +1,35 @@
+{
+  "$schema": "https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json",
+  "appId": "com.flexicom.plexierp",
+  "productName": "Plexi ERP",
+  "copyright": "Copyright © 2026 Flexicom Industries Pvt. Ltd.",
+  "directories": {
+    "output": "dist-electron"
+  },
+  "files": [
+    "electron/**/*",
+    "package.json"
+  ],
+  "win": {
+    "icon": "electron/assets/icon.ico",
+    "target": [
+      {
+        "target": "nsis",
+        "arch": ["x64"]
+      }
+    ],
+    "publisherName": "Flexicom Industries Pvt. Ltd."
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": "always",
+    "createStartMenuShortcut": true,
+    "shortcutName": "Plexi ERP",
+    "installerIcon": "electron/assets/icon.ico",
+    "uninstallerIcon": "electron/assets/icon.ico",
+    "installerHeaderIcon": "electron/assets/icon.ico",
+    "uninstallDisplayName": "Plexi ERP",
+    "artifactName": "Plexi-ERP-Setup-${version}.${ext}"
+  }
+}

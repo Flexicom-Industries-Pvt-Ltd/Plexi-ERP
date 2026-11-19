@@ -10,6 +10,7 @@ import {
   markPromptDismissed,
   markPwaInstalled,
   isMobileOrIos,
+  isElectron,
 } from "@/lib/pwa/pwa-utils";
 
 export function PwaInstallPrompt() {
@@ -19,24 +20,25 @@ export function PwaInstallPrompt() {
   const [isIos, setIsIos] = useState(false);
 
   useEffect(() => {
-    // 1. Immediately abort if running in standalone PWA mode or previously dismissed/installed
-    if (isPwaStandalone() || isPromptDismissed()) {
-      return;
-    }
-
+    // 1. Immediately abort if running in Electron, standalone PWA, previously dismissed/installed, or on desktop/laptop
     const { isMobile: mobile, isIos: ios } = isMobileOrIos();
     setIsIos(ios);
 
-    // 2. On iOS (which does not support beforeinstallprompt), show prompt for mobile web
+    if (!mobile || isElectron() || isPwaStandalone() || isPromptDismissed()) {
+      return;
+    }
+
+    // 2. On iOS mobile web
     if (ios && mobile) {
       setIsVisible(true);
     }
 
-    // 3. Android / Chromium beforeinstallprompt listener
+    // 3. Android / Chromium beforeinstallprompt listener (mobile phones only)
     const handleBeforeInstallPrompt = (e: any) => {
       e.preventDefault();
       setDeferredPrompt(e);
-      if (!isPwaStandalone() && !isPromptDismissed()) {
+      const { isMobile: isMobileDevice } = isMobileOrIos();
+      if (isMobileDevice && !isPwaStandalone() && !isPromptDismissed() && !isElectron()) {
         setIsVisible(true);
       }
     };
