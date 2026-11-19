@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import { toast } from "sonner";
 import {
   CheckCircle,
@@ -164,202 +164,162 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName, shifts }: T
       .catch((err) => console.error("Error loading master recipes:", err));
   }, []);
 
+  // Authoritative data fetch
+  const loadAuthoritativePlan = useCallback(async () => {
+    if (!date || !shiftId) return;
+    try {
+      const r = await fetch(
+        `/api/production/tape-plant/planning?date=${date}&shiftId=${shiftId}&_t=${Date.now()}`,
+        {
+          cache: "no-store",
+          headers: {
+            Pragma: "no-cache",
+            "Cache-Control": "no-cache",
+          },
+        }
+      );
+      if (!r.ok) return;
+      const data = await r.json();
+      if (!data) return;
+
+      if (Array.isArray(data.plans) && data.plans.length > 0) {
+        const loaded = data.plans.map((p: any) => ({
+          id: p.id,
+          shiftId: p.shiftId || undefined,
+          shiftName: p.shiftName || p.shift?.name || undefined,
+          recipeQuality: p.recipeQuality || "",
+          tapeType: p.tapeType || "PP",
+          denier: p.denier ?? "",
+          tapeWidth: p.tapeWidth ?? "",
+          strength: p.strength ?? "",
+          eloPercent: p.eloPercent ?? "",
+          bobbinMarking: p.bobbinMarking || "",
+          colour: p.colour || "",
+          spacerSize: p.spacerSize || "",
+          requiredAsh: p.requiredAsh ?? "",
+          ashPercent: p.ashPercent ?? "",
+          plannedQtyKg: p.plannedQtyKg ? p.plannedQtyKg : "",
+          omega: p.omega || "",
+          vistPercent: p.vistPercent ?? "",
+          remarks: p.remarks || "",
+          materials:
+            Array.isArray(p.materials) && p.materials.length > 0
+              ? p.materials
+              : DEFAULT_MATERIALS.map((m) => ({ material: m.material, quantity: "", percentage: "" })),
+          isDayNight: Boolean(p.isDayNight),
+          carriedOverFromShift: p.carriedOverFromShift || undefined,
+        }));
+        setRecipePlans(loaded);
+        const currentStatus = data.plans[0]?.status === "SUBMITTED" ? "SUBMITTED" : "SAVED";
+        setStatus(currentStatus);
+        lastSavedPayloadRef.current = JSON.stringify({
+          date,
+          shiftId,
+          status: currentStatus,
+          plans: loaded.map((p: any) => ({
+            id: p.id,
+            recipeQuality: (p.recipeQuality || "").trim(),
+            tapeType: p.tapeType,
+            denier: p.denier !== "" ? Number(p.denier) : null,
+            tapeWidth: p.tapeWidth !== "" ? Number(p.tapeWidth) : null,
+            strength: p.strength !== "" ? Number(p.strength) : null,
+            eloPercent: p.eloPercent !== "" ? Number(p.eloPercent) : null,
+            bobbinMarking: p.bobbinMarking,
+            colour: p.colour,
+            spacerSize: p.spacerSize,
+            requiredAsh: p.requiredAsh !== "" ? Number(p.requiredAsh) : null,
+            ashPercent: p.ashPercent !== "" ? Number(p.ashPercent) : null,
+            plannedQtyKg: p.plannedQtyKg !== "" ? Number(p.plannedQtyKg) : 0,
+            omega: p.omega,
+            vistPercent: p.vistPercent !== "" ? Number(p.vistPercent) : null,
+            remarks: p.remarks,
+            materials: p.materials,
+            isDayNight: Boolean(p.isDayNight),
+            shiftId: p.shiftId || (shiftId !== "ALL" ? shiftId : undefined),
+            status: currentStatus,
+          })),
+        });
+      } else if (data && data.recipeQuality) {
+        // Backward compatibility with single record
+        const single: RecipePlanItem = {
+          id: data.id || `temp-${Date.now()}`,
+          shiftId: data.shiftId || undefined,
+          shiftName: data.shiftName || (data.shift?.name) || undefined,
+          recipeQuality: data.recipeQuality || "",
+          tapeType: data.tapeType || "PP",
+          denier: data.denier ?? "",
+          tapeWidth: data.tapeWidth ?? "",
+          strength: data.strength ?? "",
+          eloPercent: data.eloPercent ?? "",
+          bobbinMarking: data.bobbinMarking || "",
+          colour: data.colour || "",
+          spacerSize: data.spacerSize || "",
+          requiredAsh: data.requiredAsh ?? "",
+          ashPercent: data.ashPercent ?? "",
+          plannedQtyKg: data.plannedQtyKg ? data.plannedQtyKg : "",
+          omega: data.omega || "",
+          vistPercent: data.vistPercent ?? "",
+          remarks: data.remarks || "",
+          materials:
+            Array.isArray(data.materials) && data.materials.length > 0
+              ? data.materials
+              : DEFAULT_MATERIALS.map((m) => ({ material: m.material, quantity: "", percentage: "" })),
+          isDayNight: Boolean(data.isDayNight),
+          carriedOverFromShift: data.carriedOverFromShift || undefined,
+        };
+        setRecipePlans([single]);
+        const currentStatus = data.status === "SUBMITTED" ? "SUBMITTED" : "SAVED";
+        setStatus(currentStatus);
+      } else {
+        const defaultShift = availableShifts[0];
+        const empty = [createEmptyRecipePlan(1, defaultShift?.id, defaultShift?.name)];
+        setRecipePlans(empty);
+        setStatus("SAVED");
+        lastSavedPayloadRef.current = "";
+      }
+    } catch (err) {
+      console.warn("Authoritative plan load error:", err);
+    }
+  }, [date, shiftId, availableShifts]);
+
   // Load plans for the shift
   useEffect(() => {
     if (!date || !shiftId) return;
     isInitialLoadedRef.current = false;
     setLoading(true);
-    fetch(`/api/production/tape-plant/planning?date=${date}&shiftId=${shiftId}&_t=${Date.now()}`, {
-      cache: "no-store",
-      headers: {
-        Pragma: "no-cache",
-        "Cache-Control": "no-cache",
-      },
-    })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (data && Array.isArray(data.plans) && data.plans.length > 0) {
-          const loaded = data.plans.map((p: any) => ({
-            id: p.id,
-            shiftId: p.shiftId || undefined,
-            shiftName: p.shiftName || (p.shift?.name) || undefined,
-            recipeQuality: p.recipeQuality || "",
-            tapeType: p.tapeType || "PP",
-            denier: p.denier ?? "",
-            tapeWidth: p.tapeWidth ?? "",
-            strength: p.strength ?? "",
-            eloPercent: p.eloPercent ?? "",
-            bobbinMarking: p.bobbinMarking || "",
-            colour: p.colour || "",
-            spacerSize: p.spacerSize || "",
-            requiredAsh: p.requiredAsh ?? "",
-            ashPercent: p.ashPercent ?? "",
-            plannedQtyKg: p.plannedQtyKg ? p.plannedQtyKg : "",
-            omega: p.omega || "",
-            vistPercent: p.vistPercent ?? "",
-            remarks: p.remarks || "",
-            materials: Array.isArray(p.materials) && p.materials.length > 0 ? p.materials : DEFAULT_MATERIALS.map((m) => ({ material: m.material, quantity: "", percentage: "" })),
-            isDayNight: Boolean(p.isDayNight),
-            carriedOverFromShift: p.carriedOverFromShift || undefined,
-          }));
-          setRecipePlans(loaded);
-          const currentStatus = data.plans[0]?.status === "SUBMITTED" ? "SUBMITTED" : "SAVED";
-          setStatus(currentStatus);
-          setActiveRecipeIndex(0);
-          lastSavedPayloadRef.current = JSON.stringify({
-            date,
-            shiftId,
-            status: currentStatus,
-            plans: loaded.map((p: any) => ({
-              id: p.id,
-              recipeQuality: (p.recipeQuality || "").trim(),
-              tapeType: p.tapeType,
-              denier: p.denier !== "" ? Number(p.denier) : null,
-              tapeWidth: p.tapeWidth !== "" ? Number(p.tapeWidth) : null,
-              strength: p.strength !== "" ? Number(p.strength) : null,
-              eloPercent: p.eloPercent !== "" ? Number(p.eloPercent) : null,
-              bobbinMarking: p.bobbinMarking,
-              colour: p.colour,
-              spacerSize: p.spacerSize,
-              requiredAsh: p.requiredAsh !== "" ? Number(p.requiredAsh) : null,
-              ashPercent: p.ashPercent !== "" ? Number(p.ashPercent) : null,
-              plannedQtyKg: p.plannedQtyKg !== "" ? Number(p.plannedQtyKg) : 0,
-              omega: p.omega,
-              vistPercent: p.vistPercent !== "" ? Number(p.vistPercent) : null,
-              remarks: p.remarks,
-              materials: p.materials,
-              isDayNight: Boolean(p.isDayNight),
-              shiftId: p.shiftId || (shiftId !== "ALL" ? shiftId : undefined),
-              status: currentStatus,
-            })),
-          });
-        } else if (data && data.recipeQuality) {
-          // Backward compatibility with single record
-          const single: RecipePlanItem = {
-            id: data.id || `temp-${Date.now()}`,
-            shiftId: data.shiftId || undefined,
-            shiftName: data.shiftName || (data.shift?.name) || undefined,
-            recipeQuality: data.recipeQuality || "",
-            tapeType: data.tapeType || "PP",
-            denier: data.denier ?? "",
-            tapeWidth: data.tapeWidth ?? "",
-            strength: data.strength ?? "",
-            eloPercent: data.eloPercent ?? "",
-            bobbinMarking: data.bobbinMarking || "",
-            colour: data.colour || "",
-            spacerSize: data.spacerSize || "",
-            requiredAsh: data.requiredAsh ?? "",
-            ashPercent: data.ashPercent ?? "",
-            plannedQtyKg: data.plannedQtyKg ? data.plannedQtyKg : "",
-            omega: data.omega || "",
-            vistPercent: data.vistPercent ?? "",
-            remarks: data.remarks || "",
-            materials: Array.isArray(data.materials) && data.materials.length > 0 ? data.materials : DEFAULT_MATERIALS.map((m) => ({ material: m.material, quantity: "", percentage: "" })),
-            isDayNight: Boolean(data.isDayNight),
-            carriedOverFromShift: data.carriedOverFromShift || undefined,
-          };
-          setRecipePlans([single]);
-          const currentStatus = data.status === "SUBMITTED" ? "SUBMITTED" : "SAVED";
-          setStatus(currentStatus);
-          setActiveRecipeIndex(0);
-          lastSavedPayloadRef.current = JSON.stringify({
-            date,
-            shiftId,
-            status: currentStatus,
-            plans: [{
-              id: single.id,
-              recipeQuality: (single.recipeQuality || "").trim(),
-              tapeType: single.tapeType,
-              denier: single.denier !== "" ? Number(single.denier) : null,
-              tapeWidth: single.tapeWidth !== "" ? Number(single.tapeWidth) : null,
-              strength: single.strength !== "" ? Number(single.strength) : null,
-              eloPercent: single.eloPercent !== "" ? Number(single.eloPercent) : null,
-              bobbinMarking: single.bobbinMarking,
-              colour: single.colour,
-              spacerSize: single.spacerSize,
-              requiredAsh: single.requiredAsh !== "" ? Number(single.requiredAsh) : null,
-              ashPercent: single.ashPercent !== "" ? Number(single.ashPercent) : null,
-              plannedQtyKg: single.plannedQtyKg !== "" ? Number(single.plannedQtyKg) : 0,
-              omega: single.omega,
-              vistPercent: single.vistPercent !== "" ? Number(single.vistPercent) : null,
-              remarks: single.remarks,
-              materials: single.materials,
-              isDayNight: Boolean(single.isDayNight),
-              shiftId: single.shiftId || (shiftId !== "ALL" ? shiftId : undefined),
-              status: currentStatus,
-            }],
-          });
-        } else {
-          const defaultShift = availableShifts[0];
-          const empty = [createEmptyRecipePlan(1, defaultShift?.id, defaultShift?.name)];
-          setRecipePlans(empty);
-          setStatus("SAVED");
-          setActiveRecipeIndex(0);
-          lastSavedPayloadRef.current = "";
-        }
-      })
+    loadAuthoritativePlan()
       .catch(() => toast.error("Failed to load Tape Plant plan"))
       .finally(() => {
         setLoading(false);
         isInitialLoadedRef.current = true;
       });
-  }, [date, shiftId]);
+  }, [date, shiftId, loadAuthoritativePlan]);
+
+  // Google Docs-grade catch-up when tab/browser is minimized, backgrounded, or wakes up from sleep
+  useEffect(() => {
+    const handleVisibilityOrFocus = () => {
+      if (typeof document !== "undefined" && document.visibilityState === "visible") {
+        loadAuthoritativePlan();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityOrFocus);
+    window.addEventListener("focus", handleVisibilityOrFocus);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityOrFocus);
+      window.removeEventListener("focus", handleVisibilityOrFocus);
+    };
+  }, [loadAuthoritativePlan]);
 
   const realtime = useProductionRealtime({
     module: "tape-plant",
     sheet: "planning",
     date,
     shift: shiftId,
-    onSync: () => {
+    onSync: (event) => {
       if (!date || !shiftId || autoSaving) return;
-      if (Date.now() - lastUserEditTimeRef.current < 3500) return;
-      fetch(`/api/production/tape-plant/planning?date=${date}&shiftId=${shiftId}&_t=${Date.now()}`, {
-        cache: "no-store",
-      })
-        .then((r) => (r.ok ? r.json() : null))
-        .then((data) => {
-          if (data && Array.isArray(data.plans) && data.plans.length > 0) {
-            const loaded = data.plans.map((p: any) => ({
-              id: p.id,
-              shiftId: p.shiftId || undefined,
-              shiftName: p.shiftName || (p.shift?.name) || undefined,
-              recipeQuality: p.recipeQuality || "",
-              tapeType: p.tapeType || "PP",
-              denier: p.denier ?? "",
-              tapeWidth: p.tapeWidth ?? "",
-              strength: p.strength ?? "",
-              eloPercent: p.eloPercent ?? "",
-              bobbinMarking: p.bobbinMarking || "",
-              colour: p.colour || "",
-              spacerSize: p.spacerSize || "",
-              requiredAsh: p.requiredAsh ?? "",
-              ashPercent: p.ashPercent ?? "",
-              plannedQtyKg: p.plannedQtyKg ? p.plannedQtyKg : "",
-              omega: p.omega || "",
-              vistPercent: p.vistPercent ?? "",
-              remarks: p.remarks || "",
-              materials: p.materials || [],
-              isDayNight: Boolean(p.isDayNight),
-              status: p.status || "DRAFT",
-            }));
-            const newStatus = data.plans[0]?.status === "SUBMITTED" ? "SUBMITTED" : "SAVED";
-            lastSavedPayloadRef.current = JSON.stringify({
-              date,
-              shiftId: shiftId !== "ALL" ? shiftId : undefined,
-              plans: loaded.map((p: any) => ({
-                ...p,
-                isDayNight: Boolean(p.isDayNight),
-                shiftId: p.shiftId || (shiftId !== "ALL" ? shiftId : undefined),
-                status: newStatus,
-              })),
-            });
-            setRecipePlans(loaded);
-            if (data.plans[0]?.status) {
-              setStatus(newStatus);
-            }
-          }
-        })
-        .catch(() => {});
+      if (event?.clientId && event.clientId === realtime.clientId) return;
+      if (Date.now() - lastUserEditTimeRef.current < 2500) return;
+      loadAuthoritativePlan();
     },
   });
 
@@ -504,6 +464,7 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName, shifts }: T
       date,
       shiftId,
       status: status === "SUBMITTED" ? "SUBMITTED" : "SAVED",
+      clientId: realtime.clientId,
       plans: recipePlans.map((p) => ({
         id: p.id,
         recipeQuality: (p.recipeQuality || "").trim(),
@@ -575,7 +536,7 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName, shifts }: T
     }, 1000);
 
     return () => clearTimeout(timer);
-  }, [recipePlans, date, shiftId, status]);
+  }, [recipePlans, date, shiftId, status, realtime]);
 
   const handleSave = async (submitStatus: "SAVED" | "SUBMITTED") => {
     // Validate each recipe
@@ -594,6 +555,7 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName, shifts }: T
         date,
         shiftId,
         status: submitStatus,
+        clientId: realtime.clientId,
         plans: recipePlans.map((p) => ({
           id: p.id,
           recipeQuality: p.recipeQuality.trim(),

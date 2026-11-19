@@ -113,6 +113,8 @@ export async function POST(request: NextRequest) {
       status = "DRAFT",
       remarks,
       entries = [],
+      deletedEntryIds = [],
+      clientId,
     } = body;
 
     if (!date || !shiftName) {
@@ -176,32 +178,77 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      // Delete existing entries for this report to replace with atomic latest state
-      await tx.laminationProductionEntry.deleteMany({
-        where: { reportId: report.id },
-      });
-
-      // Insert new entries
-      if (calculatedEntries.length > 0) {
-        await tx.laminationProductionEntry.createMany({
-          data: calculatedEntries.map((e) => ({
+      // Non-destructive synchronization: delete only explicitly removed entries
+      if (Array.isArray(deletedEntryIds) && deletedEntryIds.length > 0) {
+        await tx.laminationProductionEntry.deleteMany({
+          where: {
             reportId: report.id,
-            sequence: e.sequence,
-            quality: e.quality,
-            size: e.size || null,
-            loomNumber: e.loomNumber,
-            rollNumber: e.rollNumber,
-            rollMeter: e.rollMeter,
-            netWeightBefore: e.netWeightBefore,
-            avgWeightBefore: e.avgWeightBefore,
-            productionMeter: e.productionMeter,
-            netWeightAfter: e.netWeightAfter,
-            avgWeightAfter: e.avgWeightAfter,
-            coating: e.coating,
-            remarks: e.remarks || null,
-            loomRollCuttingEntryId: e.loomRollCuttingEntryId || null,
-          })),
+            id: { in: deletedEntryIds.filter(Boolean) },
+          },
         });
+      }
+
+      // Atomically upsert entries to protect concurrent edits on other rolls
+      for (const e of calculatedEntries) {
+        if (e.id) {
+          await tx.laminationProductionEntry.upsert({
+            where: { id: e.id },
+            create: {
+              id: e.id,
+              reportId: report.id,
+              sequence: e.sequence,
+              quality: e.quality,
+              size: e.size || null,
+              loomNumber: e.loomNumber,
+              rollNumber: e.rollNumber,
+              rollMeter: e.rollMeter,
+              netWeightBefore: e.netWeightBefore,
+              avgWeightBefore: e.avgWeightBefore,
+              productionMeter: e.productionMeter,
+              netWeightAfter: e.netWeightAfter,
+              avgWeightAfter: e.avgWeightAfter,
+              coating: e.coating,
+              remarks: e.remarks || null,
+              loomRollCuttingEntryId: e.loomRollCuttingEntryId || null,
+            },
+            update: {
+              sequence: e.sequence,
+              quality: e.quality,
+              size: e.size || null,
+              loomNumber: e.loomNumber,
+              rollNumber: e.rollNumber,
+              rollMeter: e.rollMeter,
+              netWeightBefore: e.netWeightBefore,
+              avgWeightBefore: e.avgWeightBefore,
+              productionMeter: e.productionMeter,
+              netWeightAfter: e.netWeightAfter,
+              avgWeightAfter: e.avgWeightAfter,
+              coating: e.coating,
+              remarks: e.remarks || null,
+              loomRollCuttingEntryId: e.loomRollCuttingEntryId || null,
+            },
+          });
+        } else {
+          await tx.laminationProductionEntry.create({
+            data: {
+              reportId: report.id,
+              sequence: e.sequence,
+              quality: e.quality,
+              size: e.size || null,
+              loomNumber: e.loomNumber,
+              rollNumber: e.rollNumber,
+              rollMeter: e.rollMeter,
+              netWeightBefore: e.netWeightBefore,
+              avgWeightBefore: e.avgWeightBefore,
+              productionMeter: e.productionMeter,
+              netWeightAfter: e.netWeightAfter,
+              avgWeightAfter: e.avgWeightAfter,
+              coating: e.coating,
+              remarks: e.remarks || null,
+              loomRollCuttingEntryId: e.loomRollCuttingEntryId || null,
+            },
+          });
+        }
       }
 
       return tx.laminationProductionReport.findUnique({
@@ -238,6 +285,7 @@ export async function POST(request: NextRequest) {
       action: status === "SUBMITTED" ? "SUBMIT" : "SAVE",
       date,
       shift: shiftName,
+      clientId: clientId || undefined,
       user: {
         name: authResult.session?.user?.name || "Lamination Floor",
         email: authResult.session?.user?.email || undefined,

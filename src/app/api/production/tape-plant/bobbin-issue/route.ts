@@ -374,6 +374,7 @@ export async function POST(request: NextRequest) {
       action: "ISSUE",
       date: created.date,
       shift: created.shiftId,
+      clientId: body.clientId,
       user: {
         name: authResult.session?.user?.name || "Floor Admin",
         email: authResult.session?.user?.email || undefined,
@@ -386,6 +387,7 @@ export async function POST(request: NextRequest) {
       action: "ISSUE",
       date: created.date,
       shift: created.shiftId,
+      clientId: body.clientId,
       user: {
         name: authResult.session?.user?.name || "Floor Admin",
         email: authResult.session?.user?.email || undefined,
@@ -428,12 +430,14 @@ export async function DELETE(request: NextRequest) {
       data: { status: "CANCELLED" },
     });
 
+    const clientId = searchParams.get("clientId") || undefined;
     emitProductionSync({
       module: "tape-plant",
       sheet: "bobbin-issue",
       action: "CANCEL",
       date: existing.date,
       shift: existing.shiftId,
+      clientId,
       user: {
         name: authResult.session?.user?.name || "Floor Admin",
         email: authResult.session?.user?.email || undefined,
@@ -446,6 +450,7 @@ export async function DELETE(request: NextRequest) {
       action: "CANCEL",
       date: existing.date,
       shift: existing.shiftId,
+      clientId,
       user: {
         name: authResult.session?.user?.name || "Floor Admin",
         email: authResult.session?.user?.email || undefined,

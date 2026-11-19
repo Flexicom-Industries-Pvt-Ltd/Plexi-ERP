@@ -5,7 +5,6 @@ import { format } from "date-fns";
 import {
   Printer,
   FileSpreadsheet,
-  RefreshCw,
   Plus,
   Trash2,
   Maximize2,
@@ -15,14 +14,11 @@ import {
   User,
   Shield,
   CheckCircle2,
-  AlertTriangle,
   RotateCcw,
   Sparkles,
-  Search,
   Building,
   Check,
   Loader2,
-  HelpCircle,
   FileText,
   ChevronDown,
   ChevronUp,
@@ -36,6 +32,12 @@ import {
   PrintingDailyReportData,
   PrintingReportItem,
 } from "@/lib/printing/printing-types";
+import {
+  FocusedPrintingReportCell,
+  getPrintingReportRowKey,
+  reconcileServerPrintingReportEntries,
+  serializePrintingReportPayload,
+} from "@/lib/printing/printing-daily-report-google-docs-sync";
 import { exportPrintingReportExcel } from "@/lib/printing/printing-export";
 import dynamic from "next/dynamic";
 import { UniversalQualityInput } from "@/components/ui/UniversalQualityInput";
@@ -126,6 +128,25 @@ export function PrintingDailyReportClient() {
   const isDirtyRef = useRef<boolean>(false);
   const lastUserEditTimeRef = useRef<number>(0);
 
+  // Google Docs Concurrent Sync & Typing Isolation Refs
+  const lastSavedPayloadRef = useRef<string>("");
+  const hasUnsavedLocalEditsRef = useRef<boolean>(false);
+  const activeFocusedCellRef = useRef<FocusedPrintingReportCell | null>(null);
+  const deletedEntryIdsRef = useRef<Set<string>>(new Set());
+
+  const [, setFocusedCellState] = useState<FocusedPrintingReportCell | null>(null);
+
+  const setFocusedCell = useCallback((rowKey: string, field: keyof PrintingReportItem) => {
+    const next = { rowKey, field };
+    activeFocusedCellRef.current = next;
+    setFocusedCellState(next);
+  }, []);
+
+  const clearFocusedCell = useCallback(() => {
+    activeFocusedCellRef.current = null;
+    setFocusedCellState(null);
+  }, []);
+
   // Close fullscreen on Escape
   useEffect(() => {
     if (!isFullscreen) return;
@@ -170,9 +191,8 @@ export function PrintingDailyReportClient() {
         setSupervisorName(rep.supervisorName || "");
         setRemarks(rep.remarks || "");
 
-        if (rep.entries && rep.entries.length > 0) {
-          setEntries(
-            rep.entries.map((e: any, idx: number) => ({
+        const incomingEntries: PrintingReportItem[] = (rep.entries && rep.entries.length > 0)
+          ? rep.entries.map((e: Partial<PrintingReportItem>, idx: number) => ({
               id: e.id,
               sequence: e.sequence || idx + 1,
               companyName: e.companyName || "",
@@ -189,9 +209,38 @@ export function PrintingDailyReportClient() {
               printMeter: e.printMeter ?? "",
               remarks: e.remarks || "",
             }))
-          );
-        } else {
-          // Initialize clean blank rows
+          : [
+              createEmptyRow(1),
+              createEmptyRow(2),
+              createEmptyRow(3),
+              createEmptyRow(4),
+              createEmptyRow(5),
+            ];
+
+        setEntries((prev) => {
+          if (prev.length === 0 && !hasUnsavedLocalEditsRef.current) {
+            lastSavedPayloadRef.current = serializePrintingReportPayload(rep, incomingEntries);
+            return incomingEntries;
+          }
+          const reconciled = reconcileServerPrintingReportEntries({
+            localEntries: prev,
+            incomingEntries,
+            focusedCell: activeFocusedCellRef.current,
+            hasUnsavedLocalEdits: hasUnsavedLocalEditsRef.current,
+            deletedEntryIds: deletedEntryIdsRef.current,
+          });
+          lastSavedPayloadRef.current = serializePrintingReportPayload(rep, incomingEntries);
+          return reconciled;
+        });
+
+        setLastSavedAt(format(new Date(rep.updatedAt || Date.now()), "hh:mm a"));
+      } else {
+        // No report yet: clean blank rows if no unsaved local edits
+        if (!hasUnsavedLocalEditsRef.current) {
+          setStatus("DRAFT");
+          setOperatorName("");
+          setSupervisorName("");
+          setRemarks("");
           setEntries([
             createEmptyRow(1),
             createEmptyRow(2),
@@ -199,25 +248,11 @@ export function PrintingDailyReportClient() {
             createEmptyRow(4),
             createEmptyRow(5),
           ]);
+          setLastSavedAt(null);
         }
-        setLastSavedAt(format(new Date(rep.updatedAt || Date.now()), "hh:mm a"));
-      } else {
-        // No report yet: clean blank rows
-        setStatus("DRAFT");
-        setOperatorName("");
-        setSupervisorName("");
-        setRemarks("");
-        setEntries([
-          createEmptyRow(1),
-          createEmptyRow(2),
-          createEmptyRow(3),
-          createEmptyRow(4),
-          createEmptyRow(5),
-        ]);
-        setLastSavedAt(null);
       }
-    } catch (err: any) {
-      toast.error(err.message || "Failed to load printing report");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to load printing report");
     } finally {
       setLoading(false);
       isDirtyRef.current = false;
@@ -238,11 +273,33 @@ export function PrintingDailyReportClient() {
     sheet: "production-report",
     date,
     shift: shiftName,
-    onSync: () => {
-      if (Date.now() - lastUserEditTimeRef.current < 3500) return;
+    onSync: (event) => {
+      // Echo suppression: Ignore notifications originating from this client session
+      if (event?.clientId && event.clientId === realtime.clientId) return;
+      if (Date.now() - lastUserEditTimeRef.current < 2500 && activeFocusedCellRef.current) return;
       fetchReportData();
     },
   });
+
+  // Catch-up upon tab wake-up (e.g., user returns after 10+ minutes)
+  useEffect(() => {
+    const handleVisibilityCatchup = () => {
+      if (document.visibilityState === "visible") {
+        fetchReportData();
+      }
+    };
+    const handleFocusCatchup = () => {
+      fetchReportData();
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityCatchup);
+    window.addEventListener("focus", handleFocusCatchup);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityCatchup);
+      window.removeEventListener("focus", handleFocusCatchup);
+    };
+  }, [fetchReportData]);
 
   // Load available rolls from Loom roll cutting entries for autocomplete
   const fetchAvailableRolls = useCallback(async (query: string = "") => {
@@ -263,9 +320,14 @@ export function PrintingDailyReportClient() {
 
   // Auto-Save Report to Backend
   const saveReport = useCallback(
-    async (targetStatus: "DRAFT" | "SUBMITTED" = "DRAFT", silent = true) => {
+    async (
+      targetStatus: "DRAFT" | "SUBMITTED" = "DRAFT",
+      silent = true,
+      overrideEntries?: PrintingReportItem[]
+    ) => {
+      const activeEntries = overrideEntries || entries;
       // Check if there is anything to save
-      const hasAnyData = entries.some(
+      const hasAnyData = activeEntries.some(
         (e) =>
           e.companyName?.trim() ||
           e.rollNumber?.trim() ||
@@ -275,7 +337,28 @@ export function PrintingDailyReportClient() {
           Number(e.printMeter) > 0
       );
 
-      if (!hasAnyData && targetStatus === "DRAFT") return;
+      if (!hasAnyData && targetStatus === "DRAFT" && deletedEntryIdsRef.current.size === 0) return;
+
+      const currentPayload = serializePrintingReportPayload(
+        {
+          date,
+          shiftName,
+          machineNo,
+          operatorName,
+          supervisorName,
+          status: targetStatus,
+          remarks,
+        },
+        activeEntries
+      );
+
+      if (
+        targetStatus === "DRAFT" &&
+        currentPayload === lastSavedPayloadRef.current &&
+        deletedEntryIdsRef.current.size === 0
+      ) {
+        return;
+      }
 
       setIsAutoSaving(true);
       try {
@@ -287,7 +370,9 @@ export function PrintingDailyReportClient() {
           supervisorName,
           status: targetStatus,
           remarks,
-          entries: entries.map((e, idx) => ({
+          deletedEntryIds: Array.from(deletedEntryIdsRef.current),
+          clientId: realtime.clientId,
+          entries: activeEntries.map((e, idx) => ({
             ...e,
             sequence: idx + 1,
             productionMeter: Number(e.productionMeter) || 0,
@@ -307,6 +392,9 @@ export function PrintingDailyReportClient() {
         const json = await res.json();
         if (!res.ok) throw new Error(json.error || "Failed to save printing report");
 
+        lastSavedPayloadRef.current = currentPayload;
+        hasUnsavedLocalEditsRef.current = false;
+        deletedEntryIdsRef.current.clear();
         setStatus(targetStatus);
         setLastSavedAt(format(new Date(), "hh:mm:ss a"));
         isDirtyRef.current = false;
@@ -323,31 +411,24 @@ export function PrintingDailyReportClient() {
               : "Printing report saved successfully"
           );
         }
-      } catch (err: any) {
-        if (!silent) toast.error(err.message || "Failed to save report");
+      } catch (err) {
+        if (!silent) toast.error(err instanceof Error ? err.message : "Failed to save report");
       } finally {
         setIsAutoSaving(false);
       }
     },
-    [date, shiftName, machineNo, operatorName, supervisorName, remarks, entries]
+    [date, shiftName, machineNo, operatorName, supervisorName, remarks, entries, realtime]
   );
 
-  // Debounced Auto-Save Trigger
-  useEffect(() => {
-    if (isInitialLoadRef.current || loading || !isDirtyRef.current) return;
-
-    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
-
-    autoSaveTimerRef.current = setTimeout(() => {
-      if (isDirtyRef.current) {
-        saveReport("DRAFT", true);
-      }
-    }, 1200);
-
-    return () => {
+  const triggerAutoSave = useCallback(
+    (currentEntries: PrintingReportItem[]) => {
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
-    };
-  }, [entries, operatorName, supervisorName, remarks, saveReport, loading]);
+      autoSaveTimerRef.current = setTimeout(() => {
+        saveReport("DRAFT", true, currentEntries);
+      }, 1500);
+    },
+    [saveReport]
+  );
 
   // Handle auto-saving new company details to Data Centre Party Printing master
   const handleAutoSavePartyToDataCentre = async (row: PrintingReportItem) => {
@@ -376,101 +457,149 @@ export function PrintingDailyReportClient() {
   };
 
   // Row update handlers
-  const handleFieldChange = (index: number, field: keyof PrintingReportItem, value: any) => {
-    isDirtyRef.current = true;
-    lastUserEditTimeRef.current = Date.now();
-    realtime.markLocalEdit();
-    setEntries((prev) => {
-      const updated = [...prev];
-      const current = { ...updated[index], [field]: value };
-      // Recalculate avg if netWeight or productionMeter changes
-      if (field === "productionMeter" || field === "netWeight") {
-        updated[index] = calculatePrintingRow(current);
-      } else {
-        updated[index] = current;
-      }
-      return updated;
-    });
-  };
-
-  // Select party suggestion
-  const handleSelectParty = (index: number, party: PartyPrintingDetailItem) => {
-    isDirtyRef.current = true;
-    lastUserEditTimeRef.current = Date.now();
-    realtime.markLocalEdit();
-    setEntries((prev) => {
-      const updated = [...prev];
-      updated[index] = {
-        ...updated[index],
-        companyName: party.companyName,
-        unitName: party.unitName || updated[index].unitName,
-        grade: party.grade || updated[index].grade,
-        drumSize: party.drumSize || updated[index].drumSize,
-        targetProductionMtrs: party.targetProductionMtrs ?? updated[index].targetProductionMtrs,
-        quality: party.quality || updated[index].quality,
-      };
-      return updated;
-    });
-    setActiveCompanySearchRow(null);
-  };
-
-  // Select roll autocomplete
-  const handleSelectRoll = (index: number, roll: AvailablePrintingRoll) => {
-    isDirtyRef.current = true;
-    lastUserEditTimeRef.current = Date.now();
-    realtime.markLocalEdit();
-    setEntries((prev) => {
-      const updated = [...prev];
-      const withRoll = {
-        ...updated[index],
-        rollNumber: roll.rollNumber,
-        loomNumber: String(roll.loomNumber),
-        quality: roll.qualityType || updated[index].quality,
-        productionMeter: roll.meter || updated[index].productionMeter,
-        netWeight: roll.nettWeightKg || updated[index].netWeight,
-        printMeter: roll.meter || updated[index].printMeter,
-      };
-      updated[index] = calculatePrintingRow(withRoll);
-      return updated;
-    });
-    setActiveRollSearchRow(null);
-  };
-
-  const handleAddRow = () => {
-    isDirtyRef.current = true;
-    lastUserEditTimeRef.current = Date.now();
-    realtime.markLocalEdit();
-    setEntries((prev) => [...prev, createEmptyRow(prev.length + 1)]);
-  };
-
-  const handleRemoveRow = (index: number) => {
-    isDirtyRef.current = true;
-    lastUserEditTimeRef.current = Date.now();
-    realtime.markLocalEdit();
-    setEntries((prev) => {
-      if (prev.length <= 1) {
-        return [createEmptyRow(1)];
-      }
-      const filtered = prev.filter((_, i) => i !== index);
-      return filtered.map((item, idx) => ({ ...item, sequence: idx + 1 }));
-    });
-  };
-
-  const handleResetToBlank = () => {
-    if (window.confirm("Clear all rows and reset to blank boxes?")) {
+  const handleFieldChange = useCallback(
+    (
+      index: number,
+      field: keyof PrintingReportItem,
+      value: PrintingReportItem[keyof PrintingReportItem]
+    ) => {
       isDirtyRef.current = true;
+      hasUnsavedLocalEditsRef.current = true;
       lastUserEditTimeRef.current = Date.now();
       realtime.markLocalEdit();
-      setEntries([
-        createEmptyRow(1),
-        createEmptyRow(2),
-        createEmptyRow(3),
-        createEmptyRow(4),
-        createEmptyRow(5),
-      ]);
+      setEntries((prev) => {
+        const updated = [...prev];
+        const current = { ...updated[index], [field]: value };
+        // Recalculate avg if netWeight or productionMeter changes
+        if (field === "productionMeter" || field === "netWeight") {
+          updated[index] = calculatePrintingRow(current);
+        } else {
+          updated[index] = current;
+        }
+        triggerAutoSave(updated);
+        return updated;
+      });
+    },
+    [triggerAutoSave, realtime]
+  );
+
+  // Select party suggestion
+  const handleSelectParty = useCallback(
+    (index: number, party: PartyPrintingDetailItem) => {
+      isDirtyRef.current = true;
+      hasUnsavedLocalEditsRef.current = true;
+      lastUserEditTimeRef.current = Date.now();
+      realtime.markLocalEdit();
+      setEntries((prev) => {
+        const updated = [...prev];
+        updated[index] = {
+          ...updated[index],
+          companyName: party.companyName,
+          unitName: party.unitName || updated[index].unitName,
+          grade: party.grade || updated[index].grade,
+          drumSize: party.drumSize || updated[index].drumSize,
+          targetProductionMtrs: party.targetProductionMtrs ?? updated[index].targetProductionMtrs,
+          quality: party.quality || updated[index].quality,
+        };
+        triggerAutoSave(updated);
+        return updated;
+      });
+      setActiveCompanySearchRow(null);
+    },
+    [triggerAutoSave, realtime]
+  );
+
+  // Select roll autocomplete
+  const handleSelectRoll = useCallback(
+    (index: number, roll: AvailablePrintingRoll) => {
+      isDirtyRef.current = true;
+      hasUnsavedLocalEditsRef.current = true;
+      lastUserEditTimeRef.current = Date.now();
+      realtime.markLocalEdit();
+      setEntries((prev) => {
+        const updated = [...prev];
+        const withRoll = {
+          ...updated[index],
+          rollNumber: roll.rollNumber,
+          loomNumber: String(roll.loomNumber),
+          quality: roll.qualityType || updated[index].quality,
+          productionMeter: roll.meter || updated[index].productionMeter,
+          netWeight: roll.nettWeightKg || updated[index].netWeight,
+          printMeter: roll.meter || updated[index].printMeter,
+        };
+        updated[index] = calculatePrintingRow(withRoll);
+        triggerAutoSave(updated);
+        return updated;
+      });
+      setActiveRollSearchRow(null);
+    },
+    [triggerAutoSave, realtime]
+  );
+
+  const handleAddRow = useCallback(() => {
+    isDirtyRef.current = true;
+    hasUnsavedLocalEditsRef.current = true;
+    lastUserEditTimeRef.current = Date.now();
+    realtime.markLocalEdit();
+    setEntries((prev) => {
+      const next = [...prev, createEmptyRow(prev.length + 1)];
+      triggerAutoSave(next);
+      return next;
+    });
+  }, [triggerAutoSave, realtime]);
+
+  const handleRemoveRow = useCallback(
+    (index: number) => {
+      isDirtyRef.current = true;
+      hasUnsavedLocalEditsRef.current = true;
+      lastUserEditTimeRef.current = Date.now();
+      realtime.markLocalEdit();
+      setEntries((prev) => {
+        const target = prev[index];
+        if (target) {
+          if (target.id) deletedEntryIdsRef.current.add(target.id);
+          if (target.rollNumber) deletedEntryIdsRef.current.add(target.rollNumber.trim().toUpperCase());
+          deletedEntryIdsRef.current.add(getPrintingReportRowKey(target, index));
+        }
+        if (prev.length <= 1) {
+          const next = [createEmptyRow(1)];
+          triggerAutoSave(next);
+          return next;
+        }
+        const filtered = prev.filter((_, i) => i !== index);
+        const next = filtered.map((item, idx) => ({ ...item, sequence: idx + 1 }));
+        triggerAutoSave(next);
+        return next;
+      });
+    },
+    [triggerAutoSave, realtime]
+  );
+
+  const handleResetToBlank = useCallback(() => {
+    if (window.confirm("Clear all rows and reset to blank boxes?")) {
+      isDirtyRef.current = true;
+      hasUnsavedLocalEditsRef.current = true;
+      lastUserEditTimeRef.current = Date.now();
+      realtime.markLocalEdit();
+      setEntries((prev) => {
+        prev.forEach((e, idx) => {
+          if (e.id) deletedEntryIdsRef.current.add(e.id);
+          if (e.rollNumber) deletedEntryIdsRef.current.add(e.rollNumber.trim().toUpperCase());
+          deletedEntryIdsRef.current.add(getPrintingReportRowKey(e, idx));
+        });
+        const next = [
+          createEmptyRow(1),
+          createEmptyRow(2),
+          createEmptyRow(3),
+          createEmptyRow(4),
+          createEmptyRow(5),
+        ];
+        triggerAutoSave(next);
+        return next;
+      });
       toast.info("Sheet reset to blank boxes");
     }
-  };
+  }, [triggerAutoSave, realtime]);
 
   // Calculations
   const calculatedRows = useMemo(() => {
@@ -563,7 +692,7 @@ export function PrintingDailyReportClient() {
             </button>
             <button
               onClick={() => saveReport("SUBMITTED", false)}
-              disabled={isAutoSaving}
+              disabled={isAutoSaving || loading}
               className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-xl bg-slate-900 hover:bg-slate-800 text-white transition-colors shadow-xs disabled:opacity-50"
             >
               <Check className="h-4 w-4 text-emerald-400" />
@@ -802,250 +931,285 @@ export function PrintingDailyReportClient() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 bg-white">
-                {calculatedRows.map((row, idx) => (
-                  <tr
-                    key={row.id || idx}
-                    className={`hover:bg-slate-50/80 transition-colors ${
-                      idx % 2 === 1 ? "bg-slate-50/30" : "bg-white"
-                    }`}
-                  >
-                    {/* Sequence */}
-                    <td className="py-2 px-2 text-center font-bold text-slate-400 text-xs border-r border-slate-200">
-                      {idx + 1}
-                    </td>
+                {calculatedRows.map((row, idx) => {
+                  const rowKey = getPrintingReportRowKey(row, idx);
+                  return (
+                    <tr
+                      key={row.id || rowKey}
+                      className={`hover:bg-slate-50/80 transition-colors ${
+                        idx % 2 === 1 ? "bg-slate-50/30" : "bg-white"
+                      }`}
+                    >
+                      {/* Sequence */}
+                      <td className="py-2 px-2 text-center font-bold text-slate-400 text-xs border-r border-slate-200">
+                        {idx + 1}
+                      </td>
 
-                    {/* Company Name (Searchable Typing Dropdown with Auto-Save) */}
-                    <td className="py-1 px-2 border-r border-slate-200 relative">
-                      <input
-                        type="text"
-                        placeholder="Type or select company..."
-                        value={row.companyName || ""}
-                        onChange={(e) => {
-                          handleFieldChange(idx, "companyName", e.target.value);
-                          setActiveCompanySearchRow(idx);
-                          fetchPartySuggestions(e.target.value);
-                        }}
-                        onFocus={() => {
-                          setActiveCompanySearchRow(idx);
-                          fetchPartySuggestions(row.companyName || "");
-                        }}
-                        onBlur={() => {
-                          setTimeout(() => {
-                            setActiveCompanySearchRow(null);
+                      {/* Company Name (Searchable Typing Dropdown with Auto-Save) */}
+                      <td className="py-1 px-2 border-r border-slate-200 relative">
+                        <input
+                          type="text"
+                          placeholder="Type or select company..."
+                          value={row.companyName || ""}
+                          onChange={(e) => {
+                            handleFieldChange(idx, "companyName", e.target.value);
+                            setActiveCompanySearchRow(idx);
+                            fetchPartySuggestions(e.target.value);
+                          }}
+                          onFocus={() => {
+                            setFocusedCell(rowKey, "companyName");
+                            setActiveCompanySearchRow(idx);
+                            fetchPartySuggestions(row.companyName || "");
+                          }}
+                          onBlur={() => {
+                            clearFocusedCell();
+                            setTimeout(() => {
+                              setActiveCompanySearchRow(null);
+                              handleAutoSavePartyToDataCentre(row);
+                            }, 250);
+                          }}
+                          className="w-full px-2 py-1 border border-slate-300 rounded font-semibold text-slate-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-xs"
+                        />
+
+                        {/* Company Suggestions Dropdown */}
+                        {activeCompanySearchRow === idx && partySuggestions.length > 0 && (
+                          <div className="absolute left-2 top-full mt-1 z-30 w-72 bg-white rounded-lg shadow-xl border border-slate-200 py-1 max-h-56 overflow-y-auto">
+                            <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                              <span>Data Centre Parties</span>
+                              <Building className="h-3 w-3" />
+                            </div>
+                            {partySuggestions.map((party) => (
+                              <div
+                                key={party.id}
+                                onMouseDown={() => handleSelectParty(idx, party)}
+                                className="px-3 py-1.5 hover:bg-primary/10 cursor-pointer text-xs flex flex-col gap-0.5 border-b border-slate-50 last:border-0"
+                              >
+                                <span className="font-bold text-slate-800">{party.companyName}</span>
+                                <div className="text-[10px] text-slate-500 flex items-center gap-1.5">
+                                  {party.unitName && <span>Unit: {party.unitName}</span>}
+                                  {party.grade && <span>• Grade: {party.grade}</span>}
+                                  {party.drumSize && <span>• Drum: {party.drumSize}</span>}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </td>
+
+                      {/* Unit Name */}
+                      <td className="py-1 px-2 border-r border-slate-200">
+                        <input
+                          type="text"
+                          placeholder="e.g. Ropar"
+                          value={row.unitName || ""}
+                          onChange={(e) => handleFieldChange(idx, "unitName", e.target.value)}
+                          onFocus={() => setFocusedCell(rowKey, "unitName")}
+                          onBlur={() => {
+                            clearFocusedCell();
                             handleAutoSavePartyToDataCentre(row);
-                          }, 250);
-                        }}
-                        className="w-full px-2 py-1 border border-slate-300 rounded font-semibold text-slate-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-xs"
-                      />
+                          }}
+                          className="w-full px-2 py-1 border border-slate-300 rounded text-slate-800 focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-xs"
+                        />
+                      </td>
 
-                      {/* Company Suggestions Dropdown */}
-                      {activeCompanySearchRow === idx && partySuggestions.length > 0 && (
-                        <div className="absolute left-2 top-full mt-1 z-30 w-72 bg-white rounded-lg shadow-xl border border-slate-200 py-1 max-h-56 overflow-y-auto">
-                          <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
-                            <span>Data Centre Parties</span>
-                            <Building className="h-3 w-3" />
-                          </div>
-                          {partySuggestions.map((party) => (
-                            <div
-                              key={party.id}
-                              onMouseDown={() => handleSelectParty(idx, party)}
-                              className="px-3 py-1.5 hover:bg-primary/10 cursor-pointer text-xs flex flex-col gap-0.5 border-b border-slate-50 last:border-0"
-                            >
-                              <span className="font-bold text-slate-800">{party.companyName}</span>
-                              <div className="text-[10px] text-slate-500 flex items-center gap-1.5">
-                                {party.unitName && <span>Unit: {party.unitName}</span>}
-                                {party.grade && <span>• Grade: {party.grade}</span>}
-                                {party.drumSize && <span>• Drum: {party.drumSize}</span>}
-                              </div>
+                      {/* Grade */}
+                      <td className="py-1 px-2 border-r border-slate-200">
+                        <input
+                          type="text"
+                          placeholder="e.g. PPC"
+                          value={row.grade || ""}
+                          onChange={(e) => handleFieldChange(idx, "grade", e.target.value)}
+                          onFocus={() => setFocusedCell(rowKey, "grade")}
+                          onBlur={() => {
+                            clearFocusedCell();
+                            handleAutoSavePartyToDataCentre(row);
+                          }}
+                          className="w-full px-2 py-1 border border-slate-300 rounded text-slate-800 focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-xs"
+                        />
+                      </td>
+
+                      {/* Target Production (in metre) */}
+                      <td className="py-1 px-2 border-r border-slate-200">
+                        <input
+                          type="number"
+                          step="any"
+                          placeholder="0"
+                          value={row.targetProductionMtrs ?? ""}
+                          onChange={(e) => handleFieldChange(idx, "targetProductionMtrs", e.target.value)}
+                          onFocus={() => setFocusedCell(rowKey, "targetProductionMtrs")}
+                          onBlur={() => {
+                            clearFocusedCell();
+                            handleAutoSavePartyToDataCentre(row);
+                          }}
+                          className="w-full px-2 py-1 border border-slate-300 rounded font-mono text-right text-blue-700 font-bold focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-xs"
+                        />
+                      </td>
+
+                      {/* Drum Size / Cut Length */}
+                      <td className="py-1 px-2 border-r border-slate-200">
+                        <input
+                          type="text"
+                          placeholder="e.g. 20mm"
+                          value={row.drumSize || ""}
+                          onChange={(e) => handleFieldChange(idx, "drumSize", e.target.value)}
+                          onFocus={() => setFocusedCell(rowKey, "drumSize")}
+                          onBlur={() => {
+                            clearFocusedCell();
+                            handleAutoSavePartyToDataCentre(row);
+                          }}
+                          className="w-full px-2 py-1 border border-slate-300 rounded font-mono text-slate-800 focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-xs"
+                        />
+                      </td>
+
+                      {/* Quality */}
+                      <td className="py-1 px-2 border-r border-slate-200 min-w-[200px]">
+                        <UniversalQualityInput
+                          value={row.quality || ""}
+                          onChange={(val) => handleFieldChange(idx, "quality", val)}
+                          onFocus={() => setFocusedCell(rowKey, "quality")}
+                          onBlur={() => clearFocusedCell()}
+                          placeholder="— Quality —"
+                          compact={true}
+                          inputClassName="h-7 text-xs font-medium"
+                        />
+                      </td>
+
+                      {/* Roll No. (Autocomplete from Loom Roll Cutting) */}
+                      <td className="py-1 px-2 border-r border-slate-200 relative">
+                        <input
+                          type="text"
+                          placeholder="e.g. D14332"
+                          value={row.rollNumber || ""}
+                          onChange={(e) => {
+                            handleFieldChange(idx, "rollNumber", e.target.value);
+                            setActiveRollSearchRow(idx);
+                            fetchAvailableRolls(e.target.value);
+                          }}
+                          onFocus={() => {
+                            setFocusedCell(rowKey, "rollNumber");
+                            setActiveRollSearchRow(idx);
+                            fetchAvailableRolls(row.rollNumber || "");
+                          }}
+                          onBlur={() => {
+                            clearFocusedCell();
+                            setTimeout(() => setActiveRollSearchRow(null), 250);
+                          }}
+                          className="w-full px-2 py-1 border border-slate-300 rounded font-mono font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-xs"
+                        />
+
+                        {/* Roll Suggestions Dropdown */}
+                        {activeRollSearchRow === idx && availableRolls.length > 0 && (
+                          <div className="absolute left-2 top-full mt-1 z-30 w-72 bg-white rounded-lg shadow-xl border border-slate-200 py-1 max-h-56 overflow-y-auto">
+                            <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                              <span>Loom Rolls Available</span>
+                              <Sparkles className="h-3 w-3 text-amber-500" />
                             </div>
-                          ))}
-                        </div>
-                      )}
-                    </td>
-
-                    {/* Unit Name */}
-                    <td className="py-1 px-2 border-r border-slate-200">
-                      <input
-                        type="text"
-                        placeholder="e.g. Ropar"
-                        value={row.unitName || ""}
-                        onChange={(e) => handleFieldChange(idx, "unitName", e.target.value)}
-                        onBlur={() => handleAutoSavePartyToDataCentre(row)}
-                        className="w-full px-2 py-1 border border-slate-300 rounded text-slate-800 focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-xs"
-                      />
-                    </td>
-
-                    {/* Grade */}
-                    <td className="py-1 px-2 border-r border-slate-200">
-                      <input
-                        type="text"
-                        placeholder="e.g. PPC"
-                        value={row.grade || ""}
-                        onChange={(e) => handleFieldChange(idx, "grade", e.target.value)}
-                        onBlur={() => handleAutoSavePartyToDataCentre(row)}
-                        className="w-full px-2 py-1 border border-slate-300 rounded text-slate-800 focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-xs"
-                      />
-                    </td>
-
-                    {/* Target Production (in metre) */}
-                    <td className="py-1 px-2 border-r border-slate-200">
-                      <input
-                        type="number"
-                        step="any"
-                        placeholder="0"
-                        value={row.targetProductionMtrs ?? ""}
-                        onChange={(e) => handleFieldChange(idx, "targetProductionMtrs", e.target.value)}
-                        onBlur={() => handleAutoSavePartyToDataCentre(row)}
-                        className="w-full px-2 py-1 border border-slate-300 rounded font-mono text-right text-blue-700 font-bold focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-xs"
-                      />
-                    </td>
-
-                    {/* Drum Size / Cut Length */}
-                    <td className="py-1 px-2 border-r border-slate-200">
-                      <input
-                        type="text"
-                        placeholder="e.g. 20mm"
-                        value={row.drumSize || ""}
-                        onChange={(e) => handleFieldChange(idx, "drumSize", e.target.value)}
-                        onBlur={() => handleAutoSavePartyToDataCentre(row)}
-                        className="w-full px-2 py-1 border border-slate-300 rounded font-mono text-slate-800 focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-xs"
-                      />
-                    </td>
-
-                    {/* Quality */}
-                    <td className="py-1 px-2 border-r border-slate-200 min-w-[200px]">
-                      <UniversalQualityInput
-                        value={row.quality || ""}
-                        onChange={(val) => handleFieldChange(idx, "quality", val)}
-                        placeholder="— Quality —"
-                        compact={true}
-                        inputClassName="h-7 text-xs font-medium"
-                      />
-                    </td>
-
-                    {/* Roll No. (Autocomplete from Loom Roll Cutting) */}
-                    <td className="py-1 px-2 border-r border-slate-200 relative">
-                      <input
-                        type="text"
-                        placeholder="e.g. D14332"
-                        value={row.rollNumber || ""}
-                        onChange={(e) => {
-                          handleFieldChange(idx, "rollNumber", e.target.value);
-                          setActiveRollSearchRow(idx);
-                          fetchAvailableRolls(e.target.value);
-                        }}
-                        onFocus={() => {
-                          setActiveRollSearchRow(idx);
-                          fetchAvailableRolls(row.rollNumber || "");
-                        }}
-                        onBlur={() => {
-                          setTimeout(() => setActiveRollSearchRow(null), 250);
-                        }}
-                        className="w-full px-2 py-1 border border-slate-300 rounded font-mono font-bold text-slate-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-xs"
-                      />
-
-                      {/* Roll Suggestions Dropdown */}
-                      {activeRollSearchRow === idx && availableRolls.length > 0 && (
-                        <div className="absolute left-2 top-full mt-1 z-30 w-72 bg-white rounded-lg shadow-xl border border-slate-200 py-1 max-h-56 overflow-y-auto">
-                          <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
-                            <span>Loom Rolls Available</span>
-                            <Sparkles className="h-3 w-3 text-amber-500" />
+                            {availableRolls.map((roll) => (
+                              <div
+                                key={roll.id}
+                                onMouseDown={() => handleSelectRoll(idx, roll)}
+                                className="px-3 py-1.5 hover:bg-primary/10 cursor-pointer text-xs flex flex-col gap-0.5 border-b border-slate-50 last:border-0"
+                              >
+                                <div className="flex items-center justify-between font-bold text-slate-800">
+                                  <span>{roll.rollNumber}</span>
+                                  <span className="text-[10px] font-mono text-blue-600">Loom #{roll.loomNumber}</span>
+                                </div>
+                                <div className="text-[10px] text-slate-500 flex items-center justify-between">
+                                  <span className="truncate max-w-[120px]">{roll.qualityType}</span>
+                                  <span className="font-mono">{roll.meter}m • {roll.nettWeightKg}kg</span>
+                                </div>
+                              </div>
+                            ))}
                           </div>
-                          {availableRolls.map((roll) => (
-                            <div
-                              key={roll.id}
-                              onMouseDown={() => handleSelectRoll(idx, roll)}
-                              className="px-3 py-1.5 hover:bg-primary/10 cursor-pointer text-xs flex flex-col gap-0.5 border-b border-slate-50 last:border-0"
-                            >
-                              <div className="flex items-center justify-between font-bold text-slate-800">
-                                <span>{roll.rollNumber}</span>
-                                <span className="text-[10px] font-mono text-blue-600">Loom #{roll.loomNumber}</span>
-                              </div>
-                              <div className="text-[10px] text-slate-500 flex items-center justify-between">
-                                <span className="truncate max-w-[120px]">{roll.qualityType}</span>
-                                <span className="font-mono">{roll.meter}m • {roll.nettWeightKg}kg</span>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </td>
+                        )}
+                      </td>
 
-                    {/* Loom No */}
-                    <td className="py-1 px-2 border-r border-slate-200">
-                      <input
-                        type="text"
-                        placeholder="e.g. 42 S1"
-                        value={row.loomNumber || ""}
-                        onChange={(e) => handleFieldChange(idx, "loomNumber", e.target.value)}
-                        className="w-full px-2 py-1 border border-slate-300 rounded font-mono text-slate-800 focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-xs"
-                      />
-                    </td>
+                      {/* Loom No */}
+                      <td className="py-1 px-2 border-r border-slate-200">
+                        <input
+                          type="text"
+                          placeholder="e.g. 42 S1"
+                          value={row.loomNumber || ""}
+                          onChange={(e) => handleFieldChange(idx, "loomNumber", e.target.value)}
+                          onFocus={() => setFocusedCell(rowKey, "loomNumber")}
+                          onBlur={() => clearFocusedCell()}
+                          className="w-full px-2 py-1 border border-slate-300 rounded font-mono text-slate-800 focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-xs"
+                        />
+                      </td>
 
-                    {/* Production in Metre */}
-                    <td className="py-1 px-2 border-r border-slate-200">
-                      <input
-                        type="number"
-                        step="any"
-                        placeholder="0"
-                        value={row.productionMeter}
-                        onChange={(e) => handleFieldChange(idx, "productionMeter", e.target.value)}
-                        className="w-full px-2 py-1 border border-slate-300 rounded font-mono font-bold text-right text-slate-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-xs"
-                      />
-                    </td>
+                      {/* Production in Metre */}
+                      <td className="py-1 px-2 border-r border-slate-200">
+                        <input
+                          type="number"
+                          step="any"
+                          placeholder="0"
+                          value={row.productionMeter}
+                          onChange={(e) => handleFieldChange(idx, "productionMeter", e.target.value)}
+                          onFocus={() => setFocusedCell(rowKey, "productionMeter")}
+                          onBlur={() => clearFocusedCell()}
+                          className="w-full px-2 py-1 border border-slate-300 rounded font-mono font-bold text-right text-slate-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-xs"
+                        />
+                      </td>
 
-                    {/* Net Wt. (kg) */}
-                    <td className="py-1 px-2 border-r border-slate-200">
-                      <input
-                        type="number"
-                        step="any"
-                        placeholder="0.0"
-                        value={row.netWeight}
-                        onChange={(e) => handleFieldChange(idx, "netWeight", e.target.value)}
-                        className="w-full px-2 py-1 border border-slate-300 rounded font-mono text-right text-slate-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-xs"
-                      />
-                    </td>
+                      {/* Net Wt. (kg) */}
+                      <td className="py-1 px-2 border-r border-slate-200">
+                        <input
+                          type="number"
+                          step="any"
+                          placeholder="0.0"
+                          value={row.netWeight}
+                          onChange={(e) => handleFieldChange(idx, "netWeight", e.target.value)}
+                          onFocus={() => setFocusedCell(rowKey, "netWeight")}
+                          onBlur={() => clearFocusedCell()}
+                          className="w-full px-2 py-1 border border-slate-300 rounded font-mono text-right text-slate-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-xs"
+                        />
+                      </td>
 
-                    {/* Avg (g/m) Auto-Calculated */}
-                    <td className="py-2 px-3 border-r border-slate-200 text-right font-mono font-bold text-blue-700 bg-blue-50/40">
-                      {Number(row.avgWeight) > 0 ? Number(row.avgWeight).toFixed(1) : "—"}
-                    </td>
+                      {/* Avg (g/m) Auto-Calculated */}
+                      <td className="py-2 px-3 border-r border-slate-200 text-right font-mono font-bold text-blue-700 bg-blue-50/40">
+                        {Number(row.avgWeight) > 0 ? Number(row.avgWeight).toFixed(1) : "—"}
+                      </td>
 
-                    {/* Print in Metre */}
-                    <td className="py-1 px-2 border-r border-slate-200 bg-emerald-50/30">
-                      <input
-                        type="number"
-                        step="any"
-                        placeholder="0"
-                        value={row.printMeter}
-                        onChange={(e) => handleFieldChange(idx, "printMeter", e.target.value)}
-                        className="w-full px-2 py-1 border border-emerald-300 rounded font-mono font-bold text-right text-emerald-800 focus:bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 text-xs"
-                      />
-                    </td>
+                      {/* Print in Metre */}
+                      <td className="py-1 px-2 border-r border-slate-200 bg-emerald-50/30">
+                        <input
+                          type="number"
+                          step="any"
+                          placeholder="0"
+                          value={row.printMeter}
+                          onChange={(e) => handleFieldChange(idx, "printMeter", e.target.value)}
+                          onFocus={() => setFocusedCell(rowKey, "printMeter")}
+                          onBlur={() => clearFocusedCell()}
+                          className="w-full px-2 py-1 border border-emerald-300 rounded font-mono font-bold text-right text-emerald-800 focus:bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 text-xs"
+                        />
+                      </td>
 
-                    {/* Remarks */}
-                    <td className="py-1 px-2 border-r border-slate-200">
-                      <input
-                        type="text"
-                        placeholder="Notes..."
-                        value={row.remarks || ""}
-                        onChange={(e) => handleFieldChange(idx, "remarks", e.target.value)}
-                        className="w-full px-2 py-1 border border-slate-300 rounded text-slate-600 focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-xs"
-                      />
-                    </td>
+                      {/* Remarks */}
+                      <td className="py-1 px-2 border-r border-slate-200">
+                        <input
+                          type="text"
+                          placeholder="Notes..."
+                          value={row.remarks || ""}
+                          onChange={(e) => handleFieldChange(idx, "remarks", e.target.value)}
+                          onFocus={() => setFocusedCell(rowKey, "remarks")}
+                          onBlur={() => clearFocusedCell()}
+                          className="w-full px-2 py-1 border border-slate-300 rounded text-slate-600 focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-xs"
+                        />
+                      </td>
 
-                    {/* Delete Row Action */}
-                    <td className="py-1 px-2 text-center">
-                      <button
-                        onClick={() => handleRemoveRow(idx)}
-                        className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors"
-                        title="Delete row"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                      {/* Delete Row Action */}
+                      <td className="py-1 px-2 text-center">
+                        <button
+                          onClick={() => handleRemoveRow(idx)}
+                          className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors"
+                          title="Delete row"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
 
               {/* Totals Summary Row */}
@@ -1123,12 +1287,13 @@ export function PrintingDailyReportClient() {
         {/* Mobile Cards List */}
         <div className="space-y-3">
           {calculatedRows.map((row, idx) => {
+            const rowKey = getPrintingReportRowKey(row, idx);
             const isExpanded = !!expandedRows[idx];
             const hasPrint = Number(row.printMeter) > 0;
 
             return (
               <div
-                key={row.id || idx}
+                key={row.id || rowKey}
                 className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden transition-all"
               >
                 {/* Header Strip (Accordion Toggle) */}
@@ -1213,10 +1378,12 @@ export function PrintingDailyReportClient() {
                             fetchPartySuggestions(e.target.value);
                           }}
                           onFocus={() => {
+                            setFocusedCell(rowKey, "companyName");
                             setActiveCompanySearchRow(idx);
                             fetchPartySuggestions(row.companyName || "");
                           }}
                           onBlur={() => {
+                            clearFocusedCell();
                             setTimeout(() => {
                               setActiveCompanySearchRow(null);
                               handleAutoSavePartyToDataCentre(row);
@@ -1257,7 +1424,11 @@ export function PrintingDailyReportClient() {
                             placeholder="e.g. Ropar"
                             value={row.unitName || ""}
                             onChange={(e) => handleFieldChange(idx, "unitName", e.target.value)}
-                            onBlur={() => handleAutoSavePartyToDataCentre(row)}
+                            onFocus={() => setFocusedCell(rowKey, "unitName")}
+                            onBlur={() => {
+                              clearFocusedCell();
+                              handleAutoSavePartyToDataCentre(row);
+                            }}
                             className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-slate-800 text-xs"
                           />
                         </div>
@@ -1270,7 +1441,11 @@ export function PrintingDailyReportClient() {
                             placeholder="e.g. PPC"
                             value={row.grade || ""}
                             onChange={(e) => handleFieldChange(idx, "grade", e.target.value)}
-                            onBlur={() => handleAutoSavePartyToDataCentre(row)}
+                            onFocus={() => setFocusedCell(rowKey, "grade")}
+                            onBlur={() => {
+                              clearFocusedCell();
+                              handleAutoSavePartyToDataCentre(row);
+                            }}
                             className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg text-slate-800 text-xs"
                           />
                         </div>
@@ -1288,7 +1463,11 @@ export function PrintingDailyReportClient() {
                             placeholder="0"
                             value={row.targetProductionMtrs ?? ""}
                             onChange={(e) => handleFieldChange(idx, "targetProductionMtrs", e.target.value)}
-                            onBlur={() => handleAutoSavePartyToDataCentre(row)}
+                            onFocus={() => setFocusedCell(rowKey, "targetProductionMtrs")}
+                            onBlur={() => {
+                              clearFocusedCell();
+                              handleAutoSavePartyToDataCentre(row);
+                            }}
                             className="w-full px-2.5 py-1.5 border border-blue-200 bg-blue-50/20 rounded-lg font-mono text-blue-800 font-bold text-xs"
                           />
                         </div>
@@ -1301,7 +1480,11 @@ export function PrintingDailyReportClient() {
                             placeholder="e.g. 20mm"
                             value={row.drumSize || ""}
                             onChange={(e) => handleFieldChange(idx, "drumSize", e.target.value)}
-                            onBlur={() => handleAutoSavePartyToDataCentre(row)}
+                            onFocus={() => setFocusedCell(rowKey, "drumSize")}
+                            onBlur={() => {
+                              clearFocusedCell();
+                              handleAutoSavePartyToDataCentre(row);
+                            }}
                             className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-mono text-slate-800 text-xs"
                           />
                         </div>
@@ -1329,10 +1512,12 @@ export function PrintingDailyReportClient() {
                             fetchAvailableRolls(e.target.value);
                           }}
                           onFocus={() => {
+                            setFocusedCell(rowKey, "rollNumber");
                             setActiveRollSearchRow(idx);
                             fetchAvailableRolls(row.rollNumber || "");
                           }}
                           onBlur={() => {
+                            clearFocusedCell();
                             setTimeout(() => setActiveRollSearchRow(null), 250);
                           }}
                           className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-mono font-bold text-slate-900 text-xs"
@@ -1372,6 +1557,8 @@ export function PrintingDailyReportClient() {
                             placeholder="e.g. 42 S1"
                             value={row.loomNumber || ""}
                             onChange={(e) => handleFieldChange(idx, "loomNumber", e.target.value)}
+                            onFocus={() => setFocusedCell(rowKey, "loomNumber")}
+                            onBlur={() => clearFocusedCell()}
                             className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-mono text-slate-800 text-xs"
                           />
                         </div>
@@ -1382,6 +1569,8 @@ export function PrintingDailyReportClient() {
                           <UniversalQualityInput
                             value={row.quality || ""}
                             onChange={(val) => handleFieldChange(idx, "quality", val)}
+                            onFocus={() => setFocusedCell(rowKey, "quality")}
+                            onBlur={() => clearFocusedCell()}
                             placeholder="Quality"
                             compact={true}
                             inputClassName="h-8 text-xs font-medium"
@@ -1407,6 +1596,8 @@ export function PrintingDailyReportClient() {
                             placeholder="0"
                             value={row.productionMeter}
                             onChange={(e) => handleFieldChange(idx, "productionMeter", e.target.value)}
+                            onFocus={() => setFocusedCell(rowKey, "productionMeter")}
+                            onBlur={() => clearFocusedCell()}
                             className="w-full px-2.5 py-1.5 border border-sky-200 bg-sky-50/20 rounded-lg font-mono font-bold text-sky-900 text-xs"
                           />
                         </div>
@@ -1420,6 +1611,8 @@ export function PrintingDailyReportClient() {
                             placeholder="0.0"
                             value={row.netWeight}
                             onChange={(e) => handleFieldChange(idx, "netWeight", e.target.value)}
+                            onFocus={() => setFocusedCell(rowKey, "netWeight")}
+                            onBlur={() => clearFocusedCell()}
                             className="w-full px-2.5 py-1.5 border border-slate-300 rounded-lg font-mono font-bold text-slate-900 text-xs"
                           />
                         </div>
@@ -1437,6 +1630,8 @@ export function PrintingDailyReportClient() {
                             placeholder="0"
                             value={row.printMeter}
                             onChange={(e) => handleFieldChange(idx, "printMeter", e.target.value)}
+                            onFocus={() => setFocusedCell(rowKey, "printMeter")}
+                            onBlur={() => clearFocusedCell()}
                             className="w-full px-2.5 py-1.5 border border-emerald-300 bg-emerald-50/40 rounded-lg font-mono font-bold text-emerald-900 text-xs"
                           />
                         </div>
@@ -1458,6 +1653,8 @@ export function PrintingDailyReportClient() {
                         placeholder="Remarks / batch notes..."
                         value={row.remarks || ""}
                         onChange={(e) => handleFieldChange(idx, "remarks", e.target.value)}
+                        onFocus={() => setFocusedCell(rowKey, "remarks")}
+                        onBlur={() => clearFocusedCell()}
                         className="flex-1 px-2.5 py-1.5 border border-slate-200 rounded-lg text-slate-600 text-xs"
                       />
                       <button

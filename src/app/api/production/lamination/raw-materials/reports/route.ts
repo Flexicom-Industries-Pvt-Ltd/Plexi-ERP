@@ -136,6 +136,7 @@ export async function POST(request: NextRequest) {
       status = "DRAFT",
       remarks,
       entries = [],
+      clientId,
     } = body;
 
     if (!date || !shiftName) {
@@ -159,6 +160,7 @@ export async function POST(request: NextRequest) {
         );
 
         return {
+          id: entry.id || undefined,
           rawMaterialId: entry.rawMaterialId || null,
           materialName: entry.materialName?.trim() || `Material ${index + 1}`,
           percentage,
@@ -173,33 +175,89 @@ export async function POST(request: NextRequest) {
 
     const totals = computeRawMaterialTotals(processedEntries, numManualTotal);
 
-    // Upsert transaction in Neon DB
+    // Upsert transaction with atomic non-destructive entries in Neon DB
     const report = await db.$transaction(async (tx) => {
-      const existing = await tx.laminationRawMaterialReport.findUnique({
+      const header = await tx.laminationRawMaterialReport.upsert({
         where: {
           date_shiftName: { date, shiftName },
         },
+        create: {
+          date,
+          shiftName,
+          operatorName: operatorName?.trim() || null,
+          operatorId: operatorId || null,
+          supervisorName: supervisorName?.trim() || null,
+          manualTotalKg: totals.manualTotalKg,
+          machineTotalKg: totals.machineTotalKg,
+          diffTotalKg: totals.diffTotalKg,
+          status,
+          remarks: remarks?.trim() || null,
+        },
+        update: {
+          operatorName: operatorName?.trim() || null,
+          operatorId: operatorId || null,
+          supervisorName: supervisorName?.trim() || null,
+          manualTotalKg: totals.manualTotalKg,
+          machineTotalKg: totals.machineTotalKg,
+          diffTotalKg: totals.diffTotalKg,
+          status,
+          remarks: remarks?.trim() || null,
+        },
       });
 
-      if (existing) {
-        // Delete previous entries and recreate
-        await tx.laminationRawMaterialReportEntry.deleteMany({
-          where: { reportId: existing.id },
-        });
+      // Atomically upsert entries keyed by id or (reportId, materialName)
+      for (const e of processedEntries) {
+        if (e.id) {
+          await tx.laminationRawMaterialReportEntry.upsert({
+            where: { id: e.id },
+            create: {
+              id: e.id,
+              reportId: header.id,
+              rawMaterialId: e.rawMaterialId,
+              materialName: e.materialName,
+              percentage: e.percentage,
+              manualKg: e.manualKg,
+              machineKg: e.machineKg,
+              diffKg: e.diffKg,
+              sequence: e.sequence,
+              remarks: e.remarks,
+            },
+            update: {
+              rawMaterialId: e.rawMaterialId,
+              materialName: e.materialName,
+              percentage: e.percentage,
+              manualKg: e.manualKg,
+              machineKg: e.machineKg,
+              diffKg: e.diffKg,
+              sequence: e.sequence,
+              remarks: e.remarks,
+            },
+          });
+        } else {
+          const existingEntry = await tx.laminationRawMaterialReportEntry.findFirst({
+            where: {
+              reportId: header.id,
+              materialName: e.materialName,
+            },
+          });
 
-        return tx.laminationRawMaterialReport.update({
-          where: { id: existing.id },
-          data: {
-            operatorName: operatorName?.trim() || null,
-            operatorId: operatorId || null,
-            supervisorName: supervisorName?.trim() || null,
-            manualTotalKg: totals.manualTotalKg,
-            machineTotalKg: totals.machineTotalKg,
-            diffTotalKg: totals.diffTotalKg,
-            status,
-            remarks: remarks?.trim() || null,
-            entries: {
-              create: processedEntries.map((e) => ({
+          if (existingEntry) {
+            await tx.laminationRawMaterialReportEntry.update({
+              where: { id: existingEntry.id },
+              data: {
+                rawMaterialId: e.rawMaterialId,
+                percentage: e.percentage,
+                manualKg: e.manualKg,
+                machineKg: e.machineKg,
+                diffKg: e.diffKg,
+                sequence: e.sequence,
+                remarks: e.remarks,
+              },
+            });
+          } else {
+            await tx.laminationRawMaterialReportEntry.create({
+              data: {
+                reportId: header.id,
                 rawMaterialId: e.rawMaterialId,
                 materialName: e.materialName,
                 percentage: e.percentage,
@@ -208,49 +266,28 @@ export async function POST(request: NextRequest) {
                 diffKg: e.diffKg,
                 sequence: e.sequence,
                 remarks: e.remarks,
-              })),
-            },
-          },
-          include: {
-            entries: {
-              orderBy: { sequence: "asc" },
-            },
-          },
-        });
-      } else {
-        return tx.laminationRawMaterialReport.create({
-          data: {
-            date,
-            shiftName,
-            operatorName: operatorName?.trim() || null,
-            operatorId: operatorId || null,
-            supervisorName: supervisorName?.trim() || null,
-            manualTotalKg: totals.manualTotalKg,
-            machineTotalKg: totals.machineTotalKg,
-            diffTotalKg: totals.diffTotalKg,
-            status,
-            remarks: remarks?.trim() || null,
-            entries: {
-              create: processedEntries.map((e) => ({
-                rawMaterialId: e.rawMaterialId,
-                materialName: e.materialName,
-                percentage: e.percentage,
-                manualKg: e.manualKg,
-                machineKg: e.machineKg,
-                diffKg: e.diffKg,
-                sequence: e.sequence,
-                remarks: e.remarks,
-              })),
-            },
-          },
-          include: {
-            entries: {
-              orderBy: { sequence: "asc" },
-            },
-          },
-        });
+              },
+            });
+          }
+        }
       }
+
+      return tx.laminationRawMaterialReport.findUnique({
+        where: { id: header.id },
+        include: {
+          entries: {
+            orderBy: { sequence: "asc" },
+          },
+        },
+      });
     });
+
+    if (!report) {
+      return NextResponse.json(
+        { error: "Failed to save lamination raw material report" },
+        { status: 500 }
+      );
+    }
 
     await logEvent({
       module: "LAMINATION",
@@ -276,6 +313,7 @@ export async function POST(request: NextRequest) {
       action: status === "SUBMITTED" ? "SUBMIT" : "SAVE",
       date: report.date,
       shift: report.shiftName,
+      clientId: clientId || undefined,
       user: {
         name: authResult.session?.user?.name || "Lamination Operator",
         email: authResult.session?.user?.email || undefined,

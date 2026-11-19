@@ -130,13 +130,30 @@ export function PostProductionSection({ date, shiftId, shiftName }: PostProducti
     fetchPostProductionData();
   }, [fetchPostProductionData]);
 
+  // Google Docs-grade catch-up when tab/browser is minimized, backgrounded, or wakes up from sleep
+  useEffect(() => {
+    const handleVisibilityOrFocus = () => {
+      if (typeof document !== "undefined" && document.visibilityState === "visible") {
+        fetchPostProductionData();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityOrFocus);
+    window.addEventListener("focus", handleVisibilityOrFocus);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityOrFocus);
+      window.removeEventListener("focus", handleVisibilityOrFocus);
+    };
+  }, [fetchPostProductionData]);
+
   const realtime = useProductionRealtime({
     module: "tape-plant",
     sheet: "post-production",
     date,
     shift: shiftId,
-    onSync: () => {
-      if (!autoSaving && Date.now() - lastUserEditTimeRef.current >= 3500) {
+    onSync: (event) => {
+      if (!date || !shiftId || autoSaving) return;
+      if (event?.clientId && event.clientId === realtime.clientId) return;
+      if (Date.now() - lastUserEditTimeRef.current >= 2500) {
         fetchPostProductionData();
       }
     },
@@ -153,6 +170,7 @@ export function PostProductionSection({ date, shiftId, shiftName }: PostProducti
       operatorId,
       entries,
       status: status === "SUBMITTED" ? "SUBMITTED" : "SAVED",
+      clientId: realtime.clientId,
     };
 
     const serialized = JSON.stringify(payload);
@@ -179,7 +197,7 @@ export function PostProductionSection({ date, shiftId, shiftName }: PostProducti
     }, 1000);
 
     return () => clearTimeout(timer);
-  }, [entries, operatorName, operatorId, date, shiftId, status]);
+  }, [entries, operatorName, operatorId, date, shiftId, status, realtime]);
 
   const updateEntryField = (index: number, field: keyof RecipePostProductionEntry, value: any) => {
     realtime.markLocalEdit();
@@ -247,6 +265,7 @@ export function PostProductionSection({ date, shiftId, shiftName }: PostProducti
         operatorId,
         entries,
         status: submitStatus,
+        clientId: realtime.clientId,
       };
 
       const res = await fetch("/api/production/tape-plant/post-production", {

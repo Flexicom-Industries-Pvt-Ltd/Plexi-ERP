@@ -4,22 +4,15 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { format, subDays, startOfMonth } from "date-fns";
 import { toast } from "sonner";
 import {
-  BarChart3,
   Printer,
   FileSpreadsheet,
   RefreshCw,
   Calendar,
   Clock,
   Scissors,
-  Layers,
   Search,
-  Filter,
-  TrendingDown,
-  TrendingUp,
-  Tag,
   CheckCircle2,
   Trash2,
-  ShieldAlert,
 } from "lucide-react";
 import { ConvertexSummaryResult } from "@/lib/convertex/convertex-types";
 import { ConvertexSummaryPrintModal } from "./ConvertexSummaryPrintModal";
@@ -79,10 +72,31 @@ export function ConvertexProductionSummaryClient() {
   const realtime = useProductionRealtime({
     module: "convertex",
     sheet: "summary",
-    onSync: () => {
+    onSync: (event?: { clientId?: string | null }) => {
+      if (event?.clientId && event.clientId === realtime.clientId) return;
       fetchSummary();
     },
   });
+
+  // Tab visibility & focus catch-up
+  useEffect(() => {
+    const handleVisibilityCatchup = () => {
+      if (document.visibilityState === "visible") {
+        fetchSummary();
+      }
+    };
+    const handleFocusCatchup = () => {
+      fetchSummary();
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityCatchup);
+    window.addEventListener("focus", handleFocusCatchup);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityCatchup);
+      window.removeEventListener("focus", handleFocusCatchup);
+    };
+  }, [fetchSummary]);
 
   const dateRangeLabel = useMemo(() => {
     if (dateFrom && dateTo) return `${dateFrom} to ${dateTo}`;

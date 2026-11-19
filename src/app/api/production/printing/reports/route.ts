@@ -187,34 +187,66 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      // Clear existing entries to replace with atomic latest state
-      await tx.printingDailyReportEntry.deleteMany({
+      // Delete specifically removed rows if requested
+      if (Array.isArray(body.deletedEntryIds) && body.deletedEntryIds.length > 0) {
+        await tx.printingDailyReportEntry.deleteMany({
+          where: {
+            reportId: report.id,
+            OR: [
+              { id: { in: body.deletedEntryIds } },
+              { rollNumber: { in: body.deletedEntryIds } },
+            ],
+          },
+        });
+      }
+
+      // Fetch existing entries to upsert non-destructively
+      const existingEntries = await tx.printingDailyReportEntry.findMany({
         where: { reportId: report.id },
       });
+      const existingById = new Map(existingEntries.map((e) => [e.id, e]));
+      const existingByRoll = new Map(
+        existingEntries.filter((e) => e.rollNumber).map((e) => [e.rollNumber.trim().toUpperCase(), e])
+      );
 
-      // Insert fresh entries
-      if (calculatedEntries.length > 0) {
-        await tx.printingDailyReportEntry.createMany({
-          data: calculatedEntries.map((e) => ({
-            reportId: report.id,
-            sequence: e.sequence,
-            companyName: e.companyName?.trim() || null,
-            unitName: e.unitName?.trim() || null,
-            grade: e.grade?.trim() || null,
-            targetProductionMtrs: e.targetProductionMtrs !== undefined && e.targetProductionMtrs !== null && e.targetProductionMtrs !== ""
-              ? Number(e.targetProductionMtrs)
-              : null,
-            drumSize: e.drumSize?.trim() || null,
-            quality: e.quality?.trim() || "",
-            rollNumber: e.rollNumber?.trim() || "",
-            loomNumber: String(e.loomNumber || ""),
-            productionMeter: Number(e.productionMeter) || 0,
-            netWeight: Number(e.netWeight) || 0,
-            avgWeight: Number(e.avgWeight) || 0,
-            printMeter: Number(e.printMeter) || 0,
-            remarks: e.remarks?.trim() || null,
-          })),
-        });
+      // Insert or update entries atomically
+      for (const e of calculatedEntries) {
+        const rollKey = e.rollNumber ? e.rollNumber.trim().toUpperCase() : "";
+        const matched = (e.id && existingById.get(e.id)) || (rollKey && existingByRoll.get(rollKey));
+
+        const entryData = {
+          sequence: e.sequence,
+          companyName: e.companyName?.trim() || null,
+          unitName: e.unitName?.trim() || null,
+          grade: e.grade?.trim() || null,
+          targetProductionMtrs: e.targetProductionMtrs !== undefined && e.targetProductionMtrs !== null && e.targetProductionMtrs !== ""
+            ? Number(e.targetProductionMtrs)
+            : null,
+          drumSize: e.drumSize?.trim() || null,
+          quality: e.quality?.trim() || "",
+          rollNumber: e.rollNumber?.trim() || "",
+          loomNumber: String(e.loomNumber || ""),
+          productionMeter: Number(e.productionMeter) || 0,
+          netWeight: Number(e.netWeight) || 0,
+          avgWeight: Number(e.avgWeight) || 0,
+          printMeter: Number(e.printMeter) || 0,
+          remarks: e.remarks?.trim() || null,
+        };
+
+        if (matched) {
+          await tx.printingDailyReportEntry.update({
+            where: { id: matched.id },
+            data: entryData,
+          });
+        } else {
+          await tx.printingDailyReportEntry.create({
+            data: {
+              reportId: report.id,
+              ...entryData,
+            },
+          });
+        }
+      }
 
         // Auto-save new company details to Data Centre PartyPrintingDetail master
         for (const e of calculatedEntries) {
@@ -258,7 +290,6 @@ export async function POST(request: NextRequest) {
             }
           }
         }
-      }
 
       return tx.printingDailyReport.findUnique({
         where: { id: report.id },
@@ -302,6 +333,7 @@ export async function POST(request: NextRequest) {
         email: authResult.session?.user?.email || undefined,
         role: (authResult.session?.user as any)?.roleName || (authResult.session?.user as any)?.role || "Staff",
       },
+      clientId: body.clientId,
     });
 
     return NextResponse.json({

@@ -201,10 +201,26 @@ export function BobbinStockSummarySection({
     fetchBobbinStock();
   }, [fetchBobbinStock]);
 
+  // Google Docs-grade catch-up when tab/browser is minimized, backgrounded, or wakes up from sleep
+  useEffect(() => {
+    const handleVisibilityOrFocus = () => {
+      if (typeof document !== "undefined" && document.visibilityState === "visible") {
+        fetchBobbinStock();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityOrFocus);
+    window.addEventListener("focus", handleVisibilityOrFocus);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityOrFocus);
+      window.removeEventListener("focus", handleVisibilityOrFocus);
+    };
+  }, [fetchBobbinStock]);
+
   const realtime = useProductionRealtime({
     module: "tape-plant",
     sheet: "bobbin-stock",
-    onSync: () => {
+    onSync: (event) => {
+      if (event?.clientId && event.clientId === realtime.clientId) return;
       fetchBobbinStock();
     },
   });
