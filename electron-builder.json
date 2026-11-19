@@ -3,6 +3,7 @@
   "appId": "com.flexicom.plexierp",
   "productName": "Plexi ERP",
   "copyright": "Copyright © 2026 Flexicom Industries Pvt. Ltd.",
+  "electronVersion": "34.2.0",
   "directories": {
     "output": "dist-electron"
   },
@@ -12,13 +13,7 @@
   ],
   "win": {
     "icon": "electron/assets/icon.ico",
-    "target": [
-      {
-        "target": "nsis",
-        "arch": ["x64"]
-      }
-    ],
-    "publisherName": "Flexicom Industries Pvt. Ltd."
+    "target": "nsis"
   },
   "nsis": {
     "oneClick": false,
