@@ -173,7 +173,7 @@ export function reconcileServerReadings(
       const mergedRow: TemperatureReading = {
         id: server.id || local.id,
         time: t,
-        photoUrl: server.photoUrl !== undefined ? server.photoUrl : local.photoUrl,
+        photoUrl: server.photoUrl !== undefined ? (server.photoUrl || undefined) : local.photoUrl,
         b1: server.b1 ?? "",
         b2: server.b2 ?? "",
         b3: server.b3 ?? "",
@@ -621,7 +621,10 @@ export function ProcessTemperatureSection({
           shiftId,
           operatorName,
           operatorId,
-          readings,
+          readings: readings.map((r) => ({
+            ...r,
+            photoUrl: r.photoUrl || null,
+          })),
           deletedTimes,
           clientId: realtime.clientId,
         };
@@ -657,7 +660,10 @@ export function ProcessTemperatureSection({
         shiftId,
         operatorName,
         operatorId,
-        readings,
+        readings: readings.map((r) => ({
+          ...r,
+          photoUrl: r.photoUrl || null,
+        })),
         deletedTimes,
         clientId: realtime.clientId,
       };
@@ -880,9 +886,10 @@ export function ProcessTemperatureSection({
   };
 
   // Update photo for active row with immediate database persistence and cross-device sync
-  const handleUpdateRowPhoto = async (idx: number, photoUrl: string | undefined) => {
+  const handleUpdateRowPhoto = async (idx: number, photoUrl: string | null | undefined) => {
+    const cleanPhoto = photoUrl?.trim() || null;
     const updated = [...readings];
-    updated[idx] = { ...updated[idx], photoUrl: photoUrl || undefined };
+    updated[idx] = { ...updated[idx], photoUrl: cleanPhoto || undefined };
     setReadings(updated);
 
     if (!date || !shiftId) return;
@@ -893,7 +900,10 @@ export function ProcessTemperatureSection({
       shiftId,
       operatorName,
       operatorId,
-      readings: updated,
+      readings: updated.map((r) => ({
+        ...r,
+        photoUrl: r.photoUrl || null,
+      })),
       deletedTimes,
       clientId: realtime.clientId,
     };
@@ -1952,9 +1962,8 @@ export function ProcessTemperatureSection({
             toast.success(`Photo attached to ${activePhotoReading.time || `row #${photoModalRowIdx + 1}`}`);
           }}
           onRemovePhoto={() => {
-            handleUpdateRowPhoto(photoModalRowIdx, undefined);
+            handleUpdateRowPhoto(photoModalRowIdx, null);
             setPhotoModalRowIdx(null);
-            toast.info("Photo removed");
           }}
         />
       )}

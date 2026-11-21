@@ -139,7 +139,7 @@ export async function POST(request: NextRequest) {
         const rowData = {
           operatorName: r.operatorName || operatorName || null,
           operatorId: r.operatorId || operatorId || null,
-          photoUrl: r.photoUrl || null,
+          photoUrl: r.photoUrl ? String(r.photoUrl).trim() : null,
           extruderRpm: r.extruderRpm !== "" && r.extruderRpm !== null && r.extruderRpm !== undefined ? Number(r.extruderRpm) : null,
           meltPumpRpm: r.meltPumpRpm !== "" && r.meltPumpRpm !== null && r.meltPumpRpm !== undefined ? Number(r.meltPumpRpm) : null,
           takeUpMpm: r.takeUpMpm !== "" && r.takeUpMpm !== null && r.takeUpMpm !== undefined ? Number(r.takeUpMpm) : null,
