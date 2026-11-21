@@ -147,8 +147,8 @@ export function reconcileServerLoomReadings(
       // Server is authoritative for confirmed row data
       const mergedRow: LoomReadingEntryItem = {
         ...server,
-        photoUrl: server.photoUrl ?? local.photoUrl,
-        intervalPhotos: server.intervalPhotos ?? local.intervalPhotos,
+        photoUrl: server.photoUrl !== undefined ? (server.photoUrl || null) : (local.photoUrl || null),
+        intervalPhotos: server.intervalPhotos !== undefined ? (server.intervalPhotos || null) : (local.intervalPhotos || null),
       };
 
       // ACTIVE FOCUSED CELL ISOLATION (Google Docs-Grade):

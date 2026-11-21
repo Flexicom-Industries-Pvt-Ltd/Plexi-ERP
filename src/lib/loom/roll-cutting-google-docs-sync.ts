@@ -140,7 +140,7 @@ export function reconcileServerRollCuttingEntries(
     if (server && local) {
       const mergedRow: LoomRollCuttingEntryItem = {
         ...server,
-        photoUrl: server.photoUrl ?? local.photoUrl,
+        photoUrl: server.photoUrl !== undefined ? (server.photoUrl || null) : (local.photoUrl || null),
       };
 
       // ACTIVE FOCUSED CELL ISOLATION (Google Docs-Grade):
