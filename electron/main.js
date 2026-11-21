@@ -77,6 +77,7 @@ function createWindow() {
     y: windowState.y,
     minWidth: 1024,
     minHeight: 700,
+    frame: false, // Frameless window for custom titlebar (Option 2)
     autoHideMenuBar: true, // Completely hides the menu strip on Windows & Linux
     backgroundColor: "#0f172a",
     icon: fs.existsSync(iconPath) ? iconPath : undefined,
@@ -109,6 +110,19 @@ function createWindow() {
       } else {
         saveWindowState({ isMaximized: true });
       }
+    }
+  });
+
+  // Track window maximized states and broadcast to renderer
+  mainWindow.on("maximize", () => {
+    if (!mainWindow.isDestroyed()) {
+      mainWindow.webContents.send("window-maximized-change", true);
+    }
+  });
+
+  mainWindow.on("unmaximize", () => {
+    if (!mainWindow.isDestroyed()) {
+      mainWindow.webContents.send("window-maximized-change", false);
     }
   });
 
@@ -193,4 +207,28 @@ ipcMain.handle("retry-connection", () => {
   if (mainWindow) {
     mainWindow.loadURL(getTargetUrl());
   }
+});
+
+// Custom window control handlers (Option 2 frameless)
+ipcMain.handle("window-minimize", () => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.minimize();
+  }
+});
+ipcMain.handle("window-maximize", () => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    if (mainWindow.isMaximized()) {
+      mainWindow.unmaximize();
+    } else {
+      mainWindow.maximize();
+    }
+  }
+});
+ipcMain.handle("window-close", () => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.close();
+  }
+});
+ipcMain.handle("window-is-maximized", () => {
+  return mainWindow && !mainWindow.isDestroyed() ? mainWindow.isMaximized() : false;
 });
