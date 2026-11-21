@@ -446,6 +446,10 @@ export function LoomReadingSheetSection() {
 
       const bodyPayload = {
         ...currentPayload,
+        entries: (currentPayload.entries || []).map((e: any) => ({
+          ...e,
+          photoUrl: e.photoUrl || null,
+        })),
         clientId: realtime.clientId,
         deletedEntries,
       };
@@ -544,7 +548,14 @@ export function LoomReadingSheetSection() {
   useEffect(() => {
     const handleUnloadOrHide = () => {
       if (latestPayloadRef.current && !isInitialMountRef.current) {
-        const serialized = JSON.stringify(latestPayloadRef.current);
+        const payloadToFlush = {
+          ...latestPayloadRef.current,
+          entries: (latestPayloadRef.current.entries || []).map((e: any) => ({
+            ...e,
+            photoUrl: e.photoUrl || null,
+          })),
+        };
+        const serialized = JSON.stringify(payloadToFlush);
         if (serialized !== lastSavedPayloadRef.current) {
           fetch("/api/production/loom/reading-sheet", {
             method: "POST",
@@ -837,7 +848,10 @@ export function LoomReadingSheetSection() {
         action: "SAVE_SHEET",
         date: selectedDate,
         shiftName: selectedShift,
-        entries,
+        entries: entries.map((e) => ({
+          ...e,
+          photoUrl: e.photoUrl || null,
+        })),
         preparedBy,
         checkedBy,
         approvedBy,

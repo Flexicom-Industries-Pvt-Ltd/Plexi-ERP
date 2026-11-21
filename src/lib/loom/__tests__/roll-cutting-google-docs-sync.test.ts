@@ -130,5 +130,13 @@ describe("Loom Roll Cutting Google Docs-Style Realtime Sync", () => {
       expect(merged).toHaveLength(1);
       expect(merged[0].rollNumber).toBe("CT-101");
     });
+
+    it("clears local photo when roll photo is removed on server (server sends null)", () => {
+      const local = [{ ...baseRoll(1, "CT-101"), photoUrl: "http://example.com/roll-photo.jpg" }];
+      const remote = [{ ...baseRoll(1, "CT-101"), photoUrl: null }];
+
+      const merged = reconcileServerRollCuttingEntries(local, remote, null);
+      expect(merged[0].photoUrl).toBeNull();
+    });
   });
 });

@@ -159,5 +159,13 @@ describe("Loom Reading Sheet Google Docs-Style Realtime Sync", () => {
       expect(merged[0].totalProduction).toBe(700);
       expect(merged[0].efficiencyPct).toBeGreaterThan(0);
     });
+
+    it("clears local photo when photo is removed on server (server sends null)", () => {
+      const local = [{ ...baseEntry(1, 1), photoUrl: "http://example.com/loom-photo.jpg" }];
+      const remote = [{ ...baseEntry(1, 1), photoUrl: null }];
+
+      const merged = reconcileServerLoomReadings(local, remote, null);
+      expect(merged[0].photoUrl).toBeNull();
+    });
   });
 });
