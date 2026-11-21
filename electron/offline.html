@@ -17,7 +17,75 @@
       justify-content: center;
       padding: 2rem;
       user-select: none;
+      padding-top: 48px;
     }
+
+    /* Custom Frameless Title Bar */
+    .titlebar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 36px;
+      background: #090d16;
+      border-bottom: 1px solid #1e293b;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      -webkit-app-region: drag;
+      z-index: 9999;
+    }
+    .titlebar-brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-left: 12px;
+      -webkit-app-region: no-drag;
+      font-size: 12px;
+      font-weight: 600;
+      color: #f8fafc;
+    }
+    .titlebar-brand img {
+      width: 16px;
+      height: 16px;
+      object-fit: contain;
+    }
+    .titlebar-brand .tag {
+      font-size: 11px;
+      color: #94a3b8;
+      font-weight: 400;
+    }
+    .titlebar-controls {
+      display: flex;
+      height: 100%;
+      -webkit-app-region: no-drag;
+    }
+    .titlebar-btn {
+      width: 44px;
+      height: 100%;
+      border: none;
+      background: transparent;
+      color: #94a3b8;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: background-color 0.15s, color 0.15s;
+    }
+    .titlebar-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: #ffffff;
+    }
+    .titlebar-btn.close:hover {
+      background: #ef4444;
+      color: #ffffff;
+    }
+    .titlebar-btn svg {
+      width: 14px;
+      height: 14px;
+      stroke-width: 2;
+    }
+
     .card {
       background-color: #1e293b;
       border: 1px solid #334155;
@@ -137,6 +205,33 @@
   </style>
 </head>
 <body>
+  <!-- Custom Frameless Titlebar -->
+  <div class="titlebar" ondblclick="toggleMaximize()">
+    <div class="titlebar-brand">
+      <img src="assets/icon.png" alt="Plexi ERP Icon">
+      <span>Plexi ERP</span>
+      <span class="tag">| Factory Workstation (Offline)</span>
+    </div>
+    <div class="titlebar-controls">
+      <button class="titlebar-btn" onclick="minimizeWindow()" title="Minimize" aria-label="Minimize">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <line x1="5" y1="12" x2="19" y2="12"></line>
+        </svg>
+      </button>
+      <button id="btn-maximize" class="titlebar-btn" onclick="toggleMaximize()" title="Maximize" aria-label="Maximize">
+        <svg id="icon-maximize" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+        </svg>
+      </button>
+      <button class="titlebar-btn close" onclick="closeWindow()" title="Close" aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+    </div>
+  </div>
+
   <div class="card">
     <div class="logo-container">
       <img src="assets/icon.png" alt="Plexi ERP Logo">
@@ -173,6 +268,58 @@
   </div>
 
   <script>
+    let isWindowMaximized = false;
+
+    function minimizeWindow() {
+      if (window.electron && typeof window.electron.minimize === "function") {
+        window.electron.minimize();
+      }
+    }
+
+    function toggleMaximize() {
+      if (window.electron && typeof window.electron.maximize === "function") {
+        window.electron.maximize();
+      }
+    }
+
+    function closeWindow() {
+      if (window.electron && typeof window.electron.close === "function") {
+        window.electron.close();
+      }
+    }
+
+    function updateMaximizeIcon(maximized) {
+      isWindowMaximized = maximized;
+      const btn = document.getElementById("btn-maximize");
+      const icon = document.getElementById("icon-maximize");
+      if (!btn || !icon) return;
+      if (maximized) {
+        btn.setAttribute("title", "Restore");
+        btn.setAttribute("aria-label", "Restore");
+        icon.innerHTML = '<rect x="4" y="4" width="12" height="12" rx="1"></rect><path d="M8 4V2a1 1 0 0 1 1-1h11a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1h-2"></path>';
+      } else {
+        btn.setAttribute("title", "Maximize");
+        btn.setAttribute("aria-label", "Maximize");
+        icon.innerHTML = '<rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>';
+      }
+    }
+
+    async function initWindowControls() {
+      if (window.electron) {
+        if (typeof window.electron.isMaximized === "function") {
+          try {
+            const maximized = await window.electron.isMaximized();
+            updateMaximizeIcon(maximized);
+          } catch {}
+        }
+        if (typeof window.electron.onMaximizedChange === "function") {
+          window.electron.onMaximizedChange((maximized) => {
+            updateMaximizeIcon(maximized);
+          });
+        }
+      }
+    }
+
     async function loadServerUrl() {
       if (window.electron && typeof window.electron.getServerUrl === "function") {
         try {
@@ -230,6 +377,7 @@
       }
     }, 10000);
 
+    initWindowControls();
     loadServerUrl();
   </script>
 </body>
