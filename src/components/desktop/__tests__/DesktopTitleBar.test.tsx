@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import { render, screen, fireEvent, act } from "@testing-library/react";
 import React from "react";
-import { DesktopTitleBar } from "../DesktopTitleBar";
+import { DesktopTitleBar, UpdateStatus } from "../DesktopTitleBar";
 import * as pwaUtils from "@/lib/pwa/pwa-utils";
 
 // Mock next/image
@@ -19,21 +19,40 @@ describe("<DesktopTitleBar />", () => {
   let mockClose: ReturnType<typeof vi.fn>;
   let mockIsMaximized: ReturnType<typeof vi.fn>;
   let mockOnMaximizedChange: ReturnType<typeof vi.fn>;
+  let mockApplyUpdate: ReturnType<typeof vi.fn>;
+  let mockGetUpdateStatus: ReturnType<typeof vi.fn>;
+  let mockOnUpdateStatusChange: ReturnType<typeof vi.fn>;
   let maximizedChangeCallback: ((maximized: boolean) => void) | null = null;
+  let updateStatusCallback: ((status: UpdateStatus) => void) | null = null;
 
   beforeEach(() => {
     vi.restoreAllMocks();
     isElectronSpy = vi.spyOn(pwaUtils, "isElectron");
     maximizedChangeCallback = null;
+    updateStatusCallback = null;
 
     mockMinimize = vi.fn().mockResolvedValue(undefined);
     mockMaximize = vi.fn().mockResolvedValue(undefined);
     mockClose = vi.fn().mockResolvedValue(undefined);
     mockIsMaximized = vi.fn().mockResolvedValue(false);
+    mockApplyUpdate = vi.fn().mockResolvedValue(true);
+    mockGetUpdateStatus = vi.fn().mockResolvedValue({
+      state: "idle",
+      version: null,
+      percent: 0,
+    });
+
     mockOnMaximizedChange = vi.fn((cb: (maximized: boolean) => void) => {
       maximizedChangeCallback = cb;
       return () => {
         maximizedChangeCallback = null;
+      };
+    });
+
+    mockOnUpdateStatusChange = vi.fn((cb: (status: UpdateStatus) => void) => {
+      updateStatusCallback = cb;
+      return () => {
+        updateStatusCallback = null;
       };
     });
 
@@ -46,6 +65,9 @@ describe("<DesktopTitleBar />", () => {
         close: mockClose,
         isMaximized: mockIsMaximized,
         onMaximizedChange: mockOnMaximizedChange,
+        applyUpdate: mockApplyUpdate,
+        getUpdateStatus: mockGetUpdateStatus,
+        onUpdateStatusChange: mockOnUpdateStatusChange,
       },
       writable: true,
       configurable: true,
@@ -77,6 +99,24 @@ describe("<DesktopTitleBar />", () => {
     expect(screen.getByTestId("window-minimize-btn")).toBeInTheDocument();
     expect(screen.getByTestId("window-maximize-btn")).toBeInTheDocument();
     expect(screen.getByTestId("window-close-btn")).toBeInTheDocument();
+  });
+
+  it("sets document --titlebar-height to 36px in Electron and cleans up on unmount", async () => {
+    isElectronSpy.mockReturnValue(true);
+
+    let unmountFn: () => void = () => {};
+    await act(async () => {
+      const res = render(<DesktopTitleBar />);
+      unmountFn = res.unmount;
+    });
+
+    expect(document.documentElement.style.getPropertyValue("--titlebar-height")).toBe("36px");
+
+    act(() => {
+      unmountFn();
+    });
+
+    expect(document.documentElement.style.getPropertyValue("--titlebar-height")).toBe("0px");
   });
 
   it("invokes window.electron.minimize() on minimize button click", async () => {
@@ -129,28 +169,52 @@ describe("<DesktopTitleBar />", () => {
     expect(mockClose).toHaveBeenCalledTimes(1);
   });
 
-  it("updates maximize/restore state dynamically when onMaximizedChange callback fires", async () => {
+  it("displays downloading progress pill when an update is downloading", async () => {
     isElectronSpy.mockReturnValue(true);
 
     await act(async () => {
       render(<DesktopTitleBar />);
     });
 
-    const maximizeBtn = screen.getByTestId("window-maximize-btn");
-    expect(maximizeBtn).toHaveAttribute("title", "Maximize");
+    expect(screen.queryByTestId("updater-downloading-pill")).not.toBeInTheDocument();
 
-    // Simulate maximize event
     act(() => {
-      maximizedChangeCallback?.(true);
+      updateStatusCallback?.({
+        state: "downloading",
+        version: "0.2.0",
+        percent: 45,
+      });
     });
 
-    expect(maximizeBtn).toHaveAttribute("title", "Restore");
+    expect(screen.getByTestId("updater-downloading-pill")).toBeInTheDocument();
+    expect(screen.getByText("45%")).toBeInTheDocument();
+    expect(screen.getByText(/Updating v0.2.0/)).toBeInTheDocument();
+  });
 
-    // Simulate unmaximize/restore event
-    act(() => {
-      maximizedChangeCallback?.(false);
+  it("displays restart & update button when update is downloaded and triggers applyUpdate on click", async () => {
+    isElectronSpy.mockReturnValue(true);
+
+    await act(async () => {
+      render(<DesktopTitleBar />);
     });
 
-    expect(maximizeBtn).toHaveAttribute("title", "Maximize");
+    act(() => {
+      updateStatusCallback?.({
+        state: "downloaded",
+        version: "0.2.0",
+        percent: 100,
+        installerPath: "C:\\Temp\\installer.exe",
+      });
+    });
+
+    const restartBtn = screen.getByTestId("updater-restart-btn");
+    expect(restartBtn).toBeInTheDocument();
+    expect(screen.getByText(/Restart & Update v0.2.0/)).toBeInTheDocument();
+
+    await act(async () => {
+      fireEvent.click(restartBtn);
+    });
+
+    expect(mockApplyUpdate).toHaveBeenCalledTimes(1);
   });
 });
