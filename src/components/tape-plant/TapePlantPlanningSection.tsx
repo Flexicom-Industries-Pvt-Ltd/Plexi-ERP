@@ -50,6 +50,7 @@ export const DEFAULT_MATERIALS: MaterialRow[] = [
 
 export interface RecipePlanItem {
   id: string;
+  clientUid?: string;
   recipeQuality: string;
   tapeType: "PP" | "LPP" | string;
   denier: number | string;
@@ -73,12 +74,14 @@ export interface RecipePlanItem {
 }
 
 export const createEmptyRecipePlan = (
-  index: number = 1,
+  _index: number = 1,
   defaultShiftId?: string,
   defaultShiftName?: string
 ): RecipePlanItem => {
+  const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
   return {
-    id: `temp-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    id: tempId,
+    clientUid: tempId,
     recipeQuality: "",
     tapeType: "PP",
     denier: "",
@@ -185,6 +188,7 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName, shifts }: T
       if (Array.isArray(data.plans) && data.plans.length > 0) {
         const loaded = data.plans.map((p: any) => ({
           id: p.id,
+          clientUid: p.clientUid || p.id || `client-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
           shiftId: p.shiftId || undefined,
           shiftName: p.shiftName || p.shift?.name || undefined,
           recipeQuality: p.recipeQuality || "",
@@ -241,8 +245,10 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName, shifts }: T
         });
       } else if (data && data.recipeQuality) {
         // Backward compatibility with single record
+        const singleId = data.id || `temp-${Date.now()}`;
         const single: RecipePlanItem = {
-          id: data.id || `temp-${Date.now()}`,
+          id: singleId,
+          clientUid: data.clientUid || singleId,
           shiftId: data.shiftId || undefined,
           shiftName: data.shiftName || (data.shift?.name) || undefined,
           recipeQuality: data.recipeQuality || "",
@@ -432,9 +438,11 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName, shifts }: T
   };
 
   const handleDuplicateCurrentRecipe = () => {
+    const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
     const duplicated: RecipePlanItem = {
       ...JSON.parse(JSON.stringify(currentPlan)),
-      id: `temp-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      id: tempId,
+      clientUid: tempId,
       materials: JSON.parse(JSON.stringify(currentPlan.materials)),
     };
     setRecipePlans((prev) => [...prev, duplicated]);
@@ -493,6 +501,9 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName, shifts }: T
     if (serialized === lastSavedPayloadRef.current) return;
 
     const timer = setTimeout(async () => {
+      // Don't auto-save if user is actively interacting or typed within the last 2 seconds
+      if (Date.now() - lastUserEditTimeRef.current < 2000) return;
+
       setAutoSaving(true);
       try {
         const res = await fetch("/api/production/tape-plant/planning", {
@@ -507,7 +518,7 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName, shifts }: T
           realtime.broadcastSync({ action: "SAVE", date, shift: shiftId });
           if (Array.isArray(resData.plans)) {
             // Only update recipePlans state if IDs actually changed (e.g. newly minted DB IDs)
-            // This prevents disruptive input re-renders, focus loss, and keystroke drops while typing
+            // Preserving clientUid guarantees React never unmounts row components or active dropdowns
             setRecipePlans((prev) => {
               let hasIdMismatch = false;
               for (let i = 0; i < prev.length; i++) {
@@ -521,7 +532,7 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName, shifts }: T
               return prev.map((p, i) => {
                 const match = resData.plans[i];
                 if (match && match.id && p.id !== match.id) {
-                  return { ...p, id: match.id };
+                  return { ...p, id: match.id, clientUid: p.clientUid || p.id };
                 }
                 return p;
               });
@@ -533,7 +544,7 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName, shifts }: T
       } finally {
         setAutoSaving(false);
       }
-    }, 1000);
+    }, 2500);
 
     return () => clearTimeout(timer);
   }, [recipePlans, date, shiftId, status, realtime]);
@@ -771,6 +782,8 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName, shifts }: T
 
   // Helper to update a specific plan by index (for inline grid editing)
   const updatePlanAt = (index: number, updates: Partial<RecipePlanItem>) => {
+    lastUserEditTimeRef.current = Date.now();
+    realtime.markLocalEdit();
     setRecipePlans((prev) =>
       prev.map((plan, idx) => (idx === index ? { ...plan, ...updates } : plan))
     );
@@ -1133,7 +1146,7 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName, shifts }: T
                 const rowMaterialTotalPct = plan.materials.reduce((sum, m) => sum + (Number(m.percentage) || 0), 0);
 
                 return (
-                  <React.Fragment key={plan.id}>
+                  <React.Fragment key={plan.clientUid || plan.id}>
                     {/* ── Main Row ── */}
                     <tr
                       className={`${rowBg} border-b border-slate-100 hover:bg-sky-50/30 transition-colors ${isActive ? "ring-1 ring-inset ring-sky-200" : ""}`}
@@ -1477,7 +1490,7 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName, shifts }: T
 
             return (
               <div
-                key={plan.id}
+                key={plan.clientUid || plan.id}
                 className={`rounded-xl border transition-all shadow-xs overflow-hidden bg-white ${
                   isActive
                     ? "border-sky-400 ring-2 ring-sky-100"
