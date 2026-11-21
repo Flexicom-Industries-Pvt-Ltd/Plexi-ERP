@@ -22,4 +22,22 @@ contextBridge.exposeInMainWorld("electron", {
     ipcRenderer.on("window-maximized-change", subscription);
     return () => ipcRenderer.removeListener("window-maximized-change", subscription);
   },
+
+  // Auto-updater integration
+  checkForUpdates: () => ipcRenderer.invoke("check-for-updates"),
+  getUpdateStatus: () => ipcRenderer.invoke("get-update-status"),
+  applyUpdate: () => ipcRenderer.invoke("apply-update"),
+  onUpdateStatusChange: (callback) => {
+    if (typeof callback !== "function") return () => {};
+    const subscription = (_event, status) => callback(status);
+    ipcRenderer.on("update-status-change", subscription);
+    return () => ipcRenderer.removeListener("update-status-change", subscription);
+  },
+});
+
+// Immediately inject desktop titlebar CSS variable into DOM
+window.addEventListener("DOMContentLoaded", () => {
+  if (document && document.documentElement) {
+    document.documentElement.style.setProperty("--titlebar-height", "36px");
+  }
 });
