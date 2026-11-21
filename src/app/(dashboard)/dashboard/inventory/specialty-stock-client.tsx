@@ -96,19 +96,12 @@ export function SpecialtyStockView({ title, description, materialTypes }: Specia
                   <span className="font-medium text-slate-700">{item.location?.name || "Unassigned"}</span>
                 </div>
 
-                {/* 3-Column Stock Breakdown */}
-                <div className="grid grid-cols-3 gap-1.5 p-2 bg-white rounded-lg border border-slate-200/80 text-center">
+                {/* 2-Column Stock Breakdown (Available & Consumed) */}
+                <div className="grid grid-cols-2 gap-2 p-2 bg-white rounded-lg border border-slate-200/80 text-center">
                   <div>
                     <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Available</span>
                     <span className="text-sm font-black text-emerald-600 block">
                       {item.movementSummary?.available ?? item.currentStock}
-                    </span>
-                    <span className="text-[9px] text-slate-400 block">{item.uom?.abbreviation}</span>
-                  </div>
-                  <div className="border-x border-slate-100">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Reserved</span>
-                    <span className="text-sm font-black text-amber-600 block">
-                      {item.movementSummary?.reserved ?? item.reservedStock ?? 0}
                     </span>
                     <span className="text-[9px] text-slate-400 block">{item.uom?.abbreviation}</span>
                   </div>
@@ -133,7 +126,6 @@ export function SpecialtyStockView({ title, description, materialTypes }: Specia
                   <th className="px-4 py-3 text-left">Material Type</th>
                   <th className="px-4 py-3 text-left">Location</th>
                   <th className="px-4 py-3 text-right">Available</th>
-                  <th className="px-4 py-3 text-right">Reserved</th>
                   <th className="px-4 py-3 text-right">Consumed</th>
                 </tr>
               </thead>
@@ -148,9 +140,6 @@ export function SpecialtyStockView({ title, description, materialTypes }: Specia
                     <td className="px-4 py-3 text-slate-600">{item.location?.name || "Unassigned"}</td>
                     <td className="px-4 py-3 text-right font-bold text-emerald-600">
                       {item.movementSummary?.available ?? item.currentStock} {item.uom?.abbreviation}
-                    </td>
-                    <td className="px-4 py-3 text-right text-amber-600">
-                      {item.movementSummary?.reserved ?? item.reservedStock ?? 0}
                     </td>
                     <td className="px-4 py-3 text-right text-slate-600">
                       {item.movementSummary?.consumed ?? 0}
