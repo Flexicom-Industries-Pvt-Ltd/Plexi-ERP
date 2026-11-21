@@ -140,7 +140,7 @@ export async function POST(request: NextRequest) {
         const rowData = {
           operatorName: r.operatorName || operatorName || null,
           operatorId: r.operatorId || operatorId || null,
-          photoUrl: r.photoUrl || null,
+          photoUrl: r.photoUrl ? String(r.photoUrl).trim() : null,
           material: matName,
           grade: r.grade ? String(r.grade).trim() : null,
           openingStock: opening,

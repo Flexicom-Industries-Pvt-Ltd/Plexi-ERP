@@ -168,6 +168,7 @@ export function PhotoEvidenceModal({
       setPreviewUrl(currentPhotoUrl || null);
       setSelectedFile(null);
       setCameraError(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
       setActiveTab(resolveDefaultTab(Boolean(currentPhotoUrl), allowUpload, allowCapture));
     } else {
       stopCamera();
@@ -354,6 +355,9 @@ export function PhotoEvidenceModal({
   };
 
   const handleRemove = () => {
+    setPreviewUrl(null);
+    setSelectedFile(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
     if (onRemovePhoto) {
       onRemovePhoto();
       toast.info("Photo removed from this reading");
