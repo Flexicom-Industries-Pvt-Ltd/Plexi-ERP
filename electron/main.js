@@ -1,6 +1,7 @@
 const { app, BrowserWindow, Menu, shell, ipcMain } = require("electron");
 const path = require("path");
 const fs = require("fs");
+const { initAutoUpdater } = require("./updater");
 
 // Prevent multiple instances of the desktop application
 const gotTheLock = app.requestSingleInstanceLock();
@@ -174,10 +175,12 @@ app.on("second-instance", () => {
 
 app.whenReady().then(() => {
   createWindow();
+  initAutoUpdater(mainWindow);
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createWindow();
+      initAutoUpdater(mainWindow);
     }
   });
 });
