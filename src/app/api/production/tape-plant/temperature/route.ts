@@ -148,7 +148,7 @@ export async function POST(request: NextRequest) {
           time: timeTrimmed,
           operatorName: r.operatorName || operatorName || null,
           operatorId: r.operatorId || operatorId || null,
-          photoUrl: r.photoUrl !== undefined ? (r.photoUrl || null) : (existing?.photoUrl || null),
+          photoUrl: r.photoUrl ? String(r.photoUrl).trim() : null,
           b1: r.b1 !== "" && r.b1 !== null && r.b1 !== undefined ? Number(r.b1) : null,
           b2: r.b2 !== "" && r.b2 !== null && r.b2 !== undefined ? Number(r.b2) : null,
           b3: r.b3 !== "" && r.b3 !== null && r.b3 !== undefined ? Number(r.b3) : null,

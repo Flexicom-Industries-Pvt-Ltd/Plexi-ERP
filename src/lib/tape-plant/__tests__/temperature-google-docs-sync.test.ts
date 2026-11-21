@@ -129,6 +129,19 @@ describe("Google Docs-Grade Collaborative Sync for Process Temperature", () => {
       expect(times).toContain("09:15");
       expect(times).toContain("09:45");
     });
+
+    it("clears local photo when photo is removed on server (server sends null)", () => {
+      const local: TemperatureReading[] = [
+        mockReading({ time: "08:00", photoUrl: "http://example.com/old-photo.jpg" }),
+      ];
+      const server: TemperatureReading[] = [
+        mockReading({ time: "08:00", photoUrl: null as any }),
+      ];
+
+      const reconciled = reconcileServerReadings(local, server, null, intervals);
+      const row8 = reconciled.find((r) => r.time === "08:00");
+      expect(row8?.photoUrl).toBeUndefined();
+    });
   });
 
   describe("mergeTemperatureReadings", () => {

@@ -160,7 +160,7 @@ export function reconcileServerDriveReadings(
       const mergedRow: DriveParameterReading = {
         id: server.id || local.id,
         time: t,
-        photoUrl: server.photoUrl !== undefined ? server.photoUrl : local.photoUrl,
+        photoUrl: server.photoUrl !== undefined ? (server.photoUrl || undefined) : local.photoUrl,
         operatorName: server.operatorName || local.operatorName || "",
         operatorId: server.operatorId || local.operatorId || "",
         extruderRpm: server.extruderRpm ?? "",
@@ -598,7 +598,10 @@ export function ProcessDriveParameterSection({
           shiftId,
           operatorName,
           operatorId,
-          records,
+          records: records.map((r) => ({
+            ...r,
+            photoUrl: r.photoUrl || null,
+          })),
           deletedTimes,
           clientId: realtime.clientId,
         };
@@ -634,7 +637,10 @@ export function ProcessDriveParameterSection({
         shiftId,
         operatorName,
         operatorId,
-        records,
+        records: records.map((r) => ({
+          ...r,
+          photoUrl: r.photoUrl || null,
+        })),
         deletedTimes,
         clientId: realtime.clientId,
       };
@@ -843,9 +849,10 @@ export function ProcessDriveParameterSection({
   };
 
   // Update photo for active row with immediate database persistence and cross-device sync
-  const handleUpdateRowPhoto = async (idx: number, photoUrl: string | undefined) => {
+  const handleUpdateRowPhoto = async (idx: number, photoUrl: string | null | undefined) => {
+    const cleanPhoto = photoUrl?.trim() || null;
     const updated = [...records];
-    updated[idx] = { ...updated[idx], photoUrl: photoUrl || undefined };
+    updated[idx] = { ...updated[idx], photoUrl: cleanPhoto || undefined };
     setRecords(updated);
 
     if (!date || !shiftId) return;
@@ -856,7 +863,10 @@ export function ProcessDriveParameterSection({
       shiftId,
       operatorName,
       operatorId,
-      records: updated,
+      records: updated.map((r) => ({
+        ...r,
+        photoUrl: r.photoUrl || null,
+      })),
       deletedTimes,
       clientId: realtime.clientId,
     };
@@ -1807,9 +1817,8 @@ export function ProcessDriveParameterSection({
             toast.success(`Photo attached to ${activePhotoRecord.time || `row #${photoModalRowIdx + 1}`}`);
           }}
           onRemovePhoto={() => {
-            handleUpdateRowPhoto(photoModalRowIdx, undefined);
+            handleUpdateRowPhoto(photoModalRowIdx, null);
             setPhotoModalRowIdx(null);
-            toast.info("Photo removed");
           }}
         />
       )}
