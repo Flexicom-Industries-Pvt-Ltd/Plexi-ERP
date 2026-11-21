@@ -1,11 +1,7 @@
 "use client";
 
 import React from "react";
-import {
-  UniversalQualityInput,
-  UniversalQualityInputProps,
-  UniversalQualityOption,
-} from "@/components/ui/UniversalQualityInput";
+import { UniversalQualityInput } from "@/components/ui/UniversalQualityInput";
 
 export interface QualityComboboxProps {
   value: string;
@@ -21,7 +17,7 @@ export interface QualityComboboxProps {
   disabled?: boolean;
 }
 
-export function QualityCombobox({
+export const QualityCombobox = React.memo(function QualityCombobox({
   value,
   onChange,
   recipes,
@@ -51,6 +47,6 @@ export function QualityCombobox({
       allowManualTyping={true}
     />
   );
-}
+});
 
 export default QualityCombobox;

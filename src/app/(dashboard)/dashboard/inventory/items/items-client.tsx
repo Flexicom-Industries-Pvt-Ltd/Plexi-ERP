@@ -260,7 +260,6 @@ export function InventoryItemsClient({
             items.map((item) => {
               const isLowStock = item.currentStock <= item.minimumStock && item.minimumStock > 0;
               const availableQty = item.movementSummary?.available ?? item.currentStock;
-              const reservedQty = item.movementSummary?.reserved ?? item.reservedStock ?? 0;
               const consumedQty = item.movementSummary?.consumed ?? 0;
 
               return (
@@ -292,19 +291,12 @@ export function InventoryItemsClient({
                     )}
                   </div>
                   
-                  {/* 3-Column Stock Breakdown */}
-                  <div className="grid grid-cols-3 gap-1.5 p-2 bg-white rounded-lg border border-slate-200/80 text-center">
+                  {/* 2-Column Stock Breakdown (Available & Consumed) */}
+                  <div className="grid grid-cols-2 gap-2 p-2 bg-white rounded-lg border border-slate-200/80 text-center">
                     <div>
                       <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Available</span>
                       <span className={`text-sm font-black block ${isLowStock ? "text-red-600" : "text-emerald-600"}`}>
                         {availableQty}
-                      </span>
-                      <span className="text-[9px] text-slate-400 block">{item.uom?.abbreviation}</span>
-                    </div>
-                    <div className="border-x border-slate-100">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Reserved</span>
-                      <span className="text-sm font-black text-amber-600 block">
-                        {reservedQty}
                       </span>
                       <span className="text-[9px] text-slate-400 block">{item.uom?.abbreviation}</span>
                     </div>
@@ -365,7 +357,6 @@ export function InventoryItemsClient({
                 <th className="px-4 py-3 font-medium">Code & Name</th>
                 <th className="px-4 py-3 font-medium">Type & Category</th>
                 <th className="px-4 py-3 font-medium text-right">Available</th>
-                <th className="px-4 py-3 font-medium text-right">Reserved</th>
                 <th className="px-4 py-3 font-medium text-right">Consumed</th>
                 <th className="px-4 py-3 font-medium">Location</th>
                 <th className="px-4 py-3 font-medium text-right">Actions</th>
@@ -374,7 +365,7 @@ export function InventoryItemsClient({
             <tbody className="divide-y divide-slate-100">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-slate-500">
+                  <td colSpan={6} className="px-4 py-12 text-center text-slate-500">
                     <div className="animate-pulse flex flex-col items-center">
                       <Package className="h-8 w-8 text-slate-300 mb-2" />
                       <p>Loading items...</p>
@@ -383,7 +374,7 @@ export function InventoryItemsClient({
                 </tr>
               ) : items.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-slate-500">
+                  <td colSpan={6} className="px-4 py-12 text-center text-slate-500">
                     No inventory items found.
                   </td>
                 </tr>
@@ -413,9 +404,6 @@ export function InventoryItemsClient({
                             <AlertTriangle className="h-3 w-3" /> Low Stock (Min: {item.minimumStock})
                           </div>
                         )}
-                      </td>
-                      <td className="px-4 py-3 text-right text-amber-600 font-medium">
-                        {item.movementSummary?.reserved ?? item.reservedStock ?? 0}
                       </td>
                       <td className="px-4 py-3 text-right text-slate-600 font-medium">
                         {item.movementSummary?.consumed ?? 0}
