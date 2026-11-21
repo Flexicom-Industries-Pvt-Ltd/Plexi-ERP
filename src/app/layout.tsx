@@ -49,6 +49,7 @@ export const viewport: Viewport = {
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { PwaInstallPrompt } from "@/components/pwa/pwa-install-prompt";
+import { DesktopTitleBar } from "@/components/desktop/DesktopTitleBar";
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
@@ -57,6 +58,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col overscroll-none">
+        <DesktopTitleBar />
         <TooltipProvider>
           {children}
         </TooltipProvider>
