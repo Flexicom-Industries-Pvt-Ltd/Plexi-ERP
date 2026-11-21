@@ -351,6 +351,10 @@ export function LoomRollCuttingSection() {
     try {
       const bodyPayload = {
         ...currentPayload,
+        entries: (currentPayload.entries || []).map((e: any) => ({
+          ...e,
+          photoUrl: e.photoUrl || null,
+        })),
         clientId: realtime.clientId,
         deletedRollIds: Array.from(deletedRollsRef.current.ids),
         deletedRollNumbers: Array.from(deletedRollsRef.current.numbers),
@@ -438,7 +442,14 @@ export function LoomRollCuttingSection() {
   useEffect(() => {
     const handleUnloadOrHide = () => {
       if (latestPayloadRef.current && !isInitialMountRef.current) {
-        const serialized = JSON.stringify(latestPayloadRef.current);
+        const payloadToFlush = {
+          ...latestPayloadRef.current,
+          entries: (latestPayloadRef.current.entries || []).map((e: any) => ({
+            ...e,
+            photoUrl: e.photoUrl || null,
+          })),
+        };
+        const serialized = JSON.stringify(payloadToFlush);
         if (serialized !== lastSavedPayloadRef.current) {
           fetch("/api/production/loom/roll-cutting", {
             method: "POST",
@@ -756,7 +767,10 @@ export function LoomRollCuttingSection() {
         supervisorName,
         status: "SUBMITTED",
         remarks: reportRemarks,
-        entries,
+        entries: entries.map((e) => ({
+          ...e,
+          photoUrl: e.photoUrl || null,
+        })),
         clientId: realtime.clientId,
         deletedRollIds: Array.from(deletedRollsRef.current.ids),
         deletedRollNumbers: Array.from(deletedRollsRef.current.numbers),
