@@ -578,7 +578,7 @@ export async function POST(request: NextRequest) {
           avgWeightPerMeter: item.avgWeightPerMeter,
           supervisorSign: item.supervisorSign,
           remarks: item.remarks,
-          photoUrl: item.photoUrl,
+          photoUrl: item.photoUrl ? String(item.photoUrl).trim() : null,
           productionRollId: item.productionRollId,
         };
 
@@ -668,7 +668,7 @@ export async function POST(request: NextRequest) {
                     date,
                     shiftName: targetShiftName,
                     supervisorSign: item.supervisorSign,
-                    photoUrl: item.photoUrl,
+                    photoUrl: item.photoUrl ? String(item.photoUrl).trim() : null,
                   },
                   remarks: `Loom #${item.loomNumber} Roll Cut: ${item.qualityType} (${item.meter}m, ${weightVal}kg)`,
                 },
@@ -689,7 +689,7 @@ export async function POST(request: NextRequest) {
                     date,
                     shiftName: targetShiftName,
                     supervisorSign: item.supervisorSign,
-                    photoUrl: item.photoUrl,
+                    photoUrl: item.photoUrl ? String(item.photoUrl).trim() : null,
                   },
                   remarks: `Loom #${item.loomNumber} Roll Cut: ${item.qualityType} (${item.meter}m, ${weightVal}kg)`,
                 },

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@/generated/prisma";
 import { db } from "@/lib/db";
 import { requireLoomApiPermission } from "@/lib/loom/permissions";
 import { logAudit } from "@/lib/audit-logger";
@@ -606,8 +607,8 @@ export async function POST(request: NextRequest) {
           efficiencyPct: item.efficiencyPct,
           status: item.status,
           remarks: item.remarks,
-          photoUrl: item.photoUrl,
-          intervalPhotos: item.intervalPhotos || undefined,
+          photoUrl: item.photoUrl ? String(item.photoUrl).trim() : null,
+          intervalPhotos: (item.intervalPhotos as any) ?? Prisma.JsonNull,
         };
 
         await db.loomReadingEntry.upsert({
