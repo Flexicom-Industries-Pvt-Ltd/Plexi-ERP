@@ -73,12 +73,17 @@ export interface RecipePlanItem {
   shiftName?: string;
 }
 
+function generateTempId(prefix = "temp"): string {
+  const rand = typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID().slice(0, 8) : Date.now().toString(36);
+  return `${prefix}-${Date.now()}-${rand}`;
+}
+
 export const createEmptyRecipePlan = (
   _index: number = 1,
   defaultShiftId?: string,
   defaultShiftName?: string
 ): RecipePlanItem => {
-  const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  const tempId = generateTempId("temp");
   return {
     id: tempId,
     clientUid: tempId,
@@ -188,7 +193,7 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName, shifts }: T
       if (Array.isArray(data.plans) && data.plans.length > 0) {
         const loaded = data.plans.map((p: any) => ({
           id: p.id,
-          clientUid: p.clientUid || p.id || `client-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          clientUid: p.clientUid || p.id || generateTempId("client"),
           shiftId: p.shiftId || undefined,
           shiftName: p.shiftName || p.shift?.name || undefined,
           recipeQuality: p.recipeQuality || "",
@@ -438,7 +443,7 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName, shifts }: T
   };
 
   const handleDuplicateCurrentRecipe = () => {
-    const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const tempId = generateTempId("temp");
     const duplicated: RecipePlanItem = {
       ...JSON.parse(JSON.stringify(currentPlan)),
       id: tempId,
@@ -1363,7 +1368,7 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName, shifts }: T
                             title="Toggle material formula">
                             <FlaskConical className="h-4 w-4" />
                           </button>
-                          <button type="button" onClick={(e) => { e.stopPropagation(); const dup = { ...JSON.parse(JSON.stringify(plan)), id: `temp-${Date.now()}-${Math.random().toString(36).slice(2, 7)}` }; setRecipePlans((prev) => [...prev.slice(0, index + 1), dup, ...prev.slice(index + 1)]); setActiveRecipeIndex(index + 1); toast.info(`Duplicated quality as row #${index + 2}`); }}
+                          <button type="button" onClick={(e) => { e.stopPropagation(); const dup = { ...JSON.parse(JSON.stringify(plan)), id: generateTempId("temp") }; setRecipePlans((prev) => [...prev.slice(0, index + 1), dup, ...prev.slice(index + 1)]); setActiveRecipeIndex(index + 1); toast.info(`Duplicated quality as row #${index + 2}`); }}
                             className="p-1.5 rounded text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
                             title="Duplicate row">
                             <Copy className="h-4 w-4" />
@@ -1528,7 +1533,7 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName, shifts }: T
                         e.stopPropagation();
                         const dup = {
                           ...JSON.parse(JSON.stringify(plan)),
-                          id: `temp-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+                          id: generateTempId("temp"),
                         };
                         setRecipePlans((prev) => [
                           ...prev.slice(0, index + 1),
