@@ -279,6 +279,11 @@ export class InventoryService {
 
         const qtyDelta = Number(data.quantity);
         const newStock = item.currentStock + qtyDelta;
+        if (newStock < 0) {
+          throw new Error(
+            `Stock adjustment cannot result in negative inventory balance. Current stock: ${item.currentStock}, adjustment: ${qtyDelta}`
+          );
+        }
 
         const updatedItem = await tx.inventoryItem.update({
           where: { id: itemId },

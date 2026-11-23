@@ -35,6 +35,11 @@ export async function POST(request: NextRequest) {
       if (!item) throw new Error("Item not found");
 
       const newStock = item.currentStock + Number(adjustmentQuantity);
+      if (newStock < 0) {
+        throw new Error(
+          `Adjustment cannot result in negative stock. Current stock: ${item.currentStock}, adjustment: ${adjustmentQuantity}`
+        );
+      }
 
       const updatedItem = await tx.inventoryItem.update({
         where: { id: itemId },
@@ -72,6 +77,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (error: any) {
     console.error("Error adjusting stock:", error);
-    return NextResponse.json({ error: error.message || "Failed to adjust stock" }, { status: 500 });
+    const isValidation = error.message?.includes("negative stock") || error.message?.includes("not found");
+    return NextResponse.json({ error: error.message || "Failed to adjust stock" }, { status: isValidation ? 400 : 500 });
   }
 }
