@@ -8,10 +8,12 @@ import { LoomReadingSheetSection } from "@/components/loom/LoomReadingSheetSecti
 import { LoomRollCuttingSection } from "@/components/loom/LoomRollCuttingSection";
 import { LoomRollStockSection } from "@/components/loom/LoomRollStockSection";
 import { LoomProductionReportSection } from "@/components/loom/LoomProductionReportSection";
+import { RollTracingSection } from "@/components/loom/RollTracingSection";
 
 export function LoomClient() {
   const searchParams = useSearchParams();
   const tabParam = searchParams.get("tab");
+  const rollParam = searchParams.get("roll") || undefined;
 
   return (
     <div className="space-y-5 p-4 sm:p-6 max-w-7xl mx-auto min-w-0">
@@ -23,6 +25,8 @@ export function LoomClient() {
         <LoomRollCuttingSection />
       ) : tabParam === "roll-stock" || tabParam === "stock" ? (
         <LoomRollStockSection />
+      ) : tabParam === "roll-trace" || tabParam === "trace" ? (
+        <RollTracingSection initialRollNumber={rollParam} />
       ) : tabParam === "production-report" || tabParam === "production_report" || tabParam === "report" || tabParam === "reports" ? (
         <LoomProductionReportSection />
       ) : (
