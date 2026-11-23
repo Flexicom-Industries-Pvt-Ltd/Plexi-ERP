@@ -122,6 +122,13 @@ export function InventoryItemsClient({
     if (!adjustForm.quantity || adjustForm.quantity === 0) return toast.error("Quantity cannot be 0");
     if (!adjustForm.remarks) return toast.error("Remarks are required for manual adjustments");
 
+    const projectedStock = (selectedItem?.currentStock || 0) + (adjustForm.quantity || 0);
+    if (projectedStock < 0) {
+      return toast.error(
+        `Stock adjustment cannot result in negative inventory. Current: ${selectedItem?.currentStock} ${selectedItem?.uom?.abbreviation || "units"}`
+      );
+    }
+
     setSubmitting(true);
     try {
       const res = await fetch("/api/inventory/transactions/adjust", {
@@ -134,7 +141,10 @@ export function InventoryItemsClient({
         }),
       });
 
-      if (!res.ok) throw new Error("Failed to adjust stock");
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || "Failed to adjust stock");
+      }
       toast.success("Stock adjusted successfully");
       setShowModal(false);
       fetchData();
@@ -490,7 +500,15 @@ export function InventoryItemsClient({
                       className="w-full mt-1 px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm font-bold"
                       placeholder="e.g. -5 to write off, 10 to add"
                     />
-                    <p className="text-xs text-slate-500 mt-1">New Stock will be: {selectedItem?.currentStock + adjustForm.quantity} {selectedItem?.uom?.abbreviation}</p>
+                    {(selectedItem?.currentStock || 0) + adjustForm.quantity < 0 ? (
+                      <p className="text-xs text-rose-600 font-semibold mt-1">
+                        ⚠️ Invalid: Stock would drop to {((selectedItem?.currentStock || 0) + adjustForm.quantity).toFixed(2)} {selectedItem?.uom?.abbreviation} (cannot be negative)
+                      </p>
+                    ) : (
+                      <p className="text-xs text-slate-500 mt-1">
+                        New Stock will be: {((selectedItem?.currentStock || 0) + adjustForm.quantity).toFixed(2)} {selectedItem?.uom?.abbreviation}
+                      </p>
+                    )}
                   </div>
                   <div>
                     <label className="text-xs sm:text-sm font-bold text-slate-700 uppercase tracking-wider block">Reason / Remarks *</label>
@@ -651,7 +669,7 @@ export function InventoryItemsClient({
               <button
                 type="submit"
                 form={modalMode === "ADJUST" ? "adjustForm" : "itemForm"}
-                disabled={submitting}
+                disabled={submitting || (modalMode === "ADJUST" && (selectedItem?.currentStock || 0) + (adjustForm.quantity || 0) < 0)}
                 className={`px-5 py-2 text-white text-xs sm:text-sm font-bold rounded-lg shadow-sm disabled:opacity-50 transition-colors ${
                   modalMode === "ADJUST" ? "bg-amber-600 hover:bg-amber-700" : "bg-primary hover:bg-primary/90"
                 }`}

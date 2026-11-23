@@ -25,15 +25,6 @@ export async function GET(request: Request) {
 
   let isClosed = false;
 
-  const safeWrite = async (text: string) => {
-    if (isClosed) return;
-    try {
-      await writer.write(encoder.encode(text));
-    } catch {
-      isClosed = true;
-    }
-  };
-
   // Subscribe to production event bus
   const unsubscribe = subscribeProductionSync(
     (event: ProductionSyncEvent) => {
@@ -41,6 +32,33 @@ export async function GET(request: Request) {
     },
     { module: moduleParam, sheet: sheetParam }
   );
+
+  let heartbeatTimer: NodeJS.Timeout | null = null;
+
+  const cleanup = () => {
+    if (isClosed) return;
+    isClosed = true;
+    if (heartbeatTimer) clearInterval(heartbeatTimer);
+    try {
+      unsubscribe();
+    } catch {
+      // already unsubscribed
+    }
+    try {
+      writer.close();
+    } catch {
+      // already closed
+    }
+  };
+
+  const safeWrite = async (text: string) => {
+    if (isClosed) return;
+    try {
+      await writer.write(encoder.encode(text));
+    } catch {
+      cleanup();
+    }
+  };
 
   // Send initial state if available
   if (moduleParam) {
@@ -55,25 +73,17 @@ export async function GET(request: Request) {
   }
 
   // Heartbeat keep-alive every 20s
-  const heartbeatTimer = setInterval(() => {
+  heartbeatTimer = setInterval(() => {
     if (isClosed) {
-      clearInterval(heartbeatTimer);
+      if (heartbeatTimer) clearInterval(heartbeatTimer);
       return;
     }
     safeWrite(`event: ping\ndata: {"time":${Date.now()}}\n\n`);
   }, 20000);
 
   // Cleanup on request abort / socket close
-  request.signal.addEventListener("abort", () => {
-    isClosed = true;
-    clearInterval(heartbeatTimer);
-    unsubscribe();
-    try {
-      writer.close();
-    } catch {
-      // already closed
-    }
-  });
+  request.signal.addEventListener("abort", cleanup);
+  writer.closed.catch(() => {}).finally(cleanup);
 
   return new Response(stream.readable, {
     status: 200,

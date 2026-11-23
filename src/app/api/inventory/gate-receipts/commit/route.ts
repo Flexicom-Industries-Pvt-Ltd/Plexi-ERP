@@ -58,6 +58,17 @@ export async function POST(request: NextRequest) {
         for (const commit of sortedCommits) {
           const { stockDetailId, stockId, actualQuantity } = commit;
 
+          // 0. Verify line has not already been committed to prevent double stock receipt race condition
+          const existingDetail = await tx.truckStockDetail.findUnique({
+            where: { id: stockDetailId },
+          });
+          if (!existingDetail) {
+            throw new Error(`Stock detail line "${stockDetailId}" not found`);
+          }
+          if (existingDetail.actualQuantity !== null && existingDetail.actualQuantity !== undefined) {
+            throw new Error(`Stock detail line "${stockDetailId}" has already been committed`);
+          }
+
           // 1. Update TruckStockDetail
           const stockDetail = await tx.truckStockDetail.update({
             where: { id: stockDetailId },
@@ -78,6 +89,12 @@ export async function POST(request: NextRequest) {
           const newStock = transactionType === "IN" 
             ? previousStock + actualQuantity 
             : previousStock - actualQuantity;
+
+          if (newStock < 0) {
+            throw new Error(
+              `Insufficient stock for item "${item.name}". Current available: ${previousStock}, Requested deduction: ${actualQuantity}`
+            );
+          }
 
           const updatedItem = await tx.inventoryItem.update({
             where: { id: itemId },
@@ -151,6 +168,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (error: any) {
     console.error("Error committing gate receipt:", error);
-    return NextResponse.json({ error: error.message || "Failed to commit gate receipt" }, { status: 500 });
+    const isValidation =
+      error.message?.includes("already been committed") ||
+      error.message?.includes("Insufficient stock") ||
+      error.message?.includes("not found");
+    return NextResponse.json(
+      { error: error.message || "Failed to commit gate receipt" },
+      { status: isValidation ? 400 : 500 }
+    );
   }
 }
