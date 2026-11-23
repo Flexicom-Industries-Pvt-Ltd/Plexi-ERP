@@ -287,20 +287,11 @@ export function RollTracingSection({ initialRollNumber }: RollTraceSectionProps)
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2.5">
+              <div className="flex items-center gap-2.5">
                 <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-sky-50 text-sky-700 border border-sky-200">
                   <span className="h-1.5 w-1.5 rounded-full bg-sky-500 animate-pulse" />
                   {traceData.currentStageLabel}
                 </span>
-
-                <button
-                  type="button"
-                  onClick={() => setPrintModalOpen(true)}
-                  className="px-3 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 hover:border-slate-300 text-slate-700 text-xs font-medium rounded-lg shadow-2xs inline-flex items-center gap-1.5 transition-all cursor-pointer"
-                >
-                  <Printer className="h-3.5 w-3.5 text-sky-600" />
-                  <span>Passport Preview</span>
-                </button>
               </div>
             </div>
 
