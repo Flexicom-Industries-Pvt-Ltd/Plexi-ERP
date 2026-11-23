@@ -6,14 +6,14 @@ export const dynamic = "force-dynamic";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { rollNumber: string } }
+  context: { params: Promise<{ rollNumber: string }> }
 ) {
   const session = await auth();
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const rollNumber = params?.rollNumber;
+  const { rollNumber } = await context.params;
   if (!rollNumber) {
     return NextResponse.json({ error: "Roll number parameter is required" }, { status: 400 });
   }
