@@ -371,7 +371,7 @@ export async function POST(request: NextRequest) {
             });
           }
         } catch (syncErr) {
-          console.error(`Failed to auto-sync Loom #${loomNumber} to quality ${dataToUpsert.nextQualityCode}:`, syncErr);
+          console.error("Failed to auto-sync Loom to quality:", loomNumber, dataToUpsert.nextQualityCode, syncErr);
         }
       }
 
