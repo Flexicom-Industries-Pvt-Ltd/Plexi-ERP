@@ -17,6 +17,7 @@ import {
   Film,
   Printer,
   Scissors,
+  ScanLine,
   UserCheck,
   X,
 } from "lucide-react";
@@ -70,7 +71,6 @@ const loomItems = [
   { title: "2 Hours Reading Sheet", url: "/dashboard/production/loom?tab=reading-sheet" },
   { title: "Roll Cutting Report", url: "/dashboard/production/loom?tab=roll-cutting" },
   { title: "Roll Stock", url: "/dashboard/production/loom?tab=roll-stock" },
-  { title: "Roll Tracing", url: "/dashboard/production/loom?tab=roll-trace" },
   { title: "Production Report", url: "/dashboard/production/loom?tab=production-report" },
 ];
 
@@ -180,6 +180,14 @@ export function AppSidebar({ user, allowedModules }: AppSidebarProps) {
   const hasPrintingAccess = isSuperAdmin || Boolean(allowedModules["PRINTING"]) || Boolean(allowedModules["PRODUCTION"]);
   const hasConvertexAccess = isSuperAdmin || Boolean(allowedModules["CONVERTEX"]) || Boolean(allowedModules["PRODUCTION"]);
   const hasValvomaticAccess = isSuperAdmin || Boolean(allowedModules["VALVOMATIC"]) || Boolean(allowedModules["CONVERTEX"]) || Boolean(allowedModules["PRODUCTION"]);
+  const hasRollTraceAccess =
+    isSuperAdmin ||
+    Boolean(allowedModules["ROLL_TRACE"]) ||
+    Boolean(allowedModules["PRODUCTION"]) ||
+    Boolean(allowedModules["LOOM"]) ||
+    Boolean(allowedModules["LAMINATION"]) ||
+    Boolean(allowedModules["PRINTING"]) ||
+    Boolean(allowedModules["CONVERTEX"]);
 
   const visibleNavItems = navItems.filter(
     (item) => (!item.module || isSuperAdmin || allowedModules[item.module]),
@@ -454,6 +462,19 @@ export function AppSidebar({ user, allowedModules }: AppSidebarProps) {
                 </CollapsibleContent>
               </SidebarMenuItem>
             </Collapsible>
+          )}
+
+          {hasRollTraceAccess && (
+            <SidebarMenuItem key="/dashboard/production/roll-trace">
+              <SidebarMenuButton
+                render={<Link href="/dashboard/production/roll-trace" />}
+                isActive={pathname === "/dashboard/production/roll-trace" || pathname.startsWith("/dashboard/production/roll-trace/")}
+                tooltip="Roll Tracing"
+              >
+                <ScanLine className="h-4 w-4" />
+                <span>Roll Tracing</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
           )}
 
           {hasDataCentreAccess && (

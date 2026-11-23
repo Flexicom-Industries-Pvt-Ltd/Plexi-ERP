@@ -1,9 +1,9 @@
 import { Metadata } from "next";
-import { RollTracingSection } from "@/components/loom/RollTracingSection";
+import { RollTracingSection } from "@/components/production/RollTracingSection";
 
 export const metadata: Metadata = {
-  title: "Roll Tracing & Genealogy | Flexicom ERP",
-  description: "End-to-end manufacturing genealogy and tracking for fabric rolls.",
+  title: "Roll Tracing & Production Genealogy | Flexicom ERP",
+  description: "End-to-end manufacturing traveler across Loom, Lamination, Printing, and Bag Conversion.",
 };
 
 export default async function RollTracePage(props: {
