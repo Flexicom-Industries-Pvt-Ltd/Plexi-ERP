@@ -246,6 +246,7 @@ export function registerLogListener(res: any) {
 }
 
 function pushRealtime(entry: any) {
+  if (!entry) return;
   const payload = JSON.stringify({
     id: entry.id,
     correlationId: entry.correlationId,
