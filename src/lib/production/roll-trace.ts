@@ -198,15 +198,15 @@ export async function traceRollByNumber(rawRollNumber: string): Promise<RollTrac
     stageBadgeColor = "bg-emerald-100 text-emerald-800 border-emerald-300";
   } else if (printEntry) {
     currentStage = "PRINTING";
-    currentStageLabel = "Printed (Ready for Cutting)";
+    currentStageLabel = "Printed (Ready for Conversion)";
     stageBadgeColor = "bg-purple-100 text-purple-800 border-purple-300";
   } else if (lamEntry) {
     currentStage = "LAMINATION";
-    currentStageLabel = "Laminated (Ready for Print / Cut)";
+    currentStageLabel = "Laminated (Ready for Print / Conversion)";
     stageBadgeColor = "bg-blue-100 text-blue-800 border-blue-300";
   } else if (loomEntry) {
     currentStage = "LOOM";
-    currentStageLabel = "Fresh Loom Roll (In Roll Stock)";
+    currentStageLabel = "Loom Roll (Roll Stock)";
     stageBadgeColor = "bg-sky-100 text-sky-800 border-sky-300";
   }
 
@@ -273,7 +273,7 @@ export async function traceRollByNumber(rawRollNumber: string): Promise<RollTrac
   // Stage 1: Loom Weaving & Cutting
   timeline.push({
     stage: "LOOM",
-    title: "Loom Weaving & Roll Cutting",
+    title: "Loom Section",
     date: loomEntry?.report?.date,
     shift: loomEntry?.report?.shiftName,
     operatorOrSupervisor: loomEntry?.supervisorSign || loomEntry?.report?.supervisorName || loomEntry?.contractor || undefined,
@@ -291,15 +291,14 @@ export async function traceRollByNumber(rawRollNumber: string): Promise<RollTrac
           photoAvailable: Boolean(loomEntry.photoUrl),
           photoUrl: loomEntry.photoUrl,
         }
-      : { message: "No loom cut record found for this roll number" },
+      : {},
   });
 
   // Stage 2: Lamination
   const isLamCurrent = currentStage === "LAMINATION";
-  const isLamDone = Boolean(lamEntry) && !isLamCurrent;
   timeline.push({
     stage: "LAMINATION",
-    title: "Extrusion Lamination",
+    title: "Lamination",
     date: lamEntry?.report?.date,
     shift: lamEntry?.report?.shiftName,
     operatorOrSupervisor: lamEntry?.report?.supervisorName || undefined,
@@ -313,14 +312,14 @@ export async function traceRollByNumber(rawRollNumber: string): Promise<RollTrac
           weightGainKg: (lamEntry.netWeightAfter - lamEntry.netWeightBefore).toFixed(2) + " kg",
           remarks: lamEntry.remarks || "—",
         }
-      : { message: "Not yet processed in Lamination" },
+      : {},
   });
 
   // Stage 3: Printing
   const isPrintCurrent = currentStage === "PRINTING";
   timeline.push({
     stage: "PRINTING",
-    title: "Flexographic Printing",
+    title: "Printing",
     date: printEntry?.report?.date,
     shift: printEntry?.report?.shiftName,
     operatorOrSupervisor: printEntry?.report?.supervisorName || undefined,
@@ -335,14 +334,14 @@ export async function traceRollByNumber(rawRollNumber: string): Promise<RollTrac
           netWeight: `${printEntry.netWeight} kg`,
           remarks: printEntry.remarks || "—",
         }
-      : { message: "Not yet processed in Printing" },
+      : {},
   });
 
   // Stage 4: Conversion / Bag Making
   const isConverted = Boolean(conversionEntry);
   timeline.push({
     stage: "CONVERSION",
-    title: conversionEntry ? `${conversionEntry.type} Bag Conversion` : "Bag Cutting & Conversion",
+    title: conversionEntry ? `${conversionEntry.type} (Bag Conversion)` : "Convertex / Valvomatic",
     date: conversionEntry?.date,
     shift: conversionEntry?.shiftName,
     operatorOrSupervisor: conversionEntry?.supervisorName || undefined,
@@ -359,7 +358,7 @@ export async function traceRollByNumber(rawRollNumber: string): Promise<RollTrac
           printFabricWaste: `${conversionEntry.printFabricWasteKg} kg`,
           totalWaste: `${(conversionEntry.loomFabricWasteKg + conversionEntry.lamFabricWasteKg + conversionEntry.printFabricWasteKg).toFixed(2)} kg`,
         }
-      : { message: "Roll has not reached Convertex / Valvomatic cutting stage" },
+      : {},
   });
 
   return {
