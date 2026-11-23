@@ -414,7 +414,7 @@ export async function getLatestDatabaseSheetUpdate(
       }
     }
   } catch (error) {
-    console.error(`[db-sync] Error checking database for ${normMod}:${normSheet}:`, error);
+    console.error("[db-sync] Error checking database for:", normMod, normSheet, error);
   }
 
   statusCache.set(cacheKey, { result, cachedAt: now });
