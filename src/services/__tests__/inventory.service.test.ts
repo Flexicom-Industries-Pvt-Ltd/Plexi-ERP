@@ -220,6 +220,45 @@ describe("InventoryService", () => {
       ).rejects.toThrow(/not found/i);
     });
 
+    it("should throw error if adjustment results in negative stock", async () => {
+      const mockItem = { id: "item-1", currentStock: 5 };
+      vi.mocked(db.inventoryItem.findUnique).mockResolvedValue(mockItem as any);
+
+      await expect(
+        InventoryService.adjustStock("item-1", { quantity: -10, remarks: "Write-off too much" })
+      ).rejects.toThrow(/negative inventory balance/i);
+    });
+
+    it("should allow downward adjustment if resulting stock remains non-negative", async () => {
+      const mockItem = { id: "item-1", currentStock: 50 };
+      const updatedItem = { id: "item-1", currentStock: 40 };
+
+      vi.mocked(db.inventoryItem.findUnique).mockResolvedValue(mockItem as any);
+      vi.mocked(db.inventoryItem.update).mockResolvedValue(updatedItem as any);
+      vi.mocked(db.inventoryTransaction.create).mockResolvedValue({ id: "tx-down" } as any);
+
+      const result = await InventoryService.adjustStock(
+        "item-1",
+        { quantity: -10, remarks: "Damage recount" },
+        "user-1"
+      );
+
+      expect(result.currentStock).toBe(40);
+      expect(db.inventoryItem.update).toHaveBeenCalledWith({
+        where: { id: "item-1" },
+        data: { currentStock: 40 },
+      });
+      expect(db.inventoryTransaction.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            itemId: "item-1",
+            type: "OUT",
+            quantity: 10,
+          }),
+        })
+      );
+    });
+
     it("should adjust stock and record transaction record", async () => {
       const mockItem = { id: "item-1", currentStock: 100 };
       const updatedItem = { id: "item-1", currentStock: 125 };
