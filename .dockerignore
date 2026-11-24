@@ -1,0 +1,11 @@
+node_modules
+.next
+.git
+.github
+dist
+coverage
+*.log
+.env*.local
+docs
+.vscode
+.agents

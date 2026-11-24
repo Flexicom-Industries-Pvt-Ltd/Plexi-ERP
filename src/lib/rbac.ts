@@ -6,17 +6,13 @@ export type PermissionAction = "canCreate" | "canRead" | "canUpdate" | "canDelet
 
 /**
  * Case-insensitive and variant-aware Super Admin / System Admin detector (ERP-010)
+ * Only legitimate SuperAdmin and SystemAdmin roles are granted bypass access.
+ * Generic "Admin" roles do NOT receive global super admin bypass.
  */
 export function isSuperAdminRole(roleName?: string | null): boolean {
   if (!roleName) return false;
   const normalized = roleName.trim().toUpperCase().replace(/[\s_-]/g, "");
-  return (
-    normalized === "SUPERADMIN" ||
-    normalized === "SUPER_ADMIN" ||
-    normalized === "SYSTEMADMIN" ||
-    normalized === "SYSTEM_ADMIN" ||
-    normalized === "ADMIN"
-  );
+  return normalized === "SUPERADMIN" || normalized === "SYSTEMADMIN";
 }
 
 export const getRolePermissions = unstable_cache(

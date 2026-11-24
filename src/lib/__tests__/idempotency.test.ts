@@ -66,7 +66,7 @@ describe("Idempotency Middleware (withIdempotency)", () => {
       },
     });
 
-    const scopedKey = buildIdempotencyCacheKey(request, "in-flight-key");
+    const scopedKey = buildIdempotencyCacheKey(request, "in-flight-key", "test-user-id");
     await cache.set(
       scopedKey,
       {
@@ -76,7 +76,7 @@ describe("Idempotency Middleware (withIdempotency)", () => {
       60
     );
 
-    const handler = vi.fn();
+    const handler = vi.fn(async () => NextResponse.json({ ok: true }));
     const response = await withIdempotency(request, handler);
 
     expect(handler).not.toHaveBeenCalled();
@@ -126,5 +126,38 @@ describe("Idempotency Middleware (withIdempotency)", () => {
 
     const scopedKey = buildIdempotencyCacheKey(request, "failing-key-999");
     expect(await cache.get(scopedKey)).toBeNull();
+  });
+
+  it("should reject key reuse if payload fingerprint does not match (ERP-004)", async () => {
+    const request1 = new NextRequest("http://localhost:3000/api/dispatch/orders/1/pick", {
+      method: "POST",
+      headers: {
+        "Idempotency-Key": "key-fingerprint-test",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ qty: 100, item: "ITEM-A" }),
+    });
+
+    const handler = vi.fn(async () =>
+      NextResponse.json({ success: true, processedQty: 100 }, { status: 200 })
+    );
+
+    const res1 = await withIdempotency(request1, handler);
+    expect(res1.status).toBe(200);
+
+    // Second request with SAME idempotency key but DIFFERENT payload
+    const request2 = new NextRequest("http://localhost:3000/api/dispatch/orders/1/pick", {
+      method: "POST",
+      headers: {
+        "Idempotency-Key": "key-fingerprint-test",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ qty: 999, item: "ITEM-TAMPERED" }),
+    });
+
+    const res2 = await withIdempotency(request2, handler);
+    expect(res2.status).toBe(422);
+    const body2 = await res2.json();
+    expect(body2.code).toBe("IDEMPOTENCY_PAYLOAD_MISMATCH");
   });
 });

@@ -160,6 +160,15 @@ export class TimeWatchClient {
       // Offline fallback
     }
 
+    // Do NOT return simulated devices as online in production when unreachable (ERP-021)
+    if (process.env.NODE_ENV !== "test" && process.env.ENABLE_BIOMETRIC_SIMULATOR !== "true") {
+      return {
+        success: false,
+        devices: [],
+        isMock: false,
+      };
+    }
+
     return {
       success: true,
       devices: [

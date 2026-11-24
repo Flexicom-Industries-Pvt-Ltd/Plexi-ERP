@@ -3,7 +3,9 @@ import { NextResponse } from "next/server";
 
 // Use the auth wrapper from next-auth which attaches the session to the request
 export default auth((req) => {
-  const isLoggedIn = !!req.auth;
+  const sessionUser = req.auth?.user;
+  const isDeactivated = sessionUser?.role === "DEACTIVATED" || (sessionUser as any)?.isActive === false;
+  const isLoggedIn = !!req.auth && !isDeactivated;
   const isAuthRoute = req.nextUrl.pathname.startsWith("/auth");
   const isPublicRoute =
     req.nextUrl.pathname === "/" ||
