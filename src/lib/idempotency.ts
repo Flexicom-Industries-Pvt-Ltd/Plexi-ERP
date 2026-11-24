@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cache } from "./cache";
+import { withResourceLock } from "./concurrency-lock";
 
 export interface IdempotencyRecord {
   status: "PROCESSING" | "COMPLETED" | "FAILED";
@@ -44,70 +45,74 @@ export async function withIdempotency(
   }
 
   const cacheKey = `idempotency:${idempotencyKey}`;
-  const existing = await cache.get<IdempotencyRecord>(cacheKey);
 
-  if (existing) {
-    if (existing.status === "PROCESSING") {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Conflict: This transaction is currently being processed. Please do not retry concurrently.",
-          code: "IDEMPOTENT_OPERATION_IN_PROGRESS",
-        },
-        { status: 409 }
-      );
-    }
+  // Atomic lock acquisition using withResourceLock to prevent check-before-insert races (ERP-003)
+  return withResourceLock(`lock:${cacheKey}`, async () => {
+    const existing = await cache.get<IdempotencyRecord>(cacheKey);
 
-    if (existing.status === "COMPLETED") {
-      const response = NextResponse.json(existing.body, {
-        status: existing.statusCode || 200,
-      });
-      response.headers.set("X-Idempotent-Replay", "true");
-      return response;
-    }
-  }
-
-  // Lock the key in PROCESSING state
-  await cache.set(
-    cacheKey,
-    {
-      status: "PROCESSING",
-      createdAt: Date.now(),
-    },
-    LOCK_TIMEOUT_SECONDS
-  );
-
-  try {
-    const result = await handler();
-
-    // Only cache successful 2xx responses
-    if (result.status >= 200 && result.status < 300) {
-      let body: unknown;
-      try {
-        body = await result.clone().json();
-      } catch {
-        body = { status: "OK" };
+    if (existing) {
+      if (existing.status === "PROCESSING") {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Conflict: This transaction is currently being processed. Please do not retry concurrently.",
+            code: "IDEMPOTENT_OPERATION_IN_PROGRESS",
+          },
+          { status: 409 }
+        );
       }
 
-      await cache.set(
-        cacheKey,
-        {
-          status: "COMPLETED",
-          statusCode: result.status,
-          body,
-          createdAt: Date.now(),
-        },
-        IDEMPOTENCY_TTL_SECONDS
-      );
-    } else {
-      // If the response is a client/server error, release the lock so the client can retry
-      await cache.del(cacheKey);
+      if (existing.status === "COMPLETED") {
+        const response = NextResponse.json(existing.body, {
+          status: existing.statusCode || 200,
+        });
+        response.headers.set("X-Idempotent-Replay", "true");
+        return response;
+      }
     }
 
-    return result;
-  } catch (err) {
-    // Release the lock on unhandled exception so future retries are not blocked
-    await cache.del(cacheKey);
-    throw err;
-  }
+    // Lock the key in PROCESSING state
+    await cache.set(
+      cacheKey,
+      {
+        status: "PROCESSING",
+        createdAt: Date.now(),
+      },
+      LOCK_TIMEOUT_SECONDS
+    );
+
+    try {
+      const result = await handler();
+
+      // Only cache successful 2xx responses
+      if (result.status >= 200 && result.status < 300) {
+        let body: unknown;
+        try {
+          body = await result.clone().json();
+        } catch {
+          body = { status: "OK" };
+        }
+
+        await cache.set(
+          cacheKey,
+          {
+            status: "COMPLETED",
+            statusCode: result.status,
+            body,
+            createdAt: Date.now(),
+          },
+          IDEMPOTENCY_TTL_SECONDS
+        );
+      } else {
+        // If the response is a client/server error, release the lock so the client can retry
+        await cache.del(cacheKey);
+      }
+
+      return result;
+    } catch (err) {
+      // Release the lock on unhandled exception so future retries are not blocked
+      await cache.del(cacheKey);
+      throw err;
+    }
+  });
 }

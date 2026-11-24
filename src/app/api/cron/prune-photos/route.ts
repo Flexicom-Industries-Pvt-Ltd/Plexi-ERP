@@ -1,18 +1,14 @@
 import { NextResponse } from "next/server";
 import { pruneExpiredEvidencePhotos } from "@/lib/production/photo-retention";
 import { pruneExpiredGatePhotos } from "@/lib/gate/gate-photo-retention";
+import { verifyCronRequest } from "@/lib/cron-auth";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
-  // Check cron secret header if configured (Vercel Cron protection)
-  const authHeader = request.headers.get("authorization");
-  if (
-    process.env.CRON_SECRET &&
-    authHeader !== `Bearer ${process.env.CRON_SECRET}`
-  ) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  // Fail-closed authorization: requires valid CRON_SECRET Bearer header
+  const authCheck = verifyCronRequest(request);
+  if (!authCheck.ok) return authCheck.response;
 
   try {
     const [productionResult, gateResult] = await Promise.all([

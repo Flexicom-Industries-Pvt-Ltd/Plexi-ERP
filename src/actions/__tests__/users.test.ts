@@ -18,6 +18,16 @@ vi.mock('next/cache', () => ({
   revalidatePath: vi.fn()
 }));
 
+vi.mock('@/lib/permissions', () => ({
+  requirePermission: vi.fn().mockResolvedValue(true)
+}));
+
+vi.mock('@/auth', () => ({
+  auth: vi.fn().mockResolvedValue({
+    user: { id: 'u-1', name: 'Test User', role: 'Super Admin' }
+  })
+}));
+
 // Mock bcrypt
 vi.mock('bcryptjs', () => ({
   default: {

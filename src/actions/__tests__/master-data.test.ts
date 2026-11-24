@@ -18,6 +18,10 @@ vi.mock('next/cache', () => ({
   revalidatePath: vi.fn()
 }));
 
+vi.mock('@/lib/permissions', () => ({
+  requirePermission: vi.fn().mockResolvedValue(true)
+}));
+
 describe('Master Data Actions', () => {
   beforeEach(() => {
     vi.clearAllMocks();

@@ -3,6 +3,7 @@ import { Module } from "@/generated/prisma";
 import { apiError } from "./api-response";
 import { NextResponse } from "next/server";
 import type { Session } from "next-auth";
+import { isSuperAdminRole } from "@/lib/rbac";
 
 export type ApiAction = "canRead" | "canCreate" | "canUpdate" | "canDelete";
 
@@ -22,20 +23,12 @@ export type ApiAuthResult =
       response: NextResponse;
     };
 
-/**
- * isSuperAdminRole
- * Case-insensitive & variant-aware Super Admin check.
- */
-export function isSuperAdminRole(roleName?: string | null): boolean {
-  if (!roleName) return false;
-  const normalized = roleName.trim().toUpperCase().replace(/[\s_-]/g, "");
-  return normalized === "SUPERADMIN" || normalized === "SUPER_ADMIN" || normalized === "SUPER ADMIN";
-}
+export { isSuperAdminRole };
 
 /**
  * requireApiAuth
  * High-performance API authentication & authorization helper.
- * Zero database overhead when using JWT session tokens.
+ * Enforces active account status and module-level permissions.
  */
 export async function requireApiAuth(options: ApiAuthOptions = {}): Promise<ApiAuthResult> {
   const session = (await auth()) as Session | null;
@@ -43,6 +36,14 @@ export async function requireApiAuth(options: ApiAuthOptions = {}): Promise<ApiA
     return {
       ok: false,
       response: apiError("Unauthorized", 401),
+    };
+  }
+
+  // Enforce account active status (ERP-001, ERP-033, ERP-040)
+  if ((session.user as any).isActive === false || session.user.role === "DEACTIVATED") {
+    return {
+      ok: false,
+      response: apiError("Forbidden: Account has been deactivated", 403),
     };
   }
 

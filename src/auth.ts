@@ -67,6 +67,23 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           return null;
         }
 
+        // Enforce account active status (ERP-040)
+        if (!user.isActive) {
+          const { logEvent } = await import("@/lib/logging");
+          logEvent({
+            userId: user.id,
+            module: "AUTH",
+            severity: "SECURITY",
+            action: "Login Failed — Inactive Account",
+            payload: { email: credentials.email },
+            ip,
+            userAgent,
+            httpMethod: "POST",
+            url: "/api/auth/callback/credentials",
+          }).catch(console.error);
+          return null;
+        }
+
         // Return user object without the password
         const roleName = user.role?.name || "USER";
         const normalizedRole = roleName.toUpperCase().replace(/[\s_-]+/g, "");
@@ -111,6 +128,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             const userWithRole = await db.user.findUnique({
               where: { id: token.id as string },
               select: {
+                isActive: true,
                 role: {
                   select: {
                     name: true,
@@ -122,6 +140,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                 },
               },
             });
+
+            // Enforce account active status and revoke session permissions immediately if deactivated (ERP-001, ERP-040)
+            if (!userWithRole || !userWithRole.isActive) {
+              session.user.role = "DEACTIVATED";
+              session.user.permissions = [];
+              (session.user as any).isActive = false;
+              return session;
+            }
 
             if (userWithRole?.role) {
               session.user.role = userWithRole.role.name;
@@ -163,7 +189,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         httpMethod: "POST",
         url: "/api/auth/callback/credentials",
         statusCode: 200,
-        durationMs: Math.floor(Math.random() * 50) + 150, // Simulated duration for auth events
       }).catch(console.error);
     },
     async signOut(message) {
@@ -185,7 +210,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         httpMethod: "POST",
         url: "/api/auth/signout",
         statusCode: 200,
-        durationMs: Math.floor(Math.random() * 20) + 30, // Simulated duration for auth events
       }).catch(console.error);
     },
   },
