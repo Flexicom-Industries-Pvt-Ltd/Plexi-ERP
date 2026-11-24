@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
     const affectedDates = new Set<string>();
     const now = Date.now();
     const maxFutureTime = now + 5 * 60 * 1000; // 5 minutes clock skew allowance
-    const maxPastTime = now - 7 * 24 * 60 * 60 * 1000; // 7 days max past age
+    const maxPastTime = now - 30 * 24 * 60 * 60 * 1000; // 30 days max past age (accommodates delayed factory offline sync)
 
     for (const p of punches) {
       const code = String(p.UserID || p.employeeCode || p.userId || "").trim();

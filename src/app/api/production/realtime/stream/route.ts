@@ -123,12 +123,34 @@ export async function GET(request: Request) {
       try {
         const user = await db.user.findUnique({
           where: { id: session.user.id },
-          select: { isActive: true, roleId: true },
+          select: {
+            isActive: true,
+            role: {
+              select: {
+                name: true,
+                permissions: {
+                  select: { module: true, canRead: true },
+                },
+              },
+            },
+          },
         });
-        if (!user || !user.isActive || !user.roleId) {
+        if (!user || !user.isActive || !user.role) {
           await safeWrite(`event: error\ndata: {"error":"Session or role revoked. Connection terminated."}\n\n`);
           cleanup();
           return;
+        }
+
+        // Dynamically terminate stream if user module read permission was revoked
+        if (!isSuperAdminRole(user.role.name) && moduleParam) {
+          const hasPerm = user.role.permissions.some(
+            (p) => ((p.module as string) === moduleParam || (p.module as string) === "ALL" || (p.module as string) === "PRODUCTION") && Boolean(p.canRead)
+          );
+          if (!hasPerm) {
+            await safeWrite(`event: error\ndata: {"error":"Module permissions revoked. Connection terminated."}\n\n`);
+            cleanup();
+            return;
+          }
         }
       } catch {
         // If DB is temporarily unreachable during heartbeat, do not abruptly kill stream unless continuous

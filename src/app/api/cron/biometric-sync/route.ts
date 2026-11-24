@@ -41,26 +41,32 @@ export async function GET(request: NextRequest) {
         const windowStart = new Date(p.punchTime.getTime() - 45000);
         const windowEnd = new Date(p.punchTime.getTime() + 45000);
 
-        const exists = await db.attendancePunch.findFirst({
-          where: {
-            employeeCode: p.employeeCode,
-            punchTime: { gte: windowStart, lte: windowEnd },
-          },
-        });
-
-        if (!exists) {
-          await db.attendancePunch.create({
-            data: {
+        const created = await db.$transaction(async (tx) => {
+          const exists = await tx.attendancePunch.findFirst({
+            where: {
               employeeCode: p.employeeCode,
-              employeeName: p.employeeName,
-              punchTime: p.punchTime,
-              direction: p.direction,
-              verifyMode: p.verifyMode,
-              deviceName: p.deviceName,
-              source: PunchSource.API_POLL,
-              rawPayload: p.rawPayload || undefined,
+              punchTime: { gte: windowStart, lte: windowEnd },
             },
           });
+
+          if (!exists) {
+            return tx.attendancePunch.create({
+              data: {
+                employeeCode: p.employeeCode,
+                employeeName: p.employeeName,
+                punchTime: p.punchTime,
+                direction: p.direction,
+                verifyMode: p.verifyMode,
+                deviceName: p.deviceName,
+                source: PunchSource.API_POLL,
+                rawPayload: p.rawPayload || undefined,
+              },
+            });
+          }
+          return null;
+        });
+
+        if (created) {
           newCount++;
         }
       }
