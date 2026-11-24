@@ -4,6 +4,7 @@ import { env } from "@/env";
 import { randomUUID } from "crypto";
 import { db } from "@/lib/db";
 import { Module } from "@/generated/prisma";
+import { isSuperAdminRole } from "@/lib/rbac";
 
 const s3Client = new S3Client({
   region: env.S3_REGION || "us-east-1",
@@ -44,7 +45,19 @@ export async function getPublicUrl(fileKey: string) {
   return `https://${env.S3_BUCKET_NAME || "dummy-bucket"}.s3.${env.S3_REGION || "us-east-1"}.amazonaws.com/${fileKey}`;
 }
 
-export async function deleteS3File(fileKey: string) {
+export async function deleteS3File(
+  fileKey: string,
+  requestingUserId?: string,
+  userRole?: string
+) {
+  // Validate ownership if requestingUserId is provided (ERP-020)
+  if (requestingUserId) {
+    const fileAsset = await db.fileAsset.findUnique({ where: { fileKey } });
+    if (fileAsset?.uploadedBy && fileAsset.uploadedBy !== requestingUserId && !isSuperAdminRole(userRole)) {
+      throw new Error("Forbidden: You do not have permission to delete this file asset");
+    }
+  }
+
   const command = new DeleteObjectCommand({
     Bucket: env.S3_BUCKET_NAME || "dummy-bucket",
     Key: fileKey,

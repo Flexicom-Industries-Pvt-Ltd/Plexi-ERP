@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { NextRequest, NextResponse } from "next/server";
-import { withIdempotency } from "../idempotency";
+import { withIdempotency, buildIdempotencyCacheKey } from "../idempotency";
 import { cache } from "../cache";
 
 describe("Idempotency Middleware (withIdempotency)", () => {
@@ -59,21 +59,22 @@ describe("Idempotency Middleware (withIdempotency)", () => {
   });
 
   it("should return 409 Conflict if an operation is currently processing", async () => {
-    await cache.set(
-      "idempotency:in-flight-key",
-      {
-        status: "PROCESSING",
-        createdAt: Date.now(),
-      },
-      60
-    );
-
     const request = new NextRequest("http://localhost:3000/api/dispatch/orders/1/pick", {
       method: "POST",
       headers: {
         "Idempotency-Key": "in-flight-key",
       },
     });
+
+    const scopedKey = buildIdempotencyCacheKey(request, "in-flight-key");
+    await cache.set(
+      scopedKey,
+      {
+        status: "PROCESSING",
+        createdAt: Date.now(),
+      },
+      60
+    );
 
     const handler = vi.fn();
     const response = await withIdempotency(request, handler);
@@ -83,6 +84,30 @@ describe("Idempotency Middleware (withIdempotency)", () => {
 
     const data = await response.json();
     expect(data.code).toBe("IDEMPOTENT_OPERATION_IN_PROGRESS");
+  });
+
+  it("should isolate idempotency keys across different endpoints (ERP-004)", async () => {
+    const requestA = new NextRequest("http://localhost:3000/api/dispatch/orders/1/pick", {
+      method: "POST",
+      headers: { "Idempotency-Key": "shared-key-001" },
+    });
+    const requestB = new NextRequest("http://localhost:3000/api/production/rolls/cut", {
+      method: "POST",
+      headers: { "Idempotency-Key": "shared-key-001" },
+    });
+
+    const handlerA = vi.fn(async () => NextResponse.json({ action: "pick" }, { status: 200 }));
+    const handlerB = vi.fn(async () => NextResponse.json({ action: "cut" }, { status: 200 }));
+
+    const resA = await withIdempotency(requestA, handlerA);
+    const resB = await withIdempotency(requestB, handlerB);
+
+    expect(handlerA).toHaveBeenCalledTimes(1);
+    expect(handlerB).toHaveBeenCalledTimes(1); // Not suppressed because endpoint paths differ!
+    const bodyA = await resA.json();
+    const bodyB = await resB.json();
+    expect(bodyA.action).toBe("pick");
+    expect(bodyB.action).toBe("cut");
   });
 
   it("should release the lock if the handler throws an error, allowing subsequent retries", async () => {
@@ -99,7 +124,7 @@ describe("Idempotency Middleware (withIdempotency)", () => {
 
     await expect(withIdempotency(request, failingHandler)).rejects.toThrow("Temporary database connection error");
 
-    // Verify key was cleaned up so retry is not locked out
-    expect(await cache.get("idempotency:failing-key-999")).toBeNull();
+    const scopedKey = buildIdempotencyCacheKey(request, "failing-key-999");
+    expect(await cache.get(scopedKey)).toBeNull();
   });
 });
