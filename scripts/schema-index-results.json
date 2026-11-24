@@ -1,0 +1,1643 @@
+{
+  "models": [
+    {
+      "modelName": "Role",
+      "fieldsCount": 10,
+      "foreignKeys": [],
+      "indexes": []
+    },
+    {
+      "modelName": "RolePermission",
+      "fieldsCount": 8,
+      "foreignKeys": [
+        "roleId"
+      ],
+      "indexes": [
+        "@@unique([roleId, module])"
+      ]
+    },
+    {
+      "modelName": "User",
+      "fieldsCount": 51,
+      "foreignKeys": [
+        "employeeId",
+        "roleId",
+        "departmentId"
+      ],
+      "indexes": [
+        "@@index([roleId, isActive])",
+        "@@index([departmentId])"
+      ]
+    },
+    {
+      "modelName": "Account",
+      "fieldsCount": 13,
+      "foreignKeys": [
+        "userId",
+        "providerAccountId"
+      ],
+      "indexes": [
+        "@@unique([provider, providerAccountId])"
+      ]
+    },
+    {
+      "modelName": "Session",
+      "fieldsCount": 5,
+      "foreignKeys": [
+        "userId"
+      ],
+      "indexes": []
+    },
+    {
+      "modelName": "VerificationToken",
+      "fieldsCount": 3,
+      "foreignKeys": [],
+      "indexes": [
+        "@@unique([identifier, token])"
+      ]
+    },
+    {
+      "modelName": "Shift",
+      "fieldsCount": 22,
+      "foreignKeys": [],
+      "indexes": []
+    },
+    {
+      "modelName": "UnitOfMeasurement",
+      "fieldsCount": 9,
+      "foreignKeys": [],
+      "indexes": []
+    },
+    {
+      "modelName": "Category",
+      "fieldsCount": 9,
+      "foreignKeys": [],
+      "indexes": []
+    },
+    {
+      "modelName": "Driver",
+      "fieldsCount": 7,
+      "foreignKeys": [],
+      "indexes": []
+    },
+    {
+      "modelName": "Stock",
+      "fieldsCount": 12,
+      "foreignKeys": [
+        "uomId"
+      ],
+      "indexes": [
+        "@@index([materialType])",
+        "@@index([uomId])"
+      ]
+    },
+    {
+      "modelName": "SubCategory",
+      "fieldsCount": 9,
+      "foreignKeys": [
+        "categoryId"
+      ],
+      "indexes": [
+        "@@unique([categoryId, name])"
+      ]
+    },
+    {
+      "modelName": "AuditLog",
+      "fieldsCount": 13,
+      "foreignKeys": [
+        "correlationId",
+        "userId",
+        "entityId"
+      ],
+      "indexes": [
+        "@@index([correlationId])",
+        "@@index([module])",
+        "@@index([action])",
+        "@@index([userId])",
+        "@@index([entityId])",
+        "@@index([createdAt])"
+      ]
+    },
+    {
+      "modelName": "FileAsset",
+      "fieldsCount": 10,
+      "foreignKeys": [],
+      "indexes": [
+        "@@index([module])",
+        "@@index([uploadedBy])"
+      ]
+    },
+    {
+      "modelName": "Department",
+      "fieldsCount": 9,
+      "foreignKeys": [],
+      "indexes": []
+    },
+    {
+      "modelName": "Section",
+      "fieldsCount": 10,
+      "foreignKeys": [
+        "departmentId"
+      ],
+      "indexes": [
+        "@@unique([departmentId, name])",
+        "@@index([departmentId])"
+      ]
+    },
+    {
+      "modelName": "Location",
+      "fieldsCount": 14,
+      "foreignKeys": [],
+      "indexes": []
+    },
+    {
+      "modelName": "Machine",
+      "fieldsCount": 21,
+      "foreignKeys": [
+        "sectionId",
+        "status"
+      ],
+      "indexes": [
+        "@@index([sectionId])"
+      ]
+    },
+    {
+      "modelName": "ConfigParameter",
+      "fieldsCount": 8,
+      "foreignKeys": [],
+      "indexes": []
+    },
+    {
+      "modelName": "LogEntry",
+      "fieldsCount": 21,
+      "foreignKeys": [
+        "timestamp",
+        "userId",
+        "correlationId",
+        "statusCode"
+      ],
+      "indexes": [
+        "@@index([timestamp])",
+        "@@index([module])",
+        "@@index([severity])",
+        "@@index([userId])",
+        "@@index([statusCode])",
+        "@@index([httpMethod])"
+      ]
+    },
+    {
+      "modelName": "LogDiff",
+      "fieldsCount": 7,
+      "foreignKeys": [
+        "logEntryId",
+        "entityId"
+      ],
+      "indexes": [
+        "@@index([logEntryId])"
+      ]
+    },
+    {
+      "modelName": "GateEntry",
+      "fieldsCount": 27,
+      "foreignKeys": [
+        "status"
+      ],
+      "indexes": [
+        "@@index([status])",
+        "@@index([truckNumber])",
+        "@@index([arrivalTime])",
+        "@@index([status, arrivalTime])"
+      ]
+    },
+    {
+      "modelName": "TruckStockDetail",
+      "fieldsCount": 15,
+      "foreignKeys": [
+        "gateEntryId",
+        "stockId"
+      ],
+      "indexes": [
+        "@@index([stockId])",
+        "@@index([gateEntryId])"
+      ]
+    },
+    {
+      "modelName": "GateDocument",
+      "fieldsCount": 12,
+      "foreignKeys": [
+        "gateEntryId",
+        "status"
+      ],
+      "indexes": [
+        "@@index([gateEntryId, status])"
+      ]
+    },
+    {
+      "modelName": "GateStatusLog",
+      "fieldsCount": 10,
+      "foreignKeys": [
+        "gateEntryId",
+        "status",
+        "timestamp"
+      ],
+      "indexes": [
+        "@@index([gateEntryId])",
+        "@@index([gateEntryId, timestamp])",
+        "@@index([timestamp])"
+      ]
+    },
+    {
+      "modelName": "InventoryItem",
+      "fieldsCount": 42,
+      "foreignKeys": [
+        "categoryId",
+        "subCategoryId",
+        "uomId",
+        "locationId",
+        "stockId"
+      ],
+      "indexes": [
+        "@@index([itemType])",
+        "@@index([categoryId])",
+        "@@index([locationId])",
+        "@@index([stockId])"
+      ]
+    },
+    {
+      "modelName": "InventoryTransaction",
+      "fieldsCount": 15,
+      "foreignKeys": [
+        "itemId",
+        "referenceId",
+        "userId"
+      ],
+      "indexes": [
+        "@@index([itemId])",
+        "@@index([type])",
+        "@@index([referenceType])",
+        "@@index([referenceId])",
+        "@@index([batchLot])",
+        "@@index([createdAt])"
+      ]
+    },
+    {
+      "modelName": "InventoryBatch",
+      "fieldsCount": 11,
+      "foreignKeys": [
+        "itemId",
+        "locationId",
+        "gateEntryId"
+      ],
+      "indexes": [
+        "@@unique([itemId, batchLot])",
+        "@@index([itemId])",
+        "@@index([batchLot])",
+        "@@index([locationId])"
+      ]
+    },
+    {
+      "modelName": "ProductionPlan",
+      "fieldsCount": 14,
+      "foreignKeys": [
+        "shiftId",
+        "status",
+        "createdById",
+        "approvedById"
+      ],
+      "indexes": [
+        "@@index([status])",
+        "@@index([planDate])",
+        "@@index([shiftId])",
+        "@@index([planDate, status])"
+      ]
+    },
+    {
+      "modelName": "ProductionPlanLine",
+      "fieldsCount": 20,
+      "foreignKeys": [
+        "planId",
+        "machineId",
+        "operatorId",
+        "inventoryItemId"
+      ],
+      "indexes": [
+        "@@index([planId])",
+        "@@index([phase])",
+        "@@index([finishingRoute])",
+        "@@index([machineId])",
+        "@@index([inventoryItemId])"
+      ]
+    },
+    {
+      "modelName": "ProductionPlanLineOperator",
+      "fieldsCount": 6,
+      "foreignKeys": [
+        "planLineId",
+        "userId"
+      ],
+      "indexes": [
+        "@@unique([planLineId, userId])",
+        "@@index([planLineId])",
+        "@@index([userId])"
+      ]
+    },
+    {
+      "modelName": "ProductionCharacteristicDefinition",
+      "fieldsCount": 12,
+      "foreignKeys": [],
+      "indexes": [
+        "@@unique([phase, key])",
+        "@@index([phase])"
+      ]
+    },
+    {
+      "modelName": "ProductionCharacteristicValue",
+      "fieldsCount": 6,
+      "foreignKeys": [
+        "planLineId",
+        "definitionId"
+      ],
+      "indexes": [
+        "@@unique([planLineId, definitionId])",
+        "@@index([planLineId])"
+      ]
+    },
+    {
+      "modelName": "ProductionRun",
+      "fieldsCount": 26,
+      "foreignKeys": [
+        "planLineId",
+        "recordedById"
+      ],
+      "indexes": [
+        "@@index([planLineId])",
+        "@@index([startedAt])",
+        "@@index([endedAt])",
+        "@@index([planLineId, startedAt])"
+      ]
+    },
+    {
+      "modelName": "BobbinProductionRun",
+      "fieldsCount": 13,
+      "foreignKeys": [
+        "productionRunId",
+        "rawMaterialItemId",
+        "outputItemId"
+      ],
+      "indexes": [
+        "@@index([productionRunId])",
+        "@@index([rawMaterialItemId])",
+        "@@index([outputItemId])"
+      ]
+    },
+    {
+      "modelName": "LoomAssignment",
+      "fieldsCount": 10,
+      "foreignKeys": [
+        "shiftId",
+        "operatorId",
+        "createdById"
+      ],
+      "indexes": [
+        "@@index([shiftId])",
+        "@@index([operatorId])",
+        "@@index([assignmentDate])"
+      ]
+    },
+    {
+      "modelName": "LoomAssignmentMachine",
+      "fieldsCount": 5,
+      "foreignKeys": [
+        "assignmentId",
+        "machineId"
+      ],
+      "indexes": [
+        "@@unique([assignmentId, machineId])",
+        "@@unique([machineId, assignmentId])",
+        "@@index([assignmentId])",
+        "@@index([machineId])"
+      ]
+    },
+    {
+      "modelName": "LoomProductionRun",
+      "fieldsCount": 19,
+      "foreignKeys": [
+        "productionRunId",
+        "loomMachineId",
+        "operatorId",
+        "bobbinItemId",
+        "rollItemId"
+      ],
+      "indexes": [
+        "@@index([productionRunId])",
+        "@@index([loomMachineId])",
+        "@@index([operatorId])",
+        "@@index([bobbinItemId])",
+        "@@index([rollItemId])"
+      ]
+    },
+    {
+      "modelName": "LaminationProductionRun",
+      "fieldsCount": 16,
+      "foreignKeys": [
+        "productionRunId",
+        "laminationMachineId",
+        "operatorId",
+        "inputRollId"
+      ],
+      "indexes": [
+        "@@index([productionRunId])",
+        "@@index([laminationMachineId])",
+        "@@index([operatorId])",
+        "@@index([inputRollId])"
+      ]
+    },
+    {
+      "modelName": "PrintingProductionRun",
+      "fieldsCount": 21,
+      "foreignKeys": [
+        "productionRunId",
+        "printingMachineId",
+        "operatorId",
+        "inputRollId"
+      ],
+      "indexes": [
+        "@@index([productionRunId])",
+        "@@index([printingMachineId])",
+        "@@index([operatorId])",
+        "@@index([inputRollId])"
+      ]
+    },
+    {
+      "modelName": "PrintingProductionRunHelper",
+      "fieldsCount": 6,
+      "foreignKeys": [
+        "printingRunId",
+        "userId"
+      ],
+      "indexes": [
+        "@@unique([printingRunId, userId])",
+        "@@index([printingRunId])",
+        "@@index([userId])"
+      ]
+    },
+    {
+      "modelName": "CuttingProductionRun",
+      "fieldsCount": 18,
+      "foreignKeys": [
+        "productionRunId",
+        "cuttingMachineId",
+        "operatorId",
+        "inputRollId",
+        "outputItemId"
+      ],
+      "indexes": [
+        "@@index([productionRunId])",
+        "@@index([cuttingMachineId])",
+        "@@index([operatorId])",
+        "@@index([inputRollId])",
+        "@@index([outputItemId])"
+      ]
+    },
+    {
+      "modelName": "ConvertexProductionRun",
+      "fieldsCount": 17,
+      "foreignKeys": [
+        "productionRunId",
+        "convertexMachineId",
+        "operatorId",
+        "inputMaterialId",
+        "outputItemId"
+      ],
+      "indexes": [
+        "@@index([productionRunId])",
+        "@@index([convertexMachineId])",
+        "@@index([operatorId])",
+        "@@index([inputMaterialId])",
+        "@@index([outputItemId])"
+      ]
+    },
+    {
+      "modelName": "ValvomaticProductionRun",
+      "fieldsCount": 15,
+      "foreignKeys": [
+        "productionRunId",
+        "valvomaticMachineId",
+        "operatorId",
+        "outputItemId"
+      ],
+      "indexes": [
+        "@@index([productionRunId])",
+        "@@index([valvomaticMachineId])",
+        "@@index([operatorId])",
+        "@@index([outputItemId])"
+      ]
+    },
+    {
+      "modelName": "BcsProductionRun",
+      "fieldsCount": 17,
+      "foreignKeys": [
+        "productionRunId",
+        "bcsMachineId",
+        "operatorId",
+        "outputItemId"
+      ],
+      "indexes": [
+        "@@index([productionRunId])",
+        "@@index([bcsMachineId])",
+        "@@index([operatorId])",
+        "@@index([outputItemId])"
+      ]
+    },
+    {
+      "modelName": "ManualStitchProductionRun",
+      "fieldsCount": 16,
+      "foreignKeys": [
+        "productionRunId",
+        "operatorId",
+        "inputMaterialId",
+        "outputItemId"
+      ],
+      "indexes": [
+        "@@index([productionRunId])",
+        "@@index([operatorId])",
+        "@@index([inputMaterialId])",
+        "@@index([outputItemId])"
+      ]
+    },
+    {
+      "modelName": "Bale",
+      "fieldsCount": 20,
+      "foreignKeys": [
+        "productId",
+        "baleItemId",
+        "shiftId",
+        "createdById"
+      ],
+      "indexes": [
+        "@@index([productId])",
+        "@@index([baleItemId])",
+        "@@index([shiftId])",
+        "@@index([qualityStatus])",
+        "@@index([baledAt])"
+      ]
+    },
+    {
+      "modelName": "ProductionRoll",
+      "fieldsCount": 28,
+      "foreignKeys": [
+        "locationId",
+        "inventoryItemId",
+        "loomProductionRunId",
+        "laminationProductionRunId",
+        "printingProductionRunId",
+        "productionRunId"
+      ],
+      "indexes": [
+        "@@index([rollType])",
+        "@@index([qualityStatus])",
+        "@@index([locationId])",
+        "@@index([inventoryItemId])",
+        "@@index([productionRunId])",
+        "@@index([createdAt])"
+      ]
+    },
+    {
+      "modelName": "ShiftHandover",
+      "fieldsCount": 15,
+      "foreignKeys": [
+        "shiftId",
+        "handedOverById"
+      ],
+      "indexes": [
+        "@@index([shiftId])",
+        "@@index([handoverDate])"
+      ]
+    },
+    {
+      "modelName": "QcInspection",
+      "fieldsCount": 18,
+      "foreignKeys": [
+        "referenceId",
+        "status",
+        "inspectorId"
+      ],
+      "indexes": [
+        "@@index([referenceType, referenceId])",
+        "@@index([status])",
+        "@@index([decision])",
+        "@@index([inspectorId])",
+        "@@index([createdAt])"
+      ]
+    },
+    {
+      "modelName": "QcInspectionLine",
+      "fieldsCount": 11,
+      "foreignKeys": [
+        "inspectionId",
+        "status"
+      ],
+      "indexes": [
+        "@@index([inspectionId])",
+        "@@index([status])"
+      ]
+    },
+    {
+      "modelName": "QcReworkTicket",
+      "fieldsCount": 21,
+      "foreignKeys": [
+        "inspectionId",
+        "sourceReferenceId",
+        "status",
+        "assignedOperatorId",
+        "completedById",
+        "reInspectionId"
+      ],
+      "indexes": [
+        "@@index([inspectionId])",
+        "@@index([sourceReferenceType, sourceReferenceId])",
+        "@@index([status])",
+        "@@index([targetPhase])",
+        "@@index([assignedOperatorId])",
+        "@@index([createdAt])"
+      ]
+    },
+    {
+      "modelName": "ScrapRecord",
+      "fieldsCount": 23,
+      "foreignKeys": [
+        "sourceId",
+        "reasonCode",
+        "inventoryItemId",
+        "locationId",
+        "inventoryTransactionId",
+        "recyclingBatchId",
+        "recordedById"
+      ],
+      "indexes": [
+        "@@index([sourceType, sourceId])",
+        "@@index([phase])",
+        "@@index([reasonCode])",
+        "@@index([inventoryItemId])",
+        "@@index([locationId])",
+        "@@index([recordedById])",
+        "@@index([recordedAt])",
+        "@@index([recyclingBatchId])",
+        "@@index([isRecycled])"
+      ]
+    },
+    {
+      "modelName": "RecyclingBatch",
+      "fieldsCount": 21,
+      "foreignKeys": [
+        "status",
+        "outputItemId",
+        "outputLocationId",
+        "operatorId",
+        "inventoryTransactionId"
+      ],
+      "indexes": [
+        "@@index([status])",
+        "@@index([outputItemId])",
+        "@@index([outputLocationId])",
+        "@@index([operatorId])",
+        "@@index([startedAt])",
+        "@@index([completedAt])"
+      ]
+    },
+    {
+      "modelName": "MaintenanceLog",
+      "fieldsCount": 24,
+      "foreignKeys": [
+        "machineId",
+        "status",
+        "reportedById",
+        "assignedTechnicianId",
+        "resolvedById"
+      ],
+      "indexes": [
+        "@@index([machineId])",
+        "@@index([type])",
+        "@@index([status])",
+        "@@index([priority])",
+        "@@index([reportedById])",
+        "@@index([assignedTechnicianId])",
+        "@@index([reportedAt])",
+        "@@index([resolvedAt])"
+      ]
+    },
+    {
+      "modelName": "FinishedGoodsLot",
+      "fieldsCount": 27,
+      "foreignKeys": [
+        "inventoryItemId",
+        "baleId",
+        "status",
+        "locationId",
+        "inventoryTransactionId",
+        "receivedById"
+      ],
+      "indexes": [
+        "@@index([inventoryItemId])",
+        "@@index([baleId])",
+        "@@index([locationId])",
+        "@@index([status])",
+        "@@index([qualityStatus])",
+        "@@index([productionBatch])",
+        "@@index([receivedAt])"
+      ]
+    },
+    {
+      "modelName": "DispatchOrder",
+      "fieldsCount": 23,
+      "foreignKeys": [
+        "status",
+        "gateEntryId",
+        "createdById",
+        "loadedById"
+      ],
+      "indexes": [
+        "@@index([status])",
+        "@@index([customerName])",
+        "@@index([gateEntryId])",
+        "@@index([createdById])",
+        "@@index([dispatchedAt])",
+        "@@index([createdAt])"
+      ]
+    },
+    {
+      "modelName": "DispatchOrderLine",
+      "fieldsCount": 13,
+      "foreignKeys": [
+        "dispatchOrderId",
+        "inventoryItemId"
+      ],
+      "indexes": [
+        "@@index([dispatchOrderId])",
+        "@@index([inventoryItemId])"
+      ]
+    },
+    {
+      "modelName": "DispatchAllocation",
+      "fieldsCount": 11,
+      "foreignKeys": [
+        "dispatchOrderLineId",
+        "finishedGoodsLotId",
+        "status"
+      ],
+      "indexes": [
+        "@@index([dispatchOrderLineId])",
+        "@@index([finishedGoodsLotId])",
+        "@@index([status])"
+      ]
+    },
+    {
+      "modelName": "TapePlantPlan",
+      "fieldsCount": 19,
+      "foreignKeys": [
+        "date",
+        "shiftId"
+      ],
+      "indexes": []
+    },
+    {
+      "modelName": "TapePlantTemperatureReading",
+      "fieldsCount": 33,
+      "foreignKeys": [
+        "date",
+        "shiftId",
+        "operatorId"
+      ],
+      "indexes": [
+        "@@index([date, shiftId])"
+      ]
+    },
+    {
+      "modelName": "TelemetryTimeSlotUnlock",
+      "fieldsCount": 8,
+      "foreignKeys": [
+        "date",
+        "shiftId"
+      ],
+      "indexes": [
+        "@@unique([module, date, shiftId, timeSlot])",
+        "@@index([module, date, shiftId])"
+      ]
+    },
+    {
+      "modelName": "TapePlantDriveParameter",
+      "fieldsCount": 30,
+      "foreignKeys": [
+        "date",
+        "shiftId",
+        "operatorId"
+      ],
+      "indexes": [
+        "@@index([date, shiftId])"
+      ]
+    },
+    {
+      "modelName": "TapePlantRawMaterial",
+      "fieldsCount": 19,
+      "foreignKeys": [
+        "date",
+        "shiftId",
+        "operatorId"
+      ],
+      "indexes": [
+        "@@index([date, shiftId])"
+      ]
+    },
+    {
+      "modelName": "TapePlantPostProduction",
+      "fieldsCount": 13,
+      "foreignKeys": [
+        "date",
+        "shiftId",
+        "operatorId"
+      ],
+      "indexes": []
+    },
+    {
+      "modelName": "TapePlantBobbinIssue",
+      "fieldsCount": 9,
+      "foreignKeys": [
+        "date",
+        "shiftId"
+      ],
+      "indexes": []
+    },
+    {
+      "modelName": "TapePlantRecipe",
+      "fieldsCount": 30,
+      "foreignKeys": [
+        "copiedFromCode"
+      ],
+      "indexes": [
+        "@@index([code])",
+        "@@index([tapeType])",
+        "@@index([colorGroup])",
+        "@@index([recipeGroup])",
+        "@@index([isActive])"
+      ]
+    },
+    {
+      "modelName": "Operator",
+      "fieldsCount": 12,
+      "foreignKeys": [],
+      "indexes": [
+        "@@index([section, isActive])",
+        "@@index([name])",
+        "@@index([isActive])"
+      ]
+    },
+    {
+      "modelName": "LoomMachineMapping",
+      "fieldsCount": 19,
+      "foreignKeys": [
+        "qualityCode",
+        "tapePlantRecipeId"
+      ],
+      "indexes": [
+        "@@index([qualityCode])",
+        "@@index([colorGroup])",
+        "@@index([allocationDate])",
+        "@@index([isActive])"
+      ]
+    },
+    {
+      "modelName": "LoomChangeover",
+      "fieldsCount": 25,
+      "foreignKeys": [
+        "nextQualityCode",
+        "status",
+        "targetShiftId"
+      ],
+      "indexes": [
+        "@@index([loomNumber])",
+        "@@index([status])",
+        "@@index([sequence])"
+      ]
+    },
+    {
+      "modelName": "LoomReadingSheet",
+      "fieldsCount": 22,
+      "foreignKeys": [
+        "date",
+        "shiftId",
+        "status"
+      ],
+      "indexes": [
+        "@@unique([date, shiftName])",
+        "@@index([date])",
+        "@@index([shiftName])",
+        "@@index([status])"
+      ]
+    },
+    {
+      "modelName": "LoomReadingEntry",
+      "fieldsCount": 31,
+      "foreignKeys": [
+        "sheetId",
+        "status"
+      ],
+      "indexes": []
+    },
+    {
+      "modelName": "LoomRollCuttingReport",
+      "fieldsCount": 19,
+      "foreignKeys": [
+        "date",
+        "supervisorId",
+        "status"
+      ],
+      "indexes": [
+        "@@unique([date, shiftName])",
+        "@@index([date])",
+        "@@index([shiftName])",
+        "@@index([supervisorName])",
+        "@@index([status])"
+      ]
+    },
+    {
+      "modelName": "LoomRollCuttingEntry",
+      "fieldsCount": 22,
+      "foreignKeys": [
+        "reportId",
+        "productionRollId"
+      ],
+      "indexes": [
+        "@@index([rollNumber])",
+        "@@index([loomNumber])",
+        "@@index([qualityType])",
+        "@@index([contractor])",
+        "@@index([supervisorSign])"
+      ]
+    },
+    {
+      "modelName": "Contractor",
+      "fieldsCount": 12,
+      "foreignKeys": [],
+      "indexes": [
+        "@@index([name])",
+        "@@index([section, isActive])",
+        "@@index([isActive])"
+      ]
+    },
+    {
+      "modelName": "Supervisor",
+      "fieldsCount": 11,
+      "foreignKeys": [],
+      "indexes": [
+        "@@index([name])",
+        "@@index([department, isActive])",
+        "@@index([isActive])"
+      ]
+    },
+    {
+      "modelName": "LaminationProductionReport",
+      "fieldsCount": 21,
+      "foreignKeys": [
+        "date",
+        "operatorId",
+        "contractorId",
+        "status"
+      ],
+      "indexes": [
+        "@@unique([date, shiftName])",
+        "@@index([date])",
+        "@@index([shiftName])",
+        "@@index([status])"
+      ]
+    },
+    {
+      "modelName": "LaminationProductionEntry",
+      "fieldsCount": 19,
+      "foreignKeys": [
+        "reportId",
+        "loomRollCuttingEntryId"
+      ],
+      "indexes": [
+        "@@index([reportId])",
+        "@@index([rollNumber])",
+        "@@index([quality])",
+        "@@index([loomNumber])"
+      ]
+    },
+    {
+      "modelName": "LaminationRawMaterial",
+      "fieldsCount": 10,
+      "foreignKeys": [],
+      "indexes": [
+        "@@index([isActive])",
+        "@@index([sequence])"
+      ]
+    },
+    {
+      "modelName": "LaminationRawMaterialReport",
+      "fieldsCount": 14,
+      "foreignKeys": [
+        "date",
+        "operatorId",
+        "status"
+      ],
+      "indexes": [
+        "@@unique([date, shiftName])",
+        "@@index([date])",
+        "@@index([shiftName])",
+        "@@index([status])"
+      ]
+    },
+    {
+      "modelName": "LaminationRawMaterialReportEntry",
+      "fieldsCount": 13,
+      "foreignKeys": [
+        "reportId",
+        "rawMaterialId"
+      ],
+      "indexes": [
+        "@@index([reportId])",
+        "@@index([materialName])"
+      ]
+    },
+    {
+      "modelName": "LaminationWastageReport",
+      "fieldsCount": 21,
+      "foreignKeys": [
+        "date",
+        "operatorId",
+        "contractorId",
+        "status"
+      ],
+      "indexes": [
+        "@@unique([date, shiftName])",
+        "@@index([date])",
+        "@@index([shiftName])",
+        "@@index([status])"
+      ]
+    },
+    {
+      "modelName": "PrintingDailyReport",
+      "fieldsCount": 21,
+      "foreignKeys": [
+        "date",
+        "operatorId",
+        "status"
+      ],
+      "indexes": [
+        "@@unique([date, shiftName, machineNo])",
+        "@@index([date])",
+        "@@index([shiftName])",
+        "@@index([machineNo])",
+        "@@index([status])"
+      ]
+    },
+    {
+      "modelName": "PrintingDailyReportEntry",
+      "fieldsCount": 19,
+      "foreignKeys": [
+        "reportId"
+      ],
+      "indexes": [
+        "@@index([reportId])",
+        "@@index([companyName])",
+        "@@index([rollNumber])",
+        "@@index([quality])",
+        "@@index([loomNumber])"
+      ]
+    },
+    {
+      "modelName": "PartyPrintingDetail",
+      "fieldsCount": 11,
+      "foreignKeys": [],
+      "indexes": [
+        "@@index([companyName])",
+        "@@index([unitName])",
+        "@@index([grade])",
+        "@@index([drumSize])",
+        "@@index([isActive])"
+      ]
+    },
+    {
+      "modelName": "PrintingRawMaterial",
+      "fieldsCount": 12,
+      "foreignKeys": [],
+      "indexes": [
+        "@@index([name])",
+        "@@index([category])",
+        "@@index([isActive])"
+      ]
+    },
+    {
+      "modelName": "PrintingRawMaterialReport",
+      "fieldsCount": 15,
+      "foreignKeys": [
+        "date",
+        "operatorId",
+        "status"
+      ],
+      "indexes": [
+        "@@unique([date, shiftName])",
+        "@@index([date])",
+        "@@index([shiftName])",
+        "@@index([status])"
+      ]
+    },
+    {
+      "modelName": "PrintingRawMaterialReportEntry",
+      "fieldsCount": 15,
+      "foreignKeys": [
+        "reportId",
+        "rawMaterialId"
+      ],
+      "indexes": [
+        "@@index([reportId])",
+        "@@index([materialName])"
+      ]
+    },
+    {
+      "modelName": "PrintingWastageReport",
+      "fieldsCount": 18,
+      "foreignKeys": [
+        "date",
+        "operatorId",
+        "status"
+      ],
+      "indexes": [
+        "@@unique([date, shiftName])",
+        "@@index([date])",
+        "@@index([shiftName])",
+        "@@index([status])"
+      ]
+    },
+    {
+      "modelName": "ConvertexDailyReport",
+      "fieldsCount": 31,
+      "foreignKeys": [
+        "date",
+        "operatorId",
+        "status"
+      ],
+      "indexes": [
+        "@@unique([date, shiftName, machineNo])",
+        "@@index([date])",
+        "@@index([shiftName])",
+        "@@index([machineNo])",
+        "@@index([status])"
+      ]
+    },
+    {
+      "modelName": "ConvertexDailyReportEntry",
+      "fieldsCount": 32,
+      "foreignKeys": [
+        "reportId"
+      ],
+      "indexes": [
+        "@@index([reportId])",
+        "@@index([rollNumber])",
+        "@@index([quality])",
+        "@@index([partyName])",
+        "@@index([companyName])",
+        "@@index([loomNumber])"
+      ]
+    },
+    {
+      "modelName": "ConvertexWastageReport",
+      "fieldsCount": 26,
+      "foreignKeys": [
+        "date",
+        "operatorId",
+        "status"
+      ],
+      "indexes": [
+        "@@unique([date, shiftName, machineNo])",
+        "@@index([date])",
+        "@@index([shiftName])",
+        "@@index([machineNo])",
+        "@@index([status])"
+      ]
+    },
+    {
+      "modelName": "ConvertexWastageReportEntry",
+      "fieldsCount": 23,
+      "foreignKeys": [
+        "reportId"
+      ],
+      "indexes": [
+        "@@index([reportId])",
+        "@@index([quality])",
+        "@@index([rollNumber])"
+      ]
+    },
+    {
+      "modelName": "ValvomaticDailyReport",
+      "fieldsCount": 31,
+      "foreignKeys": [
+        "date",
+        "operatorId",
+        "status"
+      ],
+      "indexes": [
+        "@@unique([date, shiftName, machineNo])",
+        "@@index([date])",
+        "@@index([shiftName])",
+        "@@index([machineNo])",
+        "@@index([status])"
+      ]
+    },
+    {
+      "modelName": "ValvomaticDailyReportEntry",
+      "fieldsCount": 32,
+      "foreignKeys": [
+        "reportId"
+      ],
+      "indexes": [
+        "@@index([reportId])",
+        "@@index([rollNumber])",
+        "@@index([quality])",
+        "@@index([partyName])",
+        "@@index([companyName])",
+        "@@index([loomNumber])"
+      ]
+    },
+    {
+      "modelName": "ValvomaticWastageReport",
+      "fieldsCount": 26,
+      "foreignKeys": [
+        "date",
+        "operatorId",
+        "status"
+      ],
+      "indexes": [
+        "@@unique([date, shiftName, machineNo])",
+        "@@index([date])",
+        "@@index([shiftName])",
+        "@@index([machineNo])",
+        "@@index([status])"
+      ]
+    },
+    {
+      "modelName": "ValvomaticWastageReportEntry",
+      "fieldsCount": 23,
+      "foreignKeys": [
+        "reportId"
+      ],
+      "indexes": [
+        "@@index([reportId])",
+        "@@index([quality])",
+        "@@index([rollNumber])"
+      ]
+    },
+    {
+      "modelName": "BiometricDevice",
+      "fieldsCount": 15,
+      "foreignKeys": [
+        "status"
+      ],
+      "indexes": []
+    },
+    {
+      "modelName": "AttendancePunch",
+      "fieldsCount": 12,
+      "foreignKeys": [
+        "employeeCode",
+        "deviceId"
+      ],
+      "indexes": [
+        "@@index([employeeCode, punchTime])",
+        "@@index([punchTime])",
+        "@@index([deviceId])"
+      ]
+    },
+    {
+      "modelName": "DailyAttendance",
+      "fieldsCount": 19,
+      "foreignKeys": [
+        "date",
+        "employeeCode",
+        "shiftId",
+        "status"
+      ],
+      "indexes": [
+        "@@unique([date, employeeCode])",
+        "@@index([date, department])",
+        "@@index([status])"
+      ]
+    },
+    {
+      "modelName": "ShiftHeadcount",
+      "fieldsCount": 12,
+      "foreignKeys": [
+        "date",
+        "supervisorCode"
+      ],
+      "indexes": [
+        "@@unique([date, shiftName, department])",
+        "@@index([date, department])"
+      ]
+    },
+    {
+      "modelName": "IdempotencyRecord",
+      "fieldsCount": 11,
+      "foreignKeys": [
+        "userId",
+        "status",
+        "statusCode"
+      ],
+      "indexes": [
+        "@@unique([key, userId, endpoint, method])",
+        "@@index([expiresAt])"
+      ]
+    },
+    {
+      "modelName": "BackgroundJobRecord",
+      "fieldsCount": 11,
+      "foreignKeys": [
+        "status",
+        "createdById"
+      ],
+      "indexes": [
+        "@@index([status])",
+        "@@index([createdById])"
+      ]
+    }
+  ],
+  "unindexedColumns": [
+    {
+      "model": "User",
+      "column": "employeeId"
+    },
+    {
+      "model": "Account",
+      "column": "userId"
+    },
+    {
+      "model": "Session",
+      "column": "userId"
+    },
+    {
+      "model": "Machine",
+      "column": "status"
+    },
+    {
+      "model": "LogEntry",
+      "column": "correlationId"
+    },
+    {
+      "model": "LogDiff",
+      "column": "entityId"
+    },
+    {
+      "model": "GateStatusLog",
+      "column": "status"
+    },
+    {
+      "model": "InventoryItem",
+      "column": "subCategoryId"
+    },
+    {
+      "model": "InventoryItem",
+      "column": "uomId"
+    },
+    {
+      "model": "InventoryTransaction",
+      "column": "userId"
+    },
+    {
+      "model": "InventoryBatch",
+      "column": "gateEntryId"
+    },
+    {
+      "model": "ProductionPlan",
+      "column": "createdById"
+    },
+    {
+      "model": "ProductionPlan",
+      "column": "approvedById"
+    },
+    {
+      "model": "ProductionPlanLine",
+      "column": "operatorId"
+    },
+    {
+      "model": "ProductionRun",
+      "column": "recordedById"
+    },
+    {
+      "model": "LoomAssignment",
+      "column": "createdById"
+    },
+    {
+      "model": "Bale",
+      "column": "createdById"
+    },
+    {
+      "model": "ProductionRoll",
+      "column": "loomProductionRunId"
+    },
+    {
+      "model": "ProductionRoll",
+      "column": "laminationProductionRunId"
+    },
+    {
+      "model": "ProductionRoll",
+      "column": "printingProductionRunId"
+    },
+    {
+      "model": "ShiftHandover",
+      "column": "handedOverById"
+    },
+    {
+      "model": "QcReworkTicket",
+      "column": "completedById"
+    },
+    {
+      "model": "QcReworkTicket",
+      "column": "reInspectionId"
+    },
+    {
+      "model": "ScrapRecord",
+      "column": "inventoryTransactionId"
+    },
+    {
+      "model": "RecyclingBatch",
+      "column": "inventoryTransactionId"
+    },
+    {
+      "model": "MaintenanceLog",
+      "column": "resolvedById"
+    },
+    {
+      "model": "FinishedGoodsLot",
+      "column": "inventoryTransactionId"
+    },
+    {
+      "model": "FinishedGoodsLot",
+      "column": "receivedById"
+    },
+    {
+      "model": "DispatchOrder",
+      "column": "loadedById"
+    },
+    {
+      "model": "TapePlantPlan",
+      "column": "date"
+    },
+    {
+      "model": "TapePlantPlan",
+      "column": "shiftId"
+    },
+    {
+      "model": "TapePlantTemperatureReading",
+      "column": "operatorId"
+    },
+    {
+      "model": "TapePlantDriveParameter",
+      "column": "operatorId"
+    },
+    {
+      "model": "TapePlantRawMaterial",
+      "column": "operatorId"
+    },
+    {
+      "model": "TapePlantPostProduction",
+      "column": "date"
+    },
+    {
+      "model": "TapePlantPostProduction",
+      "column": "shiftId"
+    },
+    {
+      "model": "TapePlantPostProduction",
+      "column": "operatorId"
+    },
+    {
+      "model": "TapePlantBobbinIssue",
+      "column": "date"
+    },
+    {
+      "model": "TapePlantBobbinIssue",
+      "column": "shiftId"
+    },
+    {
+      "model": "TapePlantRecipe",
+      "column": "copiedFromCode"
+    },
+    {
+      "model": "LoomMachineMapping",
+      "column": "tapePlantRecipeId"
+    },
+    {
+      "model": "LoomChangeover",
+      "column": "nextQualityCode"
+    },
+    {
+      "model": "LoomChangeover",
+      "column": "targetShiftId"
+    },
+    {
+      "model": "LoomReadingSheet",
+      "column": "shiftId"
+    },
+    {
+      "model": "LoomReadingEntry",
+      "column": "sheetId"
+    },
+    {
+      "model": "LoomReadingEntry",
+      "column": "status"
+    },
+    {
+      "model": "LoomRollCuttingReport",
+      "column": "supervisorId"
+    },
+    {
+      "model": "LoomRollCuttingEntry",
+      "column": "reportId"
+    },
+    {
+      "model": "LoomRollCuttingEntry",
+      "column": "productionRollId"
+    },
+    {
+      "model": "LaminationProductionReport",
+      "column": "operatorId"
+    },
+    {
+      "model": "LaminationProductionReport",
+      "column": "contractorId"
+    },
+    {
+      "model": "LaminationProductionEntry",
+      "column": "loomRollCuttingEntryId"
+    },
+    {
+      "model": "LaminationRawMaterialReport",
+      "column": "operatorId"
+    },
+    {
+      "model": "LaminationRawMaterialReportEntry",
+      "column": "rawMaterialId"
+    },
+    {
+      "model": "LaminationWastageReport",
+      "column": "operatorId"
+    },
+    {
+      "model": "LaminationWastageReport",
+      "column": "contractorId"
+    },
+    {
+      "model": "PrintingDailyReport",
+      "column": "operatorId"
+    },
+    {
+      "model": "PrintingRawMaterialReport",
+      "column": "operatorId"
+    },
+    {
+      "model": "PrintingRawMaterialReportEntry",
+      "column": "rawMaterialId"
+    },
+    {
+      "model": "PrintingWastageReport",
+      "column": "operatorId"
+    },
+    {
+      "model": "ConvertexDailyReport",
+      "column": "operatorId"
+    },
+    {
+      "model": "ConvertexWastageReport",
+      "column": "operatorId"
+    },
+    {
+      "model": "ValvomaticDailyReport",
+      "column": "operatorId"
+    },
+    {
+      "model": "ValvomaticWastageReport",
+      "column": "operatorId"
+    },
+    {
+      "model": "BiometricDevice",
+      "column": "status"
+    },
+    {
+      "model": "DailyAttendance",
+      "column": "shiftId"
+    },
+    {
+      "model": "ShiftHeadcount",
+      "column": "supervisorCode"
+    },
+    {
+      "model": "IdempotencyRecord",
+      "column": "status"
+    },
+    {
+      "model": "IdempotencyRecord",
+      "column": "statusCode"
+    }
+  ]
+}
