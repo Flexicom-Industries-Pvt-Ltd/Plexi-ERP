@@ -4,6 +4,7 @@ import { withTransaction } from "@/lib/transaction";
 import { Module } from "@/generated/prisma";
 import { revalidatePath } from "next/cache";
 import { safeAction } from "@/lib/safe-action";
+import { requirePermission } from "@/lib/permissions";
 import { 
   CreateDepartmentSchema, UpdateDepartmentSchema, 
   CreateSectionSchema, UpdateSectionSchema,
@@ -13,6 +14,7 @@ import {
 } from "@/lib/schemas/master-data";
 
 export const createDepartment = safeAction(CreateDepartmentSchema, async (data) => {
+  await requirePermission(Module.SETTINGS, "canCreate");
   const result = await withTransaction({
     action: "CREATE_DEPARTMENT",
     module: Module.SETTINGS,
@@ -27,6 +29,7 @@ export const createDepartment = safeAction(CreateDepartmentSchema, async (data) 
 });
 
 export const updateDepartment = safeAction(UpdateDepartmentSchema, async (data) => {
+  await requirePermission(Module.SETTINGS, "canUpdate");
   const { id, ...updateData } = data;
   const result = await withTransaction({
     action: "UPDATE_DEPARTMENT",
@@ -46,6 +49,7 @@ export const updateDepartment = safeAction(UpdateDepartmentSchema, async (data) 
 });
 
 export const createSection = safeAction(CreateSectionSchema, async (data) => {
+  await requirePermission(Module.SETTINGS, "canCreate");
   const result = await withTransaction({
     action: "CREATE_SECTION",
     module: Module.SETTINGS,
@@ -60,6 +64,7 @@ export const createSection = safeAction(CreateSectionSchema, async (data) => {
 });
 
 export const updateSection = safeAction(UpdateSectionSchema, async (data) => {
+  await requirePermission(Module.SETTINGS, "canUpdate");
   const { id, ...updateData } = data;
   const result = await withTransaction({
     action: "UPDATE_SECTION",
@@ -79,6 +84,7 @@ export const updateSection = safeAction(UpdateSectionSchema, async (data) => {
 });
 
 export const createLocation = safeAction(CreateLocationSchema, async (data) => {
+  await requirePermission(Module.SETTINGS, "canCreate");
   const result = await withTransaction({
     action: "CREATE_LOCATION",
     module: Module.SETTINGS,
@@ -93,6 +99,7 @@ export const createLocation = safeAction(CreateLocationSchema, async (data) => {
 });
 
 export const updateLocation = safeAction(UpdateLocationSchema, async (data) => {
+  await requirePermission(Module.SETTINGS, "canUpdate");
   const { id, ...updateData } = data;
   const result = await withTransaction({
     action: "UPDATE_LOCATION",
@@ -112,6 +119,7 @@ export const updateLocation = safeAction(UpdateLocationSchema, async (data) => {
 });
 
 export const createMachine = safeAction(CreateMachineSchema, async (data) => {
+  await requirePermission(Module.SETTINGS, "canCreate");
   const result = await withTransaction({
     action: "CREATE_MACHINE",
     module: Module.SETTINGS,
@@ -126,6 +134,7 @@ export const createMachine = safeAction(CreateMachineSchema, async (data) => {
 });
 
 export const updateMachine = safeAction(UpdateMachineSchema, async (data) => {
+  await requirePermission(Module.SETTINGS, "canUpdate");
   const { id, ...updateData } = data;
   const result = await withTransaction({
     action: "UPDATE_MACHINE",
@@ -145,6 +154,7 @@ export const updateMachine = safeAction(UpdateMachineSchema, async (data) => {
 });
 
 export const createConfigParameter = safeAction(CreateConfigParameterSchema, async (data) => {
+  await requirePermission(Module.SETTINGS, "canCreate");
   const result = await withTransaction({
     action: "CREATE_CONFIG",
     module: Module.SETTINGS,
@@ -159,6 +169,7 @@ export const createConfigParameter = safeAction(CreateConfigParameterSchema, asy
 });
 
 export const updateConfigParameter = safeAction(UpdateConfigParameterSchema, async (data) => {
+  await requirePermission(Module.SETTINGS, "canUpdate");
   const { id, ...updateData } = data;
   const result = await withTransaction({
     action: "UPDATE_CONFIG",

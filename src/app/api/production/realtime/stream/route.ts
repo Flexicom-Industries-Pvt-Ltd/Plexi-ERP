@@ -3,11 +3,21 @@ import {
   getLatestSheetState,
   ProductionSyncEvent,
 } from "@/lib/realtime/production-bus";
+import { auth } from "@/auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
+  // Enforce session authentication (ERP-012, ERP-031)
+  const session = await auth();
+  if (!session?.user) {
+    return new Response("Unauthorized", { status: 401 });
+  }
+  if ((session.user as any).isActive === false || session.user.role === "DEACTIVATED") {
+    return new Response("Forbidden: Account is inactive", { status: 403 });
+  }
+
   const { searchParams } = new URL(request.url);
   const moduleParam = searchParams.get("module") || undefined;
   const sheetParam = searchParams.get("sheet") || undefined;

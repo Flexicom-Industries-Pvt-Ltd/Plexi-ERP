@@ -49,8 +49,13 @@ export function safeAction<TInput, TOutput>(
         }
       }
 
-      // Hide internal server crash details from the client in production
-      const message = error instanceof Error ? error.message : "An unexpected error occurred on the server.";
+      // Hide internal server crash details from the client in production (ERP-008)
+      const message =
+        process.env.NODE_ENV === "production"
+          ? "An unexpected error occurred. Please contact system administrator."
+          : error instanceof Error
+          ? error.message
+          : "An unexpected error occurred on the server.";
       return errorResponse(
         message,
         "INTERNAL_SERVER_ERROR"

@@ -118,37 +118,47 @@ class TaskQueueEngine {
     this.isProcessing = true;
 
     try {
-      for (const [id, job] of Array.from(this.jobs.entries())) {
-        if (job.status === "PENDING") {
-          const handler = this.handlers.get(job.type);
-
-          if (!handler) {
-            job.status = "FAILED";
-            job.error = `No handler registered for task type '${job.type}'`;
-            job.completedAt = Date.now();
-            continue;
+      while (true) {
+        // Find next pending job dynamically so concurrently enqueued jobs are never missed (ERP-023)
+        let nextJob: TaskJob<any, any> | null = null;
+        for (const job of this.jobs.values()) {
+          if (job.status === "PENDING") {
+            nextJob = job;
+            break;
           }
+        }
 
-          job.status = "PROCESSING";
-          job.startedAt = Date.now();
+        if (!nextJob) break;
 
-          const updateProgress = async (progress: number) => {
-            job.progress = Math.min(100, Math.max(0, Math.round(progress)));
-          };
+        const job = nextJob;
+        const handler = this.handlers.get(job.type);
 
-          try {
-            const result = await handler(job, updateProgress);
-            if (job.status === "PROCESSING") {
-              job.status = "COMPLETED";
-              job.progress = 100;
-              job.result = result;
-              job.completedAt = Date.now();
-            }
-          } catch (err: any) {
-            job.status = "FAILED";
-            job.error = err?.message || "Task execution failed";
+        if (!handler) {
+          job.status = "FAILED";
+          job.error = `No handler registered for task type '${job.type}'`;
+          job.completedAt = Date.now();
+          continue;
+        }
+
+        job.status = "PROCESSING";
+        job.startedAt = Date.now();
+
+        const updateProgress = async (progress: number) => {
+          job.progress = Math.min(100, Math.max(0, Math.round(progress)));
+        };
+
+        try {
+          const result = await handler(job, updateProgress);
+          if (job.status === "PROCESSING") {
+            job.status = "COMPLETED";
+            job.progress = 100;
+            job.result = result;
             job.completedAt = Date.now();
           }
+        } catch (err: any) {
+          job.status = "FAILED";
+          job.error = err?.message || "Task execution failed";
+          job.completedAt = Date.now();
         }
       }
     } finally {

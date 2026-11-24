@@ -72,15 +72,29 @@ async function applyInventoryMovement(
     );
   }
 
-  const newStock =
-    movement.type === TxType.IN
-      ? item.currentStock + movement.quantity
-      : item.currentStock - movement.quantity;
+  if (movement.type === TxType.IN) {
+    await tx.inventoryItem.update({
+      where: { id: movement.itemId },
+      data: { currentStock: { increment: movement.quantity } },
+    });
+  } else {
+    // Atomic decrement with condition to prevent negative stock and lost updates (ERP-002)
+    const updated = await tx.inventoryItem.updateMany({
+      where: {
+        id: movement.itemId,
+        currentStock: { gte: movement.quantity },
+      },
+      data: {
+        currentStock: { decrement: movement.quantity },
+      },
+    });
 
-  await tx.inventoryItem.update({
-    where: { id: movement.itemId },
-    data: { currentStock: newStock },
-  });
+    if (updated.count === 0) {
+      throw new Error(
+        `Insufficient stock for ${item.code}: need ${movement.quantity}, available stock is less than requested`,
+      );
+    }
+  }
 
   const batchLot = movement.batchLot?.trim() || null;
   if (batchLot) {
@@ -96,14 +110,28 @@ async function applyInventoryMovement(
         update: { quantity: { increment: movement.quantity } },
       });
     } else {
+      // Ensure batch exists and has sufficient quantity before decrementing (ERP-005)
       const existingBatch = await tx.inventoryBatch.findUnique({
         where: { itemId_batchLot: { itemId: movement.itemId, batchLot } },
       });
-      if (existingBatch) {
-        await tx.inventoryBatch.update({
-          where: { id: existingBatch.id },
-          data: { quantity: { decrement: movement.quantity } },
-        });
+      if (!existingBatch) {
+        throw new Error(
+          `Inventory batch lot "${batchLot}" not found for item ${item.code}`,
+        );
+      }
+      const updatedBatch = await tx.inventoryBatch.updateMany({
+        where: {
+          id: existingBatch.id,
+          quantity: { gte: movement.quantity },
+        },
+        data: {
+          quantity: { decrement: movement.quantity },
+        },
+      });
+      if (updatedBatch.count === 0) {
+        throw new Error(
+          `Insufficient batch stock in lot "${batchLot}" for item ${item.code}: need ${movement.quantity}, have ${existingBatch.quantity}`,
+        );
       }
     }
   }

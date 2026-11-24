@@ -7,7 +7,8 @@
   "main": "electron/main.js",
   "scripts": {
     "dev": "next dev --webpack",
-    "build": "node scripts/migrate-if-database-url.mjs && prisma generate && cross-env NODE_OPTIONS='--max-old-space-size=8192' next build --webpack",
+    "build": "prisma generate && cross-env NODE_OPTIONS='--max-old-space-size=8192' next build --webpack",
+    "db:migrate:deploy": "node scripts/migrate-if-database-url.mjs",
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",

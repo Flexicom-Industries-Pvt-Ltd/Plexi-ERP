@@ -13,6 +13,18 @@ export const dynamic = "force-dynamic";
  */
 export async function POST(request: NextRequest) {
   try {
+    // Webhook security verification
+    const webhookSecret = process.env.TIMEWATCH_WEBHOOK_SECRET || process.env.TIMEWATCH_API_KEY;
+    if (webhookSecret) {
+      const authHeader =
+        request.headers.get("x-webhook-secret") ||
+        request.headers.get("x-api-key") ||
+        request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
+      if (authHeader !== webhookSecret) {
+        return apiError("Unauthorized: Invalid webhook secret or API key", 401);
+      }
+    }
+
     const body = await request.json();
 
     // Support single punch object or array of punches
