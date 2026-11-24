@@ -59,14 +59,15 @@ export async function requirePermission(
     redirect("/auth/login?error=account_inactive");
   }
 
-  // 2. Admin role bypass (case-insensitive & variant-aware) (ERP-010)
-  const userRoleName = user.role?.name || session.user.role || (session.user as any).roleName;
-  if (isSuperAdminRole(userRoleName)) {
-    return true;
-  }
-
+  // User must have an active role in the database
   if (!user.role) {
     redirect("/dashboard/unauthorized");
+  }
+
+  // 2. Admin role bypass (case-insensitive & variant-aware) - only legitimate SuperAdmin/SystemAdmin
+  const userRoleName = user.role.name;
+  if (isSuperAdminRole(userRoleName)) {
+    return true;
   }
 
   const permissions = (user.role.permissions as any[]) || [];

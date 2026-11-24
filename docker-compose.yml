@@ -9,30 +9,48 @@ services:
     container_name: plexi-erp-app
     restart: always
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     environment:
       - NODE_ENV=production
-      - DATABASE_URL=postgresql://plexi_user:plexi_secure_pass@postgres:5432/plexi_erp?schema=public
-      - NEXTAUTH_URL=http://localhost:3000
-      - NEXTAUTH_SECRET=plexi_production_jwt_secret_change_in_production
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-plexi_user}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-plexi_erp}?schema=public
+      - NEXTAUTH_URL=${NEXTAUTH_URL:-http://localhost:3000}
+      - AUTH_SECRET=${AUTH_SECRET}
+      - DB_ADAPTER=pg
     depends_on:
       postgres:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:3000/api/health/ready || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  migration:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: plexi-erp-migration
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-plexi_user}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-plexi_erp}?schema=public
+    command: ["npx", "prisma", "migrate", "deploy"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
 
   postgres:
     image: postgres:16-alpine
     container_name: plexi-erp-postgres
     restart: always
     environment:
-      POSTGRES_USER: plexi_user
-      POSTGRES_PASSWORD: plexi_secure_pass
-      POSTGRES_DB: plexi_erp
-    ports:
-      - "5432:5432"
+      POSTGRES_USER: ${POSTGRES_USER:-plexi_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-plexi_erp}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U plexi_user -d plexi_erp"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-plexi_user} -d ${POSTGRES_DB:-plexi_erp}"]
       interval: 5s
       timeout: 5s
       retries: 5

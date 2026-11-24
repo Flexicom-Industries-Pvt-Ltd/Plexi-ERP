@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cache } from "./cache";
+import { withResourceLock } from "./concurrency-lock";
 
 export interface RateLimitOptions {
   maxRequests: number;
@@ -19,7 +20,7 @@ interface BucketEntry {
 }
 
 /**
- * In-memory sliding-window rate limiter
+ * Concurrency-safe sliding-window rate limiter protected by resource mutex (ERP-003, ERP-027)
  */
 export async function rateLimit(
   identifier: string,
@@ -29,35 +30,37 @@ export async function rateLimit(
   const cacheKey = `ratelimit:${identifier}`;
   const now = Date.now();
 
-  let bucket = await cache.get<BucketEntry>(cacheKey);
+  return withResourceLock(`lock:${cacheKey}`, async () => {
+    let bucket = await cache.get<BucketEntry>(cacheKey);
 
-  if (!bucket || now >= bucket.resetAt) {
-    bucket = {
-      count: 1,
-      resetAt: now + windowSeconds * 1000,
-    };
-    await cache.set(cacheKey, bucket, windowSeconds);
+    if (!bucket || now >= bucket.resetAt) {
+      bucket = {
+        count: 1,
+        resetAt: now + windowSeconds * 1000,
+      };
+      await cache.set(cacheKey, bucket, windowSeconds);
+      return {
+        success: true,
+        limit: maxRequests,
+        remaining: maxRequests - 1,
+        reset: bucket.resetAt,
+      };
+    }
+
+    bucket.count += 1;
+    const remainingTtl = Math.max(1, Math.ceil((bucket.resetAt - now) / 1000));
+    await cache.set(cacheKey, bucket, remainingTtl);
+
+    const remaining = Math.max(0, maxRequests - bucket.count);
+    const success = bucket.count <= maxRequests;
+
     return {
-      success: true,
+      success,
       limit: maxRequests,
-      remaining: maxRequests - 1,
+      remaining,
       reset: bucket.resetAt,
     };
-  }
-
-  bucket.count += 1;
-  const remainingTtl = Math.max(1, Math.ceil((bucket.resetAt - now) / 1000));
-  await cache.set(cacheKey, bucket, remainingTtl);
-
-  const remaining = Math.max(0, maxRequests - bucket.count);
-  const success = bucket.count <= maxRequests;
-
-  return {
-    success,
-    limit: maxRequests,
-    remaining,
-    reset: bucket.resetAt,
-  };
+  });
 }
 
 /**

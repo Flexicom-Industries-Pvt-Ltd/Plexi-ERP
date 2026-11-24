@@ -278,17 +278,32 @@ export class InventoryService {
         if (!item) throw new Error("Inventory item not found");
 
         const qtyDelta = Number(data.quantity);
-        const newStock = item.currentStock + qtyDelta;
-        if (newStock < 0) {
-          throw new Error(
-            `Stock adjustment cannot result in negative inventory balance. Current stock: ${item.currentStock}, adjustment: ${qtyDelta}`
-          );
-        }
+        let updatedItem: any;
 
-        const updatedItem = await tx.inventoryItem.update({
-          where: { id: itemId },
-          data: { currentStock: newStock },
-        });
+        if (qtyDelta < 0) {
+          const deduction = Math.abs(qtyDelta);
+          // Atomic conditional update ensuring stock remains non-negative (ERP-002, ERP-018)
+          const updateResult = await tx.inventoryItem.updateMany({
+            where: {
+              id: itemId,
+              currentStock: { gte: deduction },
+            },
+            data: {
+              currentStock: { decrement: deduction },
+            },
+          });
+          if (updateResult.count === 0) {
+            throw new Error(
+              `Stock adjustment cannot result in negative inventory balance. Current stock is insufficient for adjustment: ${qtyDelta}`
+            );
+          }
+          updatedItem = await tx.inventoryItem.findUnique({ where: { id: itemId } });
+        } else {
+          updatedItem = await tx.inventoryItem.update({
+            where: { id: itemId },
+            data: { currentStock: { increment: qtyDelta } },
+          });
+        }
 
         await tx.inventoryTransaction.create({
           data: {
