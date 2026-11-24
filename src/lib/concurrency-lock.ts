@@ -19,21 +19,26 @@ export async function withResourceLock<T>(key: string, fn: () => Promise<T>): Pr
   });
 
   // Chain behind current lock
-  locks.set(
-    key,
-    currentLock.then(
-      () => nextLock,
-      () => nextLock
-    )
+  const chainedPromise = currentLock.then(
+    () => nextLock,
+    () => nextLock
   );
+  locks.set(key, chainedPromise);
 
   try {
     await currentLock;
     return await fn();
   } finally {
     releaseLock();
-    if (locks.get(key) === nextLock) {
+    if (locks.get(key) === chainedPromise) {
       locks.delete(key);
     }
   }
+}
+
+/**
+ * Returns the count of currently tracked keys in the lock Map (useful for diagnostics & tests)
+ */
+export function getActiveLockCount(): number {
+  return locks.size;
 }

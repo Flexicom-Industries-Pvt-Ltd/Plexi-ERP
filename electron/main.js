@@ -87,7 +87,7 @@ function createWindow() {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false,
+      sandbox: true, // ERP-016: Enable renderer sandbox
       spellcheck: false,
     },
   });
@@ -127,22 +127,43 @@ function createWindow() {
     }
   });
 
-  // Intercept external links and open them in the user's default OS browser
+  const ALLOWED_HOSTS = new Set([
+    "localhost",
+    "127.0.0.1",
+    "plexi-erp-two.vercel.app",
+    "plexi-erp-plascom.vercel.app",
+    "plexi-erp.flexicom.in",
+  ]);
+
+  function isAuthorizedUrl(rawUrl) {
+    if (!rawUrl || typeof rawUrl !== "string") return false;
+    try {
+      const parsed = new URL(rawUrl);
+      if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return false;
+      const host = parsed.hostname.toLowerCase();
+      if (ALLOWED_HOSTS.has(host)) return true;
+      if (host.endsWith(".vercel.app") && host.startsWith("plexi-erp")) return true;
+      return false;
+    } catch {
+      return false;
+    }
+  }
+
+  // Intercept external links and open them in the user's default OS browser (ERP-017)
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    if (url.startsWith("http:") || url.startsWith("https:")) {
-      // If external destination (not Plexi domain), launch in default browser
-      if (
-        !url.includes("localhost") &&
-        !url.includes("plexi-erp-two.vercel.app") &&
-        !url.includes("plexi-erp-plascom.vercel.app") &&
-        !url.includes("plexi-erp.flexicom.in") &&
-        !url.includes("vercel.app")
-      ) {
-        shell.openExternal(url);
-        return { action: "deny" };
-      }
+    if (!isAuthorizedUrl(url)) {
+      shell.openExternal(url);
+      return { action: "deny" };
     }
     return { action: "allow" };
+  });
+
+  // Intercept top-level navigation to prevent redirect to untrusted origins
+  mainWindow.webContents.on("will-navigate", (event, url) => {
+    if (!isAuthorizedUrl(url) && !url.includes("offline.html")) {
+      event.preventDefault();
+      shell.openExternal(url);
+    }
   });
 
   // Handle network failure or unreachable server with offline recovery page
@@ -196,8 +217,20 @@ ipcMain.handle("get-app-version", () => app.getVersion());
 ipcMain.handle("get-server-url", () => getTargetUrl());
 ipcMain.handle("get-default-server-url", () => DEFAULT_URL);
 ipcMain.handle("set-server-url", (event, newUrl) => {
+  // Validate sender frame origin (ERP-032)
+  if (event.senderFrame && event.senderFrame.url) {
+    if (!isAuthorizedUrl(event.senderFrame.url) && !event.senderFrame.url.includes("offline.html")) {
+      console.warn("Rejected set-server-url from untrusted frame:", event.senderFrame.url);
+      return false;
+    }
+  }
+
   if (newUrl && typeof newUrl === "string") {
     const sanitized = newUrl.trim();
+    if (!isAuthorizedUrl(sanitized)) {
+      console.warn("Rejected set-server-url to unauthorized destination:", sanitized);
+      return false;
+    }
     setTargetUrl(sanitized);
     if (mainWindow) {
       mainWindow.loadURL(sanitized);
