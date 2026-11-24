@@ -223,6 +223,7 @@ describe("InventoryService", () => {
     it("should throw error if adjustment results in negative stock", async () => {
       const mockItem = { id: "item-1", currentStock: 5 };
       vi.mocked(db.inventoryItem.findUnique).mockResolvedValue(mockItem as any);
+      vi.mocked(db.inventoryItem.updateMany).mockResolvedValue({ count: 0 });
 
       await expect(
         InventoryService.adjustStock("item-1", { quantity: -10, remarks: "Write-off too much" })
@@ -233,8 +234,8 @@ describe("InventoryService", () => {
       const mockItem = { id: "item-1", currentStock: 50 };
       const updatedItem = { id: "item-1", currentStock: 40 };
 
-      vi.mocked(db.inventoryItem.findUnique).mockResolvedValue(mockItem as any);
-      vi.mocked(db.inventoryItem.update).mockResolvedValue(updatedItem as any);
+      vi.mocked(db.inventoryItem.findUnique).mockResolvedValueOnce(mockItem as any).mockResolvedValueOnce(updatedItem as any);
+      vi.mocked(db.inventoryItem.updateMany).mockResolvedValue({ count: 1 });
       vi.mocked(db.inventoryTransaction.create).mockResolvedValue({ id: "tx-down" } as any);
 
       const result = await InventoryService.adjustStock(
@@ -244,9 +245,9 @@ describe("InventoryService", () => {
       );
 
       expect(result.currentStock).toBe(40);
-      expect(db.inventoryItem.update).toHaveBeenCalledWith({
-        where: { id: "item-1" },
-        data: { currentStock: 40 },
+      expect(db.inventoryItem.updateMany).toHaveBeenCalledWith({
+        where: { id: "item-1", currentStock: { gte: 10 } },
+        data: { currentStock: { decrement: 10 } },
       });
       expect(db.inventoryTransaction.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -276,7 +277,7 @@ describe("InventoryService", () => {
       expect(result.currentStock).toBe(125);
       expect(db.inventoryItem.update).toHaveBeenCalledWith({
         where: { id: "item-1" },
-        data: { currentStock: 125 },
+        data: { currentStock: { increment: 25 } },
       });
       expect(db.inventoryTransaction.create).toHaveBeenCalledWith(
         expect.objectContaining({

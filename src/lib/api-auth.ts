@@ -39,11 +39,15 @@ export async function requireApiAuth(options: ApiAuthOptions = {}): Promise<ApiA
     };
   }
 
-  // Enforce account active status (ERP-001, ERP-033, ERP-040)
-  if ((session.user as any).isActive === false || session.user.role === "DEACTIVATED") {
+  // Enforce account active status and valid role (ERP-001, ERP-033, ERP-040)
+  if (
+    (session.user as any).isActive === false ||
+    session.user.role === "DEACTIVATED" ||
+    session.user.role === "NO_ROLE"
+  ) {
     return {
       ok: false,
-      response: apiError("Forbidden: Account has been deactivated", 403),
+      response: apiError("Forbidden: Account has been deactivated or has no role", 403),
     };
   }
 

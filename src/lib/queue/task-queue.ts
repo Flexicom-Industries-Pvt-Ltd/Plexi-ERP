@@ -6,6 +6,7 @@
  */
 
 import { v4 as uuidv4 } from "uuid";
+import { db } from "@/lib/db";
 
 export type TaskStatus = "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED" | "CANCELLED";
 
@@ -177,33 +178,86 @@ if (process.env.NODE_ENV !== "production") {
   globalForTaskQueue.erpTaskQueueInstance = taskQueue;
 }
 
-// Register standard background export handler
+// Register real database-backed export handlers (ERP-023, ERP-029)
 taskQueue.registerHandler("EXPORT_AUDIT_LOGS", async (job, updateProgress) => {
-  await updateProgress(20);
-  // Simulates high-throughput streaming/export processing
-  await new Promise((resolve) => setTimeout(resolve, 50));
-  await updateProgress(70);
-  await new Promise((resolve) => setTimeout(resolve, 50));
+  await updateProgress(25);
+  const rowCount = await db.auditLog.count();
+  await updateProgress(75);
   await updateProgress(100);
 
   return {
     downloadUrl: `/api/logs/export?jobId=${job.id}`,
-    rowCount: 2500,
+    rowCount,
+    fileType: "csv",
+    generatedAt: new Date().toISOString(),
+  };
+});
+
+taskQueue.registerHandler("EXPORT_INVENTORY_STOCK", async (job, updateProgress) => {
+  await updateProgress(25);
+  const rowCount = await db.inventoryItem.count();
+  await updateProgress(75);
+  await updateProgress(100);
+
+  return {
+    downloadUrl: `/api/inventory/items?format=csv&jobId=${job.id}`,
+    rowCount,
     fileType: "csv",
     generatedAt: new Date().toISOString(),
   };
 });
 
 taskQueue.registerHandler("EXPORT_INVENTORY_LEDGER", async (job, updateProgress) => {
-  await updateProgress(30);
-  await new Promise((resolve) => setTimeout(resolve, 50));
-  await updateProgress(80);
-  await new Promise((resolve) => setTimeout(resolve, 50));
+  await updateProgress(25);
+  const rowCount = await db.inventoryTransaction.count();
+  await updateProgress(75);
   await updateProgress(100);
 
   return {
     downloadUrl: `/api/inventory/transactions?format=csv&jobId=${job.id}`,
-    rowCount: 1200,
+    rowCount,
+    fileType: "csv",
+    generatedAt: new Date().toISOString(),
+  };
+});
+
+taskQueue.registerHandler("EXPORT_ATTENDANCE", async (job, updateProgress) => {
+  await updateProgress(25);
+  const rowCount = await db.attendancePunch.count();
+  await updateProgress(75);
+  await updateProgress(100);
+
+  return {
+    downloadUrl: `/api/hr/attendance/export?jobId=${job.id}`,
+    rowCount,
+    fileType: "csv",
+    generatedAt: new Date().toISOString(),
+  };
+});
+
+taskQueue.registerHandler("EXPORT_PRODUCTION_SUMMARY", async (job, updateProgress) => {
+  await updateProgress(25);
+  const rowCount = await db.productionRun.count();
+  await updateProgress(75);
+  await updateProgress(100);
+
+  return {
+    downloadUrl: `/api/production/reports/export?jobId=${job.id}`,
+    rowCount,
+    fileType: "csv",
+    generatedAt: new Date().toISOString(),
+  };
+});
+
+taskQueue.registerHandler("EXPORT_GATE_REGISTRY", async (job, updateProgress) => {
+  await updateProgress(25);
+  const rowCount = await db.gateEntry.count();
+  await updateProgress(75);
+  await updateProgress(100);
+
+  return {
+    downloadUrl: `/api/security/gate/export?jobId=${job.id}`,
+    rowCount,
     fileType: "csv",
     generatedAt: new Date().toISOString(),
   };
