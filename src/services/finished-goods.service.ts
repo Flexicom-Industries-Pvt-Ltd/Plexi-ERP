@@ -55,15 +55,32 @@ export class FinishedGoodsService {
     if (baleIds.length > 0) {
       const results = [];
 
-      for (const baleId of baleIds) {
-        const bale = await db.bale.findUnique({
-          where: { id: baleId },
+      // Batch pre-fetch when multiple bales, or direct findUnique for single bale
+      let baleMap: Map<string, any> | undefined;
+      if (baleIds.length > 1) {
+        const bales = await db.bale.findMany({
+          where: { id: { in: baleIds } },
           include: {
             product: true,
             baleItem: true,
             shift: true,
           },
         });
+        baleMap = new Map((bales || []).map((b) => [b.id, b]));
+      }
+
+      for (const baleId of baleIds) {
+        const bale =
+          baleIds.length > 1
+            ? baleMap?.get(baleId)
+            : await db.bale.findUnique({
+                where: { id: baleId },
+                include: {
+                  product: true,
+                  baleItem: true,
+                  shift: true,
+                },
+              });
 
         if (!bale) {
           throw new Error(`Bale not found with ID: ${baleId}`);

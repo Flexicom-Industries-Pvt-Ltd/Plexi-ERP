@@ -150,40 +150,74 @@ export class AttendanceImportService {
 
     const distinctDates = new Set<string>();
 
-    // Batch insert punches
-    let inserted = 0;
-    for (const r of records) {
-      // Check for exact duplicate within 60s
-      const duplicateWindowStart = new Date(r.punchTime.getTime() - 60000);
-      const duplicateWindowEnd = new Date(r.punchTime.getTime() + 60000);
+    // Batch pre-fetch existing punches within the window across all records to eliminate N+1 roundtrips
+    const timestamps = records.map((r) => r.punchTime.getTime());
+    const minTime = new Date(Math.min(...timestamps) - 60000);
+    const maxTime = new Date(Math.max(...timestamps) + 60000);
+    const empCodes = Array.from(new Set(records.map((r) => r.employeeCode)));
 
-      const existing = await db.attendancePunch.findFirst({
-        where: {
-          employeeCode: r.employeeCode,
-          punchTime: {
-            gte: duplicateWindowStart,
-            lte: duplicateWindowEnd,
-          },
+    const existingPunches = await db.attendancePunch.findMany({
+      where: {
+        employeeCode: { in: empCodes },
+        punchTime: {
+          gte: minTime,
+          lte: maxTime,
         },
-      });
+      },
+      select: {
+        employeeCode: true,
+        punchTime: true,
+      },
+    });
 
-      if (!existing) {
-        await db.attendancePunch.create({
-          data: {
-            employeeCode: r.employeeCode,
-            employeeName: r.employeeName,
-            punchTime: r.punchTime,
-            direction: r.direction,
-            verifyMode: r.verifyMode || "File Upload",
-            deviceName: r.deviceName || "Offline Import",
-            source: PunchSource.EXCEL_IMPORT,
-          },
+    // In-memory duplicate lookup index
+    const punchesToCreate: Array<{
+      employeeCode: string;
+      employeeName?: string;
+      punchTime: Date;
+      direction: PunchDirection;
+      verifyMode: string;
+      deviceName: string;
+      source: PunchSource;
+    }> = [];
+
+    const existingTimestampsByEmp = new Map<string, number[]>();
+
+    for (const ep of existingPunches) {
+      const times = existingTimestampsByEmp.get(ep.employeeCode) || [];
+      times.push(ep.punchTime.getTime());
+      existingTimestampsByEmp.set(ep.employeeCode, times);
+    }
+
+    for (const r of records) {
+      const t = r.punchTime.getTime();
+      const existingTimes = existingTimestampsByEmp.get(r.employeeCode) || [];
+      const isDuplicate = existingTimes.some((time) => Math.abs(time - t) <= 60000);
+
+      if (!isDuplicate) {
+        punchesToCreate.push({
+          employeeCode: r.employeeCode,
+          employeeName: r.employeeName,
+          punchTime: r.punchTime,
+          direction: r.direction,
+          verifyMode: r.verifyMode || "File Upload",
+          deviceName: r.deviceName || "Offline Import",
+          source: PunchSource.EXCEL_IMPORT,
         });
-        inserted++;
+        existingTimes.push(t);
+        existingTimestampsByEmp.set(r.employeeCode, existingTimes);
       }
 
       const dateKey = r.punchTime.toISOString().split("T")[0];
       distinctDates.add(dateKey);
+    }
+
+    let inserted = 0;
+    if (punchesToCreate.length > 0) {
+      const batchResult = await db.attendancePunch.createMany({
+        data: punchesToCreate,
+      });
+      inserted = batchResult.count;
     }
 
     // Process daily aggregates for all affected dates
