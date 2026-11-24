@@ -8,7 +8,8 @@ export default auth((req) => {
   const isPublicRoute =
     req.nextUrl.pathname === "/" ||
     req.nextUrl.pathname.startsWith("/api/health") ||
-    req.nextUrl.pathname.startsWith("/api/cron");
+    req.nextUrl.pathname.startsWith("/api/cron") ||
+    req.nextUrl.pathname.startsWith("/api/hr/webhook");
 
   // If the user is trying to access an auth route (like login)
   if (isAuthRoute) {

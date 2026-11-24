@@ -27,6 +27,17 @@ export function extractIdempotencyKey(request: NextRequest): string | null {
 }
 
 /**
+ * Construct a scoped idempotency cache key incorporating the endpoint path
+ * and optional authenticated user identity to prevent cross-endpoint and cross-user key collisions (ERP-004).
+ */
+export function buildIdempotencyCacheKey(request: NextRequest, idempotencyKey: string): string {
+  const pathname = request.nextUrl?.pathname || "global";
+  const userHeader = request.headers.get("x-user-id") || "";
+  const normalizedPath = pathname.replace(/^\//, "").replace(/\//g, ":");
+  return `idempotency:${normalizedPath}:${userHeader ? `${userHeader}:` : ""}${idempotencyKey}`;
+}
+
+/**
  * withIdempotency
  *
  * Enterprise wrapper for transactional API mutation handlers (POST, PUT, PATCH).
@@ -44,7 +55,8 @@ export async function withIdempotency(
     return handler();
   }
 
-  const cacheKey = `idempotency:${idempotencyKey}`;
+  // Scoped key prevents cross-endpoint and cross-user collisions (ERP-004)
+  const cacheKey = buildIdempotencyCacheKey(request, idempotencyKey);
 
   // Atomic lock acquisition using withResourceLock to prevent check-before-insert races (ERP-003)
   return withResourceLock(`lock:${cacheKey}`, async () => {
