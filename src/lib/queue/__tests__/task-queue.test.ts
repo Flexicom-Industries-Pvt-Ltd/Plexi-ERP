@@ -31,7 +31,7 @@ describe("Asynchronous Task Queue Engine (TaskQueueEngine)", () => {
     // Wait for microtask queue to process
     await new Promise((resolve) => setTimeout(resolve, 50));
 
-    const updatedJob = taskQueue.getJob(job.id);
+    const updatedJob = await taskQueue.getJob(job.id);
     expect(handlerExecuted).toBe(true);
     expect(updatedJob?.status).toBe("COMPLETED");
     expect(updatedJob?.progress).toBe(100);
@@ -46,7 +46,7 @@ describe("Asynchronous Task Queue Engine (TaskQueueEngine)", () => {
     const job = await taskQueue.enqueue("FAILING_TASK", {});
     await new Promise((resolve) => setTimeout(resolve, 50));
 
-    const updatedJob = taskQueue.getJob(job.id);
+    const updatedJob = await taskQueue.getJob(job.id);
     expect(updatedJob?.status).toBe("FAILED");
     expect(updatedJob?.error).toBe("Disk write timeout");
   });
@@ -61,7 +61,7 @@ describe("Asynchronous Task Queue Engine (TaskQueueEngine)", () => {
     const cancelled = await taskQueue.cancel(job.id);
 
     expect(cancelled).toBe(true);
-    const updatedJob = taskQueue.getJob(job.id);
+    const updatedJob = await taskQueue.getJob(job.id);
     expect(updatedJob?.status).toBe("CANCELLED");
   });
 });

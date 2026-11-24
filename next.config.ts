@@ -8,24 +8,24 @@ const withPWA = withPWAInit({
   cacheOnFrontEndNav: false,
   aggressiveFrontEndNavCaching: false,
   workboxOptions: {
-    navigateFallbackDenylist: [/^\/api/, /^\/auth/, /^\/dashboard/],
+    navigateFallbackDenylist: [/^\/api(?:\/.*)?$/i, /^\/auth(?:\/.*)?$/i, /^\/dashboard(?:\/.*)?$/i],
     runtimeCaching: [
       {
-        urlPattern: /^\/api\/.*/i,
+        urlPattern: /^\/api(?:\/.*)?$/i,
         handler: "NetworkOnly",
         options: {
           cacheName: "apis-network-only",
         },
       },
       {
-        urlPattern: /^\/dashboard\/.*/i,
+        urlPattern: /^\/dashboard(?:\/.*)?$/i,
         handler: "NetworkOnly",
         options: {
           cacheName: "dashboard-network-only",
         },
       },
       {
-        urlPattern: /^\/auth\/.*/i,
+        urlPattern: /^\/auth(?:\/.*)?$/i,
         handler: "NetworkOnly",
         options: {
           cacheName: "auth-network-only",

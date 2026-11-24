@@ -2874,3 +2874,39 @@ model ShiftHeadcount {
   @@unique([date, shiftName, department])
   @@index([date, department])
 }
+
+// Durable Database Idempotency Persistence (ERP-004, Area 2)
+model IdempotencyRecord {
+  id           String    @id @default(cuid())
+  key          String
+  userId       String    @default("ANONYMOUS")
+  endpoint     String
+  method       String    @default("POST")
+  requestHash  String
+  status       String    @default("PROCESSING") // "PROCESSING", "COMPLETED", "FAILED"
+  statusCode   Int?
+  responseBody Json?
+  createdAt    DateTime  @default(now())
+  expiresAt    DateTime
+
+  @@unique([key, userId, endpoint, method])
+  @@index([expiresAt])
+}
+
+// Durable Database Background Task Persistence (ERP-023, Area 3)
+model BackgroundJobRecord {
+  id          String    @id
+  type        String
+  payload     Json?
+  status      String    @default("PENDING") // "PENDING", "PROCESSING", "COMPLETED", "FAILED", "CANCELLED"
+  progress    Int       @default(0)
+  result      Json?
+  error       String?
+  createdById String?
+  createdAt   DateTime  @default(now())
+  startedAt   DateTime?
+  completedAt DateTime?
+
+  @@index([status])
+  @@index([createdById])
+}

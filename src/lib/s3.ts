@@ -69,6 +69,13 @@ export async function getSignedDownloadUrl(
   fileKey: string,
   expiresInSeconds = 900
 ): Promise<string> {
+  if (
+    process.env.NODE_ENV === "production" &&
+    (!env.S3_ACCESS_KEY_ID || env.S3_ACCESS_KEY_ID === "dummy")
+  ) {
+    throw new Error("S3 configuration error: Production S3 storage credentials are not configured");
+  }
+
   const command = new GetObjectCommand({
     Bucket: env.S3_BUCKET_NAME || "dummy-bucket",
     Key: fileKey,
@@ -86,9 +93,23 @@ export async function getPublicUrl(fileKey: string) {
 export async function deleteS3File(
   fileKey: string,
   requestingUserId?: string,
-  userRole?: string
+  userRole?: string,
+  options: { isSystemRetention?: boolean } = {}
 ) {
-  // Validate ownership if requestingUserId is provided (ERP-020)
+  // Fail closed if production credentials are missing or dummy
+  if (
+    process.env.NODE_ENV === "production" &&
+    (!env.S3_ACCESS_KEY_ID || env.S3_ACCESS_KEY_ID === "dummy")
+  ) {
+    throw new Error("S3 configuration error: Production S3 storage credentials are not configured");
+  }
+
+  // Require verified requestingUserId unless executed as system retention job (ERP-020)
+  if (!options.isSystemRetention && !requestingUserId) {
+    throw new Error("Unauthorized: File deletion requires verified requestingUserId unless executed as system retention");
+  }
+
+  // Validate ownership
   if (requestingUserId) {
     const fileAsset = await db.fileAsset.findUnique({ where: { fileKey } });
     if (fileAsset?.uploadedBy && fileAsset.uploadedBy !== requestingUserId && !isSuperAdminRole(userRole)) {
