@@ -1,0 +1,2230 @@
+{
+  "summary": {
+    "totalFiles": 634,
+    "routes": 113,
+    "services": 11,
+    "actions": 10,
+    "components": 208,
+    "unboundedFindManyCount": 372,
+    "loopQueriesCount": 13,
+    "heavyIncludesCount": 60
+  },
+  "unboundedFindMany": [
+    {
+      "file": "src/app/(dashboard)/dashboard/settings/roles/page.tsx",
+      "line": 15,
+      "text": "const roles = await db.role.findMany({"
+    },
+    {
+      "file": "src/app/(dashboard)/dashboard/settings/users/page.tsx",
+      "line": 17,
+      "text": "db.user.findMany({"
+    },
+    {
+      "file": "src/app/(dashboard)/dashboard/settings/users/page.tsx",
+      "line": 24,
+      "text": "db.role.findMany({"
+    },
+    {
+      "file": "src/app/(dashboard)/dashboard/settings/users/page.tsx",
+      "line": 27,
+      "text": "db.department.findMany({"
+    },
+    {
+      "file": "src/app/api/data-centre/contractors/route.ts",
+      "line": 53,
+      "text": "const contractors = await db.contractor.findMany({"
+    },
+    {
+      "file": "src/app/api/data-centre/lamination-raw-materials/route.ts",
+      "line": 31,
+      "text": "const items = await db.laminationRawMaterial.findMany({"
+    },
+    {
+      "file": "src/app/api/data-centre/loom-mappings/route.ts",
+      "line": 56,
+      "text": "const activeRecipes = await db.tapePlantRecipe.findMany({"
+    },
+    {
+      "file": "src/app/api/data-centre/loom-mappings/route.ts",
+      "line": 71,
+      "text": "(await db.loomMachineMapping.findMany({ select: { qualityCode: true } })).map((m) => m.qualityCode.toLowerCase())"
+    },
+    {
+      "file": "src/app/api/data-centre/loom-mappings/route.ts",
+      "line": 98,
+      "text": "const mappings = await db.loomMachineMapping.findMany({"
+    },
+    {
+      "file": "src/app/api/data-centre/operators/route.ts",
+      "line": 52,
+      "text": "const operators = await db.operator.findMany({"
+    },
+    {
+      "file": "src/app/api/data-centre/qualities/route.ts",
+      "line": 51,
+      "text": "db.tapePlantRecipe.findMany({"
+    },
+    {
+      "file": "src/app/api/data-centre/qualities/route.ts",
+      "line": 65,
+      "text": "db.loomMachineMapping.findMany({"
+    },
+    {
+      "file": "src/app/api/data-centre/supervisors/route.ts",
+      "line": 52,
+      "text": "const supervisors = await db.supervisor.findMany({"
+    },
+    {
+      "file": "src/app/api/data-centre/tape-plant-recipes/route.ts",
+      "line": 59,
+      "text": "const recipes = await db.tapePlantRecipe.findMany({"
+    },
+    {
+      "file": "src/app/api/data-centre/tape-plant-recipes/route.ts",
+      "line": 66,
+      "text": "const allRecipes = await db.tapePlantRecipe.findMany({"
+    },
+    {
+      "file": "src/app/api/hr/attendance/route.ts",
+      "line": 88,
+      "text": "const records = await db.dailyAttendance.findMany({"
+    },
+    {
+      "file": "src/app/api/hr/attendance/route.ts",
+      "line": 94,
+      "text": "const allForDate = await db.dailyAttendance.findMany({"
+    },
+    {
+      "file": "src/app/api/hr/attendance/route.ts",
+      "line": 106,
+      "text": "const activeShifts = await db.shift.findMany({"
+    },
+    {
+      "file": "src/app/api/hr/devices/route.ts",
+      "line": 49,
+      "text": "const devices = await db.biometricDevice.findMany({"
+    },
+    {
+      "file": "src/app/api/hr/export/route.ts",
+      "line": 30,
+      "text": "const records = await db.dailyAttendance.findMany({"
+    },
+    {
+      "file": "src/app/api/hr/export/route.ts",
+      "line": 70,
+      "text": "const punches = await db.attendancePunch.findMany({"
+    },
+    {
+      "file": "src/app/api/hr/headcount/route.ts",
+      "line": 34,
+      "text": "const headcounts = await db.shiftHeadcount.findMany({"
+    },
+    {
+      "file": "src/app/api/inventory/by-location/route.ts",
+      "line": 23,
+      "text": "const locations = await db.location.findMany({"
+    },
+    {
+      "file": "src/app/api/inventory/by-location/route.ts",
+      "line": 34,
+      "text": "const unassigned = await db.inventoryItem.findMany({"
+    },
+    {
+      "file": "src/app/api/inventory/gate-receipts/route.ts",
+      "line": 29,
+      "text": "const entries = await db.gateEntry.findMany({"
+    },
+    {
+      "file": "src/app/api/inventory/transactions/route.ts",
+      "line": 56,
+      "text": "? await db.gateEntry.findMany({"
+    },
+    {
+      "file": "src/app/api/logs/export/route.ts",
+      "line": 56,
+      "text": "? await db.user.findMany({"
+    },
+    {
+      "file": "src/app/api/logs/route.ts",
+      "line": 108,
+      "text": "db.logEntry.findMany({"
+    },
+    {
+      "file": "src/app/api/logs/route.ts",
+      "line": 118,
+      "text": "? await db.user.findMany({"
+    },
+    {
+      "file": "src/app/api/logs/route.ts",
+      "line": 131,
+      "text": "const distinctModules = await db.logEntry.findMany({"
+    },
+    {
+      "file": "src/app/api/logs/route.ts",
+      "line": 138,
+      "text": "const allUsers = await db.user.findMany({"
+    },
+    {
+      "file": "src/app/api/production/characteristics/definitions/route.ts",
+      "line": 39,
+      "text": "const definitions = await db.productionCharacteristicDefinition.findMany({"
+    },
+    {
+      "file": "src/app/api/production/convertex/reports/route.ts",
+      "line": 66,
+      "text": "const mtdRecords = await db.convertexDailyReport.findMany({"
+    },
+    {
+      "file": "src/app/api/production/convertex/reports/route.ts",
+      "line": 248,
+      "text": "const existingEntries = await tx.convertexDailyReportEntry.findMany({"
+    },
+    {
+      "file": "src/app/api/production/convertex/summary/route.ts",
+      "line": 50,
+      "text": "db.convertexDailyReport.findMany({"
+    },
+    {
+      "file": "src/app/api/production/convertex/summary/route.ts",
+      "line": 59,
+      "text": "db.convertexWastageReport.findMany({"
+    },
+    {
+      "file": "src/app/api/production/convertex/wastage/route.ts",
+      "line": 254,
+      "text": "const existingEntries = await tx.convertexWastageReportEntry.findMany({"
+    },
+    {
+      "file": "src/app/api/production/lamination/qualities/route.ts",
+      "line": 16,
+      "text": "db.loomRollCuttingEntry.findMany({"
+    },
+    {
+      "file": "src/app/api/production/lamination/qualities/route.ts",
+      "line": 21,
+      "text": "db.tapePlantRecipe.findMany({"
+    },
+    {
+      "file": "src/app/api/production/lamination/qualities/route.ts",
+      "line": 25,
+      "text": "db.loomMachineMapping.findMany({"
+    },
+    {
+      "file": "src/app/api/production/lamination/qualities/route.ts",
+      "line": 30,
+      "text": "db.laminationProductionEntry.findMany({"
+    },
+    {
+      "file": "src/app/api/production/lamination/qualities/route.ts",
+      "line": 35,
+      "text": "db.partyPrintingDetail.findMany({"
+    },
+    {
+      "file": "src/app/api/production/lamination/raw-materials/reports/route.ts",
+      "line": 59,
+      "text": "const activeMasterMaterials = await db.laminationRawMaterial.findMany({"
+    },
+    {
+      "file": "src/app/api/production/lamination/raw-materials/reports/route.ts",
+      "line": 104,
+      "text": "const reports = await db.laminationRawMaterialReport.findMany({"
+    },
+    {
+      "file": "src/app/api/production/lamination/summary/route.ts",
+      "line": 41,
+      "text": "const reports = await db.laminationProductionReport.findMany({"
+    },
+    {
+      "file": "src/app/api/production/lamination/wastage/route.ts",
+      "line": 108,
+      "text": "const reports = await db.laminationWastageReport.findMany({"
+    },
+    {
+      "file": "src/app/api/production/loom/changeover/route.ts",
+      "line": 42,
+      "text": "const readingSheetEntries = await db.loomReadingEntry.findMany({"
+    },
+    {
+      "file": "src/app/api/production/loom/changeover/route.ts",
+      "line": 66,
+      "text": "db.loomChangeover.findMany({"
+    },
+    {
+      "file": "src/app/api/production/loom/changeover/route.ts",
+      "line": 69,
+      "text": "db.tapePlantRecipe.findMany({"
+    },
+    {
+      "file": "src/app/api/production/loom/changeover/route.ts",
+      "line": 73,
+      "text": "db.shift.findMany({"
+    },
+    {
+      "file": "src/app/api/production/loom/changeover/route.ts",
+      "line": 77,
+      "text": "db.loomMachineMapping.findMany({"
+    },
+    {
+      "file": "src/app/api/production/loom/changeover/route.ts",
+      "line": 331,
+      "text": "const otherMappings = await db.loomMachineMapping.findMany({"
+    },
+    {
+      "file": "src/app/api/production/loom/production-report/route.ts",
+      "line": 62,
+      "text": "db.loomRollCuttingReport.findMany({"
+    },
+    {
+      "file": "src/app/api/production/loom/production-report/route.ts",
+      "line": 71,
+      "text": "db.loomReadingSheet.findMany({"
+    },
+    {
+      "file": "src/app/api/production/loom/production-report/route.ts",
+      "line": 78,
+      "text": "db.supervisor.findMany({"
+    },
+    {
+      "file": "src/app/api/production/loom/production-report/route.ts",
+      "line": 82,
+      "text": "db.operator.findMany({"
+    },
+    {
+      "file": "src/app/api/production/loom/production-report/route.ts",
+      "line": 86,
+      "text": "db.shift.findMany({"
+    },
+    {
+      "file": "src/app/api/production/loom/reading-sheet/route.ts",
+      "line": 58,
+      "text": "db.shift.findMany({"
+    },
+    {
+      "file": "src/app/api/production/loom/reading-sheet/route.ts",
+      "line": 62,
+      "text": "db.operator.findMany({"
+    },
+    {
+      "file": "src/app/api/production/loom/reading-sheet/route.ts",
+      "line": 66,
+      "text": "db.loomMachineMapping.findMany({"
+    },
+    {
+      "file": "src/app/api/production/loom/reading-sheet/route.ts",
+      "line": 70,
+      "text": "db.tapePlantRecipe.findMany({"
+    },
+    {
+      "file": "src/app/api/production/loom/reading-sheet/route.ts",
+      "line": 665,
+      "text": "const otherMappings = await db.loomMachineMapping.findMany({"
+    },
+    {
+      "file": "src/app/api/production/loom/roll-cutting/route.ts",
+      "line": 122,
+      "text": "db.shift.findMany({"
+    },
+    {
+      "file": "src/app/api/production/loom/roll-cutting/route.ts",
+      "line": 126,
+      "text": "db.operator.findMany({"
+    },
+    {
+      "file": "src/app/api/production/loom/roll-cutting/route.ts",
+      "line": 130,
+      "text": "db.contractor.findMany({"
+    },
+    {
+      "file": "src/app/api/production/loom/roll-cutting/route.ts",
+      "line": 134,
+      "text": "db.supervisor.findMany({"
+    },
+    {
+      "file": "src/app/api/production/loom/roll-cutting/route.ts",
+      "line": 138,
+      "text": "db.loomMachineMapping.findMany({"
+    },
+    {
+      "file": "src/app/api/production/loom/roll-stock/route.ts",
+      "line": 105,
+      "text": "db.shift.findMany({"
+    },
+    {
+      "file": "src/app/api/production/loom/roll-stock/route.ts",
+      "line": 110,
+      "text": "db.tapePlantRecipe.findMany({"
+    },
+    {
+      "file": "src/app/api/production/loom/roll-stock/route.ts",
+      "line": 115,
+      "text": "db.loomMachineMapping.findMany({"
+    },
+    {
+      "file": "src/app/api/production/loom/summary/route.ts",
+      "line": 41,
+      "text": "db.tapePlantRecipe.findMany({"
+    },
+    {
+      "file": "src/app/api/production/loom/summary/route.ts",
+      "line": 45,
+      "text": "db.shift.findMany({"
+    },
+    {
+      "file": "src/app/api/production/loom/summary/route.ts",
+      "line": 49,
+      "text": "db.loomMachineMapping.findMany({"
+    },
+    {
+      "file": "src/app/api/production/loom/summary/route.ts",
+      "line": 53,
+      "text": "db.tapePlantBobbinIssue.findMany({"
+    },
+    {
+      "file": "src/app/api/production/loom/summary/route.ts",
+      "line": 535,
+      "text": "const existingMappings = await db.loomMachineMapping.findMany({"
+    },
+    {
+      "file": "src/app/api/production/loom/summary/route.ts",
+      "line": 627,
+      "text": "const existingMappings = await db.loomMachineMapping.findMany({"
+    },
+    {
+      "file": "src/app/api/production/loom/summary/route.ts",
+      "line": 664,
+      "text": "const otherMappings = await db.loomMachineMapping.findMany({"
+    },
+    {
+      "file": "src/app/api/production/printing/raw-materials/route.ts",
+      "line": 216,
+      "text": "const existingEntries = await tx.printingRawMaterialReportEntry.findMany({"
+    },
+    {
+      "file": "src/app/api/production/printing/reports/route.ts",
+      "line": 204,
+      "text": "const existingEntries = await tx.printingDailyReportEntry.findMany({"
+    },
+    {
+      "file": "src/app/api/production/printing/summary/route.ts",
+      "line": 38,
+      "text": "const reports = await db.printingDailyReport.findMany({"
+    },
+    {
+      "file": "src/app/api/production/shifts/route.ts",
+      "line": 13,
+      "text": "let dbShifts = await db.shift.findMany({"
+    },
+    {
+      "file": "src/app/api/production/shifts/route.ts",
+      "line": 40,
+      "text": "dbShifts = await db.shift.findMany({"
+    },
+    {
+      "file": "src/app/api/production/tape-plant/bobbin-issue/route.ts",
+      "line": 75,
+      "text": "const issues = await db.tapePlantBobbinIssue.findMany({"
+    },
+    {
+      "file": "src/app/api/production/tape-plant/bobbin-issue/route.ts",
+      "line": 172,
+      "text": "const allPostProd = await db.tapePlantPostProduction.findMany({"
+    },
+    {
+      "file": "src/app/api/production/tape-plant/bobbin-issue/route.ts",
+      "line": 201,
+      "text": "const prevIssues = await db.tapePlantBobbinIssue.findMany({"
+    },
+    {
+      "file": "src/app/api/production/tape-plant/bobbin-stock/route.ts",
+      "line": 59,
+      "text": "const postProductions = await db.tapePlantPostProduction.findMany({"
+    },
+    {
+      "file": "src/app/api/production/tape-plant/bobbin-stock/route.ts",
+      "line": 68,
+      "text": "const bobbinIssues = await db.tapePlantBobbinIssue.findMany({"
+    },
+    {
+      "file": "src/app/api/production/tape-plant/bobbin-transactions/route.ts",
+      "line": 69,
+      "text": "const postProductions = await db.tapePlantPostProduction.findMany({"
+    },
+    {
+      "file": "src/app/api/production/tape-plant/bobbin-transactions/route.ts",
+      "line": 161,
+      "text": "const issues = await db.tapePlantBobbinIssue.findMany({"
+    },
+    {
+      "file": "src/app/api/production/tape-plant/drive-parameters/route.ts",
+      "line": 26,
+      "text": "const records = await db.tapePlantDriveParameter.findMany({"
+    },
+    {
+      "file": "src/app/api/production/tape-plant/drive-parameters/route.ts",
+      "line": 82,
+      "text": "const activeShifts = await db.shift.findMany({"
+    },
+    {
+      "file": "src/app/api/production/tape-plant/drive-parameters/route.ts",
+      "line": 91,
+      "text": "const existingRows = await tx.tapePlantDriveParameter.findMany({"
+    },
+    {
+      "file": "src/app/api/production/tape-plant/drive-parameters/route.ts",
+      "line": 218,
+      "text": "const updated = await db.tapePlantDriveParameter.findMany({"
+    },
+    {
+      "file": "src/app/api/production/tape-plant/planning/route.ts",
+      "line": 25,
+      "text": "const allPlans = await db.tapePlantPlan.findMany({"
+    },
+    {
+      "file": "src/app/api/production/tape-plant/planning/route.ts",
+      "line": 77,
+      "text": "const plans = await db.tapePlantPlan.findMany({"
+    },
+    {
+      "file": "src/app/api/production/tape-plant/planning/route.ts",
+      "line": 86,
+      "text": "const otherContinuousPlans = await db.tapePlantPlan.findMany({"
+    },
+    {
+      "file": "src/app/api/production/tape-plant/planning/route.ts",
+      "line": 265,
+      "text": "const otherShiftContinuous = await tx.tapePlantPlan.findMany({"
+    },
+    {
+      "file": "src/app/api/production/tape-plant/planning/route.ts",
+      "line": 287,
+      "text": "const allCurrentPlans = await db.tapePlantPlan.findMany({"
+    },
+    {
+      "file": "src/app/api/production/tape-plant/planning/route.ts",
+      "line": 293,
+      "text": "const existingPostProds = await db.tapePlantPostProduction.findMany({"
+    },
+    {
+      "file": "src/app/api/production/tape-plant/planning/route.ts",
+      "line": 419,
+      "text": "const remainingPlans = await db.tapePlantPlan.findMany({"
+    },
+    {
+      "file": "src/app/api/production/tape-plant/post-production/route.ts",
+      "line": 25,
+      "text": "const allPlans = await db.tapePlantPlan.findMany({"
+    },
+    {
+      "file": "src/app/api/production/tape-plant/post-production/route.ts",
+      "line": 56,
+      "text": "const allPostProds = await db.tapePlantPostProduction.findMany({"
+    },
+    {
+      "file": "src/app/api/production/tape-plant/post-production/route.ts",
+      "line": 149,
+      "text": "const shiftPlans = await db.tapePlantPlan.findMany({"
+    },
+    {
+      "file": "src/app/api/production/tape-plant/post-production/route.ts",
+      "line": 158,
+      "text": "const otherContinuousPlans = await db.tapePlantPlan.findMany({"
+    },
+    {
+      "file": "src/app/api/production/tape-plant/post-production/route.ts",
+      "line": 276,
+      "text": "const allPlans = await db.tapePlantPlan.findMany({"
+    },
+    {
+      "file": "src/app/api/production/tape-plant/raw-material/route.ts",
+      "line": 25,
+      "text": "const records = await db.tapePlantRawMaterial.findMany({"
+    },
+    {
+      "file": "src/app/api/production/tape-plant/raw-material/route.ts",
+      "line": 89,
+      "text": "const existingRows = await tx.tapePlantRawMaterial.findMany({"
+    },
+    {
+      "file": "src/app/api/production/tape-plant/raw-material/route.ts",
+      "line": 180,
+      "text": "const updated = await db.tapePlantRawMaterial.findMany({"
+    },
+    {
+      "file": "src/app/api/production/tape-plant/reports/route.ts",
+      "line": 40,
+      "text": "const postProductions = await db.tapePlantPostProduction.findMany({"
+    },
+    {
+      "file": "src/app/api/production/tape-plant/reports/route.ts",
+      "line": 53,
+      "text": "const plans = await db.tapePlantPlan.findMany({"
+    },
+    {
+      "file": "src/app/api/production/tape-plant/temperature/route.ts",
+      "line": 29,
+      "text": "const readings = await db.tapePlantTemperatureReading.findMany({"
+    },
+    {
+      "file": "src/app/api/production/tape-plant/temperature/route.ts",
+      "line": 83,
+      "text": "const activeShifts = await db.shift.findMany({"
+    },
+    {
+      "file": "src/app/api/production/tape-plant/temperature/route.ts",
+      "line": 110,
+      "text": "const existingRows = await tx.tapePlantTemperatureReading.findMany({"
+    },
+    {
+      "file": "src/app/api/production/tape-plant/temperature/route.ts",
+      "line": 195,
+      "text": "const updated = await db.tapePlantTemperatureReading.findMany({"
+    },
+    {
+      "file": "src/app/api/production/telemetry/unlock/route.ts",
+      "line": 27,
+      "text": "const records = await db.telemetryTimeSlotUnlock.findMany({"
+    },
+    {
+      "file": "src/app/api/production/valvomatic/reports/route.ts",
+      "line": 66,
+      "text": "const mtdRecords = await db.valvomaticDailyReport.findMany({"
+    },
+    {
+      "file": "src/app/api/production/valvomatic/reports/route.ts",
+      "line": 248,
+      "text": "const existingEntries = await tx.valvomaticDailyReportEntry.findMany({"
+    },
+    {
+      "file": "src/app/api/production/valvomatic/summary/route.ts",
+      "line": 50,
+      "text": "db.valvomaticDailyReport.findMany({"
+    },
+    {
+      "file": "src/app/api/production/valvomatic/summary/route.ts",
+      "line": 59,
+      "text": "db.valvomaticWastageReport.findMany({"
+    },
+    {
+      "file": "src/app/api/production/valvomatic/wastage/route.ts",
+      "line": 254,
+      "text": "const existingEntries = await tx.valvomaticWastageReportEntry.findMany({"
+    },
+    {
+      "file": "src/app/api/settings/master-data/[model]/route.ts",
+      "line": 27,
+      "text": "const records = await (db as any)[modelConfig.modelName].findMany({"
+    },
+    {
+      "file": "src/app/api/stocks/route.ts",
+      "line": 16,
+      "text": "const stocks = await db.stock.findMany({"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1022,
+      "text": "* const roles = await prisma.role.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1045,
+      "text": "* const roles = await prisma.role.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1138,
+      "text": "* const roles = await prisma.role.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1148,
+      "text": "* const rolePermissions = await prisma.rolePermission.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1158,
+      "text": "* const users = await prisma.user.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1168,
+      "text": "* const accounts = await prisma.account.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1178,
+      "text": "* const sessions = await prisma.session.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1188,
+      "text": "* const verificationTokens = await prisma.verificationToken.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1198,
+      "text": "* const shifts = await prisma.shift.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1208,
+      "text": "* const unitOfMeasurements = await prisma.unitOfMeasurement.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1218,
+      "text": "* const categories = await prisma.category.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1228,
+      "text": "* const drivers = await prisma.driver.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1238,
+      "text": "* const stocks = await prisma.stock.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1248,
+      "text": "* const subCategories = await prisma.subCategory.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1258,
+      "text": "* const auditLogs = await prisma.auditLog.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1268,
+      "text": "* const fileAssets = await prisma.fileAsset.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1278,
+      "text": "* const departments = await prisma.department.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1288,
+      "text": "* const sections = await prisma.section.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1298,
+      "text": "* const locations = await prisma.location.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1308,
+      "text": "* const machines = await prisma.machine.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1318,
+      "text": "* const configParameters = await prisma.configParameter.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1328,
+      "text": "* const logEntries = await prisma.logEntry.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1338,
+      "text": "* const logDiffs = await prisma.logDiff.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1348,
+      "text": "* const gateEntries = await prisma.gateEntry.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1358,
+      "text": "* const truckStockDetails = await prisma.truckStockDetail.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1368,
+      "text": "* const gateDocuments = await prisma.gateDocument.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1378,
+      "text": "* const gateStatusLogs = await prisma.gateStatusLog.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1388,
+      "text": "* const inventoryItems = await prisma.inventoryItem.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1398,
+      "text": "* const inventoryTransactions = await prisma.inventoryTransaction.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1408,
+      "text": "* const inventoryBatches = await prisma.inventoryBatch.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1418,
+      "text": "* const productionPlans = await prisma.productionPlan.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1428,
+      "text": "* const productionPlanLines = await prisma.productionPlanLine.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1438,
+      "text": "* const productionPlanLineOperators = await prisma.productionPlanLineOperator.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1448,
+      "text": "* const productionCharacteristicDefinitions = await prisma.productionCharacteristicDefinition.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1458,
+      "text": "* const productionCharacteristicValues = await prisma.productionCharacteristicValue.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1468,
+      "text": "* const productionRuns = await prisma.productionRun.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1478,
+      "text": "* const bobbinProductionRuns = await prisma.bobbinProductionRun.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1488,
+      "text": "* const loomAssignments = await prisma.loomAssignment.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1498,
+      "text": "* const loomAssignmentMachines = await prisma.loomAssignmentMachine.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1508,
+      "text": "* const loomProductionRuns = await prisma.loomProductionRun.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1518,
+      "text": "* const laminationProductionRuns = await prisma.laminationProductionRun.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1528,
+      "text": "* const printingProductionRuns = await prisma.printingProductionRun.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1538,
+      "text": "* const printingProductionRunHelpers = await prisma.printingProductionRunHelper.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1548,
+      "text": "* const cuttingProductionRuns = await prisma.cuttingProductionRun.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1558,
+      "text": "* const convertexProductionRuns = await prisma.convertexProductionRun.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1568,
+      "text": "* const valvomaticProductionRuns = await prisma.valvomaticProductionRun.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1578,
+      "text": "* const bcsProductionRuns = await prisma.bcsProductionRun.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1588,
+      "text": "* const manualStitchProductionRuns = await prisma.manualStitchProductionRun.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1598,
+      "text": "* const bales = await prisma.bale.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1608,
+      "text": "* const productionRolls = await prisma.productionRoll.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1618,
+      "text": "* const shiftHandovers = await prisma.shiftHandover.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1628,
+      "text": "* const qcInspections = await prisma.qcInspection.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1638,
+      "text": "* const qcInspectionLines = await prisma.qcInspectionLine.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1648,
+      "text": "* const qcReworkTickets = await prisma.qcReworkTicket.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1658,
+      "text": "* const scrapRecords = await prisma.scrapRecord.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1668,
+      "text": "* const recyclingBatches = await prisma.recyclingBatch.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1678,
+      "text": "* const maintenanceLogs = await prisma.maintenanceLog.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1688,
+      "text": "* const finishedGoodsLots = await prisma.finishedGoodsLot.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1698,
+      "text": "* const dispatchOrders = await prisma.dispatchOrder.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1708,
+      "text": "* const dispatchOrderLines = await prisma.dispatchOrderLine.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1718,
+      "text": "* const dispatchAllocations = await prisma.dispatchAllocation.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1728,
+      "text": "* const tapePlantPlans = await prisma.tapePlantPlan.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1738,
+      "text": "* const tapePlantTemperatureReadings = await prisma.tapePlantTemperatureReading.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1748,
+      "text": "* const telemetryTimeSlotUnlocks = await prisma.telemetryTimeSlotUnlock.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1758,
+      "text": "* const tapePlantDriveParameters = await prisma.tapePlantDriveParameter.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1768,
+      "text": "* const tapePlantRawMaterials = await prisma.tapePlantRawMaterial.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1778,
+      "text": "* const tapePlantPostProductions = await prisma.tapePlantPostProduction.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1788,
+      "text": "* const tapePlantBobbinIssues = await prisma.tapePlantBobbinIssue.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1798,
+      "text": "* const tapePlantRecipes = await prisma.tapePlantRecipe.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1808,
+      "text": "* const operators = await prisma.operator.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1818,
+      "text": "* const loomMachineMappings = await prisma.loomMachineMapping.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1828,
+      "text": "* const loomChangeovers = await prisma.loomChangeover.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1838,
+      "text": "* const loomReadingSheets = await prisma.loomReadingSheet.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1848,
+      "text": "* const loomReadingEntries = await prisma.loomReadingEntry.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1858,
+      "text": "* const loomRollCuttingReports = await prisma.loomRollCuttingReport.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1868,
+      "text": "* const loomRollCuttingEntries = await prisma.loomRollCuttingEntry.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1878,
+      "text": "* const contractors = await prisma.contractor.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1888,
+      "text": "* const supervisors = await prisma.supervisor.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1898,
+      "text": "* const laminationProductionReports = await prisma.laminationProductionReport.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1908,
+      "text": "* const laminationProductionEntries = await prisma.laminationProductionEntry.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1918,
+      "text": "* const laminationRawMaterials = await prisma.laminationRawMaterial.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1928,
+      "text": "* const laminationRawMaterialReports = await prisma.laminationRawMaterialReport.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1938,
+      "text": "* const laminationRawMaterialReportEntries = await prisma.laminationRawMaterialReportEntry.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1948,
+      "text": "* const laminationWastageReports = await prisma.laminationWastageReport.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1958,
+      "text": "* const printingDailyReports = await prisma.printingDailyReport.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1968,
+      "text": "* const printingDailyReportEntries = await prisma.printingDailyReportEntry.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1978,
+      "text": "* const partyPrintingDetails = await prisma.partyPrintingDetail.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1988,
+      "text": "* const printingRawMaterials = await prisma.printingRawMaterial.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 1998,
+      "text": "* const printingRawMaterialReports = await prisma.printingRawMaterialReport.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 2008,
+      "text": "* const printingRawMaterialReportEntries = await prisma.printingRawMaterialReportEntry.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 2018,
+      "text": "* const printingWastageReports = await prisma.printingWastageReport.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 2028,
+      "text": "* const convertexDailyReports = await prisma.convertexDailyReport.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 2038,
+      "text": "* const convertexDailyReportEntries = await prisma.convertexDailyReportEntry.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 2048,
+      "text": "* const convertexWastageReports = await prisma.convertexWastageReport.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 2058,
+      "text": "* const convertexWastageReportEntries = await prisma.convertexWastageReportEntry.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 2068,
+      "text": "* const valvomaticDailyReports = await prisma.valvomaticDailyReport.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 2078,
+      "text": "* const valvomaticDailyReportEntries = await prisma.valvomaticDailyReportEntry.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 2088,
+      "text": "* const valvomaticWastageReports = await prisma.valvomaticWastageReport.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 2098,
+      "text": "* const valvomaticWastageReportEntries = await prisma.valvomaticWastageReportEntry.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 2108,
+      "text": "* const biometricDevices = await prisma.biometricDevice.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 2118,
+      "text": "* const attendancePunches = await prisma.attendancePunch.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 2128,
+      "text": "* const dailyAttendances = await prisma.dailyAttendance.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 2138,
+      "text": "* const shiftHeadcounts = await prisma.shiftHeadcount.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 2148,
+      "text": "* const idempotencyRecords = await prisma.idempotencyRecord.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 2158,
+      "text": "* const backgroundJobRecords = await prisma.backgroundJobRecord.findMany()"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 13047,
+      "text": "* const roleWithIdOnly = await prisma.role.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 14178,
+      "text": "* const rolePermissionWithIdOnly = await prisma.rolePermission.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 15456,
+      "text": "* const userWithIdOnly = await prisma.user.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 17584,
+      "text": "* const accountWithIdOnly = await prisma.account.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 18642,
+      "text": "* const sessionWithIdOnly = await prisma.session.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 19666,
+      "text": "* const verificationTokenWithIdentifierOnly = await prisma.verificationToken.findMany({ select: { identifier: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 20818,
+      "text": "* const shiftWithIdOnly = await prisma.shift.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 22176,
+      "text": "* const unitOfMeasurementWithIdOnly = await prisma.unitOfMeasurement.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 23305,
+      "text": "* const categoryWithIdOnly = await prisma.category.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 24421,
+      "text": "* const driverWithIdOnly = await prisma.driver.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 25493,
+      "text": "* const stockWithIdOnly = await prisma.stock.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 26639,
+      "text": "* const subCategoryWithIdOnly = await prisma.subCategory.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 27839,
+      "text": "* const auditLogWithIdOnly = await prisma.auditLog.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 29010,
+      "text": "* const fileAssetWithIdOnly = await prisma.fileAsset.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 30119,
+      "text": "* const departmentWithIdOnly = await prisma.department.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 31266,
+      "text": "* const sectionWithIdOnly = await prisma.section.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 32404,
+      "text": "* const locationWithIdOnly = await prisma.location.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 33703,
+      "text": "* const machineWithIdOnly = await prisma.machine.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 35043,
+      "text": "* const configParameterWithIdOnly = await prisma.configParameter.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 36262,
+      "text": "* const logEntryWithIdOnly = await prisma.logEntry.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 37360,
+      "text": "* const logDiffWithIdOnly = await prisma.logDiff.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 38680,
+      "text": "* const gateEntryWithIdOnly = await prisma.gateEntry.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 40024,
+      "text": "* const truckStockDetailWithIdOnly = await prisma.truckStockDetail.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 41182,
+      "text": "* const gateDocumentWithIdOnly = await prisma.gateDocument.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 42309,
+      "text": "* const gateStatusLogWithIdOnly = await prisma.gateStatusLog.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 43662,
+      "text": "* const inventoryItemWithIdOnly = await prisma.inventoryItem.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 45453,
+      "text": "* const inventoryTransactionWithIdOnly = await prisma.inventoryTransaction.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 46705,
+      "text": "* const inventoryBatchWithIdOnly = await prisma.inventoryBatch.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 47871,
+      "text": "* const productionPlanWithIdOnly = await prisma.productionPlan.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 49174,
+      "text": "* const productionPlanLineWithIdOnly = await prisma.productionPlanLine.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 50375,
+      "text": "* const productionPlanLineOperatorWithIdOnly = await prisma.productionPlanLineOperator.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 51536,
+      "text": "* const productionCharacteristicDefinitionWithIdOnly = await prisma.productionCharacteristicDefinition.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 52616,
+      "text": "* const productionCharacteristicValueWithIdOnly = await prisma.productionCharacteristicValue.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 53884,
+      "text": "* const productionRunWithIdOnly = await prisma.productionRun.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 55289,
+      "text": "* const bobbinProductionRunWithIdOnly = await prisma.bobbinProductionRun.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 56414,
+      "text": "* const loomAssignmentWithIdOnly = await prisma.loomAssignment.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 57488,
+      "text": "* const loomAssignmentMachineWithIdOnly = await prisma.loomAssignmentMachine.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 58711,
+      "text": "* const loomProductionRunWithIdOnly = await prisma.loomProductionRun.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 59974,
+      "text": "* const laminationProductionRunWithIdOnly = await prisma.laminationProductionRun.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 61245,
+      "text": "* const printingProductionRunWithIdOnly = await prisma.printingProductionRun.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 62361,
+      "text": "* const printingProductionRunHelperWithIdOnly = await prisma.printingProductionRunHelper.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 63582,
+      "text": "* const cuttingProductionRunWithIdOnly = await prisma.cuttingProductionRun.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 64822,
+      "text": "* const convertexProductionRunWithIdOnly = await prisma.convertexProductionRun.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 66034,
+      "text": "* const valvomaticProductionRunWithIdOnly = await prisma.valvomaticProductionRun.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 67260,
+      "text": "* const bcsProductionRunWithIdOnly = await prisma.bcsProductionRun.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 68488,
+      "text": "* const manualStitchProductionRunWithIdOnly = await prisma.manualStitchProductionRun.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 69760,
+      "text": "* const baleWithIdOnly = await prisma.bale.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 71147,
+      "text": "* const productionRollWithIdOnly = await prisma.productionRoll.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 72559,
+      "text": "* const shiftHandoverWithIdOnly = await prisma.shiftHandover.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 73789,
+      "text": "* const qcInspectionWithIdOnly = await prisma.qcInspection.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 74991,
+      "text": "* const qcInspectionLineWithIdOnly = await prisma.qcInspectionLine.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 76267,
+      "text": "* const qcReworkTicketWithIdOnly = await prisma.qcReworkTicket.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 77620,
+      "text": "* const scrapRecordWithIdOnly = await prisma.scrapRecord.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 78995,
+      "text": "* const recyclingBatchWithIdOnly = await prisma.recyclingBatch.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 80412,
+      "text": "* const maintenanceLogWithIdOnly = await prisma.maintenanceLog.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 81829,
+      "text": "* const finishedGoodsLotWithIdOnly = await prisma.finishedGoodsLot.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 83238,
+      "text": "* const dispatchOrderWithIdOnly = await prisma.dispatchOrder.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 84513,
+      "text": "* const dispatchOrderLineWithIdOnly = await prisma.dispatchOrderLine.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 85700,
+      "text": "* const dispatchAllocationWithIdOnly = await prisma.dispatchAllocation.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 87042,
+      "text": "* const tapePlantPlanWithIdOnly = await prisma.tapePlantPlan.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 88569,
+      "text": "* const tapePlantTemperatureReadingWithIdOnly = await prisma.tapePlantTemperatureReading.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 89681,
+      "text": "* const telemetryTimeSlotUnlockWithIdOnly = await prisma.telemetryTimeSlotUnlock.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 91092,
+      "text": "* const tapePlantDriveParameterWithIdOnly = await prisma.tapePlantDriveParameter.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 92397,
+      "text": "* const tapePlantRawMaterialWithIdOnly = await prisma.tapePlantRawMaterial.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 93663,
+      "text": "* const tapePlantPostProductionWithIdOnly = await prisma.tapePlantPostProduction.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 94936,
+      "text": "* const tapePlantBobbinIssueWithIdOnly = await prisma.tapePlantBobbinIssue.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 96419,
+      "text": "* const tapePlantRecipeWithIdOnly = await prisma.tapePlantRecipe.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 97528,
+      "text": "* const operatorWithIdOnly = await prisma.operator.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 98749,
+      "text": "* const loomMachineMappingWithIdOnly = await prisma.loomMachineMapping.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 100057,
+      "text": "* const loomChangeoverWithIdOnly = await prisma.loomChangeover.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 101337,
+      "text": "* const loomReadingSheetWithIdOnly = await prisma.loomReadingSheet.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 102854,
+      "text": "* const loomReadingEntryWithIdOnly = await prisma.loomReadingEntry.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 104150,
+      "text": "* const loomRollCuttingReportWithIdOnly = await prisma.loomRollCuttingReport.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 105500,
+      "text": "* const loomRollCuttingEntryWithIdOnly = await prisma.loomRollCuttingEntry.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 106649,
+      "text": "* const contractorWithIdOnly = await prisma.contractor.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 107728,
+      "text": "* const supervisorWithIdOnly = await prisma.supervisor.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 108986,
+      "text": "* const laminationProductionReportWithIdOnly = await prisma.laminationProductionReport.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 110302,
+      "text": "* const laminationProductionEntryWithIdOnly = await prisma.laminationProductionEntry.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 111462,
+      "text": "* const laminationRawMaterialWithIdOnly = await prisma.laminationRawMaterial.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 112615,
+      "text": "* const laminationRawMaterialReportWithIdOnly = await prisma.laminationRawMaterialReport.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 113836,
+      "text": "* const laminationRawMaterialReportEntryWithIdOnly = await prisma.laminationRawMaterialReportEntry.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 115150,
+      "text": "* const laminationWastageReportWithIdOnly = await prisma.laminationWastageReport.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 116414,
+      "text": "* const printingDailyReportWithIdOnly = await prisma.printingDailyReport.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 117718,
+      "text": "* const printingDailyReportEntryWithIdOnly = await prisma.printingDailyReportEntry.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 118886,
+      "text": "* const partyPrintingDetailWithIdOnly = await prisma.partyPrintingDetail.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 120018,
+      "text": "* const printingRawMaterialWithIdOnly = await prisma.printingRawMaterial.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 121189,
+      "text": "* const printingRawMaterialReportWithIdOnly = await prisma.printingRawMaterialReport.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 122439,
+      "text": "* const printingRawMaterialReportEntryWithIdOnly = await prisma.printingRawMaterialReportEntry.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 123715,
+      "text": "* const printingWastageReportWithIdOnly = await prisma.printingWastageReport.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 125136,
+      "text": "* const convertexDailyReportWithIdOnly = await prisma.convertexDailyReport.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 126658,
+      "text": "* const convertexDailyReportEntryWithIdOnly = await prisma.convertexDailyReportEntry.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 128069,
+      "text": "* const convertexWastageReportWithIdOnly = await prisma.convertexWastageReport.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 129462,
+      "text": "* const convertexWastageReportEntryWithIdOnly = await prisma.convertexWastageReportEntry.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 130936,
+      "text": "* const valvomaticDailyReportWithIdOnly = await prisma.valvomaticDailyReport.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 132458,
+      "text": "* const valvomaticDailyReportEntryWithIdOnly = await prisma.valvomaticDailyReportEntry.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 133869,
+      "text": "* const valvomaticWastageReportWithIdOnly = await prisma.valvomaticWastageReport.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 135262,
+      "text": "* const valvomaticWastageReportEntryWithIdOnly = await prisma.valvomaticWastageReportEntry.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 136488,
+      "text": "* const biometricDeviceWithIdOnly = await prisma.biometricDevice.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 137644,
+      "text": "* const attendancePunchWithIdOnly = await prisma.attendancePunch.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 138926,
+      "text": "* const dailyAttendanceWithIdOnly = await prisma.dailyAttendance.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 140137,
+      "text": "* const shiftHeadcountWithIdOnly = await prisma.shiftHeadcount.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 141246,
+      "text": "* const idempotencyRecordWithIdOnly = await prisma.idempotencyRecord.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/generated/prisma/index.d.ts",
+      "line": 142350,
+      "text": "* const backgroundJobRecordWithIdOnly = await prisma.backgroundJobRecord.findMany({ select: { id: true } })"
+    },
+    {
+      "file": "src/lib/gate/gate-photo-retention.ts",
+      "line": 47,
+      "text": "const candidateDocs = await db.gateDocument.findMany({"
+    },
+    {
+      "file": "src/lib/hr/attendance-processor.ts",
+      "line": 31,
+      "text": "const shifts = await db.shift.findMany({"
+    },
+    {
+      "file": "src/lib/hr/attendance-processor.ts",
+      "line": 41,
+      "text": "const punches = await db.attendancePunch.findMany({"
+    },
+    {
+      "file": "src/lib/hr/attendance-processor.ts",
+      "line": 63,
+      "text": "db.operator.findMany({ select: { code: true, name: true, section: true } }),"
+    },
+    {
+      "file": "src/lib/hr/attendance-processor.ts",
+      "line": 64,
+      "text": "db.supervisor.findMany({ select: { code: true, name: true, department: true } }),"
+    },
+    {
+      "file": "src/lib/hr/attendance-processor.ts",
+      "line": 65,
+      "text": "db.user.findMany({ select: { employeeId: true, name: true } }),"
+    },
+    {
+      "file": "src/lib/production/dashboard-stats.ts",
+      "line": 22,
+      "text": "db.productionPlan.findMany({"
+    },
+    {
+      "file": "src/lib/production/dashboard-stats.ts",
+      "line": 67,
+      "text": "db.productionRun.findMany({"
+    },
+    {
+      "file": "src/lib/production/finishing-route-defaults.ts",
+      "line": 50,
+      "text": "const lines = await db.productionPlanLine.findMany({"
+    },
+    {
+      "file": "src/lib/production/inventory-tx.ts",
+      "line": 293,
+      "text": "return tx.inventoryTransaction.findMany({"
+    },
+    {
+      "file": "src/lib/production/reports.ts",
+      "line": 80,
+      "text": "const plans = await db.productionPlan.findMany({"
+    },
+    {
+      "file": "src/lib/production/validate-plan.ts",
+      "line": 21,
+      "text": "const requiredDefs = await db.productionCharacteristicDefinition.findMany({"
+    },
+    {
+      "file": "src/services/dispatch.service.ts",
+      "line": 190,
+      "text": "return db.dispatchOrder.findMany({"
+    },
+    {
+      "file": "src/services/dispatch.service.ts",
+      "line": 614,
+      "text": "return db.finishedGoodsLot.findMany({"
+    },
+    {
+      "file": "src/services/finished-goods.service.ts",
+      "line": 423,
+      "text": "return db.finishedGoodsLot.findMany({"
+    },
+    {
+      "file": "src/services/finished-goods.service.ts",
+      "line": 560,
+      "text": "return db.bale.findMany({"
+    },
+    {
+      "file": "src/services/finished-goods.service.ts",
+      "line": 676,
+      "text": "qcInspections = await db.qcInspection.findMany({"
+    },
+    {
+      "file": "src/services/finished-goods.service.ts",
+      "line": 738,
+      "text": "upstreamRolls = await db.productionRoll.findMany({"
+    },
+    {
+      "file": "src/services/gate.service.ts",
+      "line": 101,
+      "text": "db.gateEntry.findMany({"
+    },
+    {
+      "file": "src/services/gate.service.ts",
+      "line": 237,
+      "text": "const res = await client.stock.findMany({"
+    },
+    {
+      "file": "src/services/gate.service.ts",
+      "line": 261,
+      "text": "const res = await client.unitOfMeasurement.findMany({ where: { isActive: true } });"
+    },
+    {
+      "file": "src/services/inventory.service.ts",
+      "line": 49,
+      "text": "db.inventoryItem.findMany({"
+    },
+    {
+      "file": "src/services/maintenance.service.ts",
+      "line": 77,
+      "text": "db.maintenanceLog.findMany({"
+    },
+    {
+      "file": "src/services/maintenance.service.ts",
+      "line": 301,
+      "text": "db.maintenanceLog.findMany({"
+    },
+    {
+      "file": "src/services/maintenance.service.ts",
+      "line": 313,
+      "text": "db.maintenanceLog.findMany({"
+    },
+    {
+      "file": "src/services/maintenance.service.ts",
+      "line": 317,
+      "text": "db.maintenanceLog.findMany({"
+    },
+    {
+      "file": "src/services/maintenance.service.ts",
+      "line": 321,
+      "text": "db.machine.findMany({"
+    },
+    {
+      "file": "src/services/quality.service.ts",
+      "line": 183,
+      "text": "db.qcInspection.findMany({"
+    },
+    {
+      "file": "src/services/quality.service.ts",
+      "line": 622,
+      "text": "db.qcReworkTicket.findMany({"
+    },
+    {
+      "file": "src/services/recycling.service.ts",
+      "line": 40,
+      "text": "return db.scrapRecord.findMany({"
+    },
+    {
+      "file": "src/services/recycling.service.ts",
+      "line": 90,
+      "text": "db.recyclingBatch.findMany({"
+    },
+    {
+      "file": "src/services/recycling.service.ts",
+      "line": 145,
+      "text": "const scrapRecords = await db.scrapRecord.findMany({"
+    },
+    {
+      "file": "src/services/recycling.service.ts",
+      "line": 304,
+      "text": "db.recyclingBatch.findMany({"
+    },
+    {
+      "file": "src/services/recycling.service.ts",
+      "line": 313,
+      "text": "db.scrapRecord.findMany({"
+    },
+    {
+      "file": "src/services/role.service.ts",
+      "line": 36,
+      "text": "return db.role.findMany({"
+    },
+    {
+      "file": "src/services/scrap.service.ts",
+      "line": 95,
+      "text": "db.scrapRecord.findMany({"
+    },
+    {
+      "file": "src/services/scrap.service.ts",
+      "line": 149,
+      "text": "db.scrapRecord.findMany({"
+    },
+    {
+      "file": "src/services/scrap.service.ts",
+      "line": 152,
+      "text": "db.scrapRecord.findMany({"
+    },
+    {
+      "file": "src/services/scrap.service.ts",
+      "line": 156,
+      "text": "db.scrapRecord.findMany({"
+    },
+    {
+      "file": "src/services/shift-digest.service.ts",
+      "line": 39,
+      "text": "const runs = await db.productionRun.findMany({"
+    },
+    {
+      "file": "src/services/shift-digest.service.ts",
+      "line": 93,
+      "text": "const maintenanceLogs = await db.maintenanceLog.findMany({"
+    },
+    {
+      "file": "src/services/user.service.ts",
+      "line": 78,
+      "text": "db.user.findMany({"
+    }
+  ],
+  "loopQueries": [
+    {
+      "file": "src/app/api/data-centre/loom-mappings/route.ts",
+      "type": "Potential N+1 loop query"
+    },
+    {
+      "file": "src/app/api/data-centre/loom-mappings/seed/route.ts",
+      "type": "Potential N+1 loop query"
+    },
+    {
+      "file": "src/app/api/data-centre/operators/seed/route.ts",
+      "type": "Potential N+1 loop query"
+    },
+    {
+      "file": "src/app/api/data-centre/tape-plant-recipes/seed/route.ts",
+      "type": "Potential N+1 loop query"
+    },
+    {
+      "file": "src/app/api/hr/attendance/route.ts",
+      "type": "Potential N+1 loop query"
+    },
+    {
+      "file": "src/app/api/hr/devices/route.ts",
+      "type": "Potential N+1 loop query"
+    },
+    {
+      "file": "src/app/api/production/loom/changeover/route.ts",
+      "type": "Potential N+1 loop query"
+    },
+    {
+      "file": "src/app/api/production/loom/reading-sheet/route.ts",
+      "type": "Potential N+1 loop query"
+    },
+    {
+      "file": "src/app/api/production/loom/roll-cutting/route.ts",
+      "type": "Potential N+1 loop query"
+    },
+    {
+      "file": "src/app/api/production/loom/summary/route.ts",
+      "type": "Potential N+1 loop query"
+    },
+    {
+      "file": "src/app/api/production/shifts/route.ts",
+      "type": "Potential N+1 loop query"
+    },
+    {
+      "file": "src/lib/hr/attendance-import.ts",
+      "type": "Potential N+1 loop query"
+    },
+    {
+      "file": "src/services/finished-goods.service.ts",
+      "type": "Potential N+1 loop query"
+    }
+  ],
+  "heavyIncludes": [
+    {
+      "file": "src/app/api/inventory/by-location/route.ts",
+      "line": 26,
+      "depth": 3
+    },
+    {
+      "file": "src/app/api/inventory/dashboard/route.ts",
+      "line": 35,
+      "depth": 3
+    },
+    {
+      "file": "src/app/api/inventory/gate-receipts/route.ts",
+      "line": 40,
+      "depth": 3
+    },
+    {
+      "file": "src/lib/production/plan-include.ts",
+      "line": 7,
+      "depth": 5
+    },
+    {
+      "file": "src/lib/production/plan-include.ts",
+      "line": 21,
+      "depth": 4
+    },
+    {
+      "file": "src/lib/production/plan-include.ts",
+      "line": 26,
+      "depth": 3
+    },
+    {
+      "file": "src/lib/production/roll-include.ts",
+      "line": 12,
+      "depth": 6
+    },
+    {
+      "file": "src/lib/production/roll-include.ts",
+      "line": 19,
+      "depth": 5
+    },
+    {
+      "file": "src/lib/production/roll-include.ts",
+      "line": 26,
+      "depth": 4
+    },
+    {
+      "file": "src/lib/production/roll-include.ts",
+      "line": 31,
+      "depth": 3
+    },
+    {
+      "file": "src/lib/production/roll-trace.ts",
+      "line": 141,
+      "depth": 6
+    },
+    {
+      "file": "src/lib/production/roll-trace.ts",
+      "line": 145,
+      "depth": 5
+    },
+    {
+      "file": "src/lib/production/roll-trace.ts",
+      "line": 149,
+      "depth": 4
+    },
+    {
+      "file": "src/lib/production/roll-trace.ts",
+      "line": 153,
+      "depth": 3
+    },
+    {
+      "file": "src/services/dispatch.service.ts",
+      "line": 166,
+      "depth": 5
+    },
+    {
+      "file": "src/services/dispatch.service.ts",
+      "line": 168,
+      "depth": 4
+    },
+    {
+      "file": "src/services/dispatch.service.ts",
+      "line": 171,
+      "depth": 4
+    },
+    {
+      "file": "src/services/dispatch.service.ts",
+      "line": 193,
+      "depth": 6
+    },
+    {
+      "file": "src/services/dispatch.service.ts",
+      "line": 195,
+      "depth": 5
+    },
+    {
+      "file": "src/services/dispatch.service.ts",
+      "line": 198,
+      "depth": 5
+    },
+    {
+      "file": "src/services/dispatch.service.ts",
+      "line": 217,
+      "depth": 6
+    },
+    {
+      "file": "src/services/dispatch.service.ts",
+      "line": 219,
+      "depth": 5
+    },
+    {
+      "file": "src/services/dispatch.service.ts",
+      "line": 221,
+      "depth": 4
+    },
+    {
+      "file": "src/services/dispatch.service.ts",
+      "line": 227,
+      "depth": 3
+    },
+    {
+      "file": "src/services/dispatch.service.ts",
+      "line": 395,
+      "depth": 3
+    },
+    {
+      "file": "src/services/dispatch.service.ts",
+      "line": 438,
+      "depth": 3
+    },
+    {
+      "file": "src/services/dispatch.service.ts",
+      "line": 575,
+      "depth": 3
+    },
+    {
+      "file": "src/services/finished-goods.service.ts",
+      "line": 388,
+      "depth": 5
+    },
+    {
+      "file": "src/services/finished-goods.service.ts",
+      "line": 390,
+      "depth": 4
+    },
+    {
+      "file": "src/services/finished-goods.service.ts",
+      "line": 396,
+      "depth": 3
+    },
+    {
+      "file": "src/services/finished-goods.service.ts",
+      "line": 405,
+      "depth": 5
+    },
+    {
+      "file": "src/services/finished-goods.service.ts",
+      "line": 407,
+      "depth": 4
+    },
+    {
+      "file": "src/services/finished-goods.service.ts",
+      "line": 426,
+      "depth": 5
+    },
+    {
+      "file": "src/services/finished-goods.service.ts",
+      "line": 428,
+      "depth": 4
+    },
+    {
+      "file": "src/services/finished-goods.service.ts",
+      "line": 434,
+      "depth": 5
+    },
+    {
+      "file": "src/services/finished-goods.service.ts",
+      "line": 443,
+      "depth": 5
+    },
+    {
+      "file": "src/services/finished-goods.service.ts",
+      "line": 445,
+      "depth": 4
+    },
+    {
+      "file": "src/services/finished-goods.service.ts",
+      "line": 461,
+      "depth": 5
+    },
+    {
+      "file": "src/services/finished-goods.service.ts",
+      "line": 463,
+      "depth": 4
+    },
+    {
+      "file": "src/services/finished-goods.service.ts",
+      "line": 470,
+      "depth": 3
+    },
+    {
+      "file": "src/services/finished-goods.service.ts",
+      "line": 651,
+      "depth": 3
+    },
+    {
+      "file": "src/services/finished-goods.service.ts",
+      "line": 653,
+      "depth": 3
+    },
+    {
+      "file": "src/services/finished-goods.service.ts",
+      "line": 681,
+      "depth": 4
+    },
+    {
+      "file": "src/services/finished-goods.service.ts",
+      "line": 706,
+      "depth": 8
+    },
+    {
+      "file": "src/services/finished-goods.service.ts",
+      "line": 708,
+      "depth": 7
+    },
+    {
+      "file": "src/services/finished-goods.service.ts",
+      "line": 710,
+      "depth": 6
+    },
+    {
+      "file": "src/services/finished-goods.service.ts",
+      "line": 718,
+      "depth": 7
+    },
+    {
+      "file": "src/services/finished-goods.service.ts",
+      "line": 719,
+      "depth": 6
+    },
+    {
+      "file": "src/services/finished-goods.service.ts",
+      "line": 720,
+      "depth": 6
+    },
+    {
+      "file": "src/services/finished-goods.service.ts",
+      "line": 721,
+      "depth": 5
+    },
+    {
+      "file": "src/services/finished-goods.service.ts",
+      "line": 722,
+      "depth": 4
+    },
+    {
+      "file": "src/services/finished-goods.service.ts",
+      "line": 740,
+      "depth": 4
+    },
+    {
+      "file": "src/services/finished-goods.service.ts",
+      "line": 742,
+      "depth": 3
+    },
+    {
+      "file": "src/services/gate.service.ts",
+      "line": 152,
+      "depth": 3
+    },
+    {
+      "file": "src/services/quality.service.ts",
+      "line": 128,
+      "depth": 4
+    },
+    {
+      "file": "src/services/quality.service.ts",
+      "line": 135,
+      "depth": 3
+    },
+    {
+      "file": "src/services/quality.service.ts",
+      "line": 460,
+      "depth": 4
+    },
+    {
+      "file": "src/services/quality.service.ts",
+      "line": 463,
+      "depth": 3
+    },
+    {
+      "file": "src/services/shift-digest.service.ts",
+      "line": 52,
+      "depth": 3
+    },
+    {
+      "file": "src/services/user.service.ts",
+      "line": 81,
+      "depth": 3
+    }
+  ]
+}

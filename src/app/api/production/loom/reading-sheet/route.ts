@@ -629,18 +629,22 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      // Explicit deletion of split rows if requested
+      // Explicit deletion of split rows if requested (batched in single deleteMany query)
       if (Array.isArray(body.deletedEntries) && body.deletedEntries.length > 0) {
-        for (const del of body.deletedEntries) {
-          if (del && del.loomNumber && del.rowSequence) {
-            await db.loomReadingEntry.deleteMany({
-              where: {
-                sheetId: savedSheet.id,
-                loomNumber: Number(del.loomNumber),
-                rowSequence: Number(del.rowSequence),
-              },
-            });
-          }
+        const validDeletions = body.deletedEntries
+          .filter((del: any) => del && del.loomNumber && del.rowSequence)
+          .map((del: any) => ({
+            loomNumber: Number(del.loomNumber),
+            rowSequence: Number(del.rowSequence),
+          }));
+
+        if (validDeletions.length > 0) {
+          await db.loomReadingEntry.deleteMany({
+            where: {
+              sheetId: savedSheet.id,
+              OR: validDeletions,
+            },
+          });
         }
       }
 

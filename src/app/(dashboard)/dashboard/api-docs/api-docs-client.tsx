@@ -1,8 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
-import { ApiReferenceReact } from "@scalar/api-reference-react";
-import "@scalar/api-reference-react/style.css";
+import dynamic from "next/dynamic";
 import {
   BookOpen,
   Server,
@@ -131,6 +130,24 @@ const SCALAR_CUSTOM_CSS = `
     }
   }
 `;
+
+const ApiReferenceLazy = dynamic(
+  () =>
+    Promise.all([
+      import("@scalar/api-reference-react"),
+      import("@scalar/api-reference-react/style.css"),
+    ]).then(([mod]) => mod.ApiReferenceReact),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex-1 min-h-[300px] flex flex-col items-center justify-center p-12 text-center text-slate-500">
+        <RefreshCw className="h-8 w-8 animate-spin text-sky-600 mb-3" />
+        <p className="text-sm font-semibold text-slate-700">Loading Interactive API Playground...</p>
+        <p className="text-xs text-slate-400 mt-1">Downloading Scalar documentation engine asynchronously</p>
+      </div>
+    ),
+  }
+);
 
 
 interface EndpointItem {
@@ -409,7 +426,7 @@ export function ApiDocsClient() {
             </a>
           </div>
           <div className="flex-1 h-full min-h-[calc(100vh-16rem)] w-full bg-white overflow-hidden flex flex-col">
-            <ApiReferenceReact
+            <ApiReferenceLazy
               configuration={{
                 spec: { url: "/api/swagger" },
                 theme: "default",

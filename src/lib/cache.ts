@@ -24,6 +24,11 @@ class MemoryCacheManager {
    * Set a key in cache with optional TTL in seconds.
    */
   async set<T>(key: string, value: T, ttlSeconds?: number): Promise<void> {
+    // When store approaches 80% capacity, run expired pruning before evicting live keys
+    if (this.store.size >= this.maxEntries * 0.8) {
+      this.pruneExpired();
+    }
+
     // Evict oldest if exceeding max entries
     if (this.store.size >= this.maxEntries) {
       const firstKey = this.store.keys().next().value;
@@ -37,6 +42,21 @@ class MemoryCacheManager {
       expiresAt,
       createdAt: Date.now(),
     });
+  }
+
+  /**
+   * Prune all expired entries to prevent memory retention
+   */
+  pruneExpired(): number {
+    const now = Date.now();
+    let pruned = 0;
+    for (const [key, entry] of this.store.entries()) {
+      if (entry.expiresAt !== null && now > entry.expiresAt) {
+        this.store.delete(key);
+        pruned++;
+      }
+    }
+    return pruned;
   }
 
   /**
