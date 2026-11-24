@@ -101,8 +101,8 @@ export class TimeWatchClient {
       // Unreachable (e.g. factory LAN not routed to current environment)
     }
 
-    // Do NOT return fake/mock punches as genuine attendance data in production
-    if (process.env.NODE_ENV !== "test" && process.env.ENABLE_BIOMETRIC_SIMULATOR !== "true") {
+    // Strictly fail closed in production - never return fake/simulated punches regardless of flags
+    if (process.env.NODE_ENV === "production" || (process.env.NODE_ENV !== "test" && process.env.ENABLE_BIOMETRIC_SIMULATOR !== "true")) {
       return {
         success: false,
         data: [],
@@ -160,8 +160,8 @@ export class TimeWatchClient {
       // Offline fallback
     }
 
-    // Do NOT return simulated devices as online in production when unreachable (ERP-021)
-    if (process.env.NODE_ENV !== "test" && process.env.ENABLE_BIOMETRIC_SIMULATOR !== "true") {
+    // Strictly fail closed in production - never return simulated devices as online regardless of flags
+    if (process.env.NODE_ENV === "production" || (process.env.NODE_ENV !== "test" && process.env.ENABLE_BIOMETRIC_SIMULATOR !== "true")) {
       return {
         success: false,
         devices: [],

@@ -19,7 +19,7 @@ export async function GET(
 
   try {
     const { id } = await params;
-    const job = taskQueue.getJob(id);
+    const job = await taskQueue.getJob(id);
 
     if (!job) {
       const errorResponse = apiError("Job not found", 404);

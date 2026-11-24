@@ -579,7 +579,18 @@ export function AppSidebar({ user, allowedModules }: AppSidebarProps) {
                   <DropdownMenuItem onClick={() => router.push("/dashboard/profile")} className="cursor-pointer">
                     Profile
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => signOut({ callbackUrl: '/auth/login' })} className="text-red-600 font-medium cursor-pointer">
+                  <DropdownMenuItem
+                    onClick={async () => {
+                      if (typeof window !== "undefined" && "caches" in window) {
+                        try {
+                          const cacheNames = await caches.keys();
+                          await Promise.all(cacheNames.map((name) => caches.delete(name)));
+                        } catch {}
+                      }
+                      signOut({ callbackUrl: '/auth/login' });
+                    }}
+                    className="text-red-600 font-medium cursor-pointer"
+                  >
                     Log out
                   </DropdownMenuItem>
                 </DropdownMenuGroup>

@@ -62,6 +62,13 @@ class MemoryCacheManager {
   }
 
   /**
+   * Alias for del to support standard Map/Set delete interface
+   */
+  async delete(key: string): Promise<boolean> {
+    return this.del(key);
+  }
+
+  /**
    * Check if a key exists and is not expired.
    */
   async has(key: string): Promise<boolean> {
