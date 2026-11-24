@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { env } from "@/env";
 import { randomUUID } from "crypto";
@@ -14,13 +14,40 @@ const s3Client = new S3Client({
   },
 });
 
+const ALLOWED_MIME_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+  "application/pdf",
+  "text/csv",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/json",
+  "text/plain",
+]);
+
 export async function generatePresignedUploadUrl(
   fileName: string,
   mimeType: string,
   module: Module,
   userId?: string
 ) {
-  const extension = fileName.split(".").pop();
+  if (
+    process.env.NODE_ENV === "production" &&
+    (!env.S3_ACCESS_KEY_ID || env.S3_ACCESS_KEY_ID === "dummy")
+  ) {
+    throw new Error("S3 configuration error: Production S3 storage credentials are not configured");
+  }
+
+  // Validate allowed MIME types (ERP-020)
+  if (!ALLOWED_MIME_TYPES.has(mimeType.toLowerCase())) {
+    throw new Error(`File upload rejected: Unsupported or dangerous MIME type '${mimeType}'`);
+  }
+
+  // Sanitize filename and extract safe extension
+  const cleanName = fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
+  const extension = cleanName.split(".").pop()?.toLowerCase() || "bin";
   const fileKey = `${module.toLowerCase()}/${randomUUID()}.${extension}`;
 
   const command = new PutObjectCommand({
@@ -32,11 +59,22 @@ export async function generatePresignedUploadUrl(
   // Presigned URL expires in 15 minutes (900 seconds)
   const presignedUrl = await getSignedUrl(s3Client, command, { expiresIn: 900 });
 
-  // Note: the client must upload to this URL, then call another endpoint 
-  // (e.g., saveFileRecord) to actually record the `FileAsset` in the database.
-  // Alternatively, we could record a pending FileAsset here.
-
   return { presignedUrl, fileKey };
+}
+
+/**
+ * Generates an authorized, short-lived signed download URL for private object access (ERP-020)
+ */
+export async function getSignedDownloadUrl(
+  fileKey: string,
+  expiresInSeconds = 900
+): Promise<string> {
+  const command = new GetObjectCommand({
+    Bucket: env.S3_BUCKET_NAME || "dummy-bucket",
+    Key: fileKey,
+  });
+
+  return getSignedUrl(s3Client, command, { expiresIn: expiresInSeconds });
 }
 
 export async function getPublicUrl(fileKey: string) {

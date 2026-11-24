@@ -157,9 +157,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
               if (userWithRole.role.permissions) {
                 session.user.permissions = userWithRole.role.permissions as any[];
               }
+            } else {
+              // Role was removed from user in DB - clear permissions completely (fail closed)
+              session.user.role = "NO_ROLE";
+              session.user.permissions = [];
             }
           } catch (e) {
-            console.warn("Could not query live role in session callback:", e);
+            console.error("Database query failed in session callback - failing closed:", e);
+            session.user.role = "DEACTIVATED";
+            session.user.permissions = [];
+            (session.user as any).isActive = false;
+            return session;
           }
         }
 

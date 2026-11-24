@@ -9,6 +9,40 @@ const withPWA = withPWAInit({
   aggressiveFrontEndNavCaching: false,
   workboxOptions: {
     navigateFallbackDenylist: [/^\/api/, /^\/auth/, /^\/dashboard/],
+    runtimeCaching: [
+      {
+        urlPattern: /^\/api\/.*/i,
+        handler: "NetworkOnly",
+        options: {
+          cacheName: "apis-network-only",
+        },
+      },
+      {
+        urlPattern: /^\/dashboard\/.*/i,
+        handler: "NetworkOnly",
+        options: {
+          cacheName: "dashboard-network-only",
+        },
+      },
+      {
+        urlPattern: /^\/auth\/.*/i,
+        handler: "NetworkOnly",
+        options: {
+          cacheName: "auth-network-only",
+        },
+      },
+      {
+        urlPattern: /\.(?:js|css|woff2?|png|jpg|jpeg|svg|gif|ico|webp)$/i,
+        handler: "StaleWhileRevalidate",
+        options: {
+          cacheName: "static-assets",
+          expiration: {
+            maxEntries: 64,
+            maxAgeSeconds: 24 * 60 * 60,
+          },
+        },
+      },
+    ],
   },
 });
 

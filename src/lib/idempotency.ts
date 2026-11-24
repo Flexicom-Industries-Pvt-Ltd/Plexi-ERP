@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cache } from "./cache";
 import { withResourceLock } from "./concurrency-lock";
+import { auth } from "@/auth";
+import crypto from "crypto";
 
 export interface IdempotencyRecord {
   status: "PROCESSING" | "COMPLETED" | "FAILED";
@@ -8,6 +10,8 @@ export interface IdempotencyRecord {
   body?: unknown;
   headers?: Record<string, string>;
   createdAt: number;
+  requestHash?: string;
+  userId?: string;
 }
 
 const IDEMPOTENCY_TTL_SECONDS = 24 * 60 * 60; // 24 hours
@@ -27,14 +31,33 @@ export function extractIdempotencyKey(request: NextRequest): string | null {
 }
 
 /**
- * Construct a scoped idempotency cache key incorporating the endpoint path
- * and optional authenticated user identity to prevent cross-endpoint and cross-user key collisions (ERP-004).
+ * Compute SHA-256 request fingerprint to detect key reuse with different payloads (ERP-004)
  */
-export function buildIdempotencyCacheKey(request: NextRequest, idempotencyKey: string): string {
+export async function computeRequestFingerprint(request: NextRequest): Promise<string> {
+  try {
+    const clone = request.clone();
+    const text = await clone.text();
+    return crypto.createHash("sha256").update(text || "").digest("hex");
+  } catch {
+    return "empty-payload";
+  }
+}
+
+/**
+ * Construct a scoped idempotency cache key incorporating the endpoint path,
+ * HTTP method, and verified server-side user identity to prevent cross-endpoint
+ * and cross-user key collisions without relying on unauthenticated client headers (ERP-004).
+ */
+export function buildIdempotencyCacheKey(
+  request: NextRequest,
+  idempotencyKey: string,
+  userId?: string
+): string {
   const pathname = request.nextUrl?.pathname || "global";
-  const userHeader = request.headers.get("x-user-id") || "";
+  const method = request.method || "POST";
+  const user = userId || "anonymous";
   const normalizedPath = pathname.replace(/^\//, "").replace(/\//g, ":");
-  return `idempotency:${normalizedPath}:${userHeader ? `${userHeader}:` : ""}${idempotencyKey}`;
+  return `idempotency:${normalizedPath}:${method}:${user}:${idempotencyKey}`;
 }
 
 /**
@@ -46,7 +69,8 @@ export function buildIdempotencyCacheKey(request: NextRequest, idempotencyKey: s
  */
 export async function withIdempotency(
   request: NextRequest,
-  handler: () => Promise<NextResponse>
+  handler: () => Promise<NextResponse>,
+  options: { userId?: string } = {}
 ): Promise<NextResponse> {
   const idempotencyKey = extractIdempotencyKey(request);
 
@@ -55,14 +79,37 @@ export async function withIdempotency(
     return handler();
   }
 
-  // Scoped key prevents cross-endpoint and cross-user collisions (ERP-004)
-  const cacheKey = buildIdempotencyCacheKey(request, idempotencyKey);
+  // Derive authenticated user identity securely from server session or explicit verified caller
+  let userId = options.userId;
+  if (!userId) {
+    try {
+      const session = await auth();
+      userId = session?.user?.id;
+    } catch {
+      // In tests or non-session contexts, fallback safely
+    }
+  }
+
+  const requestHash = await computeRequestFingerprint(request);
+  const cacheKey = buildIdempotencyCacheKey(request, idempotencyKey, userId);
 
   // Atomic lock acquisition using withResourceLock to prevent check-before-insert races (ERP-003)
   return withResourceLock(`lock:${cacheKey}`, async () => {
     const existing = await cache.get<IdempotencyRecord>(cacheKey);
 
     if (existing) {
+      // Reject reuse of same idempotency key with different request payload (ERP-004)
+      if (existing.requestHash && existing.requestHash !== requestHash) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Unprocessable Entity: Idempotency key cannot be reused with a different request payload",
+            code: "IDEMPOTENCY_PAYLOAD_MISMATCH",
+          },
+          { status: 422 }
+        );
+      }
+
       if (existing.status === "PROCESSING") {
         return NextResponse.json(
           {
@@ -89,6 +136,8 @@ export async function withIdempotency(
       {
         status: "PROCESSING",
         createdAt: Date.now(),
+        requestHash,
+        userId,
       },
       LOCK_TIMEOUT_SECONDS
     );
@@ -97,7 +146,7 @@ export async function withIdempotency(
       const result = await handler();
 
       // Only cache successful 2xx responses
-      if (result.status >= 200 && result.status < 300) {
+      if (result && result.status >= 200 && result.status < 300) {
         let body: unknown;
         try {
           body = await result.clone().json();
@@ -112,6 +161,8 @@ export async function withIdempotency(
             statusCode: result.status,
             body,
             createdAt: Date.now(),
+            requestHash,
+            userId,
           },
           IDEMPOTENCY_TTL_SECONDS
         );
