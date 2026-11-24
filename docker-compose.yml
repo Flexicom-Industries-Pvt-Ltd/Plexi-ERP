@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: plexi-erp:latest
+    container_name: plexi-erp-app
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://plexi_user:plexi_secure_pass@postgres:5432/plexi_erp?schema=public
+      - NEXTAUTH_URL=http://localhost:3000
+      - NEXTAUTH_SECRET=plexi_production_jwt_secret_change_in_production
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: plexi-erp-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: plexi_user
+      POSTGRES_PASSWORD: plexi_secure_pass
+      POSTGRES_DB: plexi_erp
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U plexi_user -d plexi_erp"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
