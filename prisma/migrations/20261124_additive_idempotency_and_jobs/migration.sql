@@ -4,7 +4,7 @@
 CREATE TABLE IF NOT EXISTS "IdempotencyRecord" (
     "id" TEXT NOT NULL,
     "key" TEXT NOT NULL,
-    "userId" TEXT,
+    "userId" TEXT NOT NULL DEFAULT 'ANONYMOUS',
     "endpoint" TEXT NOT NULL,
     "method" TEXT NOT NULL DEFAULT 'POST',
     "requestHash" TEXT NOT NULL,
@@ -17,8 +17,8 @@ CREATE TABLE IF NOT EXISTS "IdempotencyRecord" (
     CONSTRAINT "IdempotencyRecord_pkey" PRIMARY KEY ("id")
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS "IdempotencyRecord_key_userId_endpoint_key" 
-ON "IdempotencyRecord"("key", "userId", "endpoint");
+CREATE UNIQUE INDEX IF NOT EXISTS "IdempotencyRecord_key_userId_endpoint_method_key" 
+ON "IdempotencyRecord"("key", "userId", "endpoint", "method");
 
 CREATE INDEX IF NOT EXISTS "IdempotencyRecord_expiresAt_idx" 
 ON "IdempotencyRecord"("expiresAt");
