@@ -9,7 +9,7 @@ import {
 const DEFAULT_TIMEWATCH_URL =
   process.env.TIMEWATCH_API_URL || "http://192.168.1.66:8001/TimeWatchAPI";
 const DEFAULT_TIMEWATCH_KEY =
-  process.env.TIMEWATCH_API_KEY || "T!meW@tch#123@";
+  process.env.TIMEWATCH_API_KEY || "";
 
 /**
  * Normalizes different date string variations into standard UTC Date objects.
@@ -101,7 +101,17 @@ export class TimeWatchClient {
       // Unreachable (e.g. factory LAN not routed to current environment)
     }
 
-    // Fallback to factory realistic simulator
+    // Do NOT return fake/mock punches as genuine attendance data in production
+    if (process.env.NODE_ENV !== "test" && process.env.ENABLE_BIOMETRIC_SIMULATOR !== "true") {
+      return {
+        success: false,
+        data: [],
+        isMock: false,
+        message: "TimeWatch live device offline or unreachable. Live sync paused.",
+      };
+    }
+
+    // Fallback to factory realistic simulator for explicit isolated test environments
     const mockPunches = this.getFactoryMockPunches(params.fromDate, params.toDate);
     return {
       success: true,

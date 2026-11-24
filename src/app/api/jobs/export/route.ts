@@ -1,9 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireApiAuth } from "@/lib/api-auth";
+import { requireApiAuth, isSuperAdminRole } from "@/lib/api-auth";
 import { apiError, apiSuccess } from "@/lib/api-response";
 import { taskQueue } from "@/lib/queue/task-queue";
 import { withIdempotency } from "@/lib/idempotency";
 import { rateLimiters, applyRateLimitHeaders } from "@/lib/rate-limit";
+import { Module } from "@/generated/prisma";
+
+const ALLOWED_EXPORT_TYPES: Record<string, Module> = {
+  EXPORT_AUDIT_LOGS: Module.SETTINGS,
+  EXPORT_ATTENDANCE: Module.HR,
+  EXPORT_PRODUCTION_SUMMARY: Module.PRODUCTION,
+  EXPORT_INVENTORY_STOCK: Module.INVENTORY,
+  EXPORT_GATE_REGISTRY: Module.SECURITY_GATE,
+};
 
 export async function POST(request: NextRequest) {
   const rateLimitRes = await rateLimiters.mutation(request);
@@ -18,7 +27,22 @@ export async function POST(request: NextRequest) {
   return withIdempotency(request, async () => {
     try {
       const body = await request.json().catch(() => ({}));
-      const exportType = body.type || "EXPORT_AUDIT_LOGS";
+      const exportType = (body.type || "EXPORT_AUDIT_LOGS") as string;
+
+      // Allowlist validation (ERP-029)
+      const targetModule = ALLOWED_EXPORT_TYPES[exportType];
+      if (!targetModule) {
+        return applyRateLimitHeaders(apiError(`Invalid export type: ${exportType}`, 400), rateLimitRes);
+      }
+
+      // Check module export permissions
+      if (!isSuperAdminRole(auth.user.role)) {
+        const permissions = (auth.user.permissions as Array<{ module: string; canRead?: boolean }>) || [];
+        const hasAccess = permissions.some((p) => (p.module === targetModule || p.module === "ALL") && Boolean(p.canRead));
+        if (!hasAccess) {
+          return applyRateLimitHeaders(apiError(`Forbidden: Insufficient permissions for ${targetModule} export`, 403), rateLimitRes);
+        }
+      }
 
       const job = await taskQueue.enqueue(
         exportType,

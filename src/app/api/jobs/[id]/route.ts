@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireApiAuth } from "@/lib/api-auth";
+import { requireApiAuth, isSuperAdminRole } from "@/lib/api-auth";
 import { apiError, apiSuccess } from "@/lib/api-response";
 import { taskQueue } from "@/lib/queue/task-queue";
 import { rateLimiters, applyRateLimitHeaders } from "@/lib/rate-limit";
@@ -23,6 +23,12 @@ export async function GET(
 
     if (!job) {
       const errorResponse = apiError("Job not found", 404);
+      return applyRateLimitHeaders(errorResponse, rateLimitRes);
+    }
+
+    // Enforce job ownership & authorized access (ERP-030)
+    if (job.createdById && job.createdById !== auth.user.id && !isSuperAdminRole(auth.user.role)) {
+      const errorResponse = apiError("Forbidden: Cannot view another user's export job", 403);
       return applyRateLimitHeaders(errorResponse, rateLimitRes);
     }
 

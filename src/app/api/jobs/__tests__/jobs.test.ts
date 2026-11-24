@@ -7,6 +7,7 @@ import { requireApiAuth } from "@/lib/api-auth";
 
 vi.mock("@/lib/api-auth", () => ({
   requireApiAuth: vi.fn(),
+  isSuperAdminRole: vi.fn().mockReturnValue(true),
 }));
 
 describe("Background Jobs API (/api/jobs)", () => {
@@ -14,8 +15,8 @@ describe("Background Jobs API (/api/jobs)", () => {
     taskQueue.clear();
     vi.mocked(requireApiAuth).mockResolvedValue({
       ok: true,
-      session: { user: { id: "user-test-admin" } } as any,
-      user: { id: "user-test-admin" } as any,
+      session: { user: { id: "user-test-admin", role: "Super Admin" } } as any,
+      user: { id: "user-test-admin", role: "Super Admin" } as any,
     });
   });
 
