@@ -26,7 +26,7 @@
     "@base-ui/react": "^1.7.0",
     "@ducanh2912/next-pwa": "^10.2.9",
     "@neondatabase/serverless": "^1.1.0",
-    "@prisma/adapter-neon": "^7.10.0",
+    "@prisma/adapter-neon": "^7.10.1",
     "@prisma/adapter-pg": "^7.10.0",
     "@prisma/client": "^7.10.0",
     "@scalar/api-reference-react": "^0.9.66",
