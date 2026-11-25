@@ -79,7 +79,7 @@
     "tailwindcss": "^4",
     "typescript": "^5.2.2",
     "vitest": "^4.1.11",
-    "vitest-mock-extended": "^5.1.1"
+    "vitest-mock-extended": "^6.0.1"
   },
   "overrides": {
     "fast-uri": "3.1.7",
