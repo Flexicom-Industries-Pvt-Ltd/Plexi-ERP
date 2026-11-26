@@ -2,17 +2,17 @@ import { Suspense } from "react";
 import { requirePermission } from "@/lib/permissions";
 import { Module } from "@/generated/prisma";
 import { Metadata } from "next";
-import { RecyclingPlantWorkspace } from "@/components/recycling/RecyclingPlantWorkspace";
+import { WastageCollectionSheet } from "@/components/recycling/WastageCollectionSheet";
 
 export const metadata: Metadata = {
-  title: "Recycling Plant (RP) | Flexicom ERP",
+  title: "Wastage Collection Report | Recycling Plant | Flexicom ERP",
   description:
-    "Digital Wastage Collection Report and R.P. Plant Production Report with shift-dynamic stock reconciliation",
+    "Digital Wastage Collection Report with dynamic shifts, bobbin cleaning, segregation and note reconciliation",
 };
 
 export const dynamic = "force-dynamic";
 
-export default async function RecyclingPlantPage() {
+export default async function RecyclingWastageCollectionPage() {
   try {
     await requirePermission(Module.RECYCLING_PLANT, "canRead");
   } catch {
@@ -23,11 +23,11 @@ export default async function RecyclingPlantPage() {
     <Suspense
       fallback={
         <div className="p-8 text-center text-slate-400">
-          Loading Recycling Plant workspace...
+          Loading Wastage Collection Report...
         </div>
       }
     >
-      <RecyclingPlantWorkspace />
+      <WastageCollectionSheet />
     </Suspense>
   );
 }

@@ -18,13 +18,25 @@ const NO_STORE_HEADERS = {
   Expires: "0",
 };
 
+function isMissingTableError(error: unknown): boolean {
+  const err = error as { code?: string; message?: string };
+  return (
+    err?.code === "P2021" ||
+    Boolean(err?.message && err.message.includes("does not exist"))
+  );
+}
+
 async function getActiveShiftNames(): Promise<string[]> {
-  const shifts = await db.shift.findMany({
-    where: { isActive: true },
-    orderBy: { startTime: "asc" },
-    select: { name: true },
-  });
-  return shifts.length > 0 ? shifts.map((s) => s.name) : ["Day Shift", "Night Shift"];
+  try {
+    const shifts = await db.shift.findMany({
+      where: { isActive: true },
+      orderBy: { startTime: "asc" },
+      select: { name: true },
+    });
+    return shifts.length > 0 ? shifts.map((s) => s.name) : ["Day Shift", "Night Shift"];
+  } catch {
+    return ["Day Shift", "Night Shift"];
+  }
 }
 
 export async function GET(request: NextRequest) {
@@ -185,6 +197,26 @@ export async function GET(request: NextRequest) {
       { headers: NO_STORE_HEADERS }
     );
   } catch (error: any) {
+    if (isMissingTableError(error)) {
+      const activeShifts = await getActiveShiftNames();
+      if (date) {
+        return NextResponse.json(
+          {
+            success: true,
+            exists: false,
+            migrationPending: true,
+            activeShifts,
+            prevMonthReport: null,
+            report: createDefaultWastageReport(date, activeShifts, 1),
+          },
+          { headers: NO_STORE_HEADERS }
+        );
+      }
+      return NextResponse.json(
+        { success: true, migrationPending: true, reports: [], activeShifts },
+        { headers: NO_STORE_HEADERS }
+      );
+    }
     console.error("Error fetching RP wastage collection report:", error);
     return NextResponse.json(
       { error: "Failed to fetch RP wastage collection report" },
@@ -296,6 +328,15 @@ export async function POST(request: NextRequest) {
       message: "Wastage Collection Report saved successfully",
     });
   } catch (error: any) {
+    if (isMissingTableError(error)) {
+      return NextResponse.json(
+        {
+          error:
+            "RP Wastage table is not migrated yet. Run 'npx prisma migrate deploy' on the database.",
+        },
+        { status: 503 }
+      );
+    }
     console.error("Error saving RP wastage collection report:", error);
     return NextResponse.json(
       { error: "Failed to save Wastage Collection Report", details: error.message },
