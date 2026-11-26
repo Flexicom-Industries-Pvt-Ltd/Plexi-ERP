@@ -15,7 +15,11 @@ import {
   computeQualityRollSummary,
 } from "@/lib/loom/loom-roll-cutting-types";
 import { exportLoomRollCuttingExcel } from "@/lib/loom/loom-roll-cutting-export";
-import { printLoomRollCutting } from "@/lib/loom/print-loom-roll-cutting";
+import {
+  generateLoomRollCuttingHtml,
+  printLoomRollCutting,
+} from "@/lib/loom/print-loom-roll-cutting";
+import { WhatsAppShareButton } from "@/components/shared/WhatsAppShareButton";
 
 interface LoomRollCuttingPrintModalProps {
   open: boolean;
@@ -99,6 +103,14 @@ export function LoomRollCuttingPrintModal({
           </div>
 
           <div className="flex items-center gap-2">
+            <WhatsAppShareButton
+              getHtml={() =>
+                generateLoomRollCuttingHtml({ report, entries, kpis })
+              }
+              fileName={docRef}
+              title={`Loom Roll Cutting Report (${report.date})`}
+              message={`Loom Roll Cutting Report — ${report.date} • ${report.shiftName} • ${entries.length} Roll(s) (Ref: ${docRef})`}
+            />
             <button
               onClick={handleExportExcel}
               className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition-all inline-flex items-center gap-1.5 shadow-sm cursor-pointer"

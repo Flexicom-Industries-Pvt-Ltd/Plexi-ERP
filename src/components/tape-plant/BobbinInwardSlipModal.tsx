@@ -2,7 +2,12 @@
 
 import React from "react";
 import { X, Printer, FileText } from "lucide-react";
-import { BobbinInwardSlipData, printBobbinInwardSlip } from "@/lib/tape-plant/print-bobbin-inward-slip";
+import {
+  BobbinInwardSlipData,
+  generateBobbinInwardSlipHtml,
+  printBobbinInwardSlip,
+} from "@/lib/tape-plant/print-bobbin-inward-slip";
+import { WhatsAppShareButton } from "@/components/shared/WhatsAppShareButton";
 
 interface BobbinInwardSlipModalProps {
   open: boolean;
@@ -41,6 +46,12 @@ export function BobbinInwardSlipModal({ open, onClose, data }: BobbinInwardSlipM
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <WhatsAppShareButton
+              getHtml={() => generateBobbinInwardSlipHtml(data)}
+              fileName={`TP-INW-${data.referenceNo}`}
+              title={`Bobbin Inward Slip (${data.referenceNo})`}
+              message={`Tape Plant Bobbin Inward Slip ${data.referenceNo} — ${data.recipeQuality} • Net: ${data.netKg.toFixed(2)} kg`}
+            />
             <button
               type="button"
               onClick={handlePrint}

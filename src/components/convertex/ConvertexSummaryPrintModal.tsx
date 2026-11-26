@@ -2,7 +2,11 @@
 
 import React from "react";
 import { ConvertexSummaryResult } from "@/lib/convertex/convertex-types";
-import { printConvertexSummaryReport } from "@/lib/convertex/print-convertex-summary";
+import {
+  generateConvertexSummaryHtml,
+  printConvertexSummaryReport,
+} from "@/lib/convertex/print-convertex-summary";
+import { WhatsAppShareButton } from "@/components/shared/WhatsAppShareButton";
 import { exportConvertexSummaryExcel } from "@/lib/convertex/convertex-export";
 import { FileText, Printer, FileSpreadsheet, X } from "lucide-react";
 
@@ -60,6 +64,12 @@ export function ConvertexSummaryPrintModal({
           </div>
 
           <div className="flex items-center gap-2">
+            <WhatsAppShareButton
+              getHtml={() => generateConvertexSummaryHtml(data, dateRange)}
+              fileName={`CVX-SUMMARY-${periodText}`}
+              title={`Convertex Executive Summary (${periodText})`}
+              message={`Convertex Production & Wastage Executive Summary (${periodText})`}
+            />
             <button
               onClick={() => exportConvertexSummaryExcel(data, dateRange)}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition-colors shadow-xs"

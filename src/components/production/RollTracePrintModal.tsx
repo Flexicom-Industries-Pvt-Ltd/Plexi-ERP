@@ -3,7 +3,11 @@
 import React from "react";
 import { FileText, Printer, X, CheckCircle2, Clock } from "lucide-react";
 import { RollTraceResult } from "@/lib/production/roll-trace";
-import { printRollTrace } from "@/lib/production/print-roll-trace";
+import {
+  generateRollTraceHtml,
+  printRollTrace,
+} from "@/lib/production/print-roll-trace";
+import { WhatsAppShareButton } from "@/components/shared/WhatsAppShareButton";
 
 interface RollTracePrintModalProps {
   open: boolean;
@@ -63,6 +67,12 @@ export function RollTracePrintModal({
           </div>
 
           <div className="flex items-center gap-2">
+            <WhatsAppShareButton
+              getHtml={() => generateRollTraceHtml(data)}
+              fileName={docRef}
+              title={`Roll Process Traveler #${rollNumber}`}
+              message={`Roll Process Traveler #${rollNumber} — Stage: ${data.currentStageLabel} (Ref: ${docRef})`}
+            />
             <button
               onClick={handlePrint}
               className="px-4 py-1.5 text-xs font-bold rounded-lg bg-white hover:bg-slate-100 text-slate-900 transition-all inline-flex items-center gap-1.5 shadow-sm cursor-pointer"

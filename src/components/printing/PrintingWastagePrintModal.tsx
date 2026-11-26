@@ -2,7 +2,11 @@
 
 import React from "react";
 import { PrintingWastageReportData, calculatePrintingWastage } from "@/lib/printing/printing-types";
-import { printPrintingWastageReport } from "@/lib/printing/print-printing-wastage";
+import {
+  generatePrintingWastageHtml,
+  printPrintingWastageReport,
+} from "@/lib/printing/print-printing-wastage";
+import { WhatsAppShareButton } from "@/components/shared/WhatsAppShareButton";
 import { FileText, Printer, X } from "lucide-react";
 
 interface PrintingWastagePrintModalProps {
@@ -80,6 +84,12 @@ export function PrintingWastagePrintModal({
           </div>
 
           <div className="flex items-center gap-2">
+            <WhatsAppShareButton
+              getHtml={() => generatePrintingWastageHtml(data)}
+              fileName={docRef}
+              title={`Printing Wastage Report (${data.date})`}
+              message={`Printing Wastage Report — ${data.date} • ${data.shiftName} • ${calc.totalWastageKg.toFixed(2)} Kg (Ref: ${docRef})`}
+            />
             <button
               onClick={handlePrint}
               className="px-4 py-1.5 text-xs font-bold rounded-lg bg-white hover:bg-slate-100 text-slate-900 transition-all inline-flex items-center gap-1.5 shadow-sm cursor-pointer"
