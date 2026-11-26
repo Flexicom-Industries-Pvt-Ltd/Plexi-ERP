@@ -435,35 +435,37 @@ export interface RpProductionReportData {
   remarks: string;
 }
 
-export const DEFAULT_RP_PARTICULARS: Array<{
-  id: string;
-  particular: string;
-  color: string;
-  isLumpsOnly?: boolean;
-}> = [
-  { id: "rp-1", particular: "PP", color: "MIX" },
-  { id: "rp-2", particular: "PP", color: "YELLOW" },
-  { id: "rp-3", particular: "PP", color: "WHITE" },
-  { id: "rp-4", particular: "PP", color: "GREEN" },
-  { id: "rp-5", particular: "PP", color: "BLUE" },
-  { id: "rp-6", particular: "PP", color: "ORANGE" },
-  { id: "rp-7", particular: "PP", color: "LUMS", isLumpsOnly: true },
-  { id: "rp-8", particular: "PP", color: "LD" },
-  { id: "rp-9", particular: "ULTRA Y BAG", color: "BROWN" },
-  { id: "rp-10", particular: "ULTRA WEATHER +", color: "GRENEESE" },
-  { id: "rp-11", particular: "BAG MIX", color: "GRENEESE" },
-  { id: "rp-12", particular: "AMBUJA BAG", color: "GREENEES" },
-  { id: "rp-13", particular: "ACC BAG", color: "BROWN" },
-  { id: "rp-14", particular: "POLYSURE BAG", color: "OFF WHITE" },
-  { id: "rp-15", particular: "PATTI MIX", color: "RED" },
-  { id: "rp-16", particular: "LUMS MIX", color: "40/60" },
-  { id: "rp-17", particular: "RED PP", color: "" },
-  { id: "rp-18", particular: "PATTI MIX", color: "" },
-  { id: "rp-19", particular: "TAPE MIX", color: "" },
-  { id: "rp-20", particular: "HD WHITE", color: "" },
-  { id: "rp-21", particular: "HD MIX", color: "" },
-  { id: "rp-22", particular: "DRL", color: "" },
-];
+export const DEFAULT_RP_BLANK_ROW_COUNT = 5;
+
+export function createBlankRpRow(
+  seq: number,
+  shiftNames: string[],
+  id?: string
+): RpProductionRow {
+  const emptyShifts: Record<string, number> = Object.fromEntries(
+    shiftNames.map((s) => [s, 0])
+  );
+  return {
+    id: id || `rp-row-${seq}-${Date.now()}`,
+    seq,
+    particular: "",
+    color: "",
+    isLumpsOnly: false,
+    isCustom: true,
+    openingStock: 0,
+    productionShifts: emptyShifts,
+    productionTotal: 0,
+    productionMtd: 0,
+    issuedToTapePlant: 0,
+    issuedToTapePlantMtd: 0,
+    lumpsOnDate: 0,
+    lumpsMtd: 0,
+    dispatchOnDate: 0,
+    dispatchMtd: 0,
+    closingStock: 0,
+    remarks: "",
+  };
+}
 
 export function createDefaultRpProductionReport(
   date: string,
@@ -478,54 +480,47 @@ export function createDefaultRpProductionReport(
     Boolean(previousDayReport?.date) &&
     previousDayReport!.date.slice(0, 7) === date.slice(0, 7);
 
-  const sourceRows =
-    previousDayReport && Array.isArray(previousDayReport.rows) && previousDayReport.rows.length > 0
-      ? previousDayReport.rows
-      : DEFAULT_RP_PARTICULARS.map((p, idx) => ({
-          id: p.id,
-          seq: idx + 1,
-          particular: p.particular,
-          color: p.color,
-          isLumpsOnly: Boolean(p.isLumpsOnly),
-          isCustom: false,
-          openingStock: 0,
-          productionShifts: emptyShifts(),
-          productionTotal: 0,
-          productionMtd: 0,
-          issuedToTapePlant: 0,
-          issuedToTapePlantMtd: 0,
-          lumpsOnDate: 0,
-          lumpsMtd: 0,
-          dispatchOnDate: 0,
-          dispatchMtd: 0,
-          closingStock: 0,
-          remarks: "",
-        }));
+  const prevNonEmptyRows =
+    previousDayReport && Array.isArray(previousDayReport.rows)
+      ? previousDayReport.rows.filter(
+          (r) =>
+            (r.particular && r.particular.trim() !== "") ||
+            (r.color && r.color.trim() !== "") ||
+            safeNum(r.closingStock) !== 0
+        )
+      : [];
 
-  const rows: RpProductionRow[] = sourceRows.map((prev, idx) => {
-    const isLumpsOnly = Boolean(prev.isLumpsOnly);
-    const openingStock = isLumpsOnly ? 0 : round2(safeNum(prev.closingStock));
-    return {
-      id: prev.id || `rp-row-${idx + 1}`,
-      seq: idx + 1,
-      particular: prev.particular,
-      color: prev.color || "",
-      isLumpsOnly,
-      isCustom: Boolean(prev.isCustom),
-      openingStock,
-      productionShifts: emptyShifts(),
-      productionTotal: 0,
-      productionMtd: sameMonthAsPrev ? round2(safeNum(prev.productionMtd)) : 0,
-      issuedToTapePlant: 0,
-      issuedToTapePlantMtd: sameMonthAsPrev ? round2(safeNum(prev.issuedToTapePlantMtd)) : 0,
-      lumpsOnDate: 0,
-      lumpsMtd: sameMonthAsPrev ? round2(safeNum(prev.lumpsMtd)) : 0,
-      dispatchOnDate: 0,
-      dispatchMtd: sameMonthAsPrev ? round2(safeNum(prev.dispatchMtd)) : 0,
-      closingStock: openingStock,
-      remarks: "",
-    };
-  });
+  const rows: RpProductionRow[] =
+    prevNonEmptyRows.length > 0
+      ? prevNonEmptyRows.map((prev, idx) => {
+          const isLumpsOnly = Boolean(prev.isLumpsOnly);
+          const openingStock = isLumpsOnly ? 0 : round2(safeNum(prev.closingStock));
+          return {
+            id: prev.id || `rp-row-${idx + 1}`,
+            seq: idx + 1,
+            particular: prev.particular || "",
+            color: prev.color || "",
+            isLumpsOnly,
+            isCustom: prev.isCustom !== undefined ? Boolean(prev.isCustom) : true,
+            openingStock,
+            productionShifts: emptyShifts(),
+            productionTotal: 0,
+            productionMtd: sameMonthAsPrev ? round2(safeNum(prev.productionMtd)) : 0,
+            issuedToTapePlant: 0,
+            issuedToTapePlantMtd: sameMonthAsPrev
+              ? round2(safeNum(prev.issuedToTapePlantMtd))
+              : 0,
+            lumpsOnDate: 0,
+            lumpsMtd: sameMonthAsPrev ? round2(safeNum(prev.lumpsMtd)) : 0,
+            dispatchOnDate: 0,
+            dispatchMtd: sameMonthAsPrev ? round2(safeNum(prev.dispatchMtd)) : 0,
+            closingStock: openingStock,
+            remarks: "",
+          };
+        })
+      : Array.from({ length: DEFAULT_RP_BLANK_ROW_COUNT }, (_, idx) =>
+          createBlankRpRow(idx + 1, shiftNames, `rp-row-${idx + 1}`)
+        );
 
   return recalculateRpProductionReport(
     {
