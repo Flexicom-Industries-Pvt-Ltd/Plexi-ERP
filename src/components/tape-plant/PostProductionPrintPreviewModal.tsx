@@ -14,9 +14,11 @@ import {
 } from "lucide-react";
 import { RecipePostProductionEntry } from "./PostProductionSection";
 import {
+  generatePostProductionSheetHtml,
   printTapePlantPostProductionSheet,
   PostProductionPrintData,
 } from "@/lib/tape-plant/print-post-production-sheet";
+import { WhatsAppShareButton } from "@/components/shared/WhatsAppShareButton";
 import { exportTapePlantPostProductionExcel } from "@/lib/tape-plant/post-production-export";
 import { toast } from "sonner";
 
@@ -113,6 +115,12 @@ export function PostProductionPrintPreviewModal({
           </div>
 
           <div className="flex items-center gap-2">
+            <WhatsAppShareButton
+              getHtml={() => generatePostProductionSheetHtml(printData)}
+              fileName={docRef}
+              title={`Tape Plant Post Production Report (${date})`}
+              message={`Tape Plant Post Production — ${date} • ${shiftName} • Eff: ${overallEfficiency}% (Ref: ${docRef})`}
+            />
             <button
               onClick={handleExportExcel}
               className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition-all inline-flex items-center gap-1.5 shadow-sm cursor-pointer"

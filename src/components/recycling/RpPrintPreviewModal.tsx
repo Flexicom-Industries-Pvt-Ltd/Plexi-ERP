@@ -15,6 +15,7 @@ import {
   generateWastageCollectionHtml,
   openPrintWindow,
 } from "@/lib/recycling/print-rp-reports";
+import { WhatsAppShareButton } from "@/components/shared/WhatsAppShareButton";
 
 type RpPrintPreviewModalProps =
   | {
@@ -112,6 +113,24 @@ export function RpPrintPreviewModal(props: RpPrintPreviewModalProps) {
           </div>
 
           <div className="flex items-center gap-2">
+            <WhatsAppShareButton
+              getHtml={() =>
+                mode === "wastage"
+                  ? generateWastageCollectionHtml(reportData)
+                  : generateRpProductionHtml(reportData)
+              }
+              fileName={docRef}
+              title={
+                mode === "wastage"
+                  ? `Wastage Collection Report (${reportData.date})`
+                  : `R.P. Plant Production Report (${reportData.date})`
+              }
+              message={
+                mode === "wastage"
+                  ? `Wastage Collection Report (${reportData.date}, Sl. ${serial}) — Total: ${reportData.grandTotalKg.toFixed(1)} Kg`
+                  : `R.P. Plant Production Report (${reportData.date}, Sr. ${serial}) — Closing Stock: ${reportData.totalClosingStock.toLocaleString()} Kg`
+              }
+            />
             <button
               type="button"
               onClick={handleExcel}

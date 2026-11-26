@@ -2,7 +2,12 @@
 
 import React from "react";
 import { X, Printer, FileText } from "lucide-react";
-import { BobbinIssueSlipData, printBobbinIssueSlip } from "@/lib/tape-plant/print-bobbin-issue-slip";
+import {
+  BobbinIssueSlipData,
+  generateBobbinIssueSlipHtml,
+  printBobbinIssueSlip,
+} from "@/lib/tape-plant/print-bobbin-issue-slip";
+import { WhatsAppShareButton } from "@/components/shared/WhatsAppShareButton";
 
 interface BobbinIssueSlipModalProps {
   open: boolean;
@@ -44,6 +49,12 @@ export function BobbinIssueSlipModal({ open, onClose, data, slipData }: BobbinIs
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <WhatsAppShareButton
+              getHtml={() => generateBobbinIssueSlipHtml(activeData)}
+              fileName={`TP-ISS-${activeData.slipNumber}`}
+              title={`Bobbin Issue Slip (${activeData.slipNumber})`}
+              message={`Bobbin Issue Slip ${activeData.slipNumber} -> ${targetLoom} • ${activeData.weightKg.toFixed(2)} kg`}
+            />
             <button
               type="button"
               onClick={handlePrint}

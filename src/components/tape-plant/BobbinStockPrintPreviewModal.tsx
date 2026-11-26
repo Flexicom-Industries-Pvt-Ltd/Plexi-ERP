@@ -18,8 +18,10 @@ import {
   CRATE_WEIGHT_KG,
   BOBBINS_PER_CRATE,
   exportBobbinStockExcel,
+  generateBobbinStockSheetHtml,
   printBobbinStockSummary,
 } from "@/lib/tape-plant/bobbin-stock";
+import { WhatsAppShareButton } from "@/components/shared/WhatsAppShareButton";
 
 interface BobbinStockPrintPreviewModalProps {
   open: boolean;
@@ -101,6 +103,19 @@ export function BobbinStockPrintPreviewModal({
           </div>
 
           <div className="flex items-center gap-2">
+            <WhatsAppShareButton
+              getHtml={() =>
+                generateBobbinStockSheetHtml({
+                  dateDescription,
+                  shiftDescription,
+                  items,
+                  totals,
+                })
+              }
+              fileName={docRef}
+              title={`Bobbin & Crate Stock Summary (${docDate})`}
+              message={`Bobbin Stock Summary — ${dateDescription} • ${shiftDescription} (Ref: ${docRef})`}
+            />
             <button
               type="button"
               onClick={handleExportExcel}
