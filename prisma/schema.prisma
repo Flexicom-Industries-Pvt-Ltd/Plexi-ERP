@@ -2925,7 +2925,6 @@ model BackgroundJobRecord {
   @@index([status])
   @@index([createdById])
 }
-<<<<<<< HEAD
 
 // ==========================================
 // Phase 5: Recycling Plant (RP) Daily Reports
@@ -2979,5 +2978,3 @@ model RpProductionReport {
   @@index([status])
   @@index([serialNo])
 }
-=======
->>>>>>> origin/staging
