@@ -5,7 +5,11 @@ import {
   PrintingRawMaterialReportData,
   computePrintingRawMaterialTotals,
 } from "@/lib/printing/printing-types";
-import { printPrintingRawMaterialReport } from "@/lib/printing/print-printing-raw-materials";
+import {
+  generatePrintingRawMaterialHtml,
+  printPrintingRawMaterialReport,
+} from "@/lib/printing/print-printing-raw-materials";
+import { WhatsAppShareButton } from "@/components/shared/WhatsAppShareButton";
 import { FileText, Printer, X } from "lucide-react";
 
 interface PrintingRawMaterialPrintModalProps {
@@ -72,6 +76,12 @@ export function PrintingRawMaterialPrintModal({
           </div>
 
           <div className="flex items-center gap-2">
+            <WhatsAppShareButton
+              getHtml={() => generatePrintingRawMaterialHtml(data)}
+              fileName={docRef}
+              title={`Printing Raw Material Report (${data.date})`}
+              message={`Printing Raw Material Consumption — ${data.date} • ${data.shiftName} • ${totals.totalConsumedKg.toFixed(2)} Kg (Ref: ${docRef})`}
+            />
             <button
               onClick={handlePrint}
               className="px-4 py-1.5 text-xs font-bold rounded-lg bg-white hover:bg-slate-100 text-slate-900 transition-all inline-flex items-center gap-1.5 shadow-sm cursor-pointer"

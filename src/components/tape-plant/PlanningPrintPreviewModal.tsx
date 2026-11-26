@@ -12,7 +12,11 @@ import {
 } from "lucide-react";
 import { RecipePlanItem } from "./TapePlantPlanningSection";
 import { generateTapePlantPlanningExcel } from "@/lib/tape-plant/planning-export";
-import { printTapePlantPlanningSheet } from "@/lib/tape-plant/print-planning-sheet";
+import {
+  generatePlanningSheetHtml,
+  printTapePlantPlanningSheet,
+} from "@/lib/tape-plant/print-planning-sheet";
+import { WhatsAppShareButton } from "@/components/shared/WhatsAppShareButton";
 
 interface PlanningPrintPreviewModalProps {
   open: boolean;
@@ -171,6 +175,14 @@ export function PlanningPrintPreviewModal({
           </div>
 
           <div className="flex items-center gap-2">
+            <WhatsAppShareButton
+              getHtml={() =>
+                generatePlanningSheetHtml({ date, shiftName, status, plans })
+              }
+              fileName={docRef}
+              title={`Tape Plant Shift Plan (${date})`}
+              message={`Tape Plant Shift Plan — ${date} • ${shiftName} • ${plans.length} Recipe(s) (Ref: ${docRef})`}
+            />
             <button
               type="button"
               onClick={handleExportExcel}

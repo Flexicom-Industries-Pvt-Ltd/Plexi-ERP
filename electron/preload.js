@@ -33,6 +33,11 @@ contextBridge.exposeInMainWorld("electron", {
     ipcRenderer.on("update-status-change", subscription);
     return () => ipcRenderer.removeListener("update-status-change", subscription);
   },
+
+  // Vector PDF export & external WhatsApp handoff
+  generatePdfFromHtml: (html, fileName) =>
+    ipcRenderer.invoke("generate-pdf-from-html", { html, fileName }),
+  openWhatsAppUrl: (url) => ipcRenderer.invoke("open-whatsapp-url", url),
 });
 
 // Immediately inject desktop titlebar CSS variable into DOM

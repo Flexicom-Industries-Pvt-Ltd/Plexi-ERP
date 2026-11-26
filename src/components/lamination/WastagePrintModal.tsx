@@ -2,7 +2,11 @@
 
 import React from "react";
 import { LaminationWastageReportData } from "@/lib/lamination/lamination-wastage-types";
-import { printWastageReport } from "@/lib/lamination/print-wastage-report";
+import {
+  generateWastageReportHtml,
+  printWastageReport,
+} from "@/lib/lamination/print-wastage-report";
+import { WhatsAppShareButton } from "@/components/shared/WhatsAppShareButton";
 import { exportWastageReportExcel } from "@/lib/lamination/wastage-export";
 import { FileText, Printer, FileSpreadsheet, X } from "lucide-react";
 
@@ -53,11 +57,10 @@ export function WastagePrintModal({
                   Daily Lamination Wastage Report Preview
                 </h2>
                 <span
-                  className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-sm border ${
-                    reportData.status === "SUBMITTED" || reportData.status === "APPROVED"
+                  className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-sm border ${reportData.status === "SUBMITTED" || reportData.status === "APPROVED"
                       ? "bg-emerald-900/40 text-emerald-300 border-emerald-500/40"
                       : "bg-amber-900/40 text-amber-300 border-amber-500/40"
-                  }`}
+                    }`}
                 >
                   {reportData.status || "DRAFT"}
                 </span>
@@ -69,6 +72,12 @@ export function WastagePrintModal({
           </div>
 
           <div className="flex items-center gap-2">
+            <WhatsAppShareButton
+              getHtml={() => generateWastageReportHtml(reportData)}
+              fileName={docRef}
+              title={`Lamination Wastage Report (${reportData.date})`}
+              message={`Lamination Wastage Report — ${reportData.date} • ${reportData.shiftName} • Total: ${reportData.totalWastageKg.toFixed(2)} Kg (Ref: ${docRef})`}
+            />
             <button
               onClick={handleExcelExport}
               className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition-all inline-flex items-center gap-1.5 shadow-sm cursor-pointer"

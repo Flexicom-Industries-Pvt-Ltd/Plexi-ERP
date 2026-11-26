@@ -2,7 +2,11 @@
 
 import React from "react";
 import { PrintingProductionSummaryResult } from "@/lib/printing/printing-types";
-import { printPrintingSummaryReport } from "@/lib/printing/print-printing-summary";
+import {
+  generatePrintingSummaryHtml,
+  printPrintingSummaryReport,
+} from "@/lib/printing/print-printing-summary";
+import { WhatsAppShareButton } from "@/components/shared/WhatsAppShareButton";
 import { FileText, Printer, X } from "lucide-react";
 
 interface PrintingSummaryPrintModalProps {
@@ -56,6 +60,12 @@ export function PrintingSummaryPrintModal({
           </div>
 
           <div className="flex items-center gap-2">
+            <WhatsAppShareButton
+              getHtml={() => generatePrintingSummaryHtml(data)}
+              fileName={`PRN-SUMMARY-${periodText}`}
+              title={`Printing Executive Summary (${periodText})`}
+              message={`Printing Production Summary (${periodText}) — ${data.overall.totalPrintMtrs.toLocaleString()} Metres`}
+            />
             <button
               onClick={handlePrint}
               className="px-4 py-1.5 text-xs font-bold rounded-lg bg-white hover:bg-slate-100 text-slate-900 transition-all inline-flex items-center gap-1.5 shadow-sm cursor-pointer"

@@ -2,7 +2,11 @@
 
 import React, { useMemo } from "react";
 import { ValvomaticDailyReportData, computeValvomaticTotals } from "@/lib/valvomatic/valvomatic-types";
-import { printValvomaticReport } from "@/lib/valvomatic/print-valvomatic-production";
+import {
+  generateValvomaticReportHtml,
+  printValvomaticReport,
+} from "@/lib/valvomatic/print-valvomatic-production";
+import { WhatsAppShareButton } from "@/components/shared/WhatsAppShareButton";
 import { exportValvomaticReportExcel } from "@/lib/valvomatic/valvomatic-export";
 import { FileText, Printer, FileSpreadsheet, X } from "lucide-react";
 
@@ -73,6 +77,12 @@ export function ValvomaticReportPrintModal({
           </div>
 
           <div className="flex items-center gap-2">
+            <WhatsAppShareButton
+              getHtml={() => generateValvomaticReportHtml(data)}
+              fileName={docRef}
+              title={`Valvomatic Production Report (${data.date})`}
+              message={`Valvomatic Production Report — ${data.date} • ${data.shiftName} • Machine ${data.machineNo} (Ref: ${docRef})`}
+            />
             <button
               onClick={handleExportExcel}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition-colors shadow-xs"

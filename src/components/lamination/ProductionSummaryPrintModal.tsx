@@ -1,7 +1,12 @@
 "use client";
 
 import React from "react";
-import { ProductionSummaryPrintData, printProductionSummary } from "@/lib/lamination/print-production-summary";
+import {
+  ProductionSummaryPrintData,
+  generateProductionSummaryHtml,
+  printProductionSummary,
+} from "@/lib/lamination/print-production-summary";
+import { WhatsAppShareButton } from "@/components/shared/WhatsAppShareButton";
 import { exportProductionSummaryExcel } from "@/lib/lamination/production-summary-export";
 import { FileText, Printer, FileSpreadsheet, X } from "lucide-react";
 
@@ -62,6 +67,12 @@ export function ProductionSummaryPrintModal({
           </div>
 
           <div className="flex items-center gap-2">
+            <WhatsAppShareButton
+              getHtml={() => generateProductionSummaryHtml(data)}
+              fileName={`LAM-SUMMARY-${filters.dateFrom}_${filters.dateTo}`}
+              title={`Lamination Production Summary (${filters.dateFrom} to ${filters.dateTo})`}
+              message={`Lamination Production Summary (${filters.dateFrom} to ${filters.dateTo}) — ${overall.totalRolls} Roll(s)`}
+            />
             <button
               onClick={handleExcelExport}
               className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition-all inline-flex items-center gap-1.5 shadow-sm cursor-pointer"

@@ -8,7 +8,12 @@ import {
   ShieldCheck,
   Building2,
 } from "lucide-react";
-import { printTransportSlip, GatePrintEntry } from "@/lib/gate/print-transport-slip";
+import {
+  generateTransportSlipHtml,
+  printTransportSlip,
+  GatePrintEntry,
+} from "@/lib/gate/print-transport-slip";
+import { WhatsAppShareButton } from "@/components/shared/WhatsAppShareButton";
 
 export interface TransportSlipModalProps {
   open: boolean;
@@ -130,6 +135,13 @@ export function TransportSlipModal({ open, onClose, entry }: TransportSlipModalP
           </div>
 
           <div className="flex items-center gap-2">
+            <WhatsAppShareButton
+              getHtml={() => generateTransportSlipHtml(entry)}
+              fileName={`GATE-${entry.entryNumber || "SLIP"}`}
+              title={`Transport Slip / Gate Pass #${entry.entryNumber}`}
+              message={`Gate Pass #${entry.entryNumber} — Truck: ${entry.truckNumber || "—"}`}
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg bg-[#25D366] hover:bg-[#1ebe5b] disabled:opacity-60 text-slate-950 transition-colors shadow-xs cursor-pointer"
+            />
             <button
               onClick={handlePrint}
               className="inline-flex items-center gap-1.5 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-lg shadow-xs active:scale-95 transition-all cursor-pointer"
