@@ -2925,3 +2925,56 @@ model BackgroundJobRecord {
   @@index([status])
   @@index([createdById])
 }
+
+// ==========================================
+// Phase 5: Recycling Plant (RP) Daily Reports
+// ==========================================
+
+model RpWastageCollectionReport {
+  id             String   @id @default(cuid())
+  serialNo       Int      @default(1)
+  date           String   @unique // YYYY-MM-DD
+  shiftNames     Json     @default("[]") // Active shifts from Shift Master e.g. ["Day Shift", "Night Shift"]
+  operatorName   String?
+  operatorId     String?
+  supervisorName String?
+  sections       Json     @default("[]") // 8 departmental sections with shift values and custom rows
+  marginBlocks   Json     @default("{}") // Bobbin Cleaning, Segregation, Old Bobbin Cutting, Note Box
+  summaryTotalKg Float    @default(0)
+  grandTotalKg   Float    @default(0)
+  status         String   @default("DRAFT") // DRAFT | SUBMITTED | APPROVED
+  remarks        String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([status])
+  @@index([serialNo])
+}
+
+model RpProductionReport {
+  id                         String   @id @default(cuid())
+  serialNo                   Int      @default(1)
+  date                       String   @unique // YYYY-MM-DD
+  shiftNames                 Json     @default("[]") // Active shifts from Shift Master
+  operatorName               String?
+  operatorId                 String?
+  supervisorName             String?
+  rows                       Json     @default("[]") // Material/Particular stock & production ledger rows
+  totalOpeningStock          Float    @default(0)
+  totalProductionOnDate      Float    @default(0)
+  totalProductionMtd         Float    @default(0)
+  totalIssuedToTapePlant     Float    @default(0)
+  totalIssuedToTapePlantMtd  Float    @default(0)
+  totalLumpsOnDate           Float    @default(0)
+  totalLumpsMtd              Float    @default(0)
+  totalDispatchOnDate        Float    @default(0)
+  totalDispatchMtd           Float    @default(0)
+  totalClosingStock          Float    @default(0)
+  status                     String   @default("DRAFT") // DRAFT | SUBMITTED | APPROVED
+  remarks                    String?
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
+
+  @@index([status])
+  @@index([serialNo])
+}
