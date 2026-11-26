@@ -10,9 +10,11 @@ import {
 } from "lucide-react";
 import { TemperatureReading } from "./ProcessTemperatureSection";
 import {
+  generateTemperatureSheetHtml,
   printTapePlantTemperatureSheet,
   TemperaturePrintData,
 } from "@/lib/tape-plant/print-temperature-sheet";
+import { WhatsAppShareButton } from "@/components/shared/WhatsAppShareButton";
 import { exportTapePlantTemperatureExcel } from "@/lib/tape-plant/temperature-export";
 import { toast } from "sonner";
 
@@ -157,6 +159,12 @@ export function TemperaturePrintPreviewModal({
           </div>
 
           <div className="flex items-center gap-2">
+            <WhatsAppShareButton
+              getHtml={() => generateTemperatureSheetHtml(printData)}
+              fileName={docRef}
+              title={`Tape Plant Process Temperature (${date})`}
+              message={`Tape Plant Process Temperature — ${date} • ${shiftName} (Ref: ${docRef})`}
+            />
             <button
               type="button"
               onClick={handleExportExcel}

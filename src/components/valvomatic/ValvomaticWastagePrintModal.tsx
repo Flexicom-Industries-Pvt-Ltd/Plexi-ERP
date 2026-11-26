@@ -5,7 +5,11 @@ import {
   ValvomaticWastageReportData,
   computeValvomaticWastageTotals,
 } from "@/lib/valvomatic/valvomatic-types";
-import { printValvomaticWastageReport } from "@/lib/valvomatic/print-valvomatic-wastage";
+import {
+  generateValvomaticWastageReportHtml,
+  printValvomaticWastageReport,
+} from "@/lib/valvomatic/print-valvomatic-wastage";
+import { WhatsAppShareButton } from "@/components/shared/WhatsAppShareButton";
 import { exportValvomaticWastageReportExcel } from "@/lib/valvomatic/valvomatic-export";
 import { FileText, Printer, FileSpreadsheet, X } from "lucide-react";
 
@@ -76,6 +80,12 @@ export function ValvomaticWastagePrintModal({
           </div>
 
           <div className="flex items-center gap-2">
+            <WhatsAppShareButton
+              getHtml={() => generateValvomaticWastageReportHtml(data)}
+              fileName={docRef}
+              title={`Valvomatic Wastage Report (${data.date})`}
+              message={`Valvomatic Wastage Report — ${data.date} • ${data.shiftName} • Machine ${data.machineNo} (Ref: ${docRef})`}
+            />
             <button
               onClick={() => exportValvomaticWastageReportExcel(data)}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition-colors shadow-xs"

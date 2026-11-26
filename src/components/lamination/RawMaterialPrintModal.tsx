@@ -2,7 +2,11 @@
 
 import React from "react";
 import { LaminationRawMaterialReportData } from "@/lib/lamination/lamination-raw-material-types";
-import { printRawMaterialReport } from "@/lib/lamination/print-raw-material-report";
+import {
+  generateRawMaterialReportHtml,
+  printRawMaterialReport,
+} from "@/lib/lamination/print-raw-material-report";
+import { WhatsAppShareButton } from "@/components/shared/WhatsAppShareButton";
 import { exportRawMaterialReportExcel } from "@/lib/lamination/raw-material-export";
 import { FileText, Printer, FileSpreadsheet, X } from "lucide-react";
 
@@ -76,6 +80,12 @@ export function RawMaterialPrintModal({
           </div>
 
           <div className="flex items-center gap-2">
+            <WhatsAppShareButton
+              getHtml={() => generateRawMaterialReportHtml(reportData)}
+              fileName={docRef}
+              title={`Lamination Raw Material Report (${reportData.date})`}
+              message={`Lamination Raw Material Consumption — ${reportData.date} • ${reportData.shiftName} (Ref: ${docRef})`}
+            />
             <button
               onClick={handleExcelExport}
               className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition-all inline-flex items-center gap-1.5 shadow-sm cursor-pointer"

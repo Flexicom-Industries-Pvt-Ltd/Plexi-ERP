@@ -9,9 +9,11 @@ import {
 } from "lucide-react";
 import { RawMaterialRow } from "./RawMaterialSection";
 import {
+  generateRawMaterialSheetHtml,
   printTapePlantRawMaterialSheet,
   RawMaterialPrintData,
 } from "@/lib/tape-plant/print-raw-material-sheet";
+import { WhatsAppShareButton } from "@/components/shared/WhatsAppShareButton";
 import { exportTapePlantRawMaterialExcel } from "@/lib/tape-plant/raw-material-export";
 import { toast } from "sonner";
 
@@ -129,6 +131,20 @@ export function RawMaterialPrintPreviewModal({
           </div>
 
           <div className="flex items-center gap-2">
+            <WhatsAppShareButton
+              getHtml={() =>
+                generateRawMaterialSheetHtml({
+                  date,
+                  shiftName,
+                  operatorName,
+                  status,
+                  records,
+                })
+              }
+              fileName={docRef}
+              title={`Tape Plant Raw Material Sheet (${date})`}
+              message={`Tape Plant Raw Material Consumption — ${date} • ${shiftName} (Ref: ${docRef})`}
+            />
             <button
               type="button"
               onClick={handleExportExcel}

@@ -5,7 +5,11 @@ import {
   ConvertexWastageReportData,
   computeConvertexWastageTotals,
 } from "@/lib/convertex/convertex-types";
-import { printConvertexWastageReport } from "@/lib/convertex/print-convertex-wastage";
+import {
+  generateConvertexWastageReportHtml,
+  printConvertexWastageReport,
+} from "@/lib/convertex/print-convertex-wastage";
+import { WhatsAppShareButton } from "@/components/shared/WhatsAppShareButton";
 import { exportConvertexWastageReportExcel } from "@/lib/convertex/convertex-export";
 import { FileText, Printer, FileSpreadsheet, X } from "lucide-react";
 
@@ -76,6 +80,12 @@ export function ConvertexWastagePrintModal({
           </div>
 
           <div className="flex items-center gap-2">
+            <WhatsAppShareButton
+              getHtml={() => generateConvertexWastageReportHtml(data)}
+              fileName={docRef}
+              title={`Convertex Wastage Report (${data.date})`}
+              message={`Convertex Wastage Report — ${data.date} • ${data.shiftName} • Machine ${data.machineNo} (Ref: ${docRef})`}
+            />
             <button
               onClick={() => exportConvertexWastageReportExcel(data)}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition-colors shadow-xs"

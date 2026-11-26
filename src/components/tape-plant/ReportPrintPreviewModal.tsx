@@ -8,7 +8,11 @@ import {
   BarChart3,
 } from "lucide-react";
 import { TapePlantReportDataset, exportTapePlantReportsExcel } from "@/lib/tape-plant/reports-export";
-import { printTapePlantReport } from "@/lib/tape-plant/print-report-sheet";
+import {
+  generateTapePlantReportHtml,
+  printTapePlantReport,
+} from "@/lib/tape-plant/print-report-sheet";
+import { WhatsAppShareButton } from "@/components/shared/WhatsAppShareButton";
 import { toast } from "sonner";
 
 interface ReportPrintPreviewModalProps {
@@ -105,6 +109,22 @@ export function ReportPrintPreviewModal({
           </div>
 
           <div className="flex items-center gap-2">
+            <WhatsAppShareButton
+              getHtml={() =>
+                generateTapePlantReportHtml({
+                  data,
+                  dateFrom,
+                  dateTo,
+                  mode: activeTab === "summary" ? "summary" : "shift",
+                  filterShiftName,
+                  filterOperatorName,
+                  filterRecipeQuality,
+                })
+              }
+              fileName={docRef}
+              title={`Tape Plant Performance Report (${dateRangeLabel})`}
+              message={`Tape Plant Performance Report — ${dateRangeLabel} (Ref: ${docRef})`}
+            />
             <button
               onClick={handleExportExcel}
               className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition-all inline-flex items-center gap-1.5 shadow-sm cursor-pointer"
