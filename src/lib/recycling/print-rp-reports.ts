@@ -184,14 +184,14 @@ export function generateWastageCollectionHtml(data: RpWastageCollectionData): st
             <th colspan="${2 + shifts.length * 2}">${escapeHtml(sec.title)}</th>
           </tr>
           <tr class="col-header">
-            <th style="width: 115px; text-align:left;">COLOUR / TYPE</th>
+            <th style="width: 95px; text-align:left;">COLOUR / TYPE</th>
             ${shifts
               .map(
                 (s) =>
-                  `<th>${escapeHtml(s.toUpperCase())}</th><th style="width:48px;">MTD</th>`
+                  `<th>${escapeHtml(s.toUpperCase())}</th><th style="width:29px;">MTD</th>`
               )
               .join("")}
-            <th style="width: 60px;">TOTAL</th>
+            <th style="width: 40px;">TOTAL</th>
           </tr>
         </thead>
         <tbody>
@@ -237,38 +237,38 @@ export function generateWastageCollectionHtml(data: RpWastageCollectionData): st
   <meta charset="UTF-8">
   <title>Wastage Collection Report - ${escapeHtml(data.date)} (Sl. ${serial})</title>
   <style>
-    @page { size: A4 portrait; margin: 6mm 7mm; }
+    @page { size: A4 portrait; margin: 5mm 6mm; }
     ${STANDARD_LETTERHEAD_CSS}
-    body { font-size: 7.6pt; padding: 2px; line-height: 1.28; }
-    .company-header { padding-bottom: 4px; margin-bottom: 6px; }
-    .company-logo img { height: 34px; }
-    .company-title { font-size: 13pt; }
-    .company-sub { font-size: 6.8pt; }
-    .doc-main-heading { padding: 2px 14px; font-size: 8.2pt; margin-top: 3px; }
-    .doc-meta-strip { padding: 4px 8px; margin-bottom: 6px; font-size: 7.2pt; }
-    .kpi-table { margin-bottom: 6px; }
-    .kpi-table td { padding: 4px 6px; }
-    .kpi-label { font-size: 6.4pt; }
-    .kpi-val { font-size: 9.2pt; }
-    .layout { display: flex; gap: 8px; align-items: flex-start; page-break-inside: avoid; }
-    .left-col { flex: 1; }
-    .right-col { width: 202px; }
-    .grid-table { width: 100%; border-collapse: collapse; margin-bottom: 3.5px; page-break-inside: avoid; }
-    .grid-table th, .grid-table td { border: 1px solid #64748b; padding: 2.2px 4.5px; }
-    .section-banner th { background: #e2e8f0; font-size: 7.2pt; font-weight: 800; text-align: center; letter-spacing: 0.25px; padding: 2.2px 4px; }
-    .col-header th { background: #f8fafc; font-size: 6.6pt; font-weight: 700; text-align: center; padding: 1.5px 3px; }
+    body { font-size: 7.3pt; padding: 2px; line-height: 1.22; }
+    .company-header { padding-bottom: 3px; margin-bottom: 5px; }
+    .company-logo img { height: 30px; }
+    .company-title { font-size: 12pt; }
+    .company-sub { font-size: 6.3pt; }
+    .doc-main-heading { padding: 1.5px 12px; font-size: 8pt; margin-top: 2px; }
+    .doc-meta-strip { padding: 2.5px 6px; margin-bottom: 5px; font-size: 6.5pt; gap: 6px; }
+    .kpi-table { margin-bottom: 5px; }
+    .kpi-table td { padding: 3px 5px; }
+    .kpi-label { font-size: 6pt; }
+    .kpi-val { font-size: 8.8pt; }
+    .layout { display: flex; gap: 7px; align-items: flex-start; }
+    .left-col { flex: 1; min-width: 0; }
+    .right-col { width: 186px; flex-shrink: 0; }
+    .grid-table { width: 100%; border-collapse: collapse; margin-bottom: 3px; page-break-inside: avoid; }
+    .grid-table th, .grid-table td { border: 1px solid #64748b; padding: 1.9px 3.5px; }
+    .section-banner th { background: #e2e8f0; font-size: 7pt; font-weight: 800; text-align: center; letter-spacing: 0.25px; padding: 2px 4px; }
+    .col-header th { background: #f8fafc; font-size: 5.8pt; font-weight: 700; text-align: center; padding: 1.5px 2px; white-space: nowrap; }
     .label-cell { font-weight: 600; text-align: left; }
     .num-cell { text-align: right; font-variant-numeric: tabular-nums; }
     .num-cell.muted { color: #64748b; }
     .bold { font-weight: 700; }
     .total-row td { background: #f1f5f9; font-weight: 800; }
-    .side-card { border: 1px solid #64748b; margin-bottom: 8px; page-break-inside: avoid; }
-    .side-title { background: #e2e8f0; font-weight: 800; font-size: 7.4pt; text-align: center; padding: 3px 4px; border-bottom: 1px solid #64748b; }
+    .side-card { border: 1px solid #64748b; margin-bottom: 7px; page-break-inside: avoid; }
+    .side-title { background: #e2e8f0; font-weight: 800; font-size: 7.2pt; text-align: center; padding: 2.5px 4px; border-bottom: 1px solid #64748b; }
     .side-table { width: 100%; border-collapse: collapse; }
-    .side-table td, .side-table th { border-bottom: 1px solid #cbd5e1; padding: 2.8px 5px; font-size: 7.3pt; }
+    .side-table td, .side-table th { border-bottom: 1px solid #cbd5e1; padding: 2.6px 4.5px; font-size: 7.1pt; }
     .side-table tr:last-child td { border-bottom: none; }
-    .signatures-container { margin-top: 10px; padding: 0 18px; }
-    .sig-line { margin-top: 22px; padding-top: 4px; font-size: 7.2pt; }
+    .signatures-container { margin-top: 8px; padding: 0 18px; }
+    .sig-line { margin-top: 20px; padding-top: 4px; font-size: 7pt; }
   </style>
 </head>
 <body>
