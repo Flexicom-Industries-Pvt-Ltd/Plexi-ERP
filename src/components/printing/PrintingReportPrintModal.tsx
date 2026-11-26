@@ -2,7 +2,11 @@
 
 import React, { useMemo } from "react";
 import { PrintingDailyReportData, computePrintingTotals } from "@/lib/printing/printing-types";
-import { printPrintingReport } from "@/lib/printing/print-printing-report";
+import {
+  generatePrintingReportHtml,
+  printPrintingReport,
+} from "@/lib/printing/print-printing-report";
+import { WhatsAppShareButton } from "@/components/shared/WhatsAppShareButton";
 import { exportPrintingReportExcel } from "@/lib/printing/printing-export";
 import { FileText, Printer, FileSpreadsheet, X } from "lucide-react";
 
@@ -73,6 +77,12 @@ export function PrintingReportPrintModal({
           </div>
 
           <div className="flex items-center gap-2">
+            <WhatsAppShareButton
+              getHtml={() => generatePrintingReportHtml(data)}
+              fileName={docRef}
+              title={`Printing Daily Production Report (${data.date})`}
+              message={`Printing Daily Production Report — ${data.date} • ${data.shiftName} (Ref: ${docRef})`}
+            />
             <button
               onClick={handleExportExcel}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition-colors shadow-xs"

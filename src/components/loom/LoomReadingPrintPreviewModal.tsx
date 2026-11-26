@@ -10,7 +10,11 @@ import {
 } from "lucide-react";
 import { LoomReadingEntryItem, IntervalKpiSummary } from "@/lib/loom/loom-reading-types";
 import { exportLoomReadingSheetExcel } from "@/lib/loom/loom-reading-export";
-import { printLoomReadingSheet } from "@/lib/loom/print-loom-reading";
+import {
+  generateLoomReadingHtml,
+  printLoomReadingSheet,
+} from "@/lib/loom/print-loom-reading";
+import { WhatsAppShareButton } from "@/components/shared/WhatsAppShareButton";
 
 interface LoomReadingPrintPreviewModalProps {
   open: boolean;
@@ -190,6 +194,35 @@ export function LoomReadingPrintPreviewModal({
 
           {/* Action Buttons */}
           <div className="flex items-center gap-2">
+            <WhatsAppShareButton
+              getHtml={() =>
+                generateLoomReadingHtml({
+                  date,
+                  shiftName,
+                  preparedBy,
+                  checkedBy,
+                  approvedBy,
+                  timeSlots,
+                  initialTimeSlot,
+                  entries,
+                  kpis: {
+                    totalLooms: 91,
+                    runningLoomsCount: runningLooms,
+                    idleLoomsCount: idleLooms,
+                    totalShiftMeters: totalMeters,
+                    totalShiftKg: totalKg,
+                    totalWastageKg: kpis?.totalWastageKg || 0,
+                    averageEfficiency,
+                    totalBreakdownMins: kpis?.totalBreakdownMins ?? totalBreakdownMins,
+                    intervalTotals: [],
+                  },
+                  filterActiveOnly: false,
+                })
+              }
+              fileName={docRef}
+              title={`2 Hours Loom Reading Sheet (${date})`}
+              message={`2 Hours Loom Reading Sheet — ${date} • ${shiftName} • ${totalMeters.toLocaleString()} m (Ref: ${docRef})`}
+            />
             <button
               onClick={handleExportExcel}
               className="px-3.5 py-1.5 text-xs font-semibold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white transition-all inline-flex items-center gap-1.5 shadow-sm cursor-pointer"

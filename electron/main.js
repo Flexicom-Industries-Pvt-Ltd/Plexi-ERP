@@ -245,6 +245,101 @@ ipcMain.handle("retry-connection", () => {
   }
 });
 
+function isAuthorizedSenderFrame(event) {
+  if (!event || !event.senderFrame || !event.senderFrame.url) return false;
+  const senderUrl = event.senderFrame.url;
+  if (senderUrl.includes("offline.html")) return false;
+  try {
+    const parsed = new URL(senderUrl);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return false;
+    const host = parsed.hostname.toLowerCase();
+    return (
+      host === "localhost" ||
+      host === "127.0.0.1" ||
+      host === "plexi-erp-two.vercel.app" ||
+      host === "plexi-erp-plascom.vercel.app" ||
+      host === "plexi-erp.flexicom.in" ||
+      (host.endsWith(".vercel.app") && host.startsWith("plexi-erp"))
+    );
+  } catch {
+    return false;
+  }
+}
+
+ipcMain.handle("generate-pdf-from-html", async (event, payload) => {
+  if (!isAuthorizedSenderFrame(event)) {
+    return { ok: false, error: "Unauthorized sender frame" };
+  }
+  const html = payload && typeof payload.html === "string" ? payload.html : "";
+  const rawName = payload && typeof payload.fileName === "string" ? payload.fileName : "report.pdf";
+  if (!html || html.length > 5_000_000) {
+    return { ok: false, error: "Invalid report HTML" };
+  }
+
+  const baseName = path.basename(rawName).replace(/[^a-zA-Z0-9._-]/g, "_") || "report.pdf";
+  const safeFileName = baseName.toLowerCase().endsWith(".pdf") ? baseName : `${baseName}.pdf`;
+  const isLandscape = /size:\s*A4\s+landscape/i.test(html);
+
+  let pdfWin = null;
+  try {
+    pdfWin = new BrowserWindow({
+      show: false,
+      width: isLandscape ? 1123 : 794,
+      height: isLandscape ? 794 : 1123,
+      webPreferences: {
+        sandbox: true,
+        contextIsolation: true,
+        nodeIntegration: false,
+        javascript: false,
+      },
+    });
+
+    await pdfWin.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
+    const pdfBuffer = await pdfWin.webContents.printToPDF({
+      printBackground: true,
+      preferCSSPageSize: true,
+      landscape: isLandscape,
+      pageSize: "A4",
+    });
+
+    const downloadsDir = app.getPath("downloads");
+    const targetPath = path.join(downloadsDir, safeFileName);
+    await fs.promises.writeFile(targetPath, pdfBuffer);
+    shell.showItemInFolder(targetPath);
+
+    return { ok: true, filePath: targetPath, fileName: safeFileName };
+  } catch (err) {
+    console.error("generate-pdf-from-html failed:", err);
+    return { ok: false, error: err && err.message ? err.message : "PDF generation failed" };
+  } finally {
+    if (pdfWin && !pdfWin.isDestroyed()) {
+      pdfWin.destroy();
+    }
+  }
+});
+
+ipcMain.handle("open-whatsapp-url", async (event, rawUrl) => {
+  if (!isAuthorizedSenderFrame(event) || typeof rawUrl !== "string") {
+    return false;
+  }
+  try {
+    const parsed = new URL(rawUrl);
+    if (parsed.protocol !== "https:") return false;
+    const host = parsed.hostname.toLowerCase();
+    if (
+      host !== "api.whatsapp.com" &&
+      host !== "wa.me" &&
+      host !== "web.whatsapp.com"
+    ) {
+      return false;
+    }
+    await shell.openExternal(parsed.toString());
+    return true;
+  } catch {
+    return false;
+  }
+});
+
 // Custom window control handlers (Option 2 frameless)
 ipcMain.handle("window-minimize", () => {
   if (mainWindow && !mainWindow.isDestroyed()) {

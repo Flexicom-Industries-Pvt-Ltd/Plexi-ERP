@@ -2,7 +2,11 @@
 
 import React, { useMemo } from "react";
 import { LaminationProductionReportData, computeLaminationReportTotals } from "@/lib/lamination/lamination-types";
-import { printLaminationReport } from "@/lib/lamination/print-lamination-report";
+import {
+  generateLaminationReportHtml,
+  printLaminationReport,
+} from "@/lib/lamination/print-lamination-report";
+import { WhatsAppShareButton } from "@/components/shared/WhatsAppShareButton";
 import { exportLaminationReportExcel } from "@/lib/lamination/lamination-report-export";
 import { FileText, Printer, FileSpreadsheet, X } from "lucide-react";
 
@@ -71,6 +75,12 @@ export function LaminationReportPrintModal({
           </div>
 
           <div className="flex items-center gap-2">
+            <WhatsAppShareButton
+              getHtml={() => generateLaminationReportHtml(data)}
+              fileName={docRef}
+              title={`Daily Lamination Report (${data.date})`}
+              message={`Lamination Production Report — ${data.date} • ${data.shiftName} • ${data.entries.length} Roll(s) (Ref: ${docRef})`}
+            />
             <button
               onClick={handleExportExcel}
               className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition-all inline-flex items-center gap-1.5 shadow-sm cursor-pointer"

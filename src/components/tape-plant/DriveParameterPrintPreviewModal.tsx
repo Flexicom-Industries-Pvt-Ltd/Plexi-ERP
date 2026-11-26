@@ -10,9 +10,11 @@ import {
 } from "lucide-react";
 import { DriveParameterReading } from "./ProcessDriveParameterSection";
 import {
+  generateDriveSheetHtml,
   printTapePlantDriveSheet,
   DriveParameterPrintData,
 } from "@/lib/tape-plant/print-drive-parameter-sheet";
+import { WhatsAppShareButton } from "@/components/shared/WhatsAppShareButton";
 import { exportTapePlantDriveExcel } from "@/lib/tape-plant/drive-parameter-export";
 import { toast } from "sonner";
 
@@ -131,6 +133,20 @@ export function DriveParameterPrintPreviewModal({
           </div>
 
           <div className="flex items-center gap-2">
+            <WhatsAppShareButton
+              getHtml={() =>
+                generateDriveSheetHtml({
+                  date,
+                  shiftName,
+                  operatorName,
+                  status,
+                  records,
+                })
+              }
+              fileName={docRef}
+              title={`Tape Plant Process Drive (${date})`}
+              message={`Tape Plant Process Drive Parameters — ${date} • ${shiftName} (Ref: ${docRef})`}
+            />
             <button
               type="button"
               onClick={handleExportExcel}
