@@ -82,9 +82,6 @@ export function RpReportsRegister() {
             <h1 className="text-lg sm:text-2xl font-bold tracking-tight text-slate-900">
               Recycling Plant Reports Register
             </h1>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Saved daily Wastage Collection &amp; R.P. Plant Production logs
-            </p>
           </div>
         </div>
 

@@ -7,7 +7,6 @@ import { format, addDays, parseISO } from "date-fns";
 import {
   ChevronLeft,
   ChevronRight,
-  Save,
   CheckCircle2,
   Printer,
   FileSpreadsheet,
@@ -358,13 +357,7 @@ export function RpProductionSheet() {
   const shifts = report.shiftNames;
 
   return (
-    <div
-      className={cn(
-        "space-y-4 font-sans pb-16 max-w-[1600px] mx-auto",
-        isFullscreen &&
-          "fixed inset-0 z-50 bg-slate-50 p-3 sm:p-5 overflow-y-auto animate-in fade-in duration-150"
-      )}
-    >
+    <div className="space-y-4 font-sans pb-16 max-w-[1600px] mx-auto">
       {/* Standard ERP Header Banner */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-200 pb-4">
         <div className="flex items-center gap-3 min-w-0">
@@ -400,9 +393,6 @@ export function RpProductionSheet() {
                 </span>
               ) : null}
             </div>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Daily RP granule production, issuance to Tape Plant &amp; closing stock ledger
-            </p>
           </div>
         </div>
 
@@ -439,42 +429,18 @@ export function RpProductionSheet() {
           </Button>
 
           <Button
-            variant="outline"
-            size="sm"
-            disabled={isSaving || isLoading}
-            onClick={() => handleSave("DRAFT")}
-            className="h-9 text-xs border-slate-200 hover:bg-slate-50 touch-manipulation"
-          >
-            {isSaving ? (
-              <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
-            ) : (
-              <Save className="h-4 w-4 mr-1.5" />
-            )}
-            Save Draft
-          </Button>
-
-          <Button
             size="sm"
             disabled={isSaving || isLoading}
             onClick={() => handleSave("SUBMITTED")}
             className="h-9 text-xs bg-sky-600 hover:bg-sky-700 text-white shadow-xs touch-manipulation"
           >
-            <CheckCircle2 className="h-4 w-4 mr-1.5" />
+            {isSaving ? (
+              <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+            ) : (
+              <CheckCircle2 className="h-4 w-4 mr-1.5" />
+            )}
             Submit Report
           </Button>
-
-          <button
-            type="button"
-            onClick={() => setIsFullscreen(!isFullscreen)}
-            className="h-9 w-9 inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:text-slate-800 hover:bg-slate-50 transition-colors cursor-pointer touch-manipulation"
-            title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
-          >
-            {isFullscreen ? (
-              <Minimize2 className="h-4 w-4" />
-            ) : (
-              <Maximize2 className="h-4 w-4" />
-            )}
-          </button>
         </div>
       </div>
 
@@ -625,8 +591,54 @@ export function RpProductionSheet() {
       ) : (
         <>
           {/* DESKTOP VIEW: Spreadsheet Grid (hidden on < md mobile PWA) */}
-          <div className="hidden md:block bg-white border border-slate-200 rounded-xl shadow-xs overflow-hidden">
-            <div className="overflow-x-auto">
+          <div
+            className={cn(
+              isFullscreen
+                ? "fixed inset-0 z-50 bg-white flex flex-col p-4 md:p-6 shadow-2xl overflow-hidden"
+                : "hidden md:flex bg-white border border-slate-200 rounded-xl shadow-xs overflow-hidden flex-col"
+            )}
+          >
+            {/* Entry Area Toolbar (Expand / Collapse scoped to Entry Area) */}
+            <div className="p-3 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2 bg-slate-50/70 shrink-0">
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsFullscreen(!isFullscreen)}
+                  className="h-8 text-xs border-slate-300 bg-white hover:bg-slate-100 flex items-center gap-1.5 cursor-pointer touch-manipulation"
+                  title={
+                    isFullscreen
+                      ? "Collapse back to normal view (Esc)"
+                      : "Expand table to fullscreen"
+                  }
+                >
+                  {isFullscreen ? (
+                    <>
+                      <Minimize2 className="h-3.5 w-3.5 text-sky-600" />
+                      <span>Collapse</span>
+                    </>
+                  ) : (
+                    <>
+                      <Maximize2 className="h-3.5 w-3.5 text-sky-600" />
+                      <span>Expand</span>
+                    </>
+                  )}
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={handleAddBlankRow}
+                  className="h-8 text-xs bg-sky-600 hover:bg-sky-700 text-white flex items-center gap-1.5 cursor-pointer touch-manipulation"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>Add Row</span>
+                </Button>
+              </div>
+              <span className="text-[11px] text-slate-400">
+                Closing Stock = Opening + Production − Issued to Tape Plant − Dispatch
+              </span>
+            </div>
+
+            <div className={cn("overflow-x-auto", isFullscreen && "flex-1 overflow-auto")}>
               <table className="w-full text-xs border-collapse min-w-[1150px]">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-600 uppercase tracking-wider">
