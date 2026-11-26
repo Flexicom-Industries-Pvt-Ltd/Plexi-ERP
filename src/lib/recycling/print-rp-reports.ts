@@ -17,9 +17,163 @@ function fmtNum(val: number | undefined | null): string {
   return Number.isInteger(val) ? String(val) : Number(val).toFixed(1);
 }
 
+const STANDARD_LETTERHEAD_CSS = `
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    font-size: 7.5pt;
+    color: #0f172a;
+    background: #ffffff;
+    padding: 4px;
+    line-height: 1.35;
+  }
+  .company-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 2px solid #0f172a;
+    padding-bottom: 5px;
+    margin-bottom: 8px;
+  }
+  .company-logo {
+    width: 60px;
+  }
+  .company-logo img {
+    height: 36px;
+    width: auto;
+    object-fit: contain;
+  }
+  .company-center {
+    flex: 1;
+    text-align: center;
+  }
+  .company-title {
+    font-size: 13pt;
+    font-weight: 900;
+    letter-spacing: 0.5px;
+    color: #000000;
+    text-transform: uppercase;
+  }
+  .company-sub {
+    font-size: 6.5pt;
+    font-weight: 600;
+    color: #475569;
+    margin-top: 1px;
+  }
+  .doc-main-heading {
+    display: inline-block;
+    border: 1.5px solid #0f172a;
+    background: #f8fafc;
+    padding: 2px 14px;
+    font-size: 8.5pt;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-top: 4px;
+  }
+  .company-right {
+    width: 64px;
+    text-align: right;
+  }
+  .page-badge {
+    display: inline-block;
+    border: 1px solid #cbd5e1;
+    background: #f1f5f9;
+    color: #334155;
+    font-size: 6pt;
+    font-weight: 700;
+    padding: 2px 5px;
+    border-radius: 3px;
+  }
+  .doc-meta-strip {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    font-size: 7pt;
+    color: #334155;
+    padding: 4px 8px;
+    background: #f8fafc;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    margin-bottom: 8px;
+  }
+  .doc-meta-strip strong {
+    color: #0f172a;
+  }
+  .sl-red {
+    color: #dc2626 !important;
+    font-weight: 800;
+  }
+  .kpi-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 8px;
+    background-color: #f8fafc;
+    border: 1px solid #94a3b8;
+  }
+  .kpi-table td {
+    padding: 4px 6px;
+    border: 1px solid #cbd5e1;
+    text-align: center;
+    width: 25%;
+  }
+  .kpi-label {
+    font-size: 6pt;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: #475569;
+  }
+  .kpi-val {
+    font-size: 9.5pt;
+    font-weight: 800;
+    font-family: monospace;
+    color: #0284c7;
+    margin-top: 1px;
+  }
+  .signatures-container {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 18px;
+    padding: 0 20px;
+    page-break-inside: avoid;
+  }
+  .sig-box {
+    text-align: center;
+    width: 170px;
+  }
+  .sig-line {
+    border-top: 1.5px solid #0f172a;
+    margin-top: 28px;
+    padding-top: 4px;
+    font-weight: 700;
+    font-size: 7pt;
+    text-transform: uppercase;
+    color: #1e293b;
+  }
+`;
+
 export function generateWastageCollectionHtml(data: RpWastageCollectionData): string {
   const shifts = data.shiftNames.length > 0 ? data.shiftNames : ["Day Shift", "Night Shift"];
   const serial = String(data.serialNo || 1).padStart(3, "0");
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const docDate = (data.date || new Date().toISOString().slice(0, 10)).replace(/[^a-zA-Z0-9]/g, "");
+  const docRef = `RP-WC-${docDate}-${serial}`;
+  const genTimestamp = new Date().toLocaleString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
 
   const sectionHtml = data.sections
     .map(
@@ -30,14 +184,14 @@ export function generateWastageCollectionHtml(data: RpWastageCollectionData): st
             <th colspan="${2 + shifts.length * 2}">${escapeHtml(sec.title)}</th>
           </tr>
           <tr class="col-header">
-            <th style="width: 110px; text-align:left;">COLOUR / TYPE</th>
+            <th style="width: 115px; text-align:left;">COLOUR / TYPE</th>
             ${shifts
               .map(
                 (s) =>
                   `<th>${escapeHtml(s.toUpperCase())}</th><th style="width:48px;">MTD</th>`
               )
               .join("")}
-            <th style="width: 64px;">TOTAL</th>
+            <th style="width: 60px;">TOTAL</th>
           </tr>
         </thead>
         <tbody>
@@ -84,49 +238,73 @@ export function generateWastageCollectionHtml(data: RpWastageCollectionData): st
   <title>Wastage Collection Report - ${escapeHtml(data.date)} (Sl. ${serial})</title>
   <style>
     @page { size: A4 portrait; margin: 8mm; }
-    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    body { font-family: Arial, sans-serif; font-size: 7.5pt; color: #0f172a; background: #fff; }
-    .header-box { display: flex; justify-content: space-between; align-items: center; border: 1.5px solid #0f172a; padding: 6px 10px; margin-bottom: 6px; }
-    .company { font-size: 11pt; font-weight: 800; letter-spacing: 0.3px; }
-    .sub-title { font-size: 9pt; font-weight: 700; margin-top: 2px; }
-    .meta { text-align: right; font-size: 8pt; line-height: 1.4; }
-    .sl { color: #dc2626; font-weight: 800; font-size: 9.5pt; }
+    ${STANDARD_LETTERHEAD_CSS}
     .layout { display: flex; gap: 8px; align-items: flex-start; }
     .left-col { flex: 1; }
-    .right-col { width: 195px; }
+    .right-col { width: 190px; }
     .grid-table { width: 100%; border-collapse: collapse; margin-bottom: 4px; }
-    .grid-table th, .grid-table td { border: 1px solid #334155; padding: 2px 4px; }
-    .section-banner th { background: #e2e8f0; font-size: 7.5pt; font-weight: 800; text-align: center; letter-spacing: 0.3px; }
-    .col-header th { background: #f8fafc; font-size: 6.5pt; font-weight: 700; text-align: center; }
+    .grid-table th, .grid-table td { border: 1px solid #64748b; padding: 2px 4px; }
+    .section-banner th { background: #e2e8f0; font-size: 7pt; font-weight: 800; text-align: center; letter-spacing: 0.3px; }
+    .col-header th { background: #f8fafc; font-size: 6.2pt; font-weight: 700; text-align: center; }
     .label-cell { font-weight: 600; text-align: left; }
     .num-cell { text-align: right; font-variant-numeric: tabular-nums; }
     .num-cell.muted { color: #64748b; }
     .bold { font-weight: 700; }
     .total-row td { background: #f1f5f9; font-weight: 800; }
-    .side-card { border: 1px solid #334155; margin-bottom: 6px; }
-    .side-title { background: #e2e8f0; font-weight: 800; font-size: 7.5pt; text-align: center; padding: 3px; border-bottom: 1px solid #334155; }
+    .side-card { border: 1px solid #64748b; margin-bottom: 5px; }
+    .side-title { background: #e2e8f0; font-weight: 800; font-size: 7pt; text-align: center; padding: 2.5px; border-bottom: 1px solid #64748b; }
     .side-table { width: 100%; border-collapse: collapse; }
-    .side-table td, .side-table th { border-bottom: 1px solid #cbd5e1; padding: 2.5px 5px; font-size: 7pt; }
+    .side-table td, .side-table th { border-bottom: 1px solid #cbd5e1; padding: 2px 5px; font-size: 6.8pt; }
     .side-table tr:last-child td { border-bottom: none; }
-    .footer-sign { display: flex; justify-content: space-between; margin-top: 10px; font-size: 7.5pt; font-weight: 600; padding-top: 16px; border-top: 1px dashed #94a3b8; }
   </style>
 </head>
 <body>
-  <div class="header-box">
-    <div>
-      <div class="company">FLEXICOM INDUSTRIES PVT. LIMITED</div>
-      <div class="sub-title">WASTAGE COLLECTION REPORT</div>
+  <div class="company-header">
+    <div class="company-logo">
+      ${origin ? `<img src="${origin}/logo.png" alt="Flexicom Logo" onerror="this.style.display='none'" />` : ""}
     </div>
-    <div class="meta">
-      <div>Date: <strong>${escapeHtml(data.date)}</strong> &nbsp;|&nbsp; Sl. No.: <span class="sl">${serial}</span></div>
-      <div>Shifts: <strong>${escapeHtml(shifts.join(" + "))}</strong> &nbsp;|&nbsp; Operator: <strong>${escapeHtml(data.operatorName || "—")}</strong></div>
+    <div class="company-center">
+      <div class="company-title">Flexicom Industries Pvt. Limited</div>
+      <div class="company-sub">SIDCO INDUSTRIAL ESTATE, PHASE-II, GHATTI, KATHUA (J&amp;K) 184143 • RECYCLING PLANT DIVISION</div>
+      <div class="doc-main-heading">Wastage Collection Report</div>
+    </div>
+    <div class="company-right">
+      <span class="page-badge">A4 PORTRAIT</span>
     </div>
   </div>
 
+  <div class="doc-meta-strip">
+    <div>Doc Ref: <strong>${escapeHtml(docRef)}</strong></div>
+    <div>Sl. No.: <strong class="sl-red">${serial}</strong></div>
+    <div>Date: <strong>${escapeHtml(data.date)}</strong></div>
+    <div>Shifts: <strong>${escapeHtml(shifts.join(" + "))}</strong></div>
+    <div>Operator: <strong>${escapeHtml(data.operatorName || "—")}</strong></div>
+    <div>Generated: <strong>${escapeHtml(genTimestamp)}</strong></div>
+  </div>
+
+  <table class="kpi-table">
+    <tr>
+      <td>
+        <div class="kpi-label">Sections Summary</div>
+        <div class="kpi-val">${data.summaryTotalKg.toFixed(1)} Kg</div>
+      </td>
+      <td>
+        <div class="kpi-label">Bobbin Cleaning</div>
+        <div class="kpi-val">${data.marginBlocks.bobbinCleaning.totalDay.toFixed(1)} Kg</div>
+      </td>
+      <td>
+        <div class="kpi-label">Segregation</div>
+        <div class="kpi-val">${data.marginBlocks.segregation.total.toFixed(1)} Kg</div>
+      </td>
+      <td>
+        <div class="kpi-label">Grand Reconciled</div>
+        <div class="kpi-val" style="color:#059669;">${data.grandTotalKg.toFixed(1)} Kg</div>
+      </td>
+    </tr>
+  </table>
+
   <div class="layout">
-    <div class="left-col">
-      ${sectionHtml}
-    </div>
+    <div class="left-col">${sectionHtml}</div>
 
     <div class="right-col">
       <div class="side-card">
@@ -206,10 +384,10 @@ export function generateWastageCollectionHtml(data: RpWastageCollectionData): st
     </div>
   </div>
 
-  <div class="footer-sign">
-    <div>Operator: ${escapeHtml(data.operatorName || "________________")}</div>
-    <div>Supervisor: ${escapeHtml(data.supervisorName || "________________")}</div>
-    <div>Status: ${escapeHtml(data.status)}</div>
+  <div class="signatures-container">
+    <div class="sig-box"><div class="sig-line">Operator / Technician</div></div>
+    <div class="sig-box"><div class="sig-line">Shift Incharge</div></div>
+    <div class="sig-box"><div class="sig-line">QC / Plant Head</div></div>
   </div>
 </body>
 </html>`;
@@ -218,6 +396,17 @@ export function generateWastageCollectionHtml(data: RpWastageCollectionData): st
 export function generateRpProductionHtml(data: RpProductionReportData): string {
   const shifts = data.shiftNames.length > 0 ? data.shiftNames : ["Day Shift", "Night Shift"];
   const serial = String(data.serialNo || 1).padStart(3, "0");
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const docDate = (data.date || new Date().toISOString().slice(0, 10)).replace(/[^a-zA-Z0-9]/g, "");
+  const docRef = `RP-PR-${docDate}-${serial}`;
+  const genTimestamp = new Date().toLocaleString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -226,36 +415,62 @@ export function generateRpProductionHtml(data: RpProductionReportData): string {
   <title>R.P. Plant Production Report - ${escapeHtml(data.date)} (Sr. ${serial})</title>
   <style>
     @page { size: A4 landscape; margin: 8mm; }
-    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    body { font-family: Arial, sans-serif; font-size: 7.5pt; color: #0f172a; background: #fff; }
-    .header-box { display: flex; justify-content: space-between; align-items: center; border: 1.5px solid #0f172a; padding: 6px 10px; margin-bottom: 6px; }
-    .company { font-size: 11pt; font-weight: 800; }
-    .sub-title { font-size: 9pt; font-weight: 700; margin-top: 2px; }
-    .meta { text-align: right; font-size: 8pt; line-height: 1.4; }
-    .sr { color: #dc2626; font-weight: 800; font-size: 9.5pt; }
-    table { width: 100%; border-collapse: collapse; }
-    th, td { border: 1px solid #334155; padding: 3px 4px; }
-    thead th { background: #e2e8f0; font-size: 7pt; font-weight: 800; text-align: center; }
+    ${STANDARD_LETTERHEAD_CSS}
+    table.prod-table { width: 100%; border-collapse: collapse; }
+    table.prod-table th, table.prod-table td { border: 1px solid #64748b; padding: 3px 4px; }
+    table.prod-table thead th { background: #e2e8f0; font-size: 6.8pt; font-weight: 800; text-align: center; text-transform: uppercase; }
     .num { text-align: right; font-variant-numeric: tabular-nums; }
     .bold { font-weight: 700; }
     .muted { color: #64748b; }
-    .total-row td { background: #f1f5f9; font-weight: 800; }
-    .footer-sign { display: flex; justify-content: space-between; margin-top: 10px; font-size: 7.5pt; font-weight: 600; padding-top: 14px; border-top: 1px dashed #94a3b8; }
+    .total-row td { background: #f1f5f9; font-weight: 800; border-top: 2px solid #0f172a; border-bottom: 2px solid #0f172a; }
   </style>
 </head>
 <body>
-  <div class="header-box">
-    <div>
-      <div class="company">FLEXICOM INDUSTRIES PVT. LIMITED, GHATTI (KATHUA)</div>
-      <div class="sub-title">R.P. PLANT PRODUCTION REPORT</div>
+  <div class="company-header">
+    <div class="company-logo">
+      ${origin ? `<img src="${origin}/logo.png" alt="Flexicom Logo" onerror="this.style.display='none'" />` : ""}
     </div>
-    <div class="meta">
-      <div>DATE: <strong>${escapeHtml(data.date)}</strong> &nbsp;|&nbsp; Sr. No.: <span class="sr">${serial}</span></div>
-      <div>SHIFT: <strong>${escapeHtml(shifts.join(" + "))}</strong> &nbsp;|&nbsp; OPERATOR: <strong>${escapeHtml(data.operatorName || "—")}</strong></div>
+    <div class="company-center">
+      <div class="company-title">Flexicom Industries Pvt. Limited</div>
+      <div class="company-sub">SIDCO INDUSTRIAL ESTATE, PHASE-II, GHATTI, KATHUA (J&amp;K) 184143 • RECYCLING PLANT DIVISION</div>
+      <div class="doc-main-heading">R.P. Plant Production Report</div>
+    </div>
+    <div class="company-right">
+      <span class="page-badge">A4 LANDSCAPE</span>
     </div>
   </div>
 
-  <table>
+  <div class="doc-meta-strip">
+    <div>Doc Ref: <strong>${escapeHtml(docRef)}</strong></div>
+    <div>Sr. No.: <strong class="sl-red">${serial}</strong></div>
+    <div>Date: <strong>${escapeHtml(data.date)}</strong></div>
+    <div>Shifts: <strong>${escapeHtml(shifts.join(" + "))}</strong></div>
+    <div>Operator: <strong>${escapeHtml(data.operatorName || "—")}</strong></div>
+    <div>Generated: <strong>${escapeHtml(genTimestamp)}</strong></div>
+  </div>
+
+  <table class="kpi-table">
+    <tr>
+      <td>
+        <div class="kpi-label">Opening Stock</div>
+        <div class="kpi-val">${data.totalOpeningStock.toLocaleString()} Kg</div>
+      </td>
+      <td>
+        <div class="kpi-label">Production on Date</div>
+        <div class="kpi-val" style="color:#059669;">+${data.totalProductionOnDate.toLocaleString()} Kg</div>
+      </td>
+      <td>
+        <div class="kpi-label">Issued to Tape Plant</div>
+        <div class="kpi-val" style="color:#0284c7;">-${data.totalIssuedToTapePlant.toLocaleString()} Kg</div>
+      </td>
+      <td>
+        <div class="kpi-label">Closing Stock</div>
+        <div class="kpi-val" style="color:#0f172a;">${data.totalClosingStock.toLocaleString()} Kg</div>
+      </td>
+    </tr>
+  </table>
+
+  <table class="prod-table">
     <thead>
       <tr>
         <th rowspan="2" style="width:24px;">No.</th>
@@ -274,7 +489,7 @@ export function generateRpProductionHtml(data: RpProductionReportData): string {
         <th rowspan="2" style="text-align:left;">Remarks</th>
       </tr>
       <tr>
-        ${shifts.map((s) => `<th>${escapeHtml(s)}</th>`).join("")}
+        ${shifts.map((s) => `<th>${escapeHtml(s.replace(" Shift", ""))}</th>`).join("")}
         <th>Total</th>
       </tr>
     </thead>
@@ -284,7 +499,7 @@ export function generateRpProductionHtml(data: RpProductionReportData): string {
           (r) => `
         <tr>
           <td style="text-align:center;">${r.seq}</td>
-          <td class="bold">${escapeHtml(r.particular)}</td>
+          <td class="bold">${escapeHtml(r.particular || "—")}</td>
           <td>${escapeHtml(r.color || "—")}</td>
           <td class="num">${r.isLumpsOnly ? "—" : fmtNum(r.openingStock)}</td>
           ${shifts.map((s) => `<td class="num">${fmtNum(r.productionShifts[s])}</td>`).join("")}
@@ -322,10 +537,10 @@ export function generateRpProductionHtml(data: RpProductionReportData): string {
     </tbody>
   </table>
 
-  <div class="footer-sign">
-    <div>Operator: ${escapeHtml(data.operatorName || "________________")}</div>
-    <div>Supervisor: ${escapeHtml(data.supervisorName || "________________")}</div>
-    <div>Status: ${escapeHtml(data.status)}</div>
+  <div class="signatures-container">
+    <div class="sig-box"><div class="sig-line">Operator / Technician</div></div>
+    <div class="sig-box"><div class="sig-line">Shift Incharge</div></div>
+    <div class="sig-box"><div class="sig-line">QC / Plant Head</div></div>
   </div>
 </body>
 </html>`;

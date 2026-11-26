@@ -102,9 +102,9 @@ const valvomaticItems = [
 ];
 
 const recyclingPlantItems = [
-  { title: "Wastage Collection", url: "/dashboard/production/recycling-plant?tab=wastage" },
-  { title: "RP Plant Production", url: "/dashboard/production/recycling-plant?tab=production" },
-  { title: "Reports Register", url: "/dashboard/production/recycling-plant?tab=history" },
+  { title: "Wastage Collection", url: "/dashboard/production/recycling-plant" },
+  { title: "RP Plant Production", url: "/dashboard/production/recycling-plant/production" },
+  { title: "Reports Register", url: "/dashboard/production/recycling-plant/register" },
 ];
 
 const settingsItems = [
@@ -484,11 +484,10 @@ export function AppSidebar({ user, allowedModules }: AppSidebarProps) {
                 <CollapsibleContent>
                   <SidebarMenuSub>
                     {recyclingPlantItems.map((subItem) => {
-                      const tabParam = new URLSearchParams(subItem.url.split("?")[1] || "").get("tab");
-                      const currentRpTab = (currentSearch ? new URLSearchParams(currentSearch).get("tab") : null) || "wastage";
-                      const isSubActive =
-                        pathname === "/dashboard/production/recycling-plant" &&
-                        currentRpTab === tabParam;
+                      const isBaseUrl = subItem.url === "/dashboard/production/recycling-plant";
+                      const isSubActive = isBaseUrl
+                        ? pathname === subItem.url
+                        : pathname === subItem.url || pathname.startsWith(subItem.url + "/");
                       return (
                         <SidebarMenuSubItem key={subItem.url}>
                           <SidebarMenuSubButton
