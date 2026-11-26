@@ -7,7 +7,6 @@ import { format, addDays, parseISO } from "date-fns";
 import {
   ChevronLeft,
   ChevronRight,
-  Save,
   CheckCircle2,
   Printer,
   FileSpreadsheet,
@@ -456,13 +455,7 @@ export function WastageCollectionSheet() {
   const shifts = report.shiftNames;
 
   return (
-    <div
-      className={cn(
-        "space-y-4 font-sans pb-16 max-w-[1600px] mx-auto",
-        isFullscreen &&
-          "fixed inset-0 z-50 bg-slate-50 p-3 sm:p-5 overflow-y-auto animate-in fade-in duration-150"
-      )}
-    >
+    <div className="space-y-4 font-sans pb-16 max-w-[1600px] mx-auto">
       {/* Standard ERP Header Banner */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-200 pb-4">
         <div className="flex items-center gap-3 min-w-0">
@@ -498,9 +491,6 @@ export function WastageCollectionSheet() {
                 </span>
               ) : null}
             </div>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Factory-wide floor wastage collection, bobbin cleaning &amp; segregation
-            </p>
           </div>
         </div>
 
@@ -537,42 +527,18 @@ export function WastageCollectionSheet() {
           </Button>
 
           <Button
-            variant="outline"
-            size="sm"
-            disabled={isSaving || isLoading}
-            onClick={() => handleSave("DRAFT")}
-            className="h-9 text-xs border-slate-200 hover:bg-slate-50 touch-manipulation"
-          >
-            {isSaving ? (
-              <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
-            ) : (
-              <Save className="h-4 w-4 mr-1.5" />
-            )}
-            Save Draft
-          </Button>
-
-          <Button
             size="sm"
             disabled={isSaving || isLoading}
             onClick={() => handleSave("SUBMITTED")}
             className="h-9 text-xs bg-sky-600 hover:bg-sky-700 text-white shadow-xs touch-manipulation"
           >
-            <CheckCircle2 className="h-4 w-4 mr-1.5" />
+            {isSaving ? (
+              <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+            ) : (
+              <CheckCircle2 className="h-4 w-4 mr-1.5" />
+            )}
             Submit Report
           </Button>
-
-          <button
-            type="button"
-            onClick={() => setIsFullscreen(!isFullscreen)}
-            className="h-9 w-9 inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:text-slate-800 hover:bg-slate-50 transition-colors cursor-pointer touch-manipulation"
-            title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
-          >
-            {isFullscreen ? (
-              <Minimize2 className="h-4 w-4" />
-            ) : (
-              <Maximize2 className="h-4 w-4" />
-            )}
-          </button>
         </div>
       </div>
 
@@ -688,7 +654,54 @@ export function WastageCollectionSheet() {
           <span className="text-sm">Loading Wastage Collection Report...</span>
         </div>
       ) : (
-        <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 items-start">
+        <div
+          className={cn(
+            isFullscreen
+              ? "fixed inset-0 z-50 bg-slate-50 flex flex-col p-3 sm:p-5 shadow-2xl overflow-hidden"
+              : "bg-white rounded-xl border border-slate-200/80 shadow-xs overflow-hidden flex flex-col"
+          )}
+        >
+          {/* Entry Area Toolbar (Expand / Collapse scoped to Entry Area) */}
+          <div className="px-3.5 py-2.5 border-b border-slate-200 bg-slate-50/70 flex flex-wrap items-center justify-between gap-2 shrink-0">
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsFullscreen(!isFullscreen)}
+                className="h-8 text-xs border-slate-300 bg-white hover:bg-slate-100 flex items-center gap-1.5 cursor-pointer touch-manipulation"
+                title={
+                  isFullscreen
+                    ? "Collapse back to normal view (Esc)"
+                    : "Expand entry area to fullscreen"
+                }
+              >
+                {isFullscreen ? (
+                  <>
+                    <Minimize2 className="h-3.5 w-3.5 text-sky-600" />
+                    <span>Collapse</span>
+                  </>
+                ) : (
+                  <>
+                    <Maximize2 className="h-3.5 w-3.5 text-sky-600" />
+                    <span>Expand</span>
+                  </>
+                )}
+              </Button>
+              <span className="text-xs font-semibold text-slate-700 hidden sm:inline">
+                Section Entry Grid
+              </span>
+            </div>
+            <div className="text-xs font-mono font-bold text-sky-800">
+              Reconciled Total: {report.grandTotalKg.toFixed(1)} kg
+            </div>
+          </div>
+
+          <div
+            className={cn(
+              "grid grid-cols-1 xl:grid-cols-12 gap-4 items-start p-3 sm:p-4",
+              isFullscreen && "flex-1 overflow-y-auto"
+            )}
+          >
           {/* Left 8 Columns: 8 Departmental Sections */}
           <div className="xl:col-span-8 grid grid-cols-1 md:grid-cols-2 gap-3">
             {report.sections.map((sec) => (
@@ -1070,6 +1083,7 @@ export function WastageCollectionSheet() {
                 </tbody>
               </table>
             </div>
+          </div>
           </div>
         </div>
       )}

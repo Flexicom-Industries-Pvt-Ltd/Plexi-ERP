@@ -237,25 +237,37 @@ export function generateWastageCollectionHtml(data: RpWastageCollectionData): st
   <meta charset="UTF-8">
   <title>Wastage Collection Report - ${escapeHtml(data.date)} (Sl. ${serial})</title>
   <style>
-    @page { size: A4 portrait; margin: 8mm; }
+    @page { size: A4 portrait; margin: 5mm 6mm; }
     ${STANDARD_LETTERHEAD_CSS}
-    .layout { display: flex; gap: 8px; align-items: flex-start; }
+    body { font-size: 6.5pt; padding: 2px; line-height: 1.15; }
+    .company-header { padding-bottom: 3px; margin-bottom: 4px; }
+    .company-logo img { height: 28px; }
+    .company-title { font-size: 11.5pt; }
+    .company-sub { font-size: 6pt; }
+    .doc-main-heading { padding: 1.5px 10px; font-size: 7.5pt; margin-top: 2px; }
+    .doc-meta-strip { padding: 2.5px 6px; margin-bottom: 4px; font-size: 6.4pt; }
+    .kpi-table { margin-bottom: 4px; }
+    .kpi-table td { padding: 2.5px 4px; }
+    .kpi-val { font-size: 8.5pt; }
+    .layout { display: flex; gap: 6px; align-items: flex-start; page-break-inside: avoid; }
     .left-col { flex: 1; }
-    .right-col { width: 190px; }
-    .grid-table { width: 100%; border-collapse: collapse; margin-bottom: 4px; }
-    .grid-table th, .grid-table td { border: 1px solid #64748b; padding: 2px 4px; }
-    .section-banner th { background: #e2e8f0; font-size: 7pt; font-weight: 800; text-align: center; letter-spacing: 0.3px; }
-    .col-header th { background: #f8fafc; font-size: 6.2pt; font-weight: 700; text-align: center; }
+    .right-col { width: 180px; }
+    .grid-table { width: 100%; border-collapse: collapse; margin-bottom: 2.5px; page-break-inside: avoid; }
+    .grid-table th, .grid-table td { border: 1px solid #64748b; padding: 1.2px 3.5px; }
+    .section-banner th { background: #e2e8f0; font-size: 6.4pt; font-weight: 800; text-align: center; letter-spacing: 0.2px; padding: 1.5px 3px; }
+    .col-header th { background: #f8fafc; font-size: 5.8pt; font-weight: 700; text-align: center; padding: 1px 3px; }
     .label-cell { font-weight: 600; text-align: left; }
     .num-cell { text-align: right; font-variant-numeric: tabular-nums; }
     .num-cell.muted { color: #64748b; }
     .bold { font-weight: 700; }
     .total-row td { background: #f1f5f9; font-weight: 800; }
-    .side-card { border: 1px solid #64748b; margin-bottom: 5px; }
-    .side-title { background: #e2e8f0; font-weight: 800; font-size: 7pt; text-align: center; padding: 2.5px; border-bottom: 1px solid #64748b; }
+    .side-card { border: 1px solid #64748b; margin-bottom: 4px; page-break-inside: avoid; }
+    .side-title { background: #e2e8f0; font-weight: 800; font-size: 6.4pt; text-align: center; padding: 2px; border-bottom: 1px solid #64748b; }
     .side-table { width: 100%; border-collapse: collapse; }
-    .side-table td, .side-table th { border-bottom: 1px solid #cbd5e1; padding: 2px 5px; font-size: 6.8pt; }
+    .side-table td, .side-table th { border-bottom: 1px solid #cbd5e1; padding: 1.5px 4px; font-size: 6.2pt; }
     .side-table tr:last-child td { border-bottom: none; }
+    .signatures-container { margin-top: 8px; padding: 0 16px; }
+    .sig-line { margin-top: 18px; padding-top: 3px; font-size: 6.5pt; }
   </style>
 </head>
 <body>
