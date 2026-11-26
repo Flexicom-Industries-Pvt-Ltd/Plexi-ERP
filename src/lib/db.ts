@@ -8,6 +8,8 @@ import { env } from '../env';
 
 // Determine database environment: Neon Serverless vs Standard PostgreSQL (VPS / Docker) (ERP-022)
 const rawUrl = env.DATABASE_URL || '';
+// Placeholder URL only used during CI/CD static build when SKIP_ENV_VALIDATION=1 (runtime still enforces env.ts)
+const BUILD_PLACEHOLDER_URL = 'postgresql://placeholder:placeholder@127.0.0.1:5432/placeholder';
 const adapterType = process.env.DB_ADAPTER || (rawUrl.includes('neon.tech') || Boolean(process.env.VERCEL) ? 'neon' : 'pg');
 
 let clientConfig: ConstructorParameters<typeof PrismaClient>[0] = {
@@ -24,7 +26,7 @@ if (adapterType === 'neon') {
   neonConfig.webSocketConstructor = ws;
   neonConfig.poolQueryViaFetch = true;
 
-  let cleanConnectionString = rawUrl
+  let cleanConnectionString = (rawUrl || BUILD_PLACEHOLDER_URL)
     .replace(/[?&]channel_binding=[^&]+/, '')
     .replace(/\?$/, '');
 
@@ -43,9 +45,9 @@ if (adapterType === 'neon') {
     ...clientConfig,
     adapter: new PrismaNeon(poolConfig),
   };
-} else if (adapterType === 'pg' && rawUrl) {
+} else {
   pgPool = new Pool({
-    connectionString: rawUrl,
+    connectionString: rawUrl || BUILD_PLACEHOLDER_URL,
     connectionTimeoutMillis: 15000,
     idleTimeoutMillis: 30000,
     max: 10,
