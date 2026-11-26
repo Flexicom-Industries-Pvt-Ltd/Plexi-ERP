@@ -2,7 +2,11 @@
 
 import React, { useMemo } from "react";
 import { ConvertexDailyReportData, computeConvertexTotals } from "@/lib/convertex/convertex-types";
-import { printConvertexReport } from "@/lib/convertex/print-convertex-production";
+import {
+  generateConvertexReportHtml,
+  printConvertexReport,
+} from "@/lib/convertex/print-convertex-production";
+import { WhatsAppShareButton } from "@/components/shared/WhatsAppShareButton";
 import { exportConvertexReportExcel } from "@/lib/convertex/convertex-export";
 import { FileText, Printer, FileSpreadsheet, X } from "lucide-react";
 
@@ -73,6 +77,12 @@ export function ConvertexReportPrintModal({
           </div>
 
           <div className="flex items-center gap-2">
+            <WhatsAppShareButton
+              getHtml={() => generateConvertexReportHtml(data)}
+              fileName={docRef}
+              title={`Convertex Production Report (${data.date})`}
+              message={`Convertex Production Report — ${data.date} • ${data.shiftName} • Machine ${data.machineNo} (Ref: ${docRef})`}
+            />
             <button
               onClick={handleExportExcel}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition-colors shadow-xs"

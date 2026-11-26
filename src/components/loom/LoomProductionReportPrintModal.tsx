@@ -19,8 +19,10 @@ import {
   OperatorWiseRow,
   ReportKpis,
   ReportPeriod,
+  generateLoomProductionReportHtml,
   printLoomProductionReport,
 } from "@/lib/loom/print-loom-production-report";
+import { WhatsAppShareButton } from "@/components/shared/WhatsAppShareButton";
 import { exportLoomProductionReportExcel } from "@/lib/loom/loom-production-report-export";
 
 export type ViewCriteria = "LOOM" | "SUPERVISOR" | "OPERATOR" | "CONSOLIDATED";
@@ -121,6 +123,21 @@ export function LoomProductionReportPrintModal({
 
           {/* Action Buttons */}
           <div className="flex items-center gap-2">
+            <WhatsAppShareButton
+              getHtml={() =>
+                generateLoomProductionReportHtml({
+                  criteria: selectedCriteria,
+                  period,
+                  kpis,
+                  loomWise,
+                  supervisorWise,
+                  operatorWise,
+                })
+              }
+              fileName={docRef}
+              title={`Loom Production Report (${criteriaLabel})`}
+              message={`Loom Production Report (${criteriaLabel}) — ${periodLabel} • ${period.shiftName} (Ref: ${docRef})`}
+            />
             <button
               onClick={handleExportExcel}
               className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition-all inline-flex items-center gap-1.5 shadow-sm cursor-pointer"

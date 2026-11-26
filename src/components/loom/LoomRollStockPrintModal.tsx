@@ -9,7 +9,11 @@ import {
 } from "lucide-react";
 import { LoomRollStockItem, LoomRollStockSummary } from "@/lib/loom/loom-roll-stock-types";
 import { exportLoomRollStockExcel } from "@/lib/loom/loom-roll-stock-export";
-import { printLoomRollStock } from "@/lib/loom/print-loom-roll-stock";
+import {
+  generateLoomRollStockHtml,
+  printLoomRollStock,
+} from "@/lib/loom/print-loom-roll-stock";
+import { WhatsAppShareButton } from "@/components/shared/WhatsAppShareButton";
 
 interface LoomRollStockPrintModalProps {
   open: boolean;
@@ -72,6 +76,14 @@ export function LoomRollStockPrintModal({
           </div>
 
           <div className="flex items-center gap-2">
+            <WhatsAppShareButton
+              getHtml={() =>
+                generateLoomRollStockHtml({ rolls, summary, filterLabel })
+              }
+              fileName={docRef}
+              title={`Loom Roll Stock (${rolls.length} Rolls)`}
+              message={`Loom Roll Stock — ${filterLabel} • ${rolls.length} Rolls (Ref: ${docRef})`}
+            />
             <button
               onClick={handleExportExcel}
               className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition-all inline-flex items-center gap-1.5 shadow-sm cursor-pointer"
