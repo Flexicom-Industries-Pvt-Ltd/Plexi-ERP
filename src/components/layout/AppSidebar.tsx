@@ -19,6 +19,7 @@ import {
   Scissors,
   ScanLine,
   UserCheck,
+  Recycle,
   X,
 } from "lucide-react";
 
@@ -100,6 +101,12 @@ const valvomaticItems = [
   { title: "Production Summary", url: "/dashboard/production/valvomatic/summary" },
 ];
 
+const recyclingPlantItems = [
+  { title: "Wastage Collection", url: "/dashboard/production/recycling-plant?tab=wastage" },
+  { title: "RP Plant Production", url: "/dashboard/production/recycling-plant?tab=production" },
+  { title: "Reports Register", url: "/dashboard/production/recycling-plant?tab=history" },
+];
+
 const settingsItems = [
   { title: "General Settings", url: "/dashboard/settings/organization" },
   { title: "Users", url: "/dashboard/settings/users" },
@@ -140,6 +147,7 @@ export function AppSidebar({ user, allowedModules }: AppSidebarProps) {
   const [printingOpen, setPrintingOpen] = useState(pathname.startsWith("/dashboard/production/printing"));
   const [convertexOpen, setConvertexOpen] = useState(pathname.startsWith("/dashboard/production/convertex"));
   const [valvomaticOpen, setValvomaticOpen] = useState(pathname.startsWith("/dashboard/production/valvomatic"));
+  const [recyclingPlantOpen, setRecyclingPlantOpen] = useState(pathname.startsWith("/dashboard/production/recycling-plant"));
   const [settingsOpen, setSettingsOpen] = useState(pathname.startsWith("/dashboard/settings"));
   const [dataCentreOpen, setDataCentreOpen] = useState(pathname.startsWith("/dashboard/data-centre"));
 
@@ -180,6 +188,7 @@ export function AppSidebar({ user, allowedModules }: AppSidebarProps) {
   const hasPrintingAccess = isSuperAdmin || Boolean(allowedModules["PRINTING"]) || Boolean(allowedModules["PRODUCTION"]);
   const hasConvertexAccess = isSuperAdmin || Boolean(allowedModules["CONVERTEX"]) || Boolean(allowedModules["PRODUCTION"]);
   const hasValvomaticAccess = isSuperAdmin || Boolean(allowedModules["VALVOMATIC"]) || Boolean(allowedModules["CONVERTEX"]) || Boolean(allowedModules["PRODUCTION"]);
+  const hasRecyclingPlantAccess = isSuperAdmin || Boolean(allowedModules["RECYCLING_PLANT"]) || Boolean(allowedModules["PRODUCTION"]);
   const hasRollTraceAccess =
     isSuperAdmin ||
     Boolean(allowedModules["ROLL_TRACE"]) ||
@@ -447,6 +456,39 @@ export function AppSidebar({ user, allowedModules }: AppSidebarProps) {
                       const isSubActive = isBaseUrl
                         ? pathname === subItem.url
                         : pathname === subItem.url || pathname.startsWith(subItem.url + "/");
+                      return (
+                        <SidebarMenuSubItem key={subItem.url}>
+                          <SidebarMenuSubButton
+                            render={<Link href={subItem.url} />}
+                            isActive={isSubActive}
+                          >
+                            <span>{subItem.title}</span>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      );
+                    })}
+                  </SidebarMenuSub>
+                </CollapsibleContent>
+              </SidebarMenuItem>
+            </Collapsible>
+          )}
+
+          {hasRecyclingPlantAccess && (
+            <Collapsible open={recyclingPlantOpen} onOpenChange={setRecyclingPlantOpen} className="group/collapsible">
+              <SidebarMenuItem>
+                <CollapsibleTrigger render={<SidebarMenuButton tooltip="Recycling Plant (RP)" />}>
+                  <Recycle className="h-4 w-4" />
+                  <span>Recycling Plant (RP)</span>
+                  <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180" />
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <SidebarMenuSub>
+                    {recyclingPlantItems.map((subItem) => {
+                      const tabParam = new URLSearchParams(subItem.url.split("?")[1] || "").get("tab");
+                      const currentRpTab = (currentSearch ? new URLSearchParams(currentSearch).get("tab") : null) || "wastage";
+                      const isSubActive =
+                        pathname === "/dashboard/production/recycling-plant" &&
+                        currentRpTab === tabParam;
                       return (
                         <SidebarMenuSubItem key={subItem.url}>
                           <SidebarMenuSubButton
