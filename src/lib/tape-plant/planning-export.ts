@@ -3,6 +3,7 @@ import { RecipePlanItem } from "@/components/tape-plant/TapePlantPlanningSection
 import {
   formatRpModeLabel,
   normalizeTapeMaterialName,
+  TAPE_MATERIAL_LDPE_040,
   TAPE_MATERIAL_MIXED_RP,
   TAPE_MATERIAL_NATURAL_RP,
   TAPE_MATERIAL_RP_WHITE,
@@ -70,6 +71,8 @@ export function generateTapePlantPlanningExcel({
     "PP (%)",
     "CC Qty (KG)",
     "CC (%)",
+    "LDPE 040 Qty (KG)",
+    "LDPE 040 (%)",
     "MB Qty (KG)",
     "MB (%)",
     "RP White Qty (KG)",
@@ -93,6 +96,7 @@ export function generateTapePlantPlanningExcel({
   let totalPlannedSum = 0;
   let totalPPSum = 0;
   let totalCCSum = 0;
+  let totalLDPESum = 0;
   let totalMBSum = 0;
   let totalRP1Sum = 0;
   let totalRP2Sum = 0;
@@ -123,6 +127,7 @@ export function generateTapePlantPlanningExcel({
 
     const pp = getMat("PP");
     const cc = getMat("CC");
+    const ldpe = getMat(TAPE_MATERIAL_LDPE_040);
     const mb = getMat("MB");
     const rp1 = getMat(TAPE_MATERIAL_RP_WHITE);
     const rp2 = getMat(TAPE_MATERIAL_RP_YELLOW);
@@ -133,6 +138,7 @@ export function generateTapePlantPlanningExcel({
     const knownSet = new Set([
       "PP",
       "CC",
+      TAPE_MATERIAL_LDPE_040,
       "MB",
       TAPE_MATERIAL_RP_WHITE,
       TAPE_MATERIAL_RP_YELLOW,
@@ -155,6 +161,7 @@ export function generateTapePlantPlanningExcel({
 
     totalPPSum += pp.qty;
     totalCCSum += cc.qty;
+    totalLDPESum += ldpe.qty;
     totalMBSum += mb.qty;
     totalRP1Sum += rp1.qty;
     totalRP2Sum += rp2.qty;
@@ -185,6 +192,8 @@ export function generateTapePlantPlanningExcel({
       pp.pct ? `${pp.pct}%` : "",
       cc.qty || "",
       cc.pct ? `${cc.pct}%` : "",
+      ldpe.qty || "",
+      ldpe.pct ? `${ldpe.pct}%` : "",
       mb.qty || "",
       mb.pct ? `${mb.pct}%` : "",
       rp1.qty || "",
@@ -224,6 +233,8 @@ export function generateTapePlantPlanningExcel({
     totalPPSum,
     "—",
     totalCCSum,
+    "—",
+    totalLDPESum,
     "—",
     totalMBSum,
     "—",
@@ -276,6 +287,8 @@ export function generateTapePlantPlanningExcel({
     { wch: 10 }, // PP %
     { wch: 14 }, // CC kg
     { wch: 10 }, // CC %
+    { wch: 14 }, // LDPE 040 kg
+    { wch: 10 }, // LDPE 040 %
     { wch: 14 }, // MB kg
     { wch: 10 }, // MB %
     { wch: 14 }, // RP White kg

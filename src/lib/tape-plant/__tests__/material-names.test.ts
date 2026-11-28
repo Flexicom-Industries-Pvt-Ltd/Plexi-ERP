@@ -4,6 +4,7 @@ import {
   inferRpModeFromComposition,
   normalizeRpMode,
   normalizeTapeMaterialName,
+  TAPE_MATERIAL_LDPE_040,
   TAPE_MATERIAL_MIXED_RP,
   TAPE_MATERIAL_NATURAL_RP,
   TAPE_MATERIAL_RP_WHITE,
@@ -11,13 +12,17 @@ import {
 } from "../material-names";
 
 describe("normalizeTapeMaterialName", () => {
-  it("maps legacy RP1, RP2, HD RP, TPT keys to new canonical names", () => {
+  it("maps legacy RP1, RP2, HD RP, TPT and Excel aliases to canonical names", () => {
     expect(normalizeTapeMaterialName("RP1")).toBe(TAPE_MATERIAL_RP_WHITE);
     expect(normalizeTapeMaterialName("rp 1")).toBe(TAPE_MATERIAL_RP_WHITE);
     expect(normalizeTapeMaterialName("RP-2")).toBe(TAPE_MATERIAL_RP_YELLOW);
+    expect(normalizeTapeMaterialName("RP Colour")).toBe(TAPE_MATERIAL_RP_YELLOW);
     expect(normalizeTapeMaterialName("HD RP")).toBe(TAPE_MATERIAL_MIXED_RP);
+    expect(normalizeTapeMaterialName("RP Mix")).toBe(TAPE_MATERIAL_MIXED_RP);
     expect(normalizeTapeMaterialName("hdrp")).toBe(TAPE_MATERIAL_MIXED_RP);
     expect(normalizeTapeMaterialName("TPT")).toBe(TAPE_MATERIAL_NATURAL_RP);
+    expect(normalizeTapeMaterialName("RP Natural")).toBe(TAPE_MATERIAL_NATURAL_RP);
+    expect(normalizeTapeMaterialName("ldpe040")).toBe(TAPE_MATERIAL_LDPE_040);
   });
 
   it("preserves canonical new names regardless of casing or spacing", () => {

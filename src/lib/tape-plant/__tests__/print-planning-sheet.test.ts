@@ -96,6 +96,7 @@ describe("Tape Plant Minimalist Planning Sheet Print Engine", () => {
     expect(html).toContain(">Shift<");
     expect(html).toContain(">PP<");
     expect(html).toContain(">CC<");
+    expect(html).toContain(">LDPE 040<");
     expect(html).toContain(">RP White<");
     expect(html).toContain(">RP Yellow<");
     expect(html).toContain(">Mixed RP<");

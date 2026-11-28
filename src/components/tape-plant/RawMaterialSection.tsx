@@ -25,6 +25,7 @@ import { useProductionRealtime } from "@/hooks/useProductionRealtime";
 import { RealtimeSyncBadge } from "@/components/production/RealtimeSyncBadge";
 import {
   normalizeTapeMaterialName,
+  TAPE_MATERIAL_LDPE_040,
   TAPE_MATERIAL_MIXED_RP,
   TAPE_MATERIAL_NATURAL_RP,
   TAPE_MATERIAL_RP_WHITE,
@@ -56,6 +57,7 @@ export interface RawMaterialRow {
 const DEFAULT_MATERIALS: RawMaterialRow[] = [
   { material: "PP", grade: "", openingStock: "", received: "", consumption: "", settingPercent: "", actualPercent: "", wastage: "" },
   { material: "CC", grade: "", openingStock: "", received: "", consumption: "", settingPercent: "", actualPercent: "", wastage: "" },
+  { material: TAPE_MATERIAL_LDPE_040, grade: "", openingStock: "", received: "", consumption: "", settingPercent: "", actualPercent: "", wastage: "" },
   { material: "MB", grade: "", openingStock: "", received: "", consumption: "", settingPercent: "", actualPercent: "", wastage: "" },
   { material: TAPE_MATERIAL_RP_WHITE, grade: "", openingStock: "", received: "", consumption: "", settingPercent: "", actualPercent: "", wastage: "" },
   { material: TAPE_MATERIAL_RP_YELLOW, grade: "", openingStock: "", received: "", consumption: "", settingPercent: "", actualPercent: "", wastage: "" },

@@ -8,6 +8,7 @@ import { RecipePlanItem } from "@/components/tape-plant/TapePlantPlanningSection
 import {
   formatRpModeLabel,
   normalizeTapeMaterialName,
+  TAPE_MATERIAL_LDPE_040,
   TAPE_MATERIAL_MIXED_RP,
   TAPE_MATERIAL_NATURAL_RP,
   TAPE_MATERIAL_RP_WHITE,
@@ -71,6 +72,7 @@ export function generatePlanningSheetHtml(data: TapePlanningPrintData): string {
   // Pre-calculate aggregate raw material sums across all recipe runs
   let totalPPSum = 0;
   let totalCCSum = 0;
+  let totalLDPESum = 0;
   let totalMBSum = 0;
   let totalRP1Sum = 0;
   let totalRP2Sum = 0;
@@ -87,6 +89,7 @@ export function generatePlanningSheetHtml(data: TapePlanningPrintData): string {
       runMatQty += q;
       if (key === "PP") totalPPSum += q;
       else if (key === "CC") totalCCSum += q;
+      else if (key === TAPE_MATERIAL_LDPE_040) totalLDPESum += q;
       else if (key === "MB") totalMBSum += q;
       else if (key === TAPE_MATERIAL_RP_WHITE) totalRP1Sum += q;
       else if (key === TAPE_MATERIAL_RP_YELLOW) totalRP2Sum += q;
@@ -150,6 +153,7 @@ export function generatePlanningSheetHtml(data: TapePlanningPrintData): string {
 
       const pp = getMat("PP");
       const cc = getMat("CC");
+      const ldpe = getMat(TAPE_MATERIAL_LDPE_040);
       const mb = getMat("MB");
       const rp1 = getMat(TAPE_MATERIAL_RP_WHITE);
       const rp2 = getMat(TAPE_MATERIAL_RP_YELLOW);
@@ -170,6 +174,7 @@ export function generatePlanningSheetHtml(data: TapePlanningPrintData): string {
           ![
             "PP",
             "CC",
+            TAPE_MATERIAL_LDPE_040,
             "MB",
             TAPE_MATERIAL_RP_WHITE,
             TAPE_MATERIAL_RP_YELLOW,
@@ -194,6 +199,9 @@ export function generatePlanningSheetHtml(data: TapePlanningPrintData): string {
             <!-- CC -->
             <td style="text-align: right; font-family: monospace; font-weight: 600;">${formatKg(cc.qty)}</td>
             <td style="text-align: right; font-family: monospace; color: #475569; font-size: 6.5pt; background-color: #f8fafc;">${formatPct(cc.pct)}</td>
+            <!-- LDPE 040 -->
+            <td style="text-align: right; font-family: monospace; font-weight: 600;">${formatKg(ldpe.qty)}</td>
+            <td style="text-align: right; font-family: monospace; color: #475569; font-size: 6.5pt; background-color: #f8fafc;">${formatPct(ldpe.pct)}</td>
             <!-- MB -->
             <td style="text-align: right; font-family: monospace; font-weight: 600;">${formatKg(mb.qty)}</td>
             <td style="text-align: right; font-family: monospace; color: #475569; font-size: 6.5pt; background-color: #f8fafc;">${formatPct(mb.pct)}</td>
@@ -224,7 +232,7 @@ export function generatePlanningSheetHtml(data: TapePlanningPrintData): string {
     }).join("")
     : `
       <tr>
-        <td colspan="20" style="text-align: center; color: #64748b; font-style: italic; padding: 8px;">
+        <td colspan="22" style="text-align: center; color: #64748b; font-style: italic; padding: 8px;">
           No formulation blend defined.
         </td>
       </tr>
@@ -234,6 +242,7 @@ export function generatePlanningSheetHtml(data: TapePlanningPrintData): string {
   const summaryMats = [
     { name: "PP", qty: totalPPSum },
     { name: "CC", qty: totalCCSum },
+    { name: TAPE_MATERIAL_LDPE_040, qty: totalLDPESum },
     { name: "MB", qty: totalMBSum },
     { name: TAPE_MATERIAL_RP_WHITE, qty: totalRP1Sum },
     { name: TAPE_MATERIAL_RP_YELLOW, qty: totalRP2Sum },
@@ -568,6 +577,7 @@ export function generatePlanningSheetHtml(data: TapePlanningPrintData): string {
           <th rowspan="2" style="text-align: center; width: 36px;">Shift</th>
           <th colspan="2" style="text-align: center;">PP</th>
           <th colspan="2" style="text-align: center;">CC</th>
+          <th colspan="2" style="text-align: center;">LDPE 040</th>
           <th colspan="2" style="text-align: center;">MB</th>
           <th colspan="2" style="text-align: center;">RP White</th>
           <th colspan="2" style="text-align: center;">RP Yellow</th>
@@ -578,6 +588,8 @@ export function generatePlanningSheetHtml(data: TapePlanningPrintData): string {
           <th rowspan="2" style="text-align: right; width: 36px;">Total %</th>
         </tr>
         <tr>
+          <th style="text-align: right; width: 34px; font-size: 6pt;">KG</th>
+          <th style="text-align: right; width: 24px; font-size: 6pt; color: #475569;">%</th>
           <th style="text-align: right; width: 34px; font-size: 6pt;">KG</th>
           <th style="text-align: right; width: 24px; font-size: 6pt; color: #475569;">%</th>
           <th style="text-align: right; width: 34px; font-size: 6pt;">KG</th>
@@ -608,6 +620,9 @@ export function generatePlanningSheetHtml(data: TapePlanningPrintData): string {
           <!-- CC -->
           <td style="text-align: right; font-family: monospace; font-weight: 800;">${formatKg(totalCCSum)}</td>
           <td style="text-align: right; font-family: monospace; font-size: 6pt; color: #64748b;">${totalBatchSum > 0 && totalCCSum > 0 ? `${((totalCCSum / totalBatchSum) * 100).toFixed(1)}%` : "—"}</td>
+          <!-- LDPE 040 -->
+          <td style="text-align: right; font-family: monospace; font-weight: 800;">${formatKg(totalLDPESum)}</td>
+          <td style="text-align: right; font-family: monospace; font-size: 6pt; color: #64748b;">${totalBatchSum > 0 && totalLDPESum > 0 ? `${((totalLDPESum / totalBatchSum) * 100).toFixed(1)}%` : "—"}</td>
           <!-- MB -->
           <td style="text-align: right; font-family: monospace; font-weight: 800;">${formatKg(totalMBSum)}</td>
           <td style="text-align: right; font-family: monospace; font-size: 6pt; color: #64748b;">${totalBatchSum > 0 && totalMBSum > 0 ? `${((totalMBSum / totalBatchSum) * 100).toFixed(1)}%` : "—"}</td>
