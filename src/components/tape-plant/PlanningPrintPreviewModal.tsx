@@ -28,6 +28,7 @@ interface PlanningPrintPreviewModalProps {
 }
 
 import {
+  formatRpModeLabel,
   normalizeTapeMaterialName,
   TAPE_MATERIAL_MIXED_RP,
   TAPE_MATERIAL_NATURAL_RP,
@@ -311,6 +312,7 @@ export function PlanningPrintPreviewModal({
                       <th className="p-2 border-r border-slate-300">Quality Name / Recipe Code</th>
                       <th className="p-2 border-r border-slate-300 text-center w-16">Shift</th>
                       <th className="p-2 border-r border-slate-300 text-center">Type</th>
+                      <th className="p-2 border-r border-slate-300 text-center">RP Mode</th>
                       <th className="p-2 border-r border-slate-300 text-right">Denier</th>
                       <th className="p-2 border-r border-slate-300 text-right">Width (mm)</th>
                       <th className="p-2 border-r border-slate-300 text-right">Strength</th>
@@ -344,6 +346,9 @@ export function PlanningPrintPreviewModal({
                         </td>
                         <td className="p-2 border-r border-slate-200 text-center font-medium">
                           {p.tapeType}
+                        </td>
+                        <td className="p-2 border-r border-slate-200 text-center font-semibold text-[11px] whitespace-nowrap">
+                          {formatRpModeLabel(p.rpMode)}
                         </td>
                         <td className="p-2 border-r border-slate-200 text-right font-mono">
                           {p.denier || "—"}
@@ -380,7 +385,7 @@ export function PlanningPrintPreviewModal({
                   </tbody>
                   <tfoot>
                     <tr className="bg-slate-100 font-bold border-t-2 border-slate-300">
-                      <td colSpan={13} className="p-2 text-right uppercase tracking-wider text-[10px]">
+                      <td colSpan={14} className="p-2 text-right uppercase tracking-wider text-[10px]">
                         Total Shift Planned Output{totalDayNightPlannedKg > 0 ? " (Single-Shift Runs)" : ""}:
                       </td>
                       <td className="p-2 text-right font-mono font-black text-slate-900 bg-slate-200">
@@ -389,7 +394,7 @@ export function PlanningPrintPreviewModal({
                     </tr>
                     {totalDayNightPlannedKg > 0 && (
                       <tr className="bg-amber-50 font-bold border-t border-amber-200 text-amber-900">
-                        <td colSpan={13} className="p-2 text-right uppercase tracking-wider text-[10px] text-amber-800">
+                        <td colSpan={14} className="p-2 text-right uppercase tracking-wider text-[10px] text-amber-800">
                           + 24-Hour Continuous Batch (Day+Night Run):
                         </td>
                         <td className="p-2 text-right font-mono font-black text-amber-950 bg-amber-100">
