@@ -1,5 +1,12 @@
 import * as XLSX from "xlsx";
 import { RecipePlanItem } from "@/components/tape-plant/TapePlantPlanningSection";
+import {
+  normalizeTapeMaterialName,
+  TAPE_MATERIAL_MIXED_RP,
+  TAPE_MATERIAL_NATURAL_RP,
+  TAPE_MATERIAL_RP_WHITE,
+  TAPE_MATERIAL_RP_YELLOW,
+} from "./material-names";
 
 export interface PlanningExportOptions {
   date: string;
@@ -63,14 +70,14 @@ export function generateTapePlantPlanningExcel({
     "CC (%)",
     "MB Qty (KG)",
     "MB (%)",
-    "RP1 Qty (KG)",
-    "RP1 (%)",
-    "RP2 Qty (KG)",
-    "RP2 (%)",
-    "HD RP Qty (KG)",
-    "HD RP (%)",
-    "TPT Qty (KG)",
-    "TPT (%)",
+    "RP White Qty (KG)",
+    "RP White (%)",
+    "RP Yellow Qty (KG)",
+    "RP Yellow (%)",
+    "Mixed RP Qty (KG)",
+    "Mixed RP (%)",
+    "Natural RP Qty (KG)",
+    "Natural RP (%)",
     "Other Qty (KG)",
     "Total Batch Qty (KG)",
     "Total Blend (%)",
@@ -104,7 +111,7 @@ export function generateTapePlantPlanningExcel({
     // Extract material items
     const getMat = (name: string): { qty: number; pct: number } => {
       const match = plan.materials?.find(
-        (m) => m.material.trim().toUpperCase() === name.toUpperCase()
+        (m) => normalizeTapeMaterialName(m.material) === name
       );
       return {
         qty: match && Number(match.quantity) ? Number(match.quantity) : 0,
@@ -115,13 +122,21 @@ export function generateTapePlantPlanningExcel({
     const pp = getMat("PP");
     const cc = getMat("CC");
     const mb = getMat("MB");
-    const rp1 = getMat("RP1");
-    const rp2 = getMat("RP2");
-    const hdrp = getMat("HD RP");
-    const tpt = getMat("TPT");
+    const rp1 = getMat(TAPE_MATERIAL_RP_WHITE);
+    const rp2 = getMat(TAPE_MATERIAL_RP_YELLOW);
+    const hdrp = getMat(TAPE_MATERIAL_MIXED_RP);
+    const tpt = getMat(TAPE_MATERIAL_NATURAL_RP);
 
     // Other materials
-    const knownSet = new Set(["PP", "CC", "MB", "RP1", "RP2", "HD RP", "TPT"]);
+    const knownSet = new Set([
+      "PP",
+      "CC",
+      "MB",
+      TAPE_MATERIAL_RP_WHITE,
+      TAPE_MATERIAL_RP_YELLOW,
+      TAPE_MATERIAL_MIXED_RP,
+      TAPE_MATERIAL_NATURAL_RP,
+    ]);
     let otherQty = 0;
     let totalBlendPct = 0;
     let totalBatchQty = 0;
@@ -131,7 +146,7 @@ export function generateTapePlantPlanningExcel({
       const p = Number(m.percentage) || 0;
       totalBatchQty += q;
       totalBlendPct += p;
-      if (!knownSet.has(m.material.trim().toUpperCase())) {
+      if (!knownSet.has(normalizeTapeMaterialName(m.material))) {
         otherQty += q;
       }
     });
@@ -258,14 +273,14 @@ export function generateTapePlantPlanningExcel({
     { wch: 10 }, // CC %
     { wch: 14 }, // MB kg
     { wch: 10 }, // MB %
-    { wch: 14 }, // RP1 kg
-    { wch: 10 }, // RP1 %
-    { wch: 14 }, // RP2 kg
-    { wch: 10 }, // RP2 %
-    { wch: 14 }, // HD RP kg
-    { wch: 10 }, // HD RP %
-    { wch: 14 }, // TPT kg
-    { wch: 10 }, // TPT %
+    { wch: 14 }, // RP White kg
+    { wch: 10 }, // RP White %
+    { wch: 14 }, // RP Yellow kg
+    { wch: 10 }, // RP Yellow %
+    { wch: 14 }, // Mixed RP kg
+    { wch: 10 }, // Mixed RP %
+    { wch: 14 }, // Natural RP kg
+    { wch: 10 }, // Natural RP %
     { wch: 14 }, // Other kg
     { wch: 20 }, // Total Batch kg
     { wch: 16 }, // Total Blend %
@@ -286,7 +301,7 @@ export function generateTapePlantPlanningExcel({
   const matAggregates: Record<string, number> = {};
   plans.forEach((p) => {
     (p.materials || []).forEach((m) => {
-      const name = m.material.trim().toUpperCase() || "UNKNOWN";
+      const name = normalizeTapeMaterialName(m.material) || "UNKNOWN";
       const q = Number(m.quantity) || 0;
       matAggregates[name] = (matAggregates[name] || 0) + q;
     });
