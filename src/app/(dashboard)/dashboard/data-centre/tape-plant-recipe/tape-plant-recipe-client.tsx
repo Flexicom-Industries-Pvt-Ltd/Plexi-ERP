@@ -732,22 +732,22 @@ export function TapePlantRecipeClient() {
                             ) : null}
                             {r.rp1Percent ? (
                               <span className="px-1.5 py-0.5 bg-emerald-50 text-emerald-700 rounded border border-emerald-200 text-[10px] font-semibold">
-                                RP1: {r.rp1Percent}%
+                                RP White: {r.rp1Percent}%
                               </span>
                             ) : null}
                             {r.rp2Percent ? (
                               <span className="px-1.5 py-0.5 bg-teal-50 text-teal-700 rounded border border-teal-200 text-[10px] font-semibold">
-                                RP2: {r.rp2Percent}%
+                                RP Yellow: {r.rp2Percent}%
                               </span>
                             ) : null}
                             {r.hdrpPercent ? (
                               <span className="px-1.5 py-0.5 bg-rose-50 text-rose-700 rounded border border-rose-200 text-[10px] font-semibold">
-                                HD RP: {r.hdrpPercent}%
+                                Mixed RP: {r.hdrpPercent}%
                               </span>
                             ) : null}
                             {r.tptPercent ? (
                               <span className="px-1.5 py-0.5 bg-slate-100 text-slate-700 rounded border border-slate-200 text-[10px] font-semibold">
-                                TPT: {r.tptPercent}%
+                                Natural RP: {r.tptPercent}%
                               </span>
                             ) : null}
                           </div>
@@ -936,7 +936,7 @@ export function TapePlantRecipeClient() {
                   )}
                 </div>
                 <p className="text-[11px] text-purple-800/80">
-                  Select an existing quality to copy all material composition percentages (PP%, CC%, MB%, RP1%, RP2%, Ash%, Spacer) instantly:
+                  Select an existing quality to copy all material composition percentages (PP%, CC%, MB%, RP White%, RP Yellow%, Mixed RP%, Natural RP%, Ash%, Spacer) instantly:
                 </p>
                 <select
                   value={cloneSourceCode}
@@ -1215,7 +1215,7 @@ export function TapePlantRecipeClient() {
                     />
                   </div>
                   <div>
-                    <label className="text-[11px] font-medium text-slate-600 block mb-1">RP1 % (Reprocessed 1)</label>
+                    <label className="text-[11px] font-medium text-slate-600 block mb-1">RP White %</label>
                     <input
                       type="number"
                       step="any"
@@ -1226,7 +1226,7 @@ export function TapePlantRecipeClient() {
                     />
                   </div>
                   <div>
-                    <label className="text-[11px] font-medium text-slate-600 block mb-1">RP2 % (Reprocessed 2)</label>
+                    <label className="text-[11px] font-medium text-slate-600 block mb-1">RP Yellow %</label>
                     <input
                       type="number"
                       step="any"
@@ -1237,7 +1237,7 @@ export function TapePlantRecipeClient() {
                     />
                   </div>
                   <div>
-                    <label className="text-[11px] font-medium text-slate-600 block mb-1">HD RP %</label>
+                    <label className="text-[11px] font-medium text-slate-600 block mb-1">Mixed RP %</label>
                     <input
                       type="number"
                       step="any"
@@ -1248,7 +1248,7 @@ export function TapePlantRecipeClient() {
                     />
                   </div>
                   <div>
-                    <label className="text-[11px] font-medium text-slate-600 block mb-1">TPT %</label>
+                    <label className="text-[11px] font-medium text-slate-600 block mb-1">Natural RP %</label>
                     <input
                       type="number"
                       step="any"

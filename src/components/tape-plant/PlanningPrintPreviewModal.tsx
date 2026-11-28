@@ -27,17 +27,13 @@ interface PlanningPrintPreviewModalProps {
   plans: RecipePlanItem[];
 }
 
-function normalizeMaterialKey(mat: string): string {
-  const clean = (mat || "").trim().toUpperCase().replace(/[\s\-_]/g, "");
-  if (clean === "PP") return "PP";
-  if (clean === "CC") return "CC";
-  if (clean === "MB") return "MB";
-  if (clean === "RP1") return "RP1";
-  if (clean === "RP2") return "RP2";
-  if (clean === "HDRP") return "HD RP";
-  if (clean === "TPT") return "TPT";
-  return (mat || "").trim().toUpperCase();
-}
+import {
+  normalizeTapeMaterialName,
+  TAPE_MATERIAL_MIXED_RP,
+  TAPE_MATERIAL_NATURAL_RP,
+  TAPE_MATERIAL_RP_WHITE,
+  TAPE_MATERIAL_RP_YELLOW,
+} from "@/lib/tape-plant/material-names";
 
 function formatKg(val: number | string | undefined | null): string {
   if (val === undefined || val === null || val === "" || val === 0) return "—";
@@ -108,16 +104,16 @@ export function PlanningPrintPreviewModal({
   plans.forEach((p) => {
     let runMatQty = 0;
     (p.materials || []).forEach((m) => {
-      const key = normalizeMaterialKey(m.material);
+      const key = normalizeTapeMaterialName(m.material);
       const q = Number(m.quantity) || 0;
       runMatQty += q;
       if (key === "PP") totalPPSum += q;
       else if (key === "CC") totalCCSum += q;
       else if (key === "MB") totalMBSum += q;
-      else if (key === "RP1") totalRP1Sum += q;
-      else if (key === "RP2") totalRP2Sum += q;
-      else if (key === "HD RP") totalHDRPSum += q;
-      else if (key === "TPT") totalTPTSum += q;
+      else if (key === TAPE_MATERIAL_RP_WHITE) totalRP1Sum += q;
+      else if (key === TAPE_MATERIAL_RP_YELLOW) totalRP2Sum += q;
+      else if (key === TAPE_MATERIAL_MIXED_RP) totalHDRPSum += q;
+      else if (key === TAPE_MATERIAL_NATURAL_RP) totalTPTSum += q;
       else totalOtherSum += q;
     });
     totalBatchSum += (runMatQty || Number(p.plannedQtyKg) || 0);
@@ -424,10 +420,10 @@ export function PlanningPrintPreviewModal({
                       <th colSpan={2} className="p-1 border-r border-slate-300 text-center">PP</th>
                       <th colSpan={2} className="p-1 border-r border-slate-300 text-center">CC</th>
                       <th colSpan={2} className="p-1 border-r border-slate-300 text-center">MB</th>
-                      <th colSpan={2} className="p-1 border-r border-slate-300 text-center">RP1</th>
-                      <th colSpan={2} className="p-1 border-r border-slate-300 text-center">RP2</th>
-                      <th colSpan={2} className="p-1 border-r border-slate-300 text-center">HD RP</th>
-                      <th colSpan={2} className="p-1 border-r border-slate-300 text-center">TPT</th>
+                      <th colSpan={2} className="p-1 border-r border-slate-300 text-center">RP White</th>
+                      <th colSpan={2} className="p-1 border-r border-slate-300 text-center">RP Yellow</th>
+                      <th colSpan={2} className="p-1 border-r border-slate-300 text-center">Mixed RP</th>
+                      <th colSpan={2} className="p-1 border-r border-slate-300 text-center">Natural RP</th>
                       <th rowSpan={2} className="p-2 border-r border-slate-300 text-right w-14">Other</th>
                       <th rowSpan={2} className="p-2 border-r border-slate-300 text-right font-bold bg-slate-50 w-24">
                         Batch Total
@@ -455,7 +451,7 @@ export function PlanningPrintPreviewModal({
                     {plans.map((p, idx) => {
                       const getMatRaw = (name: string) => {
                         const match = (p.materials || []).find(
-                          (m) => normalizeMaterialKey(m.material) === name
+                          (m) => normalizeTapeMaterialName(m.material) === name
                         );
                         return {
                           qty: match && Number(match.quantity) ? Number(match.quantity) : 0,
@@ -466,10 +462,10 @@ export function PlanningPrintPreviewModal({
                       const pp = getMatRaw("PP");
                       const cc = getMatRaw("CC");
                       const mb = getMatRaw("MB");
-                      const rp1 = getMatRaw("RP1");
-                      const rp2 = getMatRaw("RP2");
-                      const hdrp = getMatRaw("HD RP");
-                      const tpt = getMatRaw("TPT");
+                      const rp1 = getMatRaw(TAPE_MATERIAL_RP_WHITE);
+                      const rp2 = getMatRaw(TAPE_MATERIAL_RP_YELLOW);
+                      const hdrp = getMatRaw(TAPE_MATERIAL_MIXED_RP);
+                      const tpt = getMatRaw(TAPE_MATERIAL_NATURAL_RP);
 
                       let otherQty = 0;
                       let totalBlendPct = 0;
@@ -480,8 +476,18 @@ export function PlanningPrintPreviewModal({
                         const pct = Number(m.percentage) || 0;
                         runBatchQty += q;
                         totalBlendPct += pct;
-                        const key = normalizeMaterialKey(m.material);
-                        if (!["PP", "CC", "MB", "RP1", "RP2", "HD RP", "TPT"].includes(key)) {
+                        const key = normalizeTapeMaterialName(m.material);
+                        if (
+                          ![
+                            "PP",
+                            "CC",
+                            "MB",
+                            TAPE_MATERIAL_RP_WHITE,
+                            TAPE_MATERIAL_RP_YELLOW,
+                            TAPE_MATERIAL_MIXED_RP,
+                            TAPE_MATERIAL_NATURAL_RP,
+                          ].includes(key)
+                        ) {
                           otherQty += q;
                         }
                       });
@@ -589,10 +595,10 @@ export function PlanningPrintPreviewModal({
                       <th className="p-2 border-r border-slate-300">PP</th>
                       <th className="p-2 border-r border-slate-300">CC</th>
                       <th className="p-2 border-r border-slate-300">MB</th>
-                      <th className="p-2 border-r border-slate-300">RP1</th>
-                      <th className="p-2 border-r border-slate-300">RP2</th>
-                      <th className="p-2 border-r border-slate-300">HD RP</th>
-                      <th className="p-2 border-r border-slate-300">TPT</th>
+                      <th className="p-2 border-r border-slate-300">RP White</th>
+                      <th className="p-2 border-r border-slate-300">RP Yellow</th>
+                      <th className="p-2 border-r border-slate-300">Mixed RP</th>
+                      <th className="p-2 border-r border-slate-300">Natural RP</th>
                       {totalOtherSum > 0 && <th className="p-2 border-r border-slate-300">Other</th>}
                       <th className="p-2 border-r border-slate-300 font-extrabold bg-slate-200">Total Batch</th>
                     </tr>
