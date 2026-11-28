@@ -24,11 +24,17 @@ import {
   ChevronRight,
   Palette,
 } from "lucide-react";
+import {
+  formatRpModeLabel,
+  normalizeRpMode,
+  RecipeRpMode,
+} from "@/lib/tape-plant/material-names";
 
 export interface TapePlantRecipeRecord {
   id: string;
   code: string;
   tapeType: string;
+  rpMode: RecipeRpMode;
   denier: number | null;
   tapeWidth: number | null;
   strength: number | null;
@@ -73,6 +79,7 @@ const COLOR_GROUPS = [
 const EMPTY_RECIPE_FORM: Omit<TapePlantRecipeRecord, "id" | "createdAt" | "updatedAt" | "sharedQualities"> = {
   code: "",
   tapeType: "PP",
+  rpMode: "WITH_RP",
   denier: 840,
   tapeWidth: 2.45,
   strength: 4.75,
@@ -105,6 +112,7 @@ export function TapePlantRecipeClient() {
   const [recipes, setRecipes] = useState<TapePlantRecipeRecord[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [tapeTypeFilter, setTapeTypeFilter] = useState("ALL");
+  const [rpModeFilter, setRpModeFilter] = useState<"ALL" | RecipeRpMode>("ALL");
   const [colorGroupFilter, setColorGroupFilter] = useState("ALL");
 
   // Modal State
@@ -174,6 +182,7 @@ export function TapePlantRecipeClient() {
     setFormData({
       code: "", // Blank so user can type the new quality code
       tapeType: sourceRecipe.tapeType || "PP",
+      rpMode: normalizeRpMode(sourceRecipe.rpMode),
       denier: sourceRecipe.denier,
       tapeWidth: sourceRecipe.tapeWidth,
       strength: sourceRecipe.strength,
@@ -212,6 +221,7 @@ export function TapePlantRecipeClient() {
     setFormData((prev) => ({
       ...prev,
       tapeType: source.tapeType || prev.tapeType,
+      rpMode: normalizeRpMode(source.rpMode),
       denier: source.denier ?? prev.denier,
       tapeWidth: source.tapeWidth ?? prev.tapeWidth,
       strength: source.strength ?? prev.strength,
@@ -244,6 +254,7 @@ export function TapePlantRecipeClient() {
     setFormData({
       code: recipe.code,
       tapeType: recipe.tapeType || "PP",
+      rpMode: normalizeRpMode(recipe.rpMode),
       denier: recipe.denier,
       tapeWidth: recipe.tapeWidth,
       strength: recipe.strength,
@@ -334,6 +345,9 @@ export function TapePlantRecipeClient() {
         tapeTypeFilter === "ALL" ||
         r.tapeType?.toUpperCase() === tapeTypeFilter.toUpperCase();
 
+      const matchesRpMode =
+        rpModeFilter === "ALL" || normalizeRpMode(r.rpMode) === rpModeFilter;
+
       const matchesColorGroup =
         colorGroupFilter === "ALL" ||
         r.colorGroup?.toLowerCase() === colorGroupFilter.toLowerCase();
@@ -348,9 +362,9 @@ export function TapePlantRecipeClient() {
         r.recipeGroup?.toLowerCase().includes(q) ||
         r.colorGroup?.toLowerCase().includes(q);
 
-      return matchesType && matchesColorGroup && matchesSearch;
+      return matchesType && matchesRpMode && matchesColorGroup && matchesSearch;
     });
-  }, [recipes, tapeTypeFilter, colorGroupFilter, searchTerm]);
+  }, [recipes, tapeTypeFilter, rpModeFilter, colorGroupFilter, searchTerm]);
 
   // Composition calculation
   const totalComposition = useMemo(() => {
@@ -537,6 +551,29 @@ export function TapePlantRecipeClient() {
               </button>
             ))}
           </div>
+
+          <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-lg border border-slate-200 text-xs">
+            {(
+              [
+                { id: "ALL", label: "All RP" },
+                { id: "WITH_RP", label: "With RP" },
+                { id: "WITHOUT_RP", label: "Without RP" },
+              ] as const
+            ).map((opt) => (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => setRpModeFilter(opt.id)}
+                className={`px-2.5 py-1 font-semibold rounded-md transition-all whitespace-nowrap ${
+                  rpModeFilter === opt.id
+                    ? "bg-white text-slate-900 shadow-sm"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="flex items-center gap-2">
@@ -591,6 +628,7 @@ export function TapePlantRecipeClient() {
                   <th className="px-4 py-3">Quality Code & Family</th>
                   <th className="px-3 py-3 text-center">Color Group</th>
                   <th className="px-3 py-3 text-center">Type</th>
+                  <th className="px-3 py-3 text-center">RP Mode</th>
                   <th className="px-3 py-3 text-right">Denier</th>
                   <th className="px-3 py-3 text-right">Width (mm)</th>
                   <th className="px-3 py-3 text-right">Strength</th>
@@ -665,6 +703,19 @@ export function TapePlantRecipeClient() {
                           }`}
                         >
                           {r.tapeType}
+                        </span>
+                      </td>
+
+                      {/* RP Mode */}
+                      <td className="px-3 py-3 text-center whitespace-nowrap">
+                        <span
+                          className={`inline-block px-2 py-0.5 font-bold text-[10px] rounded border ${
+                            normalizeRpMode(r.rpMode) === "WITHOUT_RP"
+                              ? "bg-amber-50 text-amber-800 border-amber-200"
+                              : "bg-sky-50 text-sky-800 border-sky-200"
+                          }`}
+                        >
+                          {formatRpModeLabel(r.rpMode)}
                         </span>
                       </td>
 
@@ -984,6 +1035,22 @@ export function TapePlantRecipeClient() {
                       <option value="PP">PP (Polypropylene Standard)</option>
                       <option value="LPP">LPP (Laminated / Liner PP)</option>
                       <option value="HDPE">HDPE (High Density)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700 block mb-1">
+                      RP Formulation Mode
+                    </label>
+                    <select
+                      value={formData.rpMode}
+                      onChange={(e) =>
+                        setFormData({ ...formData, rpMode: normalizeRpMode(e.target.value) })
+                      }
+                      className="w-full px-3 py-2 text-xs font-semibold border border-slate-200 rounded-lg bg-white focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                    >
+                      <option value="WITH_RP">With RP (Reprocessed Blend)</option>
+                      <option value="WITHOUT_RP">Without RP (Virgin Blend)</option>
                     </select>
                   </div>
 

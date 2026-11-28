@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { requireApiAuth } from "@/lib/api-auth";
 import { Module } from "@/generated/prisma";
 import { logEvent } from "@/lib/logging";
+import { inferRpModeFromComposition } from "@/lib/tape-plant/material-names";
 
 export const dynamic = "force-dynamic";
 
@@ -831,6 +832,7 @@ export async function POST(request: NextRequest) {
         where: { code: r.code },
         update: {
           tapeType: r.tapeType,
+          rpMode: inferRpModeFromComposition(r),
           denier: r.denier,
           tapeWidth: r.tapeWidth,
           strength: r.strength,
@@ -860,6 +862,7 @@ export async function POST(request: NextRequest) {
         create: {
           code: r.code,
           tapeType: r.tapeType,
+          rpMode: inferRpModeFromComposition(r),
           denier: r.denier,
           tapeWidth: r.tapeWidth,
           strength: r.strength,
