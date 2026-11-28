@@ -22,6 +22,16 @@ import {
 import dynamic from "next/dynamic";
 import { generateTapePlantPlanningExcel } from "@/lib/tape-plant/planning-export";
 import { parseRecipeQuality } from "@/lib/tape-plant/recipe-format";
+import {
+  inferRpModeFromComposition,
+  normalizeRpMode,
+  normalizeTapeMaterialName,
+  RecipeRpMode,
+  TAPE_MATERIAL_MIXED_RP,
+  TAPE_MATERIAL_NATURAL_RP,
+  TAPE_MATERIAL_RP_WHITE,
+  TAPE_MATERIAL_RP_YELLOW,
+} from "@/lib/tape-plant/material-names";
 import { QualityCombobox } from "./QualityCombobox";
 import { useProductionShifts } from "@/hooks/useProductionShifts";
 import { useProductionRealtime } from "@/hooks/useProductionRealtime";
@@ -42,10 +52,10 @@ export const DEFAULT_MATERIALS: MaterialRow[] = [
   { material: "PP", quantity: "", percentage: "" },
   { material: "CC", quantity: "", percentage: "" },
   { material: "MB", quantity: "", percentage: "" },
-  { material: "RP1", quantity: "", percentage: "" },
-  { material: "RP2", quantity: "", percentage: "" },
-  { material: "HD RP", quantity: "", percentage: "" },
-  { material: "TPT", quantity: "", percentage: "" },
+  { material: TAPE_MATERIAL_RP_WHITE, quantity: "", percentage: "" },
+  { material: TAPE_MATERIAL_RP_YELLOW, quantity: "", percentage: "" },
+  { material: TAPE_MATERIAL_MIXED_RP, quantity: "", percentage: "" },
+  { material: TAPE_MATERIAL_NATURAL_RP, quantity: "", percentage: "" },
 ];
 
 export interface RecipePlanItem {
@@ -53,6 +63,7 @@ export interface RecipePlanItem {
   clientUid?: string;
   recipeQuality: string;
   tapeType: "PP" | "LPP" | string;
+  rpMode?: RecipeRpMode;
   denier: number | string;
   tapeWidth: number | string;
   strength: number | string;
@@ -89,6 +100,7 @@ export const createEmptyRecipePlan = (
     clientUid: tempId,
     recipeQuality: "",
     tapeType: "PP",
+    rpMode: "WITH_RP",
     denier: "",
     tapeWidth: "",
     strength: "",
@@ -198,6 +210,7 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName, shifts }: T
           shiftName: p.shiftName || p.shift?.name || undefined,
           recipeQuality: p.recipeQuality || "",
           tapeType: p.tapeType || "PP",
+          rpMode: normalizeRpMode(p.rpMode),
           denier: p.denier ?? "",
           tapeWidth: p.tapeWidth ?? "",
           strength: p.strength ?? "",
@@ -213,7 +226,10 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName, shifts }: T
           remarks: p.remarks || "",
           materials:
             Array.isArray(p.materials) && p.materials.length > 0
-              ? p.materials
+              ? p.materials.map((m: MaterialRow) => ({
+                  ...m,
+                  material: normalizeTapeMaterialName(m.material),
+                }))
               : DEFAULT_MATERIALS.map((m) => ({ material: m.material, quantity: "", percentage: "" })),
           isDayNight: Boolean(p.isDayNight),
           carriedOverFromShift: p.carriedOverFromShift || undefined,
@@ -229,6 +245,7 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName, shifts }: T
             id: p.id,
             recipeQuality: (p.recipeQuality || "").trim(),
             tapeType: p.tapeType,
+            rpMode: normalizeRpMode(p.rpMode),
             denier: p.denier !== "" ? Number(p.denier) : null,
             tapeWidth: p.tapeWidth !== "" ? Number(p.tapeWidth) : null,
             strength: p.strength !== "" ? Number(p.strength) : null,
@@ -258,6 +275,7 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName, shifts }: T
           shiftName: data.shiftName || (data.shift?.name) || undefined,
           recipeQuality: data.recipeQuality || "",
           tapeType: data.tapeType || "PP",
+          rpMode: normalizeRpMode(data.rpMode),
           denier: data.denier ?? "",
           tapeWidth: data.tapeWidth ?? "",
           strength: data.strength ?? "",
@@ -273,7 +291,10 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName, shifts }: T
           remarks: data.remarks || "",
           materials:
             Array.isArray(data.materials) && data.materials.length > 0
-              ? data.materials
+              ? data.materials.map((m: MaterialRow) => ({
+                  ...m,
+                  material: normalizeTapeMaterialName(m.material),
+                }))
               : DEFAULT_MATERIALS.map((m) => ({ material: m.material, quantity: "", percentage: "" })),
           isDayNight: Boolean(data.isDayNight),
           carriedOverFromShift: data.carriedOverFromShift || undefined,
@@ -358,15 +379,16 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName, shifts }: T
       { material: "PP", percentage: recipe.ppPercent ?? "", quantity: computeQty(recipe.ppPercent) },
       { material: "CC", percentage: recipe.ccPercent ?? "", quantity: computeQty(recipe.ccPercent) },
       { material: "MB", percentage: recipe.mbPercent ?? "", quantity: computeQty(recipe.mbPercent) },
-      { material: "RP1", percentage: recipe.rp1Percent ?? "", quantity: computeQty(recipe.rp1Percent) },
-      { material: "RP2", percentage: recipe.rp2Percent ?? "", quantity: computeQty(recipe.rp2Percent) },
-      { material: "HD RP", percentage: recipe.hdrpPercent ?? "", quantity: computeQty(recipe.hdrpPercent) },
-      { material: "TPT", percentage: recipe.tptPercent ?? "", quantity: computeQty(recipe.tptPercent) },
+      { material: TAPE_MATERIAL_RP_WHITE, percentage: recipe.rp1Percent ?? "", quantity: computeQty(recipe.rp1Percent) },
+      { material: TAPE_MATERIAL_RP_YELLOW, percentage: recipe.rp2Percent ?? "", quantity: computeQty(recipe.rp2Percent) },
+      { material: TAPE_MATERIAL_MIXED_RP, percentage: recipe.hdrpPercent ?? "", quantity: computeQty(recipe.hdrpPercent) },
+      { material: TAPE_MATERIAL_NATURAL_RP, percentage: recipe.tptPercent ?? "", quantity: computeQty(recipe.tptPercent) },
     ];
 
     updateCurrentPlan({
       recipeQuality: recipe.code,
       tapeType: recipe.tapeType || "PP",
+      rpMode: recipe.rpMode ? normalizeRpMode(recipe.rpMode) : inferRpModeFromComposition(recipe),
       denier: recipe.denier ?? "",
       tapeWidth: recipe.tapeWidth ?? "",
       strength: recipe.strength ?? "",
@@ -482,6 +504,7 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName, shifts }: T
         id: p.id,
         recipeQuality: (p.recipeQuality || "").trim(),
         tapeType: p.tapeType,
+        rpMode: normalizeRpMode(p.rpMode),
         denier: p.denier !== "" && p.denier !== null && p.denier !== undefined ? Number(p.denier) : null,
         tapeWidth: p.tapeWidth !== "" && p.tapeWidth !== null && p.tapeWidth !== undefined ? Number(p.tapeWidth) : null,
         strength: p.strength !== "" && p.strength !== null && p.strength !== undefined ? Number(p.strength) : null,
@@ -576,6 +599,7 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName, shifts }: T
           id: p.id,
           recipeQuality: p.recipeQuality.trim(),
           tapeType: p.tapeType,
+          rpMode: normalizeRpMode(p.rpMode),
           denier: p.denier !== "" ? Number(p.denier) : null,
           tapeWidth: p.tapeWidth !== "" ? Number(p.tapeWidth) : null,
           strength: p.strength !== "" ? Number(p.strength) : null,
@@ -622,6 +646,7 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName, shifts }: T
             id: p.id,
             recipeQuality: p.recipeQuality || "",
             tapeType: p.tapeType || "PP",
+            rpMode: normalizeRpMode(p.rpMode),
             denier: p.denier ?? "",
             tapeWidth: p.tapeWidth ?? "",
             strength: p.strength ?? "",
@@ -701,7 +726,7 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName, shifts }: T
   };
 
   // ── Excel-like 2D Arrow Key Grid Navigation ──
-  const TOTAL_GRID_COLS = 16;
+  const TOTAL_GRID_COLS = 17;
 
   const handleGridKeyDown = (
     e: React.KeyboardEvent,
@@ -855,15 +880,16 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName, shifts }: T
       { material: "PP", percentage: recipe.ppPercent ?? "", quantity: computeQty(recipe.ppPercent) },
       { material: "CC", percentage: recipe.ccPercent ?? "", quantity: computeQty(recipe.ccPercent) },
       { material: "MB", percentage: recipe.mbPercent ?? "", quantity: computeQty(recipe.mbPercent) },
-      { material: "RP1", percentage: recipe.rp1Percent ?? "", quantity: computeQty(recipe.rp1Percent) },
-      { material: "RP2", percentage: recipe.rp2Percent ?? "", quantity: computeQty(recipe.rp2Percent) },
-      { material: "HD RP", percentage: recipe.hdrpPercent ?? "", quantity: computeQty(recipe.hdrpPercent) },
-      { material: "TPT", percentage: recipe.tptPercent ?? "", quantity: computeQty(recipe.tptPercent) },
+      { material: TAPE_MATERIAL_RP_WHITE, percentage: recipe.rp1Percent ?? "", quantity: computeQty(recipe.rp1Percent) },
+      { material: TAPE_MATERIAL_RP_YELLOW, percentage: recipe.rp2Percent ?? "", quantity: computeQty(recipe.rp2Percent) },
+      { material: TAPE_MATERIAL_MIXED_RP, percentage: recipe.hdrpPercent ?? "", quantity: computeQty(recipe.hdrpPercent) },
+      { material: TAPE_MATERIAL_NATURAL_RP, percentage: recipe.tptPercent ?? "", quantity: computeQty(recipe.tptPercent) },
     ];
 
     updatePlanAt(index, {
       recipeQuality: recipe.code,
       tapeType: recipe.tapeType || "PP",
+      rpMode: recipe.rpMode ? normalizeRpMode(recipe.rpMode) : inferRpModeFromComposition(recipe),
       denier: recipe.denier ?? "",
       tapeWidth: recipe.tapeWidth ?? "",
       strength: recipe.strength ?? "",
@@ -1125,6 +1151,7 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName, shifts }: T
                 <th className="sticky left-10 z-30 bg-slate-50 border-r border-slate-200 px-2.5 py-2.5 text-left font-bold text-slate-600 uppercase tracking-wider min-w-[240px]">Quality / Recipe</th>
                 <th className="px-2 py-2.5 text-center font-bold text-slate-600 uppercase tracking-wider border-r border-slate-200 w-[110px]">Shift</th>
                 <th className="px-2 py-2.5 text-center font-bold text-slate-600 uppercase tracking-wider border-r border-slate-200 w-[75px]">Type</th>
+                <th className="px-2 py-2.5 text-center font-bold text-slate-600 uppercase tracking-wider border-r border-slate-200 w-[108px]">RP Mode</th>
                 <th className="px-2 py-2.5 text-right font-bold text-slate-600 uppercase tracking-wider border-r border-slate-200 w-[80px]">Denier</th>
                 <th className="px-2 py-2.5 text-right font-bold text-slate-600 uppercase tracking-wider border-r border-slate-200 w-[90px]">Width mm</th>
                 <th className="px-2 py-2.5 text-right font-bold text-slate-600 uppercase tracking-wider border-r border-slate-200 w-[80px]">Str gpd</th>
@@ -1230,134 +1257,155 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName, shifts }: T
                         </select>
                       </td>
 
-                      {/* Col 3: Denier */}
+                      {/* Col 3: RP Mode (With RP / Without RP) */}
+                      <td className="border-r border-slate-200 px-1 py-1">
+                        <select
+                          value={normalizeRpMode(plan.rpMode)}
+                          onChange={(e) =>
+                            updatePlanAt(index, { rpMode: normalizeRpMode(e.target.value) })
+                          }
+                          onFocus={() => setActiveRecipeIndex(index)}
+                          className={`w-full h-8.5 px-1.5 text-[11px] font-bold rounded border cursor-pointer transition-colors outline-none focus:ring-1 ${
+                            normalizeRpMode(plan.rpMode) === "WITHOUT_RP"
+                              ? "bg-amber-50 text-amber-800 border-amber-200 focus:ring-amber-400"
+                              : "bg-sky-50 text-sky-800 border-sky-200 focus:ring-sky-400"
+                          }`}
+                          data-grid-cell={`${index}-3`}
+                          onKeyDown={(e) => handleGridKeyDown(e, index, 3)}
+                        >
+                          <option value="WITH_RP">With RP</option>
+                          <option value="WITHOUT_RP">Without RP</option>
+                        </select>
+                      </td>
+
+                      {/* Col 4: Denier */}
                       <td className="border-r border-slate-200 px-1 py-1">
                         <input type="number" value={plan.denier} placeholder="—"
                           onChange={(e) => updatePlanAt(index, { denier: e.target.value })}
-                          onFocus={() => setActiveRecipeIndex(index)}
-                          className={cellInputNumClass}
-                          data-grid-cell={`${index}-3`}
-                          onKeyDown={(e) => handleGridKeyDown(e, index, 3)} />
-                      </td>
-
-                      {/* Col 4: Width mm */}
-                      <td className="border-r border-slate-200 px-1 py-1">
-                        <input type="number" step="0.01" value={plan.tapeWidth} placeholder="—"
-                          onChange={(e) => updatePlanAt(index, { tapeWidth: e.target.value })}
                           onFocus={() => setActiveRecipeIndex(index)}
                           className={cellInputNumClass}
                           data-grid-cell={`${index}-4`}
                           onKeyDown={(e) => handleGridKeyDown(e, index, 4)} />
                       </td>
 
-                      {/* Col 5: Str gpd */}
+                      {/* Col 5: Width mm */}
                       <td className="border-r border-slate-200 px-1 py-1">
-                        <input type="number" step="0.01" value={plan.strength} placeholder="—"
-                          onChange={(e) => updatePlanAt(index, { strength: e.target.value })}
+                        <input type="number" step="0.01" value={plan.tapeWidth} placeholder="—"
+                          onChange={(e) => updatePlanAt(index, { tapeWidth: e.target.value })}
                           onFocus={() => setActiveRecipeIndex(index)}
                           className={cellInputNumClass}
                           data-grid-cell={`${index}-5`}
                           onKeyDown={(e) => handleGridKeyDown(e, index, 5)} />
                       </td>
 
-                      {/* Col 6: ELO % */}
+                      {/* Col 6: Str gpd */}
                       <td className="border-r border-slate-200 px-1 py-1">
-                        <input type="number" step="0.01" value={plan.eloPercent} placeholder="—"
-                          onChange={(e) => updatePlanAt(index, { eloPercent: e.target.value })}
+                        <input type="number" step="0.01" value={plan.strength} placeholder="—"
+                          onChange={(e) => updatePlanAt(index, { strength: e.target.value })}
                           onFocus={() => setActiveRecipeIndex(index)}
                           className={cellInputNumClass}
                           data-grid-cell={`${index}-6`}
                           onKeyDown={(e) => handleGridKeyDown(e, index, 6)} />
                       </td>
 
-                      {/* Col 7: Bobbin Marking */}
+                      {/* Col 7: ELO % */}
                       <td className="border-r border-slate-200 px-1 py-1">
-                        <input type="text" value={plan.bobbinMarking} placeholder="—"
-                          onChange={(e) => updatePlanAt(index, { bobbinMarking: e.target.value })}
+                        <input type="number" step="0.01" value={plan.eloPercent} placeholder="—"
+                          onChange={(e) => updatePlanAt(index, { eloPercent: e.target.value })}
                           onFocus={() => setActiveRecipeIndex(index)}
-                          className={cellInputClass}
+                          className={cellInputNumClass}
                           data-grid-cell={`${index}-7`}
                           onKeyDown={(e) => handleGridKeyDown(e, index, 7)} />
                       </td>
 
-                      {/* Col 8: Colour */}
+                      {/* Col 8: Bobbin Marking */}
                       <td className="border-r border-slate-200 px-1 py-1">
-                        <input type="text" value={plan.colour} placeholder="—"
-                          onChange={(e) => updatePlanAt(index, { colour: e.target.value })}
+                        <input type="text" value={plan.bobbinMarking} placeholder="—"
+                          onChange={(e) => updatePlanAt(index, { bobbinMarking: e.target.value })}
                           onFocus={() => setActiveRecipeIndex(index)}
                           className={cellInputClass}
                           data-grid-cell={`${index}-8`}
                           onKeyDown={(e) => handleGridKeyDown(e, index, 8)} />
                       </td>
 
-                      {/* Col 9: Spacer Size */}
+                      {/* Col 9: Colour */}
                       <td className="border-r border-slate-200 px-1 py-1">
-                        <input type="text" value={plan.spacerSize} placeholder="—"
-                          onChange={(e) => updatePlanAt(index, { spacerSize: e.target.value })}
+                        <input type="text" value={plan.colour} placeholder="—"
+                          onChange={(e) => updatePlanAt(index, { colour: e.target.value })}
                           onFocus={() => setActiveRecipeIndex(index)}
                           className={cellInputClass}
                           data-grid-cell={`${index}-9`}
                           onKeyDown={(e) => handleGridKeyDown(e, index, 9)} />
                       </td>
 
-                      {/* Col 10: Required Ash */}
+                      {/* Col 10: Spacer Size */}
                       <td className="border-r border-slate-200 px-1 py-1">
-                        <input type="number" step="0.01" value={plan.requiredAsh} placeholder="—"
-                          onChange={(e) => updatePlanAt(index, { requiredAsh: e.target.value })}
+                        <input type="text" value={plan.spacerSize} placeholder="—"
+                          onChange={(e) => updatePlanAt(index, { spacerSize: e.target.value })}
                           onFocus={() => setActiveRecipeIndex(index)}
-                          className={cellInputNumClass}
+                          className={cellInputClass}
                           data-grid-cell={`${index}-10`}
                           onKeyDown={(e) => handleGridKeyDown(e, index, 10)} />
                       </td>
 
-                      {/* Col 11: Ash % */}
+                      {/* Col 11: Required Ash */}
                       <td className="border-r border-slate-200 px-1 py-1">
-                        <input type="number" step="0.01" value={plan.ashPercent} placeholder="—"
-                          onChange={(e) => updatePlanAt(index, { ashPercent: e.target.value })}
+                        <input type="number" step="0.01" value={plan.requiredAsh} placeholder="—"
+                          onChange={(e) => updatePlanAt(index, { requiredAsh: e.target.value })}
                           onFocus={() => setActiveRecipeIndex(index)}
                           className={cellInputNumClass}
                           data-grid-cell={`${index}-11`}
                           onKeyDown={(e) => handleGridKeyDown(e, index, 11)} />
                       </td>
 
-                      {/* Col 12: Planned KG — highlighted */}
+                      {/* Col 12: Ash % */}
+                      <td className="border-r border-slate-200 px-1 py-1">
+                        <input type="number" step="0.01" value={plan.ashPercent} placeholder="—"
+                          onChange={(e) => updatePlanAt(index, { ashPercent: e.target.value })}
+                          onFocus={() => setActiveRecipeIndex(index)}
+                          className={cellInputNumClass}
+                          data-grid-cell={`${index}-12`}
+                          onKeyDown={(e) => handleGridKeyDown(e, index, 12)} />
+                      </td>
+
+                      {/* Col 13: Planned KG — highlighted */}
                       <td className="border-r border-slate-200 px-1 py-1 bg-slate-50">
                         <input type="number" value={plan.plannedQtyKg} placeholder="—"
                           onChange={(e) => handlePlannedQtyChangeForRow(index, e.target.value)}
                           onFocus={() => setActiveRecipeIndex(index)}
                           className={`${cellInputNumClass} font-bold text-slate-900 bg-white border border-slate-200 rounded`}
-                          data-grid-cell={`${index}-12`}
-                          onKeyDown={(e) => handleGridKeyDown(e, index, 12)} />
+                          data-grid-cell={`${index}-13`}
+                          onKeyDown={(e) => handleGridKeyDown(e, index, 13)} />
                       </td>
 
-                      {/* Col 13: Omega */}
+                      {/* Col 14: Omega */}
                       <td className="border-r border-slate-200 px-1 py-1">
                         <input type="text" value={plan.omega} placeholder="—"
                           onChange={(e) => updatePlanAt(index, { omega: e.target.value })}
                           onFocus={() => setActiveRecipeIndex(index)}
                           className={cellInputClass}
-                          data-grid-cell={`${index}-13`}
-                          onKeyDown={(e) => handleGridKeyDown(e, index, 13)} />
+                          data-grid-cell={`${index}-14`}
+                          onKeyDown={(e) => handleGridKeyDown(e, index, 14)} />
                       </td>
 
-                      {/* Col 14: Vist % */}
+                      {/* Col 15: Vist % */}
                       <td className="border-r border-slate-200 px-1 py-1">
                         <input type="number" step="0.01" value={plan.vistPercent} placeholder="—"
                           onChange={(e) => updatePlanAt(index, { vistPercent: e.target.value })}
                           onFocus={() => setActiveRecipeIndex(index)}
                           className={cellInputNumClass}
-                          data-grid-cell={`${index}-14`}
-                          onKeyDown={(e) => handleGridKeyDown(e, index, 14)} />
+                          data-grid-cell={`${index}-15`}
+                          onKeyDown={(e) => handleGridKeyDown(e, index, 15)} />
                       </td>
 
-                      {/* Col 15: Remarks */}
+                      {/* Col 16: Remarks */}
                       <td className="border-r border-slate-200 px-1 py-1">
                         <input type="text" value={plan.remarks} placeholder="Notes…"
                           onChange={(e) => updatePlanAt(index, { remarks: e.target.value })}
                           onFocus={() => setActiveRecipeIndex(index)}
                           className={cellInputClass}
-                          data-grid-cell={`${index}-15`}
-                          onKeyDown={(e) => handleGridKeyDown(e, index, 15)} />
+                          data-grid-cell={`${index}-16`}
+                          onKeyDown={(e) => handleGridKeyDown(e, index, 16)} />
                       </td>
 
                       {/* Actions */}
@@ -1388,7 +1436,7 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName, shifts }: T
                     {isExpanded && (
                       <tr className={`${isActive ? "bg-sky-50/20" : "bg-slate-50/50"} border-b border-slate-200`}>
                         <td className="sticky left-0 z-10 bg-inherit border-r border-slate-200"></td>
-                        <td colSpan={17} className="px-3 py-2.5">
+                        <td colSpan={18} className="px-3 py-2.5">
                           <div className="flex flex-wrap items-start gap-4">
                             {/* Material mini-table */}
                             <div className="flex-1 min-w-[320px]">
@@ -1474,7 +1522,7 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName, shifts }: T
             <tfoot>
               <tr className="border-t border-slate-200 bg-slate-50/50">
                 <td className="sticky left-0 z-20 bg-slate-50 border-r border-slate-200"></td>
-                <td colSpan={17} className="px-3.5 py-2.5">
+                <td colSpan={18} className="px-3.5 py-2.5">
                   <button type="button" onClick={handleAddRecipe}
                     className="text-xs font-semibold text-slate-700 hover:text-slate-900 hover:bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200 bg-white transition-colors inline-flex items-center gap-1.5 cursor-pointer shadow-sm">
                     <Plus className="h-3.5 w-3.5" /> Add Quality Row
@@ -1583,8 +1631,8 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName, shifts }: T
                     />
                   </div>
 
-                  {/* Primary Target Specs: Shift, Tape Type, Plan KG */}
-                  <div className="grid grid-cols-3 gap-2">
+                  {/* Primary Target Specs: Shift, Tape Type, RP Mode, Plan KG */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     <div>
                       <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
                         Shift
@@ -1616,6 +1664,27 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName, shifts }: T
                       >
                         <option value="PP">PP</option>
                         <option value="LPP">LPP</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                        RP Mode
+                      </label>
+                      <select
+                        value={normalizeRpMode(plan.rpMode)}
+                        onChange={(e) =>
+                          updatePlanAt(index, { rpMode: normalizeRpMode(e.target.value) })
+                        }
+                        onFocus={() => setActiveRecipeIndex(index)}
+                        className={`w-full h-9 px-2 text-xs font-bold rounded-lg border outline-none focus:ring-1 ${
+                          normalizeRpMode(plan.rpMode) === "WITHOUT_RP"
+                            ? "border-amber-200 bg-amber-50 text-amber-800 focus:ring-amber-400"
+                            : "border-sky-200 bg-sky-50 text-sky-800 focus:ring-sky-400"
+                        }`}
+                      >
+                        <option value="WITH_RP">With RP</option>
+                        <option value="WITHOUT_RP">Without RP</option>
                       </select>
                     </div>
 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireTapePlantApiPermission } from "@/lib/tape-plant/permissions";
 import { emitProductionSync } from "@/lib/realtime/production-bus";
+import { normalizeRpMode } from "@/lib/tape-plant/material-names";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -205,6 +206,7 @@ export async function POST(request: NextRequest) {
           shiftId: targetShiftId,
           recipeQuality: String(item.recipeQuality).trim(),
           tapeType: item.tapeType || "LPP",
+          rpMode: normalizeRpMode(item.rpMode),
           denier: item.denier !== undefined && item.denier !== null && item.denier !== "" ? Number(item.denier) : null,
           tapeWidth: item.tapeWidth !== undefined && item.tapeWidth !== null && item.tapeWidth !== "" ? Number(item.tapeWidth) : null,
           strength: item.strength !== undefined && item.strength !== null && item.strength !== "" ? Number(item.strength) : null,

@@ -23,6 +23,13 @@ import { PhotoEvidenceModal } from "./PhotoEvidenceModal";
 import { canUserOverrideLock } from "@/lib/tape-plant/telemetry-time-slots";
 import { useProductionRealtime } from "@/hooks/useProductionRealtime";
 import { RealtimeSyncBadge } from "@/components/production/RealtimeSyncBadge";
+import {
+  normalizeTapeMaterialName,
+  TAPE_MATERIAL_MIXED_RP,
+  TAPE_MATERIAL_NATURAL_RP,
+  TAPE_MATERIAL_RP_WHITE,
+  TAPE_MATERIAL_RP_YELLOW,
+} from "@/lib/tape-plant/material-names";
 
 const RawMaterialPrintPreviewModal = dynamic(
   () => import("./RawMaterialPrintPreviewModal").then((m) => m.RawMaterialPrintPreviewModal),
@@ -50,10 +57,10 @@ const DEFAULT_MATERIALS: RawMaterialRow[] = [
   { material: "PP", grade: "", openingStock: "", received: "", consumption: "", settingPercent: "", actualPercent: "", wastage: "" },
   { material: "CC", grade: "", openingStock: "", received: "", consumption: "", settingPercent: "", actualPercent: "", wastage: "" },
   { material: "MB", grade: "", openingStock: "", received: "", consumption: "", settingPercent: "", actualPercent: "", wastage: "" },
-  { material: "RP1", grade: "", openingStock: "", received: "", consumption: "", settingPercent: "", actualPercent: "", wastage: "" },
-  { material: "RP2", grade: "", openingStock: "", received: "", consumption: "", settingPercent: "", actualPercent: "", wastage: "" },
-  { material: "HD RP", grade: "", openingStock: "", received: "", consumption: "", settingPercent: "", actualPercent: "", wastage: "" },
-  { material: "TPT", grade: "", openingStock: "", received: "", consumption: "", settingPercent: "", actualPercent: "", wastage: "" },
+  { material: TAPE_MATERIAL_RP_WHITE, grade: "", openingStock: "", received: "", consumption: "", settingPercent: "", actualPercent: "", wastage: "" },
+  { material: TAPE_MATERIAL_RP_YELLOW, grade: "", openingStock: "", received: "", consumption: "", settingPercent: "", actualPercent: "", wastage: "" },
+  { material: TAPE_MATERIAL_MIXED_RP, grade: "", openingStock: "", received: "", consumption: "", settingPercent: "", actualPercent: "", wastage: "" },
+  { material: TAPE_MATERIAL_NATURAL_RP, grade: "", openingStock: "", received: "", consumption: "", settingPercent: "", actualPercent: "", wastage: "" },
 ];
 
 interface RawMaterialSectionProps {
@@ -254,7 +261,7 @@ export function RawMaterialSection({ date, shiftId, shiftName }: RawMaterialSect
         data && data.length > 0
           ? data.map((d) => ({
               id: d.id,
-              material: d.material || "",
+              material: normalizeTapeMaterialName(d.material || ""),
               grade: d.grade || "",
               openingStock: d.openingStock ?? "",
               received: d.received ?? "",
