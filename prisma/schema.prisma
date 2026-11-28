@@ -1682,6 +1682,7 @@ model TapePlantPlan {
   shiftId         String
   recipeQuality   String   // Internal codes e.g. "S1", "HC" preserved as plant uses them
   tapeType        String?  // "PP" | "LPP"
+  rpMode          String   @default("WITH_RP") // "WITH_RP" | "WITHOUT_RP"
   denier          Float?
   tapeWidth       Float?
   strength        Float?
@@ -1888,6 +1889,7 @@ model TapePlantRecipe {
   id              String   @id @default(cuid())
   code            String   @unique // e.g. "AMB/PP/YL/74/500/S1"
   tapeType        String   // "PP" | "LPP" | "HDPE"
+  rpMode          String   @default("WITH_RP") // "WITH_RP" | "WITHOUT_RP"
   denier          Float?
   tapeWidth       Float?
   strength        Float?

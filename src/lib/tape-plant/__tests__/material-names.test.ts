@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
+  formatRpModeLabel,
+  inferRpModeFromComposition,
+  normalizeRpMode,
   normalizeTapeMaterialName,
   TAPE_MATERIAL_MIXED_RP,
   TAPE_MATERIAL_NATURAL_RP,
@@ -31,6 +34,33 @@ describe("normalizeTapeMaterialName", () => {
   it("preserves custom non-standard material names", () => {
     expect(normalizeTapeMaterialName("Vistamaxx 6102")).toBe("Vistamaxx 6102");
     expect(normalizeTapeMaterialName("  ")).toBe("");
+  });
+
+  it("normalizes, formats, and infers recipe RP modes cleanly", () => {
+    expect(normalizeRpMode("WITHOUT_RP")).toBe("WITHOUT_RP");
+    expect(normalizeRpMode("Without RP")).toBe("WITHOUT_RP");
+    expect(normalizeRpMode("WITH_RP")).toBe("WITH_RP");
+    expect(normalizeRpMode(undefined)).toBe("WITH_RP");
+
+    expect(formatRpModeLabel("WITHOUT_RP")).toBe("Without RP");
+    expect(formatRpModeLabel("WITH_RP")).toBe("With RP");
+
+    expect(
+      inferRpModeFromComposition({
+        rp1Percent: 0,
+        rp2Percent: null,
+        hdrpPercent: 0,
+        tptPercent: null,
+      })
+    ).toBe("WITHOUT_RP");
+    expect(
+      inferRpModeFromComposition({
+        rp1Percent: 5,
+        rp2Percent: null,
+        hdrpPercent: null,
+        tptPercent: null,
+      })
+    ).toBe("WITH_RP");
   });
 });
 
