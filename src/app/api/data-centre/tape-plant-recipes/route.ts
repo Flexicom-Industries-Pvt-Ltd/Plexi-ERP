@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { requireApiAuth } from "@/lib/api-auth";
 import { Module } from "@/generated/prisma";
 import { logEvent } from "@/lib/logging";
+import { inferRpModeFromComposition, normalizeRpMode } from "@/lib/tape-plant/material-names";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +17,7 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const search = searchParams.get("search")?.trim();
   const tapeType = searchParams.get("tapeType")?.trim();
+  const rpMode = searchParams.get("rpMode")?.trim();
   const colorGroup = searchParams.get("colorGroup")?.trim();
   const recipeGroup = searchParams.get("recipeGroup")?.trim();
   const code = searchParams.get("code")?.trim();
@@ -34,6 +36,10 @@ export async function GET(request: NextRequest) {
 
     if (tapeType && tapeType !== "ALL") {
       where.tapeType = { equals: tapeType, mode: "insensitive" };
+    }
+
+    if (rpMode && rpMode !== "ALL") {
+      where.rpMode = normalizeRpMode(rpMode);
     }
 
     if (colorGroup && colorGroup !== "ALL") {
@@ -111,6 +117,7 @@ export async function POST(request: NextRequest) {
     const {
       code,
       tapeType,
+      rpMode,
       denier,
       tapeWidth,
       strength,
@@ -157,10 +164,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const resolvedRpMode =
+      rpMode !== undefined && rpMode !== null && String(rpMode).trim() !== ""
+        ? normalizeRpMode(rpMode)
+        : inferRpModeFromComposition({ rp1Percent, rp2Percent, hdrpPercent, tptPercent });
+
     const recipe = await db.tapePlantRecipe.create({
       data: {
         code: trimmedCode,
         tapeType: tapeType ? String(tapeType).trim().toUpperCase() : "PP",
+        rpMode: resolvedRpMode,
         denier: denier !== "" && denier !== null && denier !== undefined ? Number(denier) : null,
         tapeWidth: tapeWidth !== "" && tapeWidth !== null && tapeWidth !== undefined ? Number(tapeWidth) : null,
         strength: strength !== "" && strength !== null && strength !== undefined ? Number(strength) : null,

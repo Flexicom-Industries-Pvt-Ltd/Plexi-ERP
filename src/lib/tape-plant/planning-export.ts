@@ -1,6 +1,7 @@
 import * as XLSX from "xlsx";
 import { RecipePlanItem } from "@/components/tape-plant/TapePlantPlanningSection";
 import {
+  formatRpModeLabel,
   normalizeTapeMaterialName,
   TAPE_MATERIAL_MIXED_RP,
   TAPE_MATERIAL_NATURAL_RP,
@@ -52,6 +53,7 @@ export function generateTapePlantPlanningExcel({
     "Recipe Quality Code",
     "Shift",
     "Tape Type",
+    "RP Mode",
     "Denier",
     "Tape Width (mm)",
     "Strength (gpd)",
@@ -166,6 +168,7 @@ export function generateTapePlantPlanningExcel({
       plan.recipeQuality || `Recipe #${idx + 1}`,
       getShiftLabel(plan, shiftName),
       plan.tapeType || "LPP",
+      formatRpModeLabel(plan.rpMode),
       plan.denier !== "" ? Number(plan.denier) : "",
       plan.tapeWidth !== "" ? Number(plan.tapeWidth) : "",
       plan.strength !== "" ? Number(plan.strength) : "",
@@ -203,6 +206,7 @@ export function generateTapePlantPlanningExcel({
   const totalRow = [
     "TOTAL",
     `Total Runs: ${plans.length}`,
+    "—",
     "—",
     "—",
     "—",
@@ -255,6 +259,7 @@ export function generateTapePlantPlanningExcel({
     { wch: 28 }, // Recipe Quality
     { wch: 16 }, // Shift
     { wch: 12 }, // Type
+    { wch: 13 }, // RP Mode
     { wch: 10 }, // Denier
     { wch: 16 }, // Tape Width
     { wch: 14 }, // Strength
