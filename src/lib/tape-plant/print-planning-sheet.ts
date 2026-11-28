@@ -5,24 +5,19 @@
  */
 
 import { RecipePlanItem } from "@/components/tape-plant/TapePlantPlanningSection";
+import {
+  normalizeTapeMaterialName,
+  TAPE_MATERIAL_MIXED_RP,
+  TAPE_MATERIAL_NATURAL_RP,
+  TAPE_MATERIAL_RP_WHITE,
+  TAPE_MATERIAL_RP_YELLOW,
+} from "./material-names";
 
 export interface TapePlanningPrintData {
   date: string;
   shiftName: string;
   status: string;
   plans: RecipePlanItem[];
-}
-
-function normalizeMaterialKey(mat: string): string {
-  const clean = (mat || "").trim().toUpperCase().replace(/[\s\-_]/g, "");
-  if (clean === "PP") return "PP";
-  if (clean === "CC") return "CC";
-  if (clean === "MB") return "MB";
-  if (clean === "RP1") return "RP1";
-  if (clean === "RP2") return "RP2";
-  if (clean === "HDRP") return "HD RP";
-  if (clean === "TPT") return "TPT";
-  return (mat || "").trim().toUpperCase();
 }
 
 function formatKg(val: number | string | undefined | null): string {
@@ -86,16 +81,16 @@ export function generatePlanningSheetHtml(data: TapePlanningPrintData): string {
   plans.forEach((p) => {
     let runMatQty = 0;
     (p.materials || []).forEach((m) => {
-      const key = normalizeMaterialKey(m.material);
+      const key = normalizeTapeMaterialName(m.material);
       const q = Number(m.quantity) || 0;
       runMatQty += q;
       if (key === "PP") totalPPSum += q;
       else if (key === "CC") totalCCSum += q;
       else if (key === "MB") totalMBSum += q;
-      else if (key === "RP1") totalRP1Sum += q;
-      else if (key === "RP2") totalRP2Sum += q;
-      else if (key === "HD RP") totalHDRPSum += q;
-      else if (key === "TPT") totalTPTSum += q;
+      else if (key === TAPE_MATERIAL_RP_WHITE) totalRP1Sum += q;
+      else if (key === TAPE_MATERIAL_RP_YELLOW) totalRP2Sum += q;
+      else if (key === TAPE_MATERIAL_MIXED_RP) totalHDRPSum += q;
+      else if (key === TAPE_MATERIAL_NATURAL_RP) totalTPTSum += q;
       else totalOtherSum += q;
     });
     totalBatchSum += (runMatQty || Number(p.plannedQtyKg) || 0);
@@ -143,7 +138,7 @@ export function generatePlanningSheetHtml(data: TapePlanningPrintData): string {
     ? plans.map((p, idx) => {
         const getMat = (name: string): { qty: number; pct: number } => {
           const match = (p.materials || []).find(
-            (m) => normalizeMaterialKey(m.material) === name
+            (m) => normalizeTapeMaterialName(m.material) === name
           );
           return {
             qty: match && Number(match.quantity) ? Number(match.quantity) : 0,
@@ -154,10 +149,10 @@ export function generatePlanningSheetHtml(data: TapePlanningPrintData): string {
         const pp = getMat("PP");
         const cc = getMat("CC");
         const mb = getMat("MB");
-        const rp1 = getMat("RP1");
-        const rp2 = getMat("RP2");
-        const hdrp = getMat("HD RP");
-        const tpt = getMat("TPT");
+        const rp1 = getMat(TAPE_MATERIAL_RP_WHITE);
+        const rp2 = getMat(TAPE_MATERIAL_RP_YELLOW);
+        const hdrp = getMat(TAPE_MATERIAL_MIXED_RP);
+        const tpt = getMat(TAPE_MATERIAL_NATURAL_RP);
 
         let otherQty = 0;
         let totalBlendPct = 0;
@@ -168,8 +163,18 @@ export function generatePlanningSheetHtml(data: TapePlanningPrintData): string {
           const pct = Number(m.percentage) || 0;
           runBatchQty += q;
           totalBlendPct += pct;
-          const key = normalizeMaterialKey(m.material);
-          if (!["PP", "CC", "MB", "RP1", "RP2", "HD RP", "TPT"].includes(key)) {
+          const key = normalizeTapeMaterialName(m.material);
+          if (
+            ![
+              "PP",
+              "CC",
+              "MB",
+              TAPE_MATERIAL_RP_WHITE,
+              TAPE_MATERIAL_RP_YELLOW,
+              TAPE_MATERIAL_MIXED_RP,
+              TAPE_MATERIAL_NATURAL_RP,
+            ].includes(key)
+          ) {
             otherQty += q;
           }
         });
@@ -228,10 +233,10 @@ export function generatePlanningSheetHtml(data: TapePlanningPrintData): string {
     { name: "PP", qty: totalPPSum },
     { name: "CC", qty: totalCCSum },
     { name: "MB", qty: totalMBSum },
-    { name: "RP1", qty: totalRP1Sum },
-    { name: "RP2", qty: totalRP2Sum },
-    { name: "HD RP", qty: totalHDRPSum },
-    { name: "TPT", qty: totalTPTSum },
+    { name: TAPE_MATERIAL_RP_WHITE, qty: totalRP1Sum },
+    { name: TAPE_MATERIAL_RP_YELLOW, qty: totalRP2Sum },
+    { name: TAPE_MATERIAL_MIXED_RP, qty: totalHDRPSum },
+    { name: TAPE_MATERIAL_NATURAL_RP, qty: totalTPTSum },
   ];
   if (totalOtherSum > 0) {
     summaryMats.push({ name: "OTHER", qty: totalOtherSum });
@@ -561,10 +566,10 @@ export function generatePlanningSheetHtml(data: TapePlanningPrintData): string {
           <th colspan="2" style="text-align: center;">PP</th>
           <th colspan="2" style="text-align: center;">CC</th>
           <th colspan="2" style="text-align: center;">MB</th>
-          <th colspan="2" style="text-align: center;">RP1</th>
-          <th colspan="2" style="text-align: center;">RP2</th>
-          <th colspan="2" style="text-align: center;">HD RP</th>
-          <th colspan="2" style="text-align: center;">TPT</th>
+          <th colspan="2" style="text-align: center;">RP White</th>
+          <th colspan="2" style="text-align: center;">RP Yellow</th>
+          <th colspan="2" style="text-align: center;">Mixed RP</th>
+          <th colspan="2" style="text-align: center;">Natural RP</th>
           <th rowspan="2" style="text-align: right; width: 40px;">Other (KG)</th>
           <th rowspan="2" style="text-align: right; width: 62px;">Batch Total</th>
           <th rowspan="2" style="text-align: right; width: 36px;">Total %</th>

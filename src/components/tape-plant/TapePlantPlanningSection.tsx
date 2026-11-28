@@ -22,6 +22,13 @@ import {
 import dynamic from "next/dynamic";
 import { generateTapePlantPlanningExcel } from "@/lib/tape-plant/planning-export";
 import { parseRecipeQuality } from "@/lib/tape-plant/recipe-format";
+import {
+  normalizeTapeMaterialName,
+  TAPE_MATERIAL_MIXED_RP,
+  TAPE_MATERIAL_NATURAL_RP,
+  TAPE_MATERIAL_RP_WHITE,
+  TAPE_MATERIAL_RP_YELLOW,
+} from "@/lib/tape-plant/material-names";
 import { QualityCombobox } from "./QualityCombobox";
 import { useProductionShifts } from "@/hooks/useProductionShifts";
 import { useProductionRealtime } from "@/hooks/useProductionRealtime";
@@ -42,10 +49,10 @@ export const DEFAULT_MATERIALS: MaterialRow[] = [
   { material: "PP", quantity: "", percentage: "" },
   { material: "CC", quantity: "", percentage: "" },
   { material: "MB", quantity: "", percentage: "" },
-  { material: "RP1", quantity: "", percentage: "" },
-  { material: "RP2", quantity: "", percentage: "" },
-  { material: "HD RP", quantity: "", percentage: "" },
-  { material: "TPT", quantity: "", percentage: "" },
+  { material: TAPE_MATERIAL_RP_WHITE, quantity: "", percentage: "" },
+  { material: TAPE_MATERIAL_RP_YELLOW, quantity: "", percentage: "" },
+  { material: TAPE_MATERIAL_MIXED_RP, quantity: "", percentage: "" },
+  { material: TAPE_MATERIAL_NATURAL_RP, quantity: "", percentage: "" },
 ];
 
 export interface RecipePlanItem {
@@ -213,7 +220,10 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName, shifts }: T
           remarks: p.remarks || "",
           materials:
             Array.isArray(p.materials) && p.materials.length > 0
-              ? p.materials
+              ? p.materials.map((m: MaterialRow) => ({
+                  ...m,
+                  material: normalizeTapeMaterialName(m.material),
+                }))
               : DEFAULT_MATERIALS.map((m) => ({ material: m.material, quantity: "", percentage: "" })),
           isDayNight: Boolean(p.isDayNight),
           carriedOverFromShift: p.carriedOverFromShift || undefined,
@@ -273,7 +283,10 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName, shifts }: T
           remarks: data.remarks || "",
           materials:
             Array.isArray(data.materials) && data.materials.length > 0
-              ? data.materials
+              ? data.materials.map((m: MaterialRow) => ({
+                  ...m,
+                  material: normalizeTapeMaterialName(m.material),
+                }))
               : DEFAULT_MATERIALS.map((m) => ({ material: m.material, quantity: "", percentage: "" })),
           isDayNight: Boolean(data.isDayNight),
           carriedOverFromShift: data.carriedOverFromShift || undefined,
@@ -358,10 +371,10 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName, shifts }: T
       { material: "PP", percentage: recipe.ppPercent ?? "", quantity: computeQty(recipe.ppPercent) },
       { material: "CC", percentage: recipe.ccPercent ?? "", quantity: computeQty(recipe.ccPercent) },
       { material: "MB", percentage: recipe.mbPercent ?? "", quantity: computeQty(recipe.mbPercent) },
-      { material: "RP1", percentage: recipe.rp1Percent ?? "", quantity: computeQty(recipe.rp1Percent) },
-      { material: "RP2", percentage: recipe.rp2Percent ?? "", quantity: computeQty(recipe.rp2Percent) },
-      { material: "HD RP", percentage: recipe.hdrpPercent ?? "", quantity: computeQty(recipe.hdrpPercent) },
-      { material: "TPT", percentage: recipe.tptPercent ?? "", quantity: computeQty(recipe.tptPercent) },
+      { material: TAPE_MATERIAL_RP_WHITE, percentage: recipe.rp1Percent ?? "", quantity: computeQty(recipe.rp1Percent) },
+      { material: TAPE_MATERIAL_RP_YELLOW, percentage: recipe.rp2Percent ?? "", quantity: computeQty(recipe.rp2Percent) },
+      { material: TAPE_MATERIAL_MIXED_RP, percentage: recipe.hdrpPercent ?? "", quantity: computeQty(recipe.hdrpPercent) },
+      { material: TAPE_MATERIAL_NATURAL_RP, percentage: recipe.tptPercent ?? "", quantity: computeQty(recipe.tptPercent) },
     ];
 
     updateCurrentPlan({
@@ -855,10 +868,10 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName, shifts }: T
       { material: "PP", percentage: recipe.ppPercent ?? "", quantity: computeQty(recipe.ppPercent) },
       { material: "CC", percentage: recipe.ccPercent ?? "", quantity: computeQty(recipe.ccPercent) },
       { material: "MB", percentage: recipe.mbPercent ?? "", quantity: computeQty(recipe.mbPercent) },
-      { material: "RP1", percentage: recipe.rp1Percent ?? "", quantity: computeQty(recipe.rp1Percent) },
-      { material: "RP2", percentage: recipe.rp2Percent ?? "", quantity: computeQty(recipe.rp2Percent) },
-      { material: "HD RP", percentage: recipe.hdrpPercent ?? "", quantity: computeQty(recipe.hdrpPercent) },
-      { material: "TPT", percentage: recipe.tptPercent ?? "", quantity: computeQty(recipe.tptPercent) },
+      { material: TAPE_MATERIAL_RP_WHITE, percentage: recipe.rp1Percent ?? "", quantity: computeQty(recipe.rp1Percent) },
+      { material: TAPE_MATERIAL_RP_YELLOW, percentage: recipe.rp2Percent ?? "", quantity: computeQty(recipe.rp2Percent) },
+      { material: TAPE_MATERIAL_MIXED_RP, percentage: recipe.hdrpPercent ?? "", quantity: computeQty(recipe.hdrpPercent) },
+      { material: TAPE_MATERIAL_NATURAL_RP, percentage: recipe.tptPercent ?? "", quantity: computeQty(recipe.tptPercent) },
     ];
 
     updatePlanAt(index, {
