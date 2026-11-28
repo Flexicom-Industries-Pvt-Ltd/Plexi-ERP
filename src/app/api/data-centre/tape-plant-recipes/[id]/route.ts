@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { requireApiAuth } from "@/lib/api-auth";
 import { Module } from "@/generated/prisma";
 import { logEvent } from "@/lib/logging";
+import { normalizeRpMode } from "@/lib/tape-plant/material-names";
 
 export const dynamic = "force-dynamic";
 
@@ -54,6 +55,7 @@ export async function PUT(
     const {
       code,
       tapeType,
+      rpMode,
       denier,
       tapeWidth,
       strength,
@@ -106,6 +108,7 @@ export async function PUT(
       data: {
         code: code ? String(code).trim() : existing.code,
         tapeType: tapeType !== undefined ? String(tapeType).trim().toUpperCase() : existing.tapeType,
+        rpMode: rpMode !== undefined && rpMode !== null && String(rpMode).trim() !== "" ? normalizeRpMode(rpMode) : existing.rpMode,
         denier: denier !== "" && denier !== null && denier !== undefined ? Number(denier) : null,
         tapeWidth: tapeWidth !== "" && tapeWidth !== null && tapeWidth !== undefined ? Number(tapeWidth) : null,
         strength: strength !== "" && strength !== null && strength !== undefined ? Number(strength) : null,

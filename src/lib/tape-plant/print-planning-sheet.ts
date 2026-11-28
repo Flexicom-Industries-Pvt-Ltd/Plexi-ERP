@@ -5,24 +5,20 @@
  */
 
 import { RecipePlanItem } from "@/components/tape-plant/TapePlantPlanningSection";
+import {
+  formatRpModeLabel,
+  normalizeTapeMaterialName,
+  TAPE_MATERIAL_MIXED_RP,
+  TAPE_MATERIAL_NATURAL_RP,
+  TAPE_MATERIAL_RP_WHITE,
+  TAPE_MATERIAL_RP_YELLOW,
+} from "./material-names";
 
 export interface TapePlanningPrintData {
   date: string;
   shiftName: string;
   status: string;
   plans: RecipePlanItem[];
-}
-
-function normalizeMaterialKey(mat: string): string {
-  const clean = (mat || "").trim().toUpperCase().replace(/[\s\-_]/g, "");
-  if (clean === "PP") return "PP";
-  if (clean === "CC") return "CC";
-  if (clean === "MB") return "MB";
-  if (clean === "RP1") return "RP1";
-  if (clean === "RP2") return "RP2";
-  if (clean === "HDRP") return "HD RP";
-  if (clean === "TPT") return "TPT";
-  return (mat || "").trim().toUpperCase();
 }
 
 function formatKg(val: number | string | undefined | null): string {
@@ -86,16 +82,16 @@ export function generatePlanningSheetHtml(data: TapePlanningPrintData): string {
   plans.forEach((p) => {
     let runMatQty = 0;
     (p.materials || []).forEach((m) => {
-      const key = normalizeMaterialKey(m.material);
+      const key = normalizeTapeMaterialName(m.material);
       const q = Number(m.quantity) || 0;
       runMatQty += q;
       if (key === "PP") totalPPSum += q;
       else if (key === "CC") totalCCSum += q;
       else if (key === "MB") totalMBSum += q;
-      else if (key === "RP1") totalRP1Sum += q;
-      else if (key === "RP2") totalRP2Sum += q;
-      else if (key === "HD RP") totalHDRPSum += q;
-      else if (key === "TPT") totalTPTSum += q;
+      else if (key === TAPE_MATERIAL_RP_WHITE) totalRP1Sum += q;
+      else if (key === TAPE_MATERIAL_RP_YELLOW) totalRP2Sum += q;
+      else if (key === TAPE_MATERIAL_MIXED_RP) totalHDRPSum += q;
+      else if (key === TAPE_MATERIAL_NATURAL_RP) totalTPTSum += q;
       else totalOtherSum += q;
     });
     totalBatchSum += (runMatQty || Number(p.plannedQtyKg) || 0);
@@ -116,6 +112,7 @@ export function generatePlanningSheetHtml(data: TapePlanningPrintData): string {
           ${getShiftLabel(p, shiftName)}
         </td>
         <td style="text-align: center; font-weight: 600;">${p.tapeType || "LPP"}</td>
+        <td style="text-align: center; font-weight: 700; font-size: 6.5pt; white-space: nowrap;">${formatRpModeLabel(p.rpMode)}</td>
         <td style="text-align: right; font-family: monospace;">${p.denier !== "" && p.denier !== undefined ? p.denier : "—"}</td>
         <td style="text-align: right; font-family: monospace;">${p.tapeWidth !== "" && p.tapeWidth !== undefined ? p.tapeWidth : "—"}</td>
         <td style="text-align: right; font-family: monospace;">${p.strength !== "" && p.strength !== undefined ? p.strength : "—"}</td>
@@ -132,7 +129,7 @@ export function generatePlanningSheetHtml(data: TapePlanningPrintData): string {
     `).join("")
     : `
       <tr>
-        <td colspan="14" style="text-align: center; color: #64748b; font-style: italic; padding: 8px;">
+        <td colspan="15" style="text-align: center; color: #64748b; font-style: italic; padding: 8px;">
           No recipe plan runs defined for this shift.
         </td>
       </tr>
@@ -141,42 +138,52 @@ export function generatePlanningSheetHtml(data: TapePlanningPrintData): string {
   // Table 2: Material Formulation Matrix Rows with separate KG and % columns
   const formulationRows = plans.length > 0
     ? plans.map((p, idx) => {
-        const getMat = (name: string): { qty: number; pct: number } => {
-          const match = (p.materials || []).find(
-            (m) => normalizeMaterialKey(m.material) === name
-          );
-          return {
-            qty: match && Number(match.quantity) ? Number(match.quantity) : 0,
-            pct: match && Number(match.percentage) ? Number(match.percentage) : 0,
-          };
+      const getMat = (name: string): { qty: number; pct: number } => {
+        const match = (p.materials || []).find(
+          (m) => normalizeTapeMaterialName(m.material) === name
+        );
+        return {
+          qty: match && Number(match.quantity) ? Number(match.quantity) : 0,
+          pct: match && Number(match.percentage) ? Number(match.percentage) : 0,
         };
+      };
 
-        const pp = getMat("PP");
-        const cc = getMat("CC");
-        const mb = getMat("MB");
-        const rp1 = getMat("RP1");
-        const rp2 = getMat("RP2");
-        const hdrp = getMat("HD RP");
-        const tpt = getMat("TPT");
+      const pp = getMat("PP");
+      const cc = getMat("CC");
+      const mb = getMat("MB");
+      const rp1 = getMat(TAPE_MATERIAL_RP_WHITE);
+      const rp2 = getMat(TAPE_MATERIAL_RP_YELLOW);
+      const hdrp = getMat(TAPE_MATERIAL_MIXED_RP);
+      const tpt = getMat(TAPE_MATERIAL_NATURAL_RP);
 
-        let otherQty = 0;
-        let totalBlendPct = 0;
-        let runBatchQty = 0;
+      let otherQty = 0;
+      let totalBlendPct = 0;
+      let runBatchQty = 0;
 
-        (p.materials || []).forEach((m) => {
-          const q = Number(m.quantity) || 0;
-          const pct = Number(m.percentage) || 0;
-          runBatchQty += q;
-          totalBlendPct += pct;
-          const key = normalizeMaterialKey(m.material);
-          if (!["PP", "CC", "MB", "RP1", "RP2", "HD RP", "TPT"].includes(key)) {
-            otherQty += q;
-          }
-        });
+      (p.materials || []).forEach((m) => {
+        const q = Number(m.quantity) || 0;
+        const pct = Number(m.percentage) || 0;
+        runBatchQty += q;
+        totalBlendPct += pct;
+        const key = normalizeTapeMaterialName(m.material);
+        if (
+          ![
+            "PP",
+            "CC",
+            "MB",
+            TAPE_MATERIAL_RP_WHITE,
+            TAPE_MATERIAL_RP_YELLOW,
+            TAPE_MATERIAL_MIXED_RP,
+            TAPE_MATERIAL_NATURAL_RP,
+          ].includes(key)
+        ) {
+          otherQty += q;
+        }
+      });
 
-        const rowBatchTotal = runBatchQty || Number(p.plannedQtyKg) || 0;
+      const rowBatchTotal = runBatchQty || Number(p.plannedQtyKg) || 0;
 
-        return `
+      return `
           <tr>
             <td style="text-align: center; font-weight: 700; width: 20px;">${idx + 1}</td>
             <td style="font-weight: 700; font-family: monospace; font-size: 7.5pt; white-space: nowrap;">${p.recipeQuality || "—"}</td>
@@ -214,7 +221,7 @@ export function generatePlanningSheetHtml(data: TapePlanningPrintData): string {
             </td>
           </tr>
         `;
-      }).join("")
+    }).join("")
     : `
       <tr>
         <td colspan="20" style="text-align: center; color: #64748b; font-style: italic; padding: 8px;">
@@ -228,10 +235,10 @@ export function generatePlanningSheetHtml(data: TapePlanningPrintData): string {
     { name: "PP", qty: totalPPSum },
     { name: "CC", qty: totalCCSum },
     { name: "MB", qty: totalMBSum },
-    { name: "RP1", qty: totalRP1Sum },
-    { name: "RP2", qty: totalRP2Sum },
-    { name: "HD RP", qty: totalHDRPSum },
-    { name: "TPT", qty: totalTPTSum },
+    { name: TAPE_MATERIAL_RP_WHITE, qty: totalRP1Sum },
+    { name: TAPE_MATERIAL_RP_YELLOW, qty: totalRP2Sum },
+    { name: TAPE_MATERIAL_MIXED_RP, qty: totalHDRPSum },
+    { name: TAPE_MATERIAL_NATURAL_RP, qty: totalTPTSum },
   ];
   if (totalOtherSum > 0) {
     summaryMats.push({ name: "OTHER", qty: totalOtherSum });
@@ -513,6 +520,7 @@ export function generatePlanningSheetHtml(data: TapePlanningPrintData): string {
           <th style="text-align: left;">Quality Name / Recipe Code</th>
           <th style="text-align: center; width: 36px;">Shift</th>
           <th style="text-align: center; width: 32px;">Type</th>
+          <th style="text-align: center; width: 52px;">RP Mode</th>
           <th style="text-align: right; width: 38px;">Denier</th>
           <th style="text-align: right; width: 42px;">Width (mm)</th>
           <th style="text-align: right; width: 40px;">Strength</th>
@@ -530,7 +538,7 @@ export function generatePlanningSheetHtml(data: TapePlanningPrintData): string {
       </tbody>
       <tfoot>
         <tr>
-          <td colspan="13" style="text-align: right; text-transform: uppercase; font-size: 6.5pt; letter-spacing: 0.5px;">
+          <td colspan="14" style="text-align: right; text-transform: uppercase; font-size: 6.5pt; letter-spacing: 0.5px;">
             Total Shift Planned Output${totalDayNightPlannedKg > 0 ? " (Single-Shift Runs)" : ""}:
           </td>
           <td style="text-align: right; font-family: monospace; font-size: 7.5pt; font-weight: 800; background-color: #f1f5f9;">
@@ -539,7 +547,7 @@ export function generatePlanningSheetHtml(data: TapePlanningPrintData): string {
         </tr>
         ${totalDayNightPlannedKg > 0 ? `
         <tr>
-          <td colspan="13" style="text-align: right; text-transform: uppercase; font-size: 6.5pt; letter-spacing: 0.5px; color: #92400e; background-color: #fef3c7; font-weight: 700;">
+          <td colspan="14" style="text-align: right; text-transform: uppercase; font-size: 6.5pt; letter-spacing: 0.5px; color: #92400e; background-color: #fef3c7; font-weight: 700;">
             + Day+Night 24-Hour Continuous Batch (Running across 2 shifts):
           </td>
           <td style="text-align: right; font-family: monospace; font-size: 7.5pt; font-weight: 800; background-color: #fde68a; color: #78350f;">
@@ -561,10 +569,10 @@ export function generatePlanningSheetHtml(data: TapePlanningPrintData): string {
           <th colspan="2" style="text-align: center;">PP</th>
           <th colspan="2" style="text-align: center;">CC</th>
           <th colspan="2" style="text-align: center;">MB</th>
-          <th colspan="2" style="text-align: center;">RP1</th>
-          <th colspan="2" style="text-align: center;">RP2</th>
-          <th colspan="2" style="text-align: center;">HD RP</th>
-          <th colspan="2" style="text-align: center;">TPT</th>
+          <th colspan="2" style="text-align: center;">RP White</th>
+          <th colspan="2" style="text-align: center;">RP Yellow</th>
+          <th colspan="2" style="text-align: center;">Mixed RP</th>
+          <th colspan="2" style="text-align: center;">Natural RP</th>
           <th rowspan="2" style="text-align: right; width: 40px;">Other (KG)</th>
           <th rowspan="2" style="text-align: right; width: 62px;">Batch Total</th>
           <th rowspan="2" style="text-align: right; width: 36px;">Total %</th>
