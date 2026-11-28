@@ -6,13 +6,11 @@ import {
   FlaskConical,
   Plus,
   Search,
-  Filter,
   Edit2,
   Trash2,
   Loader2,
   CheckCircle2,
   Sparkles,
-  RefreshCw,
   Layers,
   Database,
   X,
@@ -21,18 +19,29 @@ import {
   Copy,
   Users,
   Info,
-  ChevronRight,
   Palette,
+  Building2,
+  Download,
+  AlertTriangle,
 } from "lucide-react";
 import {
-  formatRpModeLabel,
   normalizeRpMode,
   RecipeRpMode,
 } from "@/lib/tape-plant/material-names";
+import {
+  calculateActualAshContent,
+  calculatePermissibleTapeAsh,
+  calculateProfileTotal,
+  createEmptyBlendProfile,
+  RecipeBlendProfile,
+  resolveRecipeProfileForMode,
+} from "@/lib/tape-plant/recipe-formulation";
+import { exportTapelineMasterExcel } from "@/lib/tape-plant/master-export";
 
 export interface TapePlantRecipeRecord {
   id: string;
   code: string;
+  vendor: string | null;
   tapeType: string;
   rpMode: RecipeRpMode;
   denier: number | null;
@@ -44,8 +53,11 @@ export interface TapePlantRecipeRecord {
   spacerSize: number | null;
   requiredAsh: number | null;
   ashPercent: number | null;
+  permissibleFabAsh: number | null;
+  permissibleTapeAsh: number | null;
   ppPercent: number | null;
   ccPercent: number | null;
+  ldpePercent: number | null;
   mbPercent: number | null;
   rp1Percent: number | null;
   rp2Percent: number | null;
@@ -53,10 +65,13 @@ export interface TapePlantRecipeRecord {
   omega: number | null;
   vistamaxPercent: number | null;
   tptPercent: number | null;
+  tptFillerPercent: number | null;
   totalPercent: number | null;
+  withRpComposition?: RecipeBlendProfile | null;
+  withoutRpComposition?: RecipeBlendProfile | null;
   defaultQtyKg: number | null;
-  colorGroup: string | null; // "Yellow" | "White" | "Light Green" | "Dark Green" | "Grey" | "Dark Blue" | "Light Blue"
-  recipeGroup: string | null; // e.g. "860D PP Family", "900D LPP White"
+  colorGroup: string | null;
+  recipeGroup: string | null;
   copiedFromCode: string | null;
   sharedQualities?: string[];
   remarks: string | null;
@@ -76,53 +91,147 @@ const COLOR_GROUPS = [
   { id: "Dark Blue", label: "Dark Blue", dot: "bg-blue-700", border: "border-blue-600", bg: "bg-blue-100 text-blue-950" },
 ];
 
-const EMPTY_RECIPE_FORM: Omit<TapePlantRecipeRecord, "id" | "createdAt" | "updatedAt" | "sharedQualities"> = {
-  code: "",
-  tapeType: "PP",
-  rpMode: "WITH_RP",
-  denier: 840,
-  tapeWidth: 2.45,
-  strength: 4.75,
-  eloPercent: 0.22,
-  bobbinMarking: "",
-  colour: "YELLOW",
-  spacerSize: 6.15,
-  requiredAsh: null,
-  ashPercent: null,
-  ppPercent: 80,
-  ccPercent: 15,
-  mbPercent: 2,
-  rp1Percent: 3,
-  rp2Percent: null,
-  hdrpPercent: null,
-  omega: null,
-  vistamaxPercent: null,
-  tptPercent: null,
-  totalPercent: 100,
-  defaultQtyKg: 2500,
-  colorGroup: "Yellow",
-  recipeGroup: "",
-  copiedFromCode: null,
-  remarks: "",
-  isActive: true,
+type RecipeFormState = Omit<
+  TapePlantRecipeRecord,
+  "id" | "createdAt" | "updatedAt" | "sharedQualities" | "withRpComposition" | "withoutRpComposition"
+> & {
+  withRpComposition: RecipeBlendProfile;
+  withoutRpComposition: RecipeBlendProfile;
 };
+
+function buildInitialForm(): RecipeFormState {
+  const withRp: RecipeBlendProfile = {
+    ppPercent: 75,
+    ccPercent: 4,
+    ldpePercent: 1,
+    mbPercent: 0,
+    rp1Percent: 20,
+    rp2Percent: 0,
+    hdrpPercent: 0,
+    tptPercent: 0,
+    tptFillerPercent: 0,
+    totalPercent: 100,
+    actualAshPercent: 5.6,
+  };
+  const withoutRp: RecipeBlendProfile = {
+    ppPercent: 92,
+    ccPercent: 7,
+    ldpePercent: 1,
+    mbPercent: 0,
+    rp1Percent: 0,
+    rp2Percent: 0,
+    hdrpPercent: 0,
+    tptPercent: 0,
+    tptFillerPercent: 0,
+    totalPercent: 100,
+    actualAshPercent: 5.6,
+  };
+  return {
+    code: "",
+    vendor: "",
+    tapeType: "PP",
+    rpMode: "WITH_RP",
+    denier: 500,
+    tapeWidth: 2.45,
+    strength: 5.0,
+    eloPercent: 24,
+    bobbinMarking: "",
+    colour: "White",
+    spacerSize: 6.15,
+    permissibleFabAsh: 5.5,
+    permissibleTapeAsh: 5.5,
+    requiredAsh: 5.5,
+    ashPercent: 5.6,
+    ppPercent: withRp.ppPercent,
+    ccPercent: withRp.ccPercent,
+    ldpePercent: withRp.ldpePercent,
+    mbPercent: withRp.mbPercent,
+    rp1Percent: withRp.rp1Percent,
+    rp2Percent: withRp.rp2Percent,
+    hdrpPercent: withRp.hdrpPercent,
+    omega: null,
+    vistamaxPercent: null,
+    tptPercent: withRp.tptPercent,
+    tptFillerPercent: withRp.tptFillerPercent ?? 0,
+    totalPercent: 100,
+    withRpComposition: withRp,
+    withoutRpComposition: withoutRp,
+    defaultQtyKg: 2500,
+    colorGroup: "White",
+    recipeGroup: "",
+    copiedFromCode: null,
+    remarks: "",
+    isActive: true,
+  };
+}
+
+function renderBlendChips(profile: RecipeBlendProfile) {
+  const chips = [
+    { label: "PP", val: profile.ppPercent, cls: "bg-blue-50 text-blue-700 border-blue-200" },
+    { label: "CC", val: profile.ccPercent, cls: "bg-amber-50 text-amber-700 border-amber-200" },
+    { label: "LDPE 040", val: profile.ldpePercent, cls: "bg-cyan-50 text-cyan-700 border-cyan-200" },
+    { label: "MB", val: profile.mbPercent, cls: "bg-purple-50 text-purple-700 border-purple-200" },
+    { label: "RP White", val: profile.rp1Percent, cls: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+    { label: "RP Yellow", val: profile.rp2Percent, cls: "bg-yellow-50 text-yellow-800 border-yellow-300" },
+    { label: "Mixed RP", val: profile.hdrpPercent, cls: "bg-rose-50 text-rose-700 border-rose-200" },
+    { label: "Natural RP", val: profile.tptPercent, cls: "bg-slate-100 text-slate-700 border-slate-300" },
+    { label: "TPT Filler", val: profile.tptFillerPercent, cls: "bg-stone-100 text-stone-700 border-stone-300" },
+  ].filter((c) => c.val !== null && c.val !== undefined && Number(c.val) > 0);
+
+  if (chips.length === 0) {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-50 text-amber-800 border border-amber-200 rounded text-[10px] font-bold">
+        <Info className="h-3 w-3 text-amber-600" />
+        Pending Formulation
+      </span>
+    );
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-1">
+      {chips.map((c) => (
+        <span
+          key={c.label}
+          className={`px-1.5 py-0.5 rounded border text-[10px] font-semibold ${c.cls}`}
+        >
+          {c.label}: {c.val}%
+        </span>
+      ))}
+    </div>
+  );
+}
+
+const BLEND_FIELDS: { key: keyof RecipeBlendProfile; label: string; hint: string }[] = [
+  { key: "ppPercent", label: "PP % (Virgin)", hint: "e.g. 75.4" },
+  { key: "ccPercent", label: "CC % (Calcium)", hint: "e.g. 3.6" },
+  { key: "ldpePercent", label: "LDPE 040 %", hint: "e.g. 1.0" },
+  { key: "mbPercent", label: "MB % (Masterbatch)", hint: "e.g. 1.5" },
+  { key: "rp1Percent", label: "RP White %", hint: "e.g. 20" },
+  { key: "rp2Percent", label: "RP Yellow %", hint: "e.g. 10" },
+  { key: "hdrpPercent", label: "Mixed RP %", hint: "e.g. 3" },
+  { key: "tptPercent", label: "Natural RP %", hint: "e.g. 0" },
+  { key: "tptFillerPercent", label: "TPT Filler %", hint: "e.g. 0" },
+];
 
 export function TapePlantRecipeClient() {
   const [loading, setLoading] = useState(true);
   const [recipes, setRecipes] = useState<TapePlantRecipeRecord[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [vendorFilter, setVendorFilter] = useState("ALL");
   const [tapeTypeFilter, setTapeTypeFilter] = useState("ALL");
-  const [rpModeFilter, setRpModeFilter] = useState<"ALL" | RecipeRpMode>("ALL");
+  const [blendViewMode, setBlendViewMode] = useState<"WITH_RP" | "WITHOUT_RP" | "BOTH">("WITH_RP");
+  const [statusFilter, setStatusFilter] = useState<"ACTIVE" | "INACTIVE" | "ALL">("ACTIVE");
   const [colorGroupFilter, setColorGroupFilter] = useState("ALL");
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [formData, setFormData] = useState<typeof EMPTY_RECIPE_FORM>(EMPTY_RECIPE_FORM);
+  const [formData, setFormData] = useState<RecipeFormState>(buildInitialForm);
+  const [activeModalTab, setActiveModalTab] = useState<RecipeRpMode>("WITH_RP");
   const [formSaving, setFormSaving] = useState(false);
   const [cloneSourceCode, setCloneSourceCode] = useState<string>("");
 
-  // Shared Qualities Popover / View State
+  // Shared Qualities Modal State
   const [activeSharedModal, setActiveSharedModal] = useState<TapePlantRecipeRecord | null>(null);
 
   // Delete State
@@ -152,18 +261,18 @@ export function TapePlantRecipeClient() {
   }, []);
 
   const handleSeedDefaults = async () => {
-    if (!confirm("Seed / sync all 27 Loom Qualities and shared recipe master data into database?")) return;
+    if (!confirm("Sync the canonical 27 Tapeline Master recipes (With RP & Without RP) into database?")) return;
     setSeeding(true);
     try {
       const res = await fetch("/api/data-centre/tape-plant-recipes/seed", {
         method: "POST",
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed to seed recipes");
-      toast.success(data.message || "Master recipes synced successfully");
+      if (!res.ok) throw new Error(data.error || "Failed to sync recipes");
+      toast.success(data.message || "Tapeline Master synced successfully");
       fetchRecipes();
     } catch (err: any) {
-      toast.error(err.message || "Failed to seed recipes");
+      toast.error(err.message || "Failed to sync recipes");
     } finally {
       setSeeding(false);
     }
@@ -172,43 +281,77 @@ export function TapePlantRecipeClient() {
   const handleOpenAddModal = () => {
     setEditingId(null);
     setCloneSourceCode("");
-    setFormData(EMPTY_RECIPE_FORM);
+    setActiveModalTab("WITH_RP");
+    setFormData(buildInitialForm());
     setIsModalOpen(true);
+  };
+
+  const toModalStateFromRecord = (
+    source: TapePlantRecipeRecord,
+    overrides?: Partial<RecipeFormState>
+  ): RecipeFormState => {
+    const withRp = resolveRecipeProfileForMode(source, "WITH_RP");
+    const withoutRp = resolveRecipeProfileForMode(source, "WITHOUT_RP");
+    const tapeType = source.tapeType || "PP";
+    const fabAsh = source.permissibleFabAsh ?? source.requiredAsh ?? null;
+    const tapeAsh =
+      source.permissibleTapeAsh ??
+      calculatePermissibleTapeAsh(tapeType, fabAsh) ??
+      source.requiredAsh ??
+      null;
+
+    return {
+      code: source.code,
+      vendor: source.vendor || "",
+      tapeType,
+      rpMode: normalizeRpMode(source.rpMode),
+      denier: source.denier,
+      tapeWidth: source.tapeWidth,
+      strength: source.strength,
+      eloPercent: source.eloPercent,
+      bobbinMarking: source.bobbinMarking || "",
+      colour: source.colour || "",
+      spacerSize: source.spacerSize,
+      permissibleFabAsh: fabAsh,
+      permissibleTapeAsh: tapeAsh,
+      requiredAsh: source.requiredAsh ?? tapeAsh,
+      ashPercent: withRp.actualAshPercent ?? source.ashPercent,
+      ppPercent: withRp.ppPercent,
+      ccPercent: withRp.ccPercent,
+      ldpePercent: withRp.ldpePercent,
+      mbPercent: withRp.mbPercent,
+      rp1Percent: withRp.rp1Percent,
+      rp2Percent: withRp.rp2Percent,
+      hdrpPercent: withRp.hdrpPercent,
+      omega: source.omega,
+      vistamaxPercent: source.vistamaxPercent,
+      tptPercent: withRp.tptPercent,
+      tptFillerPercent: withRp.tptFillerPercent ?? 0,
+      totalPercent: withRp.totalPercent ?? 100,
+      withRpComposition: withRp,
+      withoutRpComposition: withoutRp,
+      defaultQtyKg: source.defaultQtyKg,
+      colorGroup: source.colorGroup || "White",
+      recipeGroup: source.recipeGroup || "",
+      copiedFromCode: source.copiedFromCode,
+      remarks: source.remarks || "",
+      isActive: source.isActive,
+      ...overrides,
+    };
   };
 
   const handleCopyRecipeToNew = (sourceRecipe: TapePlantRecipeRecord) => {
     setEditingId(null);
     setCloneSourceCode(sourceRecipe.code);
-    setFormData({
-      code: "", // Blank so user can type the new quality code
-      tapeType: sourceRecipe.tapeType || "PP",
-      rpMode: normalizeRpMode(sourceRecipe.rpMode),
-      denier: sourceRecipe.denier,
-      tapeWidth: sourceRecipe.tapeWidth,
-      strength: sourceRecipe.strength,
-      eloPercent: sourceRecipe.eloPercent,
-      bobbinMarking: sourceRecipe.bobbinMarking || "",
-      colour: sourceRecipe.colour || "",
-      spacerSize: sourceRecipe.spacerSize,
-      requiredAsh: sourceRecipe.requiredAsh,
-      ashPercent: sourceRecipe.ashPercent,
-      ppPercent: sourceRecipe.ppPercent,
-      ccPercent: sourceRecipe.ccPercent,
-      mbPercent: sourceRecipe.mbPercent,
-      rp1Percent: sourceRecipe.rp1Percent,
-      rp2Percent: sourceRecipe.rp2Percent,
-      hdrpPercent: sourceRecipe.hdrpPercent,
-      omega: sourceRecipe.omega,
-      vistamaxPercent: sourceRecipe.vistamaxPercent,
-      tptPercent: sourceRecipe.tptPercent,
-      totalPercent: sourceRecipe.totalPercent || 100,
-      defaultQtyKg: sourceRecipe.defaultQtyKg,
-      colorGroup: sourceRecipe.colorGroup || "Yellow",
-      recipeGroup: sourceRecipe.recipeGroup || `${sourceRecipe.denier}D ${sourceRecipe.tapeType} Shared`,
-      copiedFromCode: sourceRecipe.code,
-      remarks: `Cloned formulation from ${sourceRecipe.code}`,
-      isActive: true,
-    });
+    setActiveModalTab("WITH_RP");
+    setFormData(
+      toModalStateFromRecord(sourceRecipe, {
+        code: "",
+        copiedFromCode: sourceRecipe.code,
+        remarks: `Cloned formulation from ${sourceRecipe.code}`,
+        isActive: true,
+      })
+    );
     setIsModalOpen(true);
   };
 
@@ -218,70 +361,87 @@ export function TapePlantRecipeClient() {
     const source = recipes.find((r) => r.code === sourceCode);
     if (!source) return;
 
-    setFormData((prev) => ({
-      ...prev,
-      tapeType: source.tapeType || prev.tapeType,
-      rpMode: normalizeRpMode(source.rpMode),
-      denier: source.denier ?? prev.denier,
-      tapeWidth: source.tapeWidth ?? prev.tapeWidth,
-      strength: source.strength ?? prev.strength,
-      eloPercent: source.eloPercent ?? prev.eloPercent,
-      spacerSize: source.spacerSize ?? prev.spacerSize,
-      requiredAsh: source.requiredAsh ?? prev.requiredAsh,
-      ashPercent: source.ashPercent ?? prev.ashPercent,
-      ppPercent: source.ppPercent,
-      ccPercent: source.ccPercent,
-      mbPercent: source.mbPercent,
-      rp1Percent: source.rp1Percent,
-      rp2Percent: source.rp2Percent,
-      hdrpPercent: source.hdrpPercent,
-      omega: source.omega,
-      vistamaxPercent: source.vistamaxPercent,
-      tptPercent: source.tptPercent,
-      totalPercent: source.totalPercent || 100,
-      defaultQtyKg: source.defaultQtyKg ?? prev.defaultQtyKg,
-      colorGroup: source.colorGroup || prev.colorGroup,
-      recipeGroup: source.recipeGroup || prev.recipeGroup,
-      copiedFromCode: source.code,
-      remarks: prev.remarks || `Cloned formulation from ${source.code}`,
-    }));
-    toast.info(`Formulation copied from ${source.code}`);
+    setFormData((prev) =>
+      toModalStateFromRecord(source, {
+        code: prev.code,
+        bobbinMarking: prev.bobbinMarking || source.bobbinMarking || "",
+        colour: prev.colour || source.colour || "",
+        copiedFromCode: source.code,
+        remarks: prev.remarks || `Cloned formulation from ${source.code}`,
+        isActive: prev.isActive,
+      })
+    );
+    toast.info(`Dual formulation copied from ${source.code}`);
   };
 
   const handleOpenEditModal = (recipe: TapePlantRecipeRecord) => {
     setEditingId(recipe.id);
     setCloneSourceCode(recipe.copiedFromCode || "");
-    setFormData({
-      code: recipe.code,
-      tapeType: recipe.tapeType || "PP",
-      rpMode: normalizeRpMode(recipe.rpMode),
-      denier: recipe.denier,
-      tapeWidth: recipe.tapeWidth,
-      strength: recipe.strength,
-      eloPercent: recipe.eloPercent,
-      bobbinMarking: recipe.bobbinMarking || "",
-      colour: recipe.colour || "",
-      spacerSize: recipe.spacerSize,
-      requiredAsh: recipe.requiredAsh,
-      ashPercent: recipe.ashPercent,
-      ppPercent: recipe.ppPercent,
-      ccPercent: recipe.ccPercent,
-      mbPercent: recipe.mbPercent,
-      rp1Percent: recipe.rp1Percent,
-      rp2Percent: recipe.rp2Percent,
-      hdrpPercent: recipe.hdrpPercent,
-      omega: recipe.omega,
-      vistamaxPercent: recipe.vistamaxPercent,
-      tptPercent: recipe.tptPercent,
-      totalPercent: recipe.totalPercent || 100,
-      defaultQtyKg: recipe.defaultQtyKg,
-      colorGroup: recipe.colorGroup || "Yellow",
-      recipeGroup: recipe.recipeGroup || "",
-      copiedFromCode: recipe.copiedFromCode,
-      remarks: recipe.remarks || "",
-      isActive: recipe.isActive,
-    });
+    setActiveModalTab(normalizeRpMode(recipe.rpMode));
+    setFormData(toModalStateFromRecord(recipe));
     setIsModalOpen(true);
+  };
+
+  const updateActiveBlendField = (
+    mode: RecipeRpMode,
+    field: keyof RecipeBlendProfile,
+    rawVal: string
+  ) => {
+    const val = rawVal === "" ? null : Number(rawVal);
+    setFormData((prev) => {
+      const targetKey = mode === "WITHOUT_RP" ? "withoutRpComposition" : "withRpComposition";
+      const nextProfile: RecipeBlendProfile = {
+        ...(prev[targetKey] || createEmptyBlendProfile()),
+        [field]: val !== null && Number.isFinite(val) ? val : null,
+      };
+      nextProfile.totalPercent = calculateProfileTotal(nextProfile);
+      nextProfile.actualAshPercent = calculateActualAshContent(nextProfile, mode);
+
+      const syncFlat =
+        mode === normalizeRpMode(prev.rpMode)
+          ? {
+              ppPercent: nextProfile.ppPercent,
+              ccPercent: nextProfile.ccPercent,
+              ldpePercent: nextProfile.ldpePercent,
+              mbPercent: nextProfile.mbPercent,
+              rp1Percent: nextProfile.rp1Percent,
+              rp2Percent: nextProfile.rp2Percent,
+              hdrpPercent: nextProfile.hdrpPercent,
+              tptPercent: nextProfile.tptPercent,
+              tptFillerPercent: nextProfile.tptFillerPercent ?? 0,
+              totalPercent: nextProfile.totalPercent ?? 100,
+              ashPercent: nextProfile.actualAshPercent ?? prev.ashPercent,
+            }
+          : {};
+
+      return {
+        ...prev,
+        [targetKey]: nextProfile,
+        ...syncFlat,
+      };
+    });
+  };
+
+  const handleCopyProfileBetweenModes = (from: RecipeRpMode, to: RecipeRpMode) => {
+    setFormData((prev) => {
+      const source =
+        from === "WITHOUT_RP" ? prev.withoutRpComposition : prev.withRpComposition;
+      const cloned: RecipeBlendProfile = {
+        ...source,
+        actualAshPercent: calculateActualAshContent(source, to),
+        totalPercent: calculateProfileTotal(source),
+      };
+      const targetKey = to === "WITHOUT_RP" ? "withoutRpComposition" : "withRpComposition";
+      return {
+        ...prev,
+        [targetKey]: cloned,
+      };
+    });
+    toast.info(
+      `Copied ${from === "WITHOUT_RP" ? "Without RP" : "With RP"} blend into ${
+        to === "WITHOUT_RP" ? "Without RP" : "With RP"
+      }`
+    );
   };
 
   const handleSaveRecipe = async (e: React.FormEvent) => {
@@ -293,6 +453,27 @@ export function TapePlantRecipeClient() {
 
     setFormSaving(true);
     try {
+      const activeProfile =
+        normalizeRpMode(formData.rpMode) === "WITHOUT_RP"
+          ? formData.withoutRpComposition
+          : formData.withRpComposition;
+
+      const payload = {
+        ...formData,
+        ppPercent: activeProfile.ppPercent,
+        ccPercent: activeProfile.ccPercent,
+        ldpePercent: activeProfile.ldpePercent,
+        mbPercent: activeProfile.mbPercent,
+        rp1Percent: activeProfile.rp1Percent,
+        rp2Percent: activeProfile.rp2Percent,
+        hdrpPercent: activeProfile.hdrpPercent,
+        tptPercent: activeProfile.tptPercent,
+        tptFillerPercent: activeProfile.tptFillerPercent ?? 0,
+        totalPercent: calculateProfileTotal(activeProfile),
+        ashPercent: calculateActualAshContent(activeProfile, formData.rpMode),
+        requiredAsh: formData.permissibleTapeAsh ?? formData.requiredAsh,
+      };
+
       const url = editingId
         ? `/api/data-centre/tape-plant-recipes/${editingId}`
         : "/api/data-centre/tape-plant-recipes";
@@ -301,7 +482,7 @@ export function TapePlantRecipeClient() {
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(payload),
       });
 
       const data = await res.json();
@@ -338,15 +519,32 @@ export function TapePlantRecipeClient() {
     }
   };
 
-  // Filtered recipes
-  const filteredRecipes = useMemo(() => {
+  // Distinct vendor list from active (or all) recipes
+  const statusScopedRecipes = useMemo(() => {
     return recipes.filter((r) => {
+      if (statusFilter === "ACTIVE") return r.isActive;
+      if (statusFilter === "INACTIVE") return !r.isActive;
+      return true;
+    });
+  }, [recipes, statusFilter]);
+
+  const availableVendors = useMemo(() => {
+    const set = new Set<string>();
+    statusScopedRecipes.forEach((r) => {
+      if (r.vendor && r.vendor.trim()) set.add(r.vendor.trim().toUpperCase());
+    });
+    return Array.from(set).sort();
+  }, [statusScopedRecipes]);
+
+  const filteredRecipes = useMemo(() => {
+    return statusScopedRecipes.filter((r) => {
+      const matchesVendor =
+        vendorFilter === "ALL" ||
+        (r.vendor || "").trim().toUpperCase() === vendorFilter.toUpperCase();
+
       const matchesType =
         tapeTypeFilter === "ALL" ||
         r.tapeType?.toUpperCase() === tapeTypeFilter.toUpperCase();
-
-      const matchesRpMode =
-        rpModeFilter === "ALL" || normalizeRpMode(r.rpMode) === rpModeFilter;
 
       const matchesColorGroup =
         colorGroupFilter === "ALL" ||
@@ -356,47 +554,33 @@ export function TapePlantRecipeClient() {
       const matchesSearch =
         !searchTerm ||
         r.code?.toLowerCase().includes(q) ||
+        r.vendor?.toLowerCase().includes(q) ||
         r.colour?.toLowerCase().includes(q) ||
         r.bobbinMarking?.toLowerCase().includes(q) ||
         r.remarks?.toLowerCase().includes(q) ||
-        r.recipeGroup?.toLowerCase().includes(q) ||
-        r.colorGroup?.toLowerCase().includes(q);
+        r.tapeType?.toLowerCase().includes(q) ||
+        r.recipeGroup?.toLowerCase().includes(q);
 
-      return matchesType && matchesRpMode && matchesColorGroup && matchesSearch;
+      return matchesVendor && matchesType && matchesColorGroup && matchesSearch;
     });
-  }, [recipes, tapeTypeFilter, rpModeFilter, colorGroupFilter, searchTerm]);
+  }, [statusScopedRecipes, vendorFilter, tapeTypeFilter, colorGroupFilter, searchTerm]);
 
-  // Composition calculation
-  const totalComposition = useMemo(() => {
-    const p = (val: number | null | undefined) => (val ? Number(val) : 0);
-    return (
-      p(formData.ppPercent) +
-      p(formData.ccPercent) +
-      p(formData.mbPercent) +
-      p(formData.rp1Percent) +
-      p(formData.rp2Percent) +
-      p(formData.hdrpPercent) +
-      p(formData.tptPercent) +
-      p(formData.vistamaxPercent) +
-      p(formData.omega)
-    );
-  }, [
-    formData.ppPercent,
-    formData.ccPercent,
-    formData.mbPercent,
-    formData.rp1Percent,
-    formData.rp2Percent,
-    formData.hdrpPercent,
-    formData.tptPercent,
-    formData.vistamaxPercent,
-    formData.omega,
-  ]);
+  // Metrics based on active catalog
+  const activeCatalog = useMemo(() => recipes.filter((r) => r.isActive), [recipes]);
+  const retiredCount = recipes.length - activeCatalog.length;
+  const ppCount = activeCatalog.filter((r) => r.tapeType === "PP").length;
+  const lppCount = activeCatalog.filter((r) => r.tapeType === "LPP").length;
+  const vendorCount = new Set(activeCatalog.map((r) => r.vendor).filter(Boolean)).size;
 
-  // Metrics
-  const totalCount = recipes.length;
-  const ppCount = recipes.filter((r) => r.tapeType === "PP").length;
-  const lppCount = recipes.filter((r) => r.tapeType === "LPP").length;
-  const sharedGroupsCount = new Set(recipes.map((r) => r.recipeGroup).filter(Boolean)).size;
+  const activeModalProfile =
+    activeModalTab === "WITHOUT_RP"
+      ? formData.withoutRpComposition
+      : formData.withRpComposition;
+  const activeModalTotal = calculateProfileTotal(activeModalProfile);
+  const activeModalActualAsh = calculateActualAshContent(activeModalProfile, activeModalTab);
+  const permissibleTapeAshVal =
+    formData.permissibleTapeAsh ??
+    calculatePermissibleTapeAsh(formData.tapeType, formData.permissibleFabAsh);
 
   const getColorBadge = (cg: string | null) => {
     if (!cg) return null;
@@ -427,8 +611,8 @@ export function TapePlantRecipeClient() {
             <FlaskConical className="h-5 w-5" />
           </div>
           <div>
-            <div className="text-2xl font-bold text-slate-900">{totalCount}</div>
-            <div className="text-xs text-slate-500 font-medium">Total Qualities</div>
+            <div className="text-2xl font-bold text-slate-900">{activeCatalog.length}</div>
+            <div className="text-xs text-slate-500 font-medium">Active Master Qualities</div>
           </div>
         </div>
 
@@ -438,7 +622,7 @@ export function TapePlantRecipeClient() {
           </div>
           <div>
             <div className="text-2xl font-bold text-slate-900">{ppCount}</div>
-            <div className="text-xs text-slate-500 font-medium">PP Formulations</div>
+            <div className="text-xs text-slate-500 font-medium">PP Dual Recipes</div>
           </div>
         </div>
 
@@ -448,50 +632,102 @@ export function TapePlantRecipeClient() {
           </div>
           <div>
             <div className="text-2xl font-bold text-slate-900">{lppCount}</div>
-            <div className="text-xs text-slate-500 font-medium">LPP Formulations</div>
+            <div className="text-xs text-slate-500 font-medium">LPP Dual Recipes</div>
           </div>
         </div>
 
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-3.5">
           <div className="p-3 bg-purple-50 text-purple-600 rounded-xl border border-purple-100">
-            <Users className="h-5 w-5" />
+            <Building2 className="h-5 w-5" />
           </div>
           <div>
-            <div className="text-2xl font-bold text-slate-900">{sharedGroupsCount}</div>
-            <div className="text-xs text-slate-500 font-medium">Shared Recipe Families</div>
+            <div className="text-2xl font-bold text-slate-900">{vendorCount}</div>
+            <div className="text-xs text-slate-500 font-medium">Vendors / Customers</div>
           </div>
         </div>
       </div>
 
-      {/* 7-Color Group Filter Tabs */}
-      <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm space-y-2">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5 uppercase tracking-wider text-[10px]">
-            <Palette className="h-3.5 w-3.5 text-primary" /> Filter by Color Group (7 Categories)
+      {/* Vendor + Color Filters */}
+      <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm space-y-2.5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span className="font-bold text-slate-700 flex items-center gap-1.5 uppercase tracking-wider text-[10px]">
+            <Building2 className="h-3.5 w-3.5 text-primary" /> Filter by Vendor ({availableVendors.length})
           </span>
-          {colorGroupFilter !== "ALL" && (
-            <button
-              type="button"
-              onClick={() => setColorGroupFilter("ALL")}
-              className="text-[11px] text-primary hover:underline font-semibold"
-            >
-              Reset Color Filter
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            {vendorFilter !== "ALL" && (
+              <button
+                type="button"
+                onClick={() => setVendorFilter("ALL")}
+                className="text-[11px] text-primary hover:underline font-semibold"
+              >
+                Reset Vendor
+              </button>
+            )}
+            {colorGroupFilter !== "ALL" && (
+              <button
+                type="button"
+                onClick={() => setColorGroupFilter("ALL")}
+                className="text-[11px] text-primary hover:underline font-semibold"
+              >
+                Reset Color
+              </button>
+            )}
+          </div>
         </div>
+
         <div className="flex flex-wrap items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setVendorFilter("ALL")}
+            className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all ${
+              vendorFilter === "ALL"
+                ? "bg-slate-900 text-white border-slate-900 shadow-sm"
+                : "bg-slate-50 text-slate-700 border-slate-200 hover:border-slate-300"
+            }`}
+          >
+            All Vendors ({statusScopedRecipes.length})
+          </button>
+          {availableVendors.map((v) => {
+            const count = statusScopedRecipes.filter(
+              (r) => (r.vendor || "").trim().toUpperCase() === v
+            ).length;
+            const selected = vendorFilter === v;
+            return (
+              <button
+                key={v}
+                type="button"
+                onClick={() => setVendorFilter(v)}
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all ${
+                  selected
+                    ? "bg-slate-900 text-white border-slate-900 shadow-sm"
+                    : "bg-white text-slate-700 border-slate-200 hover:border-slate-300"
+                }`}
+              >
+                {v} <span className="opacity-70 text-[10px]">({count})</span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center gap-1.5">
+          <span className="font-bold text-slate-500 flex items-center gap-1 uppercase tracking-wider text-[10px] mr-1">
+            <Palette className="h-3 w-3" /> Color:
+          </span>
           {COLOR_GROUPS.map((cg) => {
             const isSelected = colorGroupFilter.toLowerCase() === cg.id.toLowerCase();
-            const count = cg.id === "ALL" 
-              ? recipes.length 
-              : recipes.filter((r) => r.colorGroup?.toLowerCase() === cg.id.toLowerCase()).length;
-
+            const count =
+              cg.id === "ALL"
+                ? statusScopedRecipes.length
+                : statusScopedRecipes.filter(
+                    (r) => r.colorGroup?.toLowerCase() === cg.id.toLowerCase()
+                  ).length;
+            if (cg.id !== "ALL" && count === 0) return null;
             return (
               <button
                 key={cg.id}
                 type="button"
                 onClick={() => setColorGroupFilter(cg.id)}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-all ${
                   isSelected
                     ? "bg-slate-900 text-white border-slate-900 shadow-sm"
                     : `${cg.bg} border-slate-200 text-slate-700 hover:border-slate-300`
@@ -499,13 +735,7 @@ export function TapePlantRecipeClient() {
               >
                 <span className={`h-2 w-2 rounded-full ${cg.dot}`} />
                 <span>{cg.label}</span>
-                <span
-                  className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
-                    isSelected ? "bg-white/20 text-white" : "bg-slate-200/70 text-slate-700"
-                  }`}
-                >
-                  {count}
-                </span>
+                <span className="opacity-70 text-[10px]">({count})</span>
               </button>
             );
           })}
@@ -513,16 +743,16 @@ export function TapePlantRecipeClient() {
       </div>
 
       {/* Action and Filter Bar */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-        <div className="flex flex-1 items-center gap-3">
-          <div className="relative flex-1 max-w-md">
+      <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+        <div className="flex flex-1 flex-wrap items-center gap-2.5">
+          <div className="relative flex-1 min-w-[220px] max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <input
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search by quality code, colour, marking, family..."
-              className="w-full pl-9 pr-4 py-2 text-xs border border-slate-200 rounded-lg bg-slate-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+              placeholder="Search quality, vendor, colour, marking..."
+              className="w-full pl-9 pr-8 py-2 text-xs border border-slate-200 rounded-lg bg-slate-50/50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
             />
             {searchTerm && (
               <button
@@ -535,13 +765,13 @@ export function TapePlantRecipeClient() {
             )}
           </div>
 
-          <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-lg border border-slate-200 text-xs">
+          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200 text-xs">
             {["ALL", "PP", "LPP"].map((t) => (
               <button
                 key={t}
                 type="button"
                 onClick={() => setTapeTypeFilter(t)}
-                className={`px-3 py-1 font-semibold rounded-md transition-all ${
+                className={`px-2.5 py-1 font-semibold rounded-md transition-all ${
                   tapeTypeFilter === t
                     ? "bg-white text-slate-900 shadow-sm"
                     : "text-slate-600 hover:text-slate-900"
@@ -552,20 +782,20 @@ export function TapePlantRecipeClient() {
             ))}
           </div>
 
-          <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-lg border border-slate-200 text-xs">
+          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200 text-xs">
             {(
               [
-                { id: "ALL", label: "All RP" },
-                { id: "WITH_RP", label: "With RP" },
-                { id: "WITHOUT_RP", label: "Without RP" },
+                { id: "WITH_RP", label: "View: With RP" },
+                { id: "WITHOUT_RP", label: "View: Without RP" },
+                { id: "BOTH", label: "Both Blends" },
               ] as const
             ).map((opt) => (
               <button
                 key={opt.id}
                 type="button"
-                onClick={() => setRpModeFilter(opt.id)}
+                onClick={() => setBlendViewMode(opt.id)}
                 className={`px-2.5 py-1 font-semibold rounded-md transition-all whitespace-nowrap ${
-                  rpModeFilter === opt.id
+                  blendViewMode === opt.id
                     ? "bg-white text-slate-900 shadow-sm"
                     : "text-slate-600 hover:text-slate-900"
                 }`}
@@ -574,15 +804,53 @@ export function TapePlantRecipeClient() {
               </button>
             ))}
           </div>
+
+          {retiredCount > 0 && (
+            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200 text-xs">
+              {(
+                [
+                  { id: "ACTIVE", label: `Active (${activeCatalog.length})` },
+                  { id: "INACTIVE", label: `Retired (${retiredCount})` },
+                ] as const
+              ).map((opt) => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => setStatusFilter(opt.id)}
+                  className={`px-2.5 py-1 font-semibold rounded-md transition-all whitespace-nowrap ${
+                    statusFilter === opt.id
+                      ? "bg-white text-slate-900 shadow-sm"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              exportTapelineMasterExcel(filteredRecipes);
+              toast.success(`Exported ${filteredRecipes.length} recipes to Excel`);
+            }}
+            disabled={filteredRecipes.length === 0}
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 rounded-lg border border-slate-200 transition-all active:scale-95 disabled:opacity-50"
+            title="Download dual-block Tapeline Master Excel"
+          >
+            <Download className="h-3.5 w-3.5 text-slate-600" />
+            Export .xlsx
+          </button>
+
           <button
             type="button"
             onClick={handleSeedDefaults}
             disabled={seeding}
             className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg border border-slate-200 transition-all active:scale-95 disabled:opacity-50"
-            title="Seed/Sync default 27 Loom Qualities and shared master recipes"
+            title="Sync all 27 canonical Tapeline Master qualities and blends"
           >
             {seeding ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -615,8 +883,8 @@ export function TapePlantRecipeClient() {
             <FlaskConical className="h-10 w-10 text-slate-300 mx-auto mb-2" />
             <p className="text-sm font-semibold text-slate-700">No qualities found</p>
             <p className="text-xs text-slate-400 mt-1">
-              {searchTerm || tapeTypeFilter !== "ALL" || colorGroupFilter !== "ALL"
-                ? "Try adjusting your search query or color filters"
+              {searchTerm || tapeTypeFilter !== "ALL" || vendorFilter !== "ALL" || colorGroupFilter !== "ALL"
+                ? "Try adjusting your search query, vendor, or filters"
                 : "Click '+ Add Quality' or 'Sync Master Qualities' to populate recipes."}
             </p>
           </div>
@@ -625,70 +893,101 @@ export function TapePlantRecipeClient() {
             <table className="w-full text-xs text-left border-collapse">
               <thead className="bg-slate-100/95 sticky top-0 z-10 backdrop-blur-sm border-b border-slate-200 text-slate-700 font-bold uppercase tracking-wider text-[11px]">
                 <tr>
-                  <th className="px-4 py-3">Quality Code & Family</th>
-                  <th className="px-3 py-3 text-center">Color Group</th>
+                  <th className="px-3 py-3">Vendor</th>
+                  <th className="px-4 py-3">Actual Quality</th>
+                  <th className="px-3 py-3">Colour / Specs</th>
                   <th className="px-3 py-3 text-center">Type</th>
-                  <th className="px-3 py-3 text-center">RP Mode</th>
-                  <th className="px-3 py-3 text-right">Denier</th>
-                  <th className="px-3 py-3 text-right">Width (mm)</th>
-                  <th className="px-3 py-3 text-right">Strength</th>
-                  <th className="px-3 py-3 text-right">ELO %</th>
-                  <th className="px-3 py-3">Marking / Colour</th>
-                  <th className="px-3 py-3 text-right">Spacer</th>
-                  <th className="px-3 py-3 text-right">Ash %</th>
-                  <th className="px-4 py-3">Composition (%)</th>
-                  <th className="px-3 py-3 text-right">Default Qty</th>
+                  <th className="px-3 py-3 text-right">Perm. Ash (Fab / Tape)</th>
+                  <th className="px-3 py-3 text-right">Actual Ash</th>
+                  <th className="px-4 py-3">
+                    {blendViewMode === "BOTH"
+                      ? "Dual Composition (Without RP & With RP)"
+                      : blendViewMode === "WITHOUT_RP"
+                      ? "Without RP Formulation (%)"
+                      : "With RP Formulation (%)"}
+                  </th>
                   <th className="px-4 py-3 text-center">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-slate-700">
                 {filteredRecipes.map((r) => {
-                  const hasComposition =
-                    r.ppPercent !== null ||
-                    r.ccPercent !== null ||
-                    r.mbPercent !== null ||
-                    r.rp1Percent !== null;
+                  const withProfile = resolveRecipeProfileForMode(r, "WITH_RP");
+                  const withoutProfile = resolveRecipeProfileForMode(r, "WITHOUT_RP");
+                  const activeProfile =
+                    blendViewMode === "WITHOUT_RP" ? withoutProfile : withProfile;
+
+                  const permFab = r.permissibleFabAsh;
+                  const permTape =
+                    r.permissibleTapeAsh ??
+                    calculatePermissibleTapeAsh(r.tapeType, permFab) ??
+                    r.requiredAsh;
+
+                  const withAsh = calculateActualAshContent(withProfile, "WITH_RP");
+                  const withoutAsh = calculateActualAshContent(withoutProfile, "WITHOUT_RP");
+                  const activeAsh = blendViewMode === "WITHOUT_RP" ? withoutAsh : withAsh;
+                  const overLimit =
+                    permTape !== null && permTape !== undefined && activeAsh > permTape + 0.01;
 
                   return (
-                    <tr key={r.id} className="hover:bg-slate-50/80 transition-colors">
-                      {/* Quality Code & Shared Group */}
+                    <tr
+                      key={r.id}
+                      className={`hover:bg-slate-50/80 transition-colors ${
+                        !r.isActive ? "opacity-65 bg-slate-50/40" : ""
+                      }`}
+                    >
+                      {/* Vendor */}
+                      <td className="px-3 py-3 whitespace-nowrap">
+                        {r.vendor ? (
+                          <span className="inline-block px-2 py-0.5 rounded bg-slate-100 border border-slate-200 font-bold text-[10px] text-slate-800 uppercase">
+                            {r.vendor}
+                          </span>
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        )}
+                      </td>
+
+                      {/* Actual Quality */}
                       <td className="px-4 py-3">
-                        <div className="font-mono font-bold text-slate-900 text-xs">
-                          {r.code}
-                        </div>
-                        <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                          {r.recipeGroup && (
-                            <span className="inline-flex items-center text-[10px] font-semibold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200">
-                              {r.recipeGroup}
+                        <div className="font-mono font-bold text-slate-900 text-xs flex items-center gap-1.5">
+                          <span>{r.code}</span>
+                          {!r.isActive && (
+                            <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase bg-slate-200 text-slate-600 rounded">
+                              Retired
                             </span>
                           )}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-1.5 mt-1">
                           {r.sharedQualities && r.sharedQualities.length > 0 && (
                             <button
                               type="button"
                               onClick={() => setActiveSharedModal(r)}
                               className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-1.5 py-0.5 rounded border border-emerald-200 transition-colors"
-                              title="Click to view all qualities sharing this recipe"
+                              title="View all qualities sharing this recipe"
                             >
                               <Users className="h-3 w-3" />
-                              Shared by {r.sharedQualities.length + 1}
+                              Family ({r.sharedQualities.length + 1})
                             </button>
                           )}
-                          {r.copiedFromCode && (
-                            <span className="text-[9px] text-slate-400">
-                              via {r.copiedFromCode}
-                            </span>
-                          )}
+                          {getColorBadge(r.colorGroup)}
                         </div>
-                        {r.remarks && (
-                          <div className="text-[10px] text-slate-400 mt-0.5 max-w-xs truncate">
-                            {r.remarks}
-                          </div>
-                        )}
                       </td>
 
-                      {/* Color Group */}
-                      <td className="px-3 py-3 text-center">
-                        {getColorBadge(r.colorGroup)}
+                      {/* Colour / Specs */}
+                      <td className="px-3 py-3">
+                        <div className="font-semibold text-slate-800 text-[11px]">
+                          {r.colour || "—"}
+                        </div>
+                        {(r.denier || r.tapeWidth || r.bobbinMarking) && (
+                          <div className="text-[10px] text-slate-400 mt-0.5 whitespace-nowrap">
+                            {[
+                              r.denier ? `${r.denier}D` : null,
+                              r.tapeWidth ? `${r.tapeWidth}mm` : null,
+                              r.bobbinMarking || null,
+                            ]
+                              .filter(Boolean)
+                              .join(" • ")}
+                          </div>
+                        )}
                       </td>
 
                       {/* Type */}
@@ -706,113 +1005,70 @@ export function TapePlantRecipeClient() {
                         </span>
                       </td>
 
-                      {/* RP Mode */}
-                      <td className="px-3 py-3 text-center whitespace-nowrap">
-                        <span
-                          className={`inline-block px-2 py-0.5 font-bold text-[10px] rounded border ${
-                            normalizeRpMode(r.rpMode) === "WITHOUT_RP"
-                              ? "bg-amber-50 text-amber-800 border-amber-200"
-                              : "bg-sky-50 text-sky-800 border-sky-200"
-                          }`}
-                        >
-                          {formatRpModeLabel(r.rpMode)}
-                        </span>
-                      </td>
-
-                      {/* Denier */}
-                      <td className="px-3 py-3 text-right font-medium">{r.denier ?? "—"}</td>
-
-                      {/* Tape Width */}
-                      <td className="px-3 py-3 text-right font-medium">{r.tapeWidth ?? "—"}</td>
-
-                      {/* Strength */}
-                      <td className="px-3 py-3 text-right font-medium">{r.strength ?? "—"}</td>
-
-                      {/* ELO% */}
-                      <td className="px-3 py-3 text-right font-medium">
-                        {r.eloPercent !== null && r.eloPercent !== undefined
-                          ? typeof r.eloPercent === "number" && r.eloPercent < 1
-                            ? `${(r.eloPercent * 100).toFixed(0)}%`
-                            : `${r.eloPercent}%`
-                          : "—"}
-                      </td>
-
-                      {/* Marking & Colour */}
-                      <td className="px-3 py-3">
-                        <div className="font-semibold text-slate-800 text-[11px]">
-                          {r.bobbinMarking || "—"}
-                        </div>
-                        <div className="text-[10px] text-slate-400 font-bold uppercase">
-                          {r.colour || "—"}
-                        </div>
-                      </td>
-
-                      {/* Spacer */}
-                      <td className="px-3 py-3 text-right font-medium">{r.spacerSize ?? "—"}</td>
-
-                      {/* Ash % */}
-                      <td className="px-3 py-3 text-right">
-                        <div className="font-medium text-slate-800">
-                          {r.ashPercent ? `${r.ashPercent}%` : "—"}
-                        </div>
-                        {r.requiredAsh && (
-                          <div className="text-[10px] text-slate-400">
-                            Req: {r.requiredAsh}%
+                      {/* Permissible Ash */}
+                      <td className="px-3 py-3 text-right whitespace-nowrap font-mono">
+                        {permTape !== null && permTape !== undefined ? (
+                          <div>
+                            <div className="font-bold text-slate-900">Tape: {permTape}%</div>
+                            {permFab !== null && permFab !== undefined && (
+                              <div className="text-[10px] text-slate-500">Fab: {permFab}%</div>
+                            )}
                           </div>
+                        ) : (
+                          <span className="text-slate-400">—</span>
                         )}
                       </td>
 
-                      {/* Composition */}
-                      <td className="px-4 py-3">
-                        {hasComposition ? (
-                          <div className="flex flex-wrap items-center gap-1 max-w-xs">
-                            {r.ppPercent ? (
-                              <span className="px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded border border-blue-200 text-[10px] font-semibold">
-                                PP: {r.ppPercent}%
-                              </span>
-                            ) : null}
-                            {r.ccPercent ? (
-                              <span className="px-1.5 py-0.5 bg-amber-50 text-amber-700 rounded border border-amber-200 text-[10px] font-semibold">
-                                CC: {r.ccPercent}%
-                              </span>
-                            ) : null}
-                            {r.mbPercent ? (
-                              <span className="px-1.5 py-0.5 bg-purple-50 text-purple-700 rounded border border-purple-200 text-[10px] font-semibold">
-                                MB: {r.mbPercent}%
-                              </span>
-                            ) : null}
-                            {r.rp1Percent ? (
-                              <span className="px-1.5 py-0.5 bg-emerald-50 text-emerald-700 rounded border border-emerald-200 text-[10px] font-semibold">
-                                RP White: {r.rp1Percent}%
-                              </span>
-                            ) : null}
-                            {r.rp2Percent ? (
-                              <span className="px-1.5 py-0.5 bg-teal-50 text-teal-700 rounded border border-teal-200 text-[10px] font-semibold">
-                                RP Yellow: {r.rp2Percent}%
-                              </span>
-                            ) : null}
-                            {r.hdrpPercent ? (
-                              <span className="px-1.5 py-0.5 bg-rose-50 text-rose-700 rounded border border-rose-200 text-[10px] font-semibold">
-                                Mixed RP: {r.hdrpPercent}%
-                              </span>
-                            ) : null}
-                            {r.tptPercent ? (
-                              <span className="px-1.5 py-0.5 bg-slate-100 text-slate-700 rounded border border-slate-200 text-[10px] font-semibold">
-                                Natural RP: {r.tptPercent}%
-                              </span>
-                            ) : null}
+                      {/* Actual Ash */}
+                      <td className="px-3 py-3 text-right whitespace-nowrap font-mono">
+                        {blendViewMode === "BOTH" ? (
+                          <div className="space-y-0.5 text-[11px]">
+                            <div className="font-semibold text-amber-800">
+                              No RP: {withoutAsh}%
+                            </div>
+                            <div className="font-bold text-sky-800">
+                              With RP: {withAsh}%
+                            </div>
                           </div>
                         ) : (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-50 text-amber-800 border border-amber-200 rounded text-[10px] font-bold">
-                            <Info className="h-3 w-3 text-amber-600" />
-                            Pending Formulation
+                          <span
+                            className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded font-bold text-[11px] ${
+                              overLimit
+                                ? "bg-amber-50 text-amber-800 border border-amber-200"
+                                : "text-slate-900"
+                            }`}
+                            title={
+                              overLimit
+                                ? `Actual ash (${activeAsh}%) exceeds Permissible Tape Ash (${permTape}%)`
+                                : `Within Permissible Tape Ash limit`
+                            }
+                          >
+                            {overLimit && <AlertTriangle className="h-3 w-3 text-amber-600" />}
+                            {activeAsh}%
                           </span>
                         )}
                       </td>
 
-                      {/* Default Qty */}
-                      <td className="px-3 py-3 text-right font-medium">
-                        {r.defaultQtyKg ? `${r.defaultQtyKg.toLocaleString()} kg` : "—"}
+                      {/* Composition */}
+                      <td className="px-4 py-3 min-w-[290px]">
+                        {blendViewMode === "BOTH" ? (
+                          <div className="space-y-1.5">
+                            <div className="flex items-start gap-1.5">
+                              <span className="shrink-0 px-1.5 py-0.5 text-[9px] font-bold uppercase rounded bg-amber-50 text-amber-800 border border-amber-200">
+                                Without RP
+                              </span>
+                              {renderBlendChips(withoutProfile)}
+                            </div>
+                            <div className="flex items-start gap-1.5">
+                              <span className="shrink-0 px-1.5 py-0.5 text-[9px] font-bold uppercase rounded bg-sky-50 text-sky-800 border border-sky-200">
+                                With RP
+                              </span>
+                              {renderBlendChips(withProfile)}
+                            </div>
+                          </div>
+                        ) : (
+                          renderBlendChips(activeProfile)
+                        )}
                       </td>
 
                       {/* Actions */}
@@ -822,7 +1078,7 @@ export function TapePlantRecipeClient() {
                             type="button"
                             onClick={() => handleCopyRecipeToNew(r)}
                             className="p-1.5 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
-                            title="Copy Recipe Formulation to New Quality"
+                            title="Copy Dual Formulation to New Quality"
                           >
                             <Copy className="h-3.5 w-3.5" />
                           </button>
@@ -830,7 +1086,7 @@ export function TapePlantRecipeClient() {
                             type="button"
                             onClick={() => handleOpenEditModal(r)}
                             className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                            title="Edit Quality / Recipe"
+                            title="Edit Quality / Dual Formulations"
                           >
                             <Edit2 className="h-3.5 w-3.5" />
                           </button>
@@ -867,10 +1123,13 @@ export function TapePlantRecipeClient() {
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-slate-900">
-                    Shared Recipe Formulation
+                    Vendor / Recipe Cluster
                   </h3>
                   <p className="text-xs text-slate-500">
-                    Family: <span className="font-semibold text-purple-700">{activeSharedModal.recipeGroup || "Shared Cluster"}</span>
+                    Group:{" "}
+                    <span className="font-semibold text-purple-700">
+                      {activeSharedModal.recipeGroup || "Shared Cluster"}
+                    </span>
                   </p>
                 </div>
               </div>
@@ -884,49 +1143,34 @@ export function TapePlantRecipeClient() {
             </div>
 
             <div className="p-5 space-y-4">
-              <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-100 text-xs text-emerald-900 space-y-1">
-                <div className="font-bold flex items-center gap-1.5">
-                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                  Identical Tape Plant Formulation
+              <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                <div className="p-2.5 bg-slate-50 rounded-lg border border-slate-200 flex items-center justify-between">
+                  <span className="font-mono font-bold text-xs text-slate-900">
+                    {activeSharedModal.code}
+                  </span>
+                  <span className="text-[10px] font-bold px-2 py-0.5 bg-slate-200 text-slate-700 rounded">
+                    Selected
+                  </span>
                 </div>
-                <p className="text-slate-600 text-[11px]">
-                  All circular looms weaving these qualities consume bobbins with the exact same chemical formulation and extrusion parameters:
-                </p>
-              </div>
-
-              <div>
-                <span className="text-xs font-bold text-slate-700 block mb-2">
-                  Qualities Sharing This Recipe ({(activeSharedModal.sharedQualities?.length || 0) + 1}):
-                </span>
-                <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
-                  <div className="p-2.5 bg-slate-50 rounded-lg border border-slate-200 flex items-center justify-between">
-                    <span className="font-mono font-bold text-xs text-slate-900">
-                      {activeSharedModal.code}
-                    </span>
-                    <span className="text-[10px] font-bold px-2 py-0.5 bg-slate-200 text-slate-700 rounded">
-                      (Selected)
-                    </span>
-                  </div>
-                  {activeSharedModal.sharedQualities?.map((code) => {
-                    const matchedRecipe = recipes.find((r) => r.code === code);
-                    return (
-                      <div
-                        key={code}
-                        className="p-2.5 bg-white rounded-lg border border-slate-200 flex items-center justify-between hover:bg-slate-50"
-                      >
-                        <div>
-                          <div className="font-mono font-bold text-xs text-slate-900">{code}</div>
-                          {matchedRecipe && (
-                            <div className="text-[10px] text-slate-400">
-                              Colour: {matchedRecipe.colour || "—"} | Marking: {matchedRecipe.bobbinMarking || "—"}
-                            </div>
-                          )}
-                        </div>
-                        {matchedRecipe && getColorBadge(matchedRecipe.colorGroup)}
+                {activeSharedModal.sharedQualities?.map((code) => {
+                  const matchedRecipe = recipes.find((r) => r.code === code);
+                  return (
+                    <div
+                      key={code}
+                      className="p-2.5 bg-white rounded-lg border border-slate-200 flex items-center justify-between hover:bg-slate-50"
+                    >
+                      <div>
+                        <div className="font-mono font-bold text-xs text-slate-900">{code}</div>
+                        {matchedRecipe && (
+                          <div className="text-[10px] text-slate-400">
+                            {matchedRecipe.vendor || "—"} | {matchedRecipe.colour || "—"}
+                          </div>
+                        )}
                       </div>
-                    );
-                  })}
-                </div>
+                      {matchedRecipe && getColorBadge(matchedRecipe.colorGroup)}
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
@@ -946,7 +1190,7 @@ export function TapePlantRecipeClient() {
       {/* Add / Edit Recipe Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-3xl overflow-hidden max-h-[90vh] flex flex-col">
+          <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-4xl overflow-hidden max-h-[92vh] flex flex-col">
             {/* Header */}
             <div className="px-6 py-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
@@ -955,10 +1199,10 @@ export function TapePlantRecipeClient() {
                 </div>
                 <div>
                   <h3 className="text-sm font-bold text-slate-900">
-                    {editingId ? "Edit Quality / Recipe" : "Add New Quality / Recipe"}
+                    {editingId ? "Edit Quality & Dual Formulations" : "Add New Quality / Dual Recipe"}
                   </h3>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    Configure specifications, mechanical tolerances, and formulation composition.
+                    Configure Vendor, Permissible Fab/Tape Ash, and both Without RP & With RP blends.
                   </p>
                 </div>
               </div>
@@ -973,8 +1217,8 @@ export function TapePlantRecipeClient() {
 
             {/* Form */}
             <form onSubmit={handleSaveRecipe} className="flex-1 overflow-y-auto p-6 space-y-6">
-              {/* Clone / Copy from Existing Quality Selector */}
-              <div className="p-4 bg-purple-50/70 border border-purple-200 rounded-xl space-y-2">
+              {/* Clone / Copy from Existing Quality */}
+              <div className="p-3.5 bg-purple-50/70 border border-purple-200 rounded-xl space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-purple-900 flex items-center gap-1.5">
                     <Sparkles className="h-4 w-4 text-purple-600" />
@@ -986,40 +1230,50 @@ export function TapePlantRecipeClient() {
                     </span>
                   )}
                 </div>
-                <p className="text-[11px] text-purple-800/80">
-                  Select an existing quality to copy all material composition percentages (PP%, CC%, MB%, RP White%, RP Yellow%, Mixed RP%, Natural RP%, Ash%, Spacer) instantly:
-                </p>
                 <select
                   value={cloneSourceCode}
                   onChange={(e) => handleApplyCloneSource(e.target.value)}
                   className="w-full text-xs font-mono font-medium px-3 py-2 bg-white border border-purple-200 rounded-lg text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-400"
                 >
-                  <option value="">-- Choose Quality to Copy Recipe From --</option>
-                  {recipes.map((r) => (
+                  <option value="">-- Choose Quality to Copy Both Formulations From --</option>
+                  {activeCatalog.map((r) => (
                     <option key={r.id} value={r.code}>
-                      {r.code} ({r.tapeType} | {r.denier}D | {r.colour} | {r.recipeGroup || "No Family"})
+                      {r.vendor ? `[${r.vendor}] ` : ""}{r.code} ({r.tapeType} | {r.colour})
                     </option>
                   ))}
                 </select>
               </div>
 
-              {/* Section 1: Identification & Classification */}
+              {/* Section 1: Identification & Ash Spec */}
               <div className="space-y-3">
                 <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                  <Layers className="h-3.5 w-3.5 text-primary" /> Quality Identification & Family
+                  <Layers className="h-3.5 w-3.5 text-primary" /> Quality Identification & Ash Spec
                 </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
                   <div>
                     <label className="text-xs font-semibold text-slate-700 block mb-1">
-                      Quality / Recipe Code <span className="text-rose-500">*</span>
+                      Actual Quality Code <span className="text-rose-500">*</span>
                     </label>
                     <input
                       type="text"
                       required
                       value={formData.code}
                       onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                      placeholder="e.g. wOND/LPP/WH/500/67/S1"
-                      className="w-full px-3 py-2 text-xs font-mono font-bold border border-slate-200 rounded-lg bg-white focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                      placeholder="e.g. AMB-NVCO/LPP/WHT/500/64/S1"
+                      className="w-full px-3 py-2 text-xs font-mono font-bold border border-slate-200 rounded-lg bg-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700 block mb-1">
+                      Vendor
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.vendor || ""}
+                      onChange={(e) => setFormData({ ...formData, vendor: e.target.value.toUpperCase() })}
+                      placeholder="e.g. ADANI, CCI, UTCL, WONDER"
+                      className="w-full px-3 py-2 text-xs font-bold uppercase border border-slate-200 rounded-lg bg-white"
                     />
                   </div>
 
@@ -1029,74 +1283,117 @@ export function TapePlantRecipeClient() {
                     </label>
                     <select
                       value={formData.tapeType}
-                      onChange={(e) => setFormData({ ...formData, tapeType: e.target.value })}
-                      className="w-full px-3 py-2 text-xs font-semibold border border-slate-200 rounded-lg bg-white focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                      onChange={(e) => {
+                        const nextType = e.target.value;
+                        const nextTapeAsh = calculatePermissibleTapeAsh(
+                          nextType,
+                          formData.permissibleFabAsh
+                        );
+                        setFormData({
+                          ...formData,
+                          tapeType: nextType,
+                          permissibleTapeAsh: nextTapeAsh,
+                          requiredAsh: nextTapeAsh,
+                        });
+                      }}
+                      className="w-full px-3 py-2 text-xs font-semibold border border-slate-200 rounded-lg bg-white"
                     >
-                      <option value="PP">PP (Polypropylene Standard)</option>
-                      <option value="LPP">LPP (Laminated / Liner PP)</option>
-                      <option value="HDPE">HDPE (High Density)</option>
+                      <option value="PP">PP (Tape Ash = Fab Ash)</option>
+                      <option value="LPP">LPP (Tape Ash = Fab Ash / 0.75)</option>
+                      <option value="HDPE">HDPE</option>
                     </select>
                   </div>
 
                   <div>
                     <label className="text-xs font-semibold text-slate-700 block mb-1">
-                      RP Formulation Mode
+                      Colour
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.colour || ""}
+                      onChange={(e) => setFormData({ ...formData, colour: e.target.value })}
+                      placeholder="e.g. White, Yellow, Red, Orange"
+                      className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg bg-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700 block mb-1">
+                      Permissible Ash in Fab (%)
+                    </label>
+                    <input
+                      type="number"
+                      step="any"
+                      value={formData.permissibleFabAsh ?? ""}
+                      onChange={(e) => {
+                        const fab = e.target.value ? Number(e.target.value) : null;
+                        const tapeAsh = calculatePermissibleTapeAsh(formData.tapeType, fab);
+                        setFormData({
+                          ...formData,
+                          permissibleFabAsh: fab,
+                          permissibleTapeAsh: tapeAsh,
+                          requiredAsh: tapeAsh,
+                        });
+                      }}
+                      placeholder="e.g. 4.0"
+                      className="w-full px-3 py-2 text-xs font-mono border border-slate-200 rounded-lg bg-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700 block mb-1">
+                      Permissible Ash in Tape (%)
+                    </label>
+                    <input
+                      type="number"
+                      step="any"
+                      value={formData.permissibleTapeAsh ?? ""}
+                      onChange={(e) => {
+                        const val = e.target.value ? Number(e.target.value) : null;
+                        setFormData({
+                          ...formData,
+                          permissibleTapeAsh: val,
+                          requiredAsh: val,
+                        });
+                      }}
+                      placeholder="Auto-computed"
+                      className="w-full px-3 py-2 text-xs font-mono font-bold border border-slate-200 rounded-lg bg-slate-50"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-slate-700 block mb-1">
+                      Default RP Mode (Planning Default)
                     </label>
                     <select
                       value={formData.rpMode}
                       onChange={(e) =>
                         setFormData({ ...formData, rpMode: normalizeRpMode(e.target.value) })
                       }
-                      className="w-full px-3 py-2 text-xs font-semibold border border-slate-200 rounded-lg bg-white focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                      className="w-full px-3 py-2 text-xs font-semibold border border-slate-200 rounded-lg bg-white"
                     >
-                      <option value="WITH_RP">With RP (Reprocessed Blend)</option>
-                      <option value="WITHOUT_RP">Without RP (Virgin Blend)</option>
+                      <option value="WITH_RP">With RP (Default)</option>
+                      <option value="WITHOUT_RP">Without RP (Default)</option>
                     </select>
                   </div>
 
                   <div>
                     <label className="text-xs font-semibold text-slate-700 block mb-1">
-                      Color Group (7 Classifications)
+                      Color Group
                     </label>
                     <select
-                      value={formData.colorGroup || "Yellow"}
+                      value={formData.colorGroup || "White"}
                       onChange={(e) => setFormData({ ...formData, colorGroup: e.target.value })}
-                      className="w-full px-3 py-2 text-xs font-semibold border border-slate-200 rounded-lg bg-white focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                      className="w-full px-3 py-2 text-xs font-semibold border border-slate-200 rounded-lg bg-white"
                     >
-                      <option value="Yellow">🟡 Yellow (High-Volume / Priority)</option>
-                      <option value="White">⚪ White (Standard Base Lines)</option>
-                      <option value="Light Green">🟢 Light Green (860D Shared Family)</option>
-                      <option value="Dark Green">🌲 Dark Green (Specialty Contract)</option>
-                      <option value="Grey">🔘 Grey (Transition / Grade B)</option>
-                      <option value="Light Blue">🩵 Light Blue</option>
-                      <option value="Dark Blue">🔵 Dark Blue</option>
+                      <option value="Yellow">Yellow</option>
+                      <option value="White">White</option>
+                      <option value="Light Green">Light Green (860D)</option>
+                      <option value="Dark Green">Dark Green</option>
+                      <option value="Grey">Grey (Mix / Transition)</option>
+                      <option value="Light Blue">Light Blue</option>
+                      <option value="Dark Blue">Dark Blue</option>
                     </select>
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-semibold text-slate-700 block mb-1">
-                      Shared Recipe Family / Cluster
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.recipeGroup || ""}
-                      onChange={(e) => setFormData({ ...formData, recipeGroup: e.target.value })}
-                      placeholder="e.g. 860D PP Shared Formulation"
-                      className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg bg-white focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-semibold text-slate-700 block mb-1">
-                      Base Tape Colour
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.colour || ""}
-                      onChange={(e) => setFormData({ ...formData, colour: e.target.value })}
-                      placeholder="e.g. WHITE, YELLOW, WH+RED, ORANGE"
-                      className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg bg-white focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                    />
                   </div>
 
                   <div>
@@ -1107,17 +1404,102 @@ export function TapePlantRecipeClient() {
                       type="text"
                       value={formData.bobbinMarking || ""}
                       onChange={(e) => setFormData({ ...formData, bobbinMarking: e.target.value })}
-                      placeholder="e.g. RED, BLUE, GREEN, BLK/GRN"
-                      className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg bg-white focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                      placeholder="e.g. RED, BLUE, BLK/GRN"
+                      className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg bg-white"
                     />
                   </div>
                 </div>
               </div>
 
-              {/* Section 2: Physical Specifications */}
+              {/* Section 2: Dual Formulation Editor (WITHOUT RP / WITH RP) */}
+              <div className="space-y-3 p-4 bg-slate-50 rounded-xl border border-slate-200">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5 bg-white p-1 rounded-lg border border-slate-200">
+                    {(
+                      [
+                        { id: "WITH_RP", label: "With RP Formulation" },
+                        { id: "WITHOUT_RP", label: "Without RP Formulation" },
+                      ] as const
+                    ).map((tab) => (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        onClick={() => setActiveModalTab(tab.id)}
+                        className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${
+                          activeModalTab === tab.id
+                            ? tab.id === "WITH_RP"
+                              ? "bg-sky-600 text-white shadow-sm"
+                              : "bg-amber-600 text-white shadow-sm"
+                            : "text-slate-600 hover:text-slate-900"
+                        }`}
+                      >
+                        {tab.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleCopyProfileBetweenModes(
+                          activeModalTab === "WITH_RP" ? "WITHOUT_RP" : "WITH_RP",
+                          activeModalTab
+                        )
+                      }
+                      className="text-[11px] font-semibold px-2.5 py-1 rounded border border-slate-200 bg-white hover:bg-slate-100 text-slate-700"
+                    >
+                      Copy from {activeModalTab === "WITH_RP" ? "Without RP" : "With RP"}
+                    </button>
+
+                    <span
+                      className={`text-xs font-mono font-bold px-2.5 py-1 rounded-full ${
+                        Math.abs(activeModalTotal - 100) < 0.05 || activeModalTotal === 0
+                          ? "bg-emerald-100 text-emerald-800"
+                          : "bg-amber-100 text-amber-800"
+                      }`}
+                    >
+                      Total: {activeModalTotal.toFixed(2)}%
+                    </span>
+
+                    <span
+                      className={`text-xs font-mono font-bold px-2.5 py-1 rounded-full ${
+                        permissibleTapeAshVal !== null &&
+                        activeModalActualAsh > permissibleTapeAshVal + 0.01
+                          ? "bg-amber-100 text-amber-800"
+                          : "bg-slate-200 text-slate-800"
+                      }`}
+                    >
+                      Actual Ash: {activeModalActualAsh.toFixed(2)}%
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 pt-1">
+                  {BLEND_FIELDS.map((f) => (
+                    <div key={f.key}>
+                      <label className="text-[11px] font-medium text-slate-600 block mb-1">
+                        {f.label}
+                      </label>
+                      <input
+                        type="number"
+                        step="any"
+                        value={activeModalProfile[f.key] ?? ""}
+                        onChange={(e) =>
+                          updateActiveBlendField(activeModalTab, f.key, e.target.value)
+                        }
+                        placeholder={f.hint}
+                        className="w-full px-2.5 py-1.5 text-xs font-mono border border-slate-200 rounded-lg bg-white"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Section 3: Physical / Machine Parameters (Optional) */}
               <div className="space-y-3">
                 <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                  <Database className="h-3.5 w-3.5 text-primary" /> Physical & Mechanical Specs
+                  <Database className="h-3.5 w-3.5 text-primary" /> Physical & Extrusion Parameters
                 </h4>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   <div>
@@ -1128,8 +1510,9 @@ export function TapePlantRecipeClient() {
                       type="number"
                       step="any"
                       value={formData.denier ?? ""}
-                      onChange={(e) => setFormData({ ...formData, denier: e.target.value ? Number(e.target.value) : null })}
-                      placeholder="e.g. 840"
+                      onChange={(e) =>
+                        setFormData({ ...formData, denier: e.target.value ? Number(e.target.value) : null })
+                      }
                       className="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg bg-white"
                     />
                   </div>
@@ -1141,8 +1524,12 @@ export function TapePlantRecipeClient() {
                       type="number"
                       step="any"
                       value={formData.tapeWidth ?? ""}
-                      onChange={(e) => setFormData({ ...formData, tapeWidth: e.target.value ? Number(e.target.value) : null })}
-                      placeholder="e.g. 2.45"
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          tapeWidth: e.target.value ? Number(e.target.value) : null,
+                        })
+                      }
                       className="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg bg-white"
                     />
                   </div>
@@ -1154,21 +1541,29 @@ export function TapePlantRecipeClient() {
                       type="number"
                       step="any"
                       value={formData.strength ?? ""}
-                      onChange={(e) => setFormData({ ...formData, strength: e.target.value ? Number(e.target.value) : null })}
-                      placeholder="e.g. 4.75"
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          strength: e.target.value ? Number(e.target.value) : null,
+                        })
+                      }
                       className="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg bg-white"
                     />
                   </div>
                   <div>
                     <label className="text-[11px] font-medium text-slate-600 block mb-1">
-                      Elongation (ELO)
+                      Elongation (ELO %)
                     </label>
                     <input
                       type="number"
                       step="any"
                       value={formData.eloPercent ?? ""}
-                      onChange={(e) => setFormData({ ...formData, eloPercent: e.target.value ? Number(e.target.value) : null })}
-                      placeholder="e.g. 0.22"
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          eloPercent: e.target.value ? Number(e.target.value) : null,
+                        })
+                      }
                       className="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg bg-white"
                     />
                   </div>
@@ -1180,34 +1575,12 @@ export function TapePlantRecipeClient() {
                       type="number"
                       step="any"
                       value={formData.spacerSize ?? ""}
-                      onChange={(e) => setFormData({ ...formData, spacerSize: e.target.value ? Number(e.target.value) : null })}
-                      placeholder="e.g. 6.15"
-                      className="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg bg-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[11px] font-medium text-slate-600 block mb-1">
-                      Required Ash %
-                    </label>
-                    <input
-                      type="number"
-                      step="any"
-                      value={formData.requiredAsh ?? ""}
-                      onChange={(e) => setFormData({ ...formData, requiredAsh: e.target.value ? Number(e.target.value) : null })}
-                      placeholder="e.g. 6.0"
-                      className="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg bg-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[11px] font-medium text-slate-600 block mb-1">
-                      Ash %
-                    </label>
-                    <input
-                      type="number"
-                      step="any"
-                      value={formData.ashPercent ?? ""}
-                      onChange={(e) => setFormData({ ...formData, ashPercent: e.target.value ? Number(e.target.value) : null })}
-                      placeholder="e.g. 5.45"
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          spacerSize: e.target.value ? Number(e.target.value) : null,
+                        })
+                      }
                       className="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg bg-white"
                     />
                   </div>
@@ -1219,120 +1592,46 @@ export function TapePlantRecipeClient() {
                       type="number"
                       step="any"
                       value={formData.defaultQtyKg ?? ""}
-                      onChange={(e) => setFormData({ ...formData, defaultQtyKg: e.target.value ? Number(e.target.value) : null })}
-                      placeholder="e.g. 2500"
-                      className="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg bg-white"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Section 3: Material Composition (%) */}
-              <div className="space-y-3 p-4 bg-slate-50 rounded-xl border border-slate-200">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                    <FlaskConical className="h-3.5 w-3.5 text-primary" /> Formulation Composition (%)
-                  </h4>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-medium text-slate-500">Total:</span>
-                    <span
-                      className={`text-xs font-mono font-bold px-2 py-0.5 rounded-full ${
-                        totalComposition === 100 || totalComposition === 0
-                          ? "bg-emerald-100 text-emerald-800"
-                          : "bg-amber-100 text-amber-800"
-                      }`}
-                    >
-                      {totalComposition.toFixed(2)}%
-                    </span>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <div>
-                    <label className="text-[11px] font-medium text-slate-600 block mb-1">PP % (Virgin)</label>
-                    <input
-                      type="number"
-                      step="any"
-                      value={formData.ppPercent ?? ""}
-                      onChange={(e) => setFormData({ ...formData, ppPercent: e.target.value ? Number(e.target.value) : null })}
-                      placeholder="e.g. 88.75"
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          defaultQtyKg: e.target.value ? Number(e.target.value) : null,
+                        })
+                      }
                       className="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg bg-white"
                     />
                   </div>
                   <div>
-                    <label className="text-[11px] font-medium text-slate-600 block mb-1">CC % (Calcium)</label>
-                    <input
-                      type="number"
-                      step="any"
-                      value={formData.ccPercent ?? ""}
-                      onChange={(e) => setFormData({ ...formData, ccPercent: e.target.value ? Number(e.target.value) : null })}
-                      placeholder="e.g. 6.25"
-                      className="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg bg-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[11px] font-medium text-slate-600 block mb-1">MB % (Masterbatch)</label>
-                    <input
-                      type="number"
-                      step="any"
-                      value={formData.mbPercent ?? ""}
-                      onChange={(e) => setFormData({ ...formData, mbPercent: e.target.value ? Number(e.target.value) : null })}
-                      placeholder="e.g. 1.0"
-                      className="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg bg-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[11px] font-medium text-slate-600 block mb-1">RP White %</label>
-                    <input
-                      type="number"
-                      step="any"
-                      value={formData.rp1Percent ?? ""}
-                      onChange={(e) => setFormData({ ...formData, rp1Percent: e.target.value ? Number(e.target.value) : null })}
-                      placeholder="e.g. 3.0"
-                      className="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg bg-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[11px] font-medium text-slate-600 block mb-1">RP Yellow %</label>
-                    <input
-                      type="number"
-                      step="any"
-                      value={formData.rp2Percent ?? ""}
-                      onChange={(e) => setFormData({ ...formData, rp2Percent: e.target.value ? Number(e.target.value) : null })}
-                      placeholder="e.g. 2.0"
-                      className="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg bg-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[11px] font-medium text-slate-600 block mb-1">Mixed RP %</label>
-                    <input
-                      type="number"
-                      step="any"
-                      value={formData.hdrpPercent ?? ""}
-                      onChange={(e) => setFormData({ ...formData, hdrpPercent: e.target.value ? Number(e.target.value) : null })}
-                      placeholder="e.g. 2.0"
-                      className="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg bg-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[11px] font-medium text-slate-600 block mb-1">Natural RP %</label>
-                    <input
-                      type="number"
-                      step="any"
-                      value={formData.tptPercent ?? ""}
-                      onChange={(e) => setFormData({ ...formData, tptPercent: e.target.value ? Number(e.target.value) : null })}
-                      placeholder="e.g. 1.0"
-                      className="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg bg-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[11px] font-medium text-slate-600 block mb-1">Omega %</label>
+                    <label className="text-[11px] font-medium text-slate-600 block mb-1">
+                      Omega
+                    </label>
                     <input
                       type="number"
                       step="any"
                       value={formData.omega ?? ""}
-                      onChange={(e) => setFormData({ ...formData, omega: e.target.value ? Number(e.target.value) : null })}
-                      placeholder="e.g. 0.5"
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          omega: e.target.value ? Number(e.target.value) : null,
+                        })
+                      }
+                      className="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-medium text-slate-600 block mb-1">
+                      Vistamax %
+                    </label>
+                    <input
+                      type="number"
+                      step="any"
+                      value={formData.vistamaxPercent ?? ""}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          vistamaxPercent: e.target.value ? Number(e.target.value) : null,
+                        })
+                      }
                       className="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg bg-white"
                     />
                   </div>
@@ -1348,8 +1647,8 @@ export function TapePlantRecipeClient() {
                   rows={2}
                   value={formData.remarks || ""}
                   onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
-                  placeholder="e.g. Special MB ratio or quality parameters..."
-                  className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg bg-white focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                  placeholder="Optional notes..."
+                  className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg bg-white"
                 />
               </div>
 

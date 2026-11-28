@@ -1,17 +1,20 @@
 /**
  * Canonical Tape Plant Raw Material / Formulation Blend Identifiers & Aliases.
- * Maps legacy identifiers (RP1, RP2, HD RP, TPT) cleanly to current names
- * (RP White, RP Yellow, Mixed RP, Natural RP) so historical records remain 100% compatible.
+ * Maps legacy identifiers (RP1, RP2, HD RP, TPT) and Tapeline Master Excel headers
+ * (RP Colour, RP Mix, RP Natural, LDPE 040) cleanly to canonical ERP names.
  */
 
+export const TAPE_MATERIAL_LDPE_040 = "LDPE 040";
 export const TAPE_MATERIAL_RP_WHITE = "RP White";
 export const TAPE_MATERIAL_RP_YELLOW = "RP Yellow";
 export const TAPE_MATERIAL_MIXED_RP = "Mixed RP";
 export const TAPE_MATERIAL_NATURAL_RP = "Natural RP";
+export const TAPE_MATERIAL_TPT_FILLER = "TPT Filler";
 
 export const STANDARD_TAPE_MATERIALS = [
   "PP",
   "CC",
+  TAPE_MATERIAL_LDPE_040,
   "MB",
   TAPE_MATERIAL_RP_WHITE,
   TAPE_MATERIAL_RP_YELLOW,
@@ -25,11 +28,17 @@ export function normalizeTapeMaterialName(mat: string): string {
   const clean = raw.toUpperCase().replace(/[\s\-_]/g, "");
   if (clean === "PP") return "PP";
   if (clean === "CC") return "CC";
+  if (clean === "LDPE040" || clean === "LDPE") return TAPE_MATERIAL_LDPE_040;
   if (clean === "MB") return "MB";
   if (clean === "RP1" || clean === "RPWHITE") return TAPE_MATERIAL_RP_WHITE;
-  if (clean === "RP2" || clean === "RPYELLOW") return TAPE_MATERIAL_RP_YELLOW;
-  if (clean === "HDRP" || clean === "MIXEDRP") return TAPE_MATERIAL_MIXED_RP;
-  if (clean === "TPT" || clean === "NATURALRP") return TAPE_MATERIAL_NATURAL_RP;
+  if (clean === "RP2" || clean === "RPYELLOW" || clean === "RPCOLOUR" || clean === "RPCOLOR") {
+    return TAPE_MATERIAL_RP_YELLOW;
+  }
+  if (clean === "HDRP" || clean === "MIXEDRP" || clean === "RPMIX") return TAPE_MATERIAL_MIXED_RP;
+  if (clean === "TPT" || clean === "NATURALRP" || clean === "RPNATURAL") {
+    return TAPE_MATERIAL_NATURAL_RP;
+  }
+  if (clean === "TPTFILLER") return TAPE_MATERIAL_TPT_FILLER;
   return raw;
 }
 
@@ -67,4 +76,3 @@ export function inferRpModeFromComposition(comp: {
     (Number(comp.tptPercent) || 0);
   return sum > 0 ? "WITH_RP" : "WITHOUT_RP";
 }
-

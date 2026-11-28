@@ -25,7 +25,7 @@ export async function GET(_request: NextRequest) {
       db.loomMachineMapping.findMany({
         select: { qualityCode: true },
         distinct: ["qualityCode"],
-        where: { qualityCode: { not: "" } },
+        where: { qualityCode: { not: "" }, isActive: true },
       }),
       db.laminationProductionEntry.findMany({
         select: { quality: true },

@@ -30,6 +30,7 @@ interface PlanningPrintPreviewModalProps {
 import {
   formatRpModeLabel,
   normalizeTapeMaterialName,
+  TAPE_MATERIAL_LDPE_040,
   TAPE_MATERIAL_MIXED_RP,
   TAPE_MATERIAL_NATURAL_RP,
   TAPE_MATERIAL_RP_WHITE,
@@ -94,6 +95,7 @@ export function PlanningPrintPreviewModal({
   // Pre-calculate aggregate raw material sums across all recipe plans
   let totalPPSum = 0;
   let totalCCSum = 0;
+  let totalLDPESum = 0;
   let totalMBSum = 0;
   let totalRP1Sum = 0;
   let totalRP2Sum = 0;
@@ -110,6 +112,7 @@ export function PlanningPrintPreviewModal({
       runMatQty += q;
       if (key === "PP") totalPPSum += q;
       else if (key === "CC") totalCCSum += q;
+      else if (key === TAPE_MATERIAL_LDPE_040) totalLDPESum += q;
       else if (key === "MB") totalMBSum += q;
       else if (key === TAPE_MATERIAL_RP_WHITE) totalRP1Sum += q;
       else if (key === TAPE_MATERIAL_RP_YELLOW) totalRP2Sum += q;
@@ -424,6 +427,7 @@ export function PlanningPrintPreviewModal({
                       <th rowSpan={2} className="p-2 border-r border-slate-300 text-center w-16">Shift</th>
                       <th colSpan={2} className="p-1 border-r border-slate-300 text-center">PP</th>
                       <th colSpan={2} className="p-1 border-r border-slate-300 text-center">CC</th>
+                      <th colSpan={2} className="p-1 border-r border-slate-300 text-center">LDPE 040</th>
                       <th colSpan={2} className="p-1 border-r border-slate-300 text-center">MB</th>
                       <th colSpan={2} className="p-1 border-r border-slate-300 text-center">RP White</th>
                       <th colSpan={2} className="p-1 border-r border-slate-300 text-center">RP Yellow</th>
@@ -436,6 +440,8 @@ export function PlanningPrintPreviewModal({
                       <th rowSpan={2} className="p-2 border-r border-slate-300 text-right w-14">Total %</th>
                     </tr>
                     <tr className="bg-slate-100/80 text-slate-700 text-[9px] font-bold border-b border-slate-300">
+                      <th className="p-1 border-r border-slate-300 text-right">KG</th>
+                      <th className="p-1 border-r border-slate-300 text-right text-slate-500">%</th>
                       <th className="p-1 border-r border-slate-300 text-right">KG</th>
                       <th className="p-1 border-r border-slate-300 text-right text-slate-500">%</th>
                       <th className="p-1 border-r border-slate-300 text-right">KG</th>
@@ -466,6 +472,7 @@ export function PlanningPrintPreviewModal({
 
                       const pp = getMatRaw("PP");
                       const cc = getMatRaw("CC");
+                      const ldpe = getMatRaw(TAPE_MATERIAL_LDPE_040);
                       const mb = getMatRaw("MB");
                       const rp1 = getMatRaw(TAPE_MATERIAL_RP_WHITE);
                       const rp2 = getMatRaw(TAPE_MATERIAL_RP_YELLOW);
@@ -486,6 +493,7 @@ export function PlanningPrintPreviewModal({
                           ![
                             "PP",
                             "CC",
+                            TAPE_MATERIAL_LDPE_040,
                             "MB",
                             TAPE_MATERIAL_RP_WHITE,
                             TAPE_MATERIAL_RP_YELLOW,
@@ -516,6 +524,9 @@ export function PlanningPrintPreviewModal({
                           {/* CC */}
                           <td className="p-1.5 border-r border-slate-200 text-right font-mono font-semibold">{formatKg(cc.qty)}</td>
                           <td className="p-1.5 border-r border-slate-200 text-right font-mono text-slate-500 bg-slate-50/50">{formatPct(cc.pct)}</td>
+                          {/* LDPE 040 */}
+                          <td className="p-1.5 border-r border-slate-200 text-right font-mono font-semibold">{formatKg(ldpe.qty)}</td>
+                          <td className="p-1.5 border-r border-slate-200 text-right font-mono text-slate-500 bg-slate-50/50">{formatPct(ldpe.pct)}</td>
                           {/* MB */}
                           <td className="p-1.5 border-r border-slate-200 text-right font-mono font-semibold">{formatKg(mb.qty)}</td>
                           <td className="p-1.5 border-r border-slate-200 text-right font-mono text-slate-500 bg-slate-50/50">{formatPct(mb.pct)}</td>
@@ -556,6 +567,9 @@ export function PlanningPrintPreviewModal({
                       {/* CC */}
                       <td className="p-1.5 text-right font-mono">{formatKg(totalCCSum)}</td>
                       <td className="p-1.5 text-right font-mono text-[10px] text-slate-500">{totalBatchSum > 0 && totalCCSum > 0 ? `${((totalCCSum / totalBatchSum) * 100).toFixed(1)}%` : "—"}</td>
+                      {/* LDPE 040 */}
+                      <td className="p-1.5 text-right font-mono">{formatKg(totalLDPESum)}</td>
+                      <td className="p-1.5 text-right font-mono text-[10px] text-slate-500">{totalBatchSum > 0 && totalLDPESum > 0 ? `${((totalLDPESum / totalBatchSum) * 100).toFixed(1)}%` : "—"}</td>
                       {/* MB */}
                       <td className="p-1.5 text-right font-mono">{formatKg(totalMBSum)}</td>
                       <td className="p-1.5 text-right font-mono text-[10px] text-slate-500">{totalBatchSum > 0 && totalMBSum > 0 ? `${((totalMBSum / totalBatchSum) * 100).toFixed(1)}%` : "—"}</td>
@@ -599,6 +613,7 @@ export function PlanningPrintPreviewModal({
                       <th className="p-2 border-r border-slate-300 text-left min-w-[130px]">Metric / Material</th>
                       <th className="p-2 border-r border-slate-300">PP</th>
                       <th className="p-2 border-r border-slate-300">CC</th>
+                      <th className="p-2 border-r border-slate-300">LDPE 040</th>
                       <th className="p-2 border-r border-slate-300">MB</th>
                       <th className="p-2 border-r border-slate-300">RP White</th>
                       <th className="p-2 border-r border-slate-300">RP Yellow</th>
@@ -615,6 +630,7 @@ export function PlanningPrintPreviewModal({
                       </td>
                       <td className="p-2 border-r border-slate-200 font-mono font-bold">{totalPPSum ? `${formatKg(totalPPSum)} KG` : "—"}</td>
                       <td className="p-2 border-r border-slate-200 font-mono font-bold">{totalCCSum ? `${formatKg(totalCCSum)} KG` : "—"}</td>
+                      <td className="p-2 border-r border-slate-200 font-mono font-bold">{totalLDPESum ? `${formatKg(totalLDPESum)} KG` : "—"}</td>
                       <td className="p-2 border-r border-slate-200 font-mono font-bold">{totalMBSum ? `${formatKg(totalMBSum)} KG` : "—"}</td>
                       <td className="p-2 border-r border-slate-200 font-mono font-bold">{totalRP1Sum ? `${formatKg(totalRP1Sum)} KG` : "—"}</td>
                       <td className="p-2 border-r border-slate-200 font-mono font-bold">{totalRP2Sum ? `${formatKg(totalRP2Sum)} KG` : "—"}</td>
@@ -631,6 +647,7 @@ export function PlanningPrintPreviewModal({
                       </td>
                       <td className="p-2 border-r border-slate-200 font-mono font-semibold text-emerald-800">{totalBatchSum > 0 && totalPPSum > 0 ? `${((totalPPSum / totalBatchSum) * 100).toFixed(1)}%` : "—"}</td>
                       <td className="p-2 border-r border-slate-200 font-mono font-semibold text-emerald-800">{totalBatchSum > 0 && totalCCSum > 0 ? `${((totalCCSum / totalBatchSum) * 100).toFixed(1)}%` : "—"}</td>
+                      <td className="p-2 border-r border-slate-200 font-mono font-semibold text-emerald-800">{totalBatchSum > 0 && totalLDPESum > 0 ? `${((totalLDPESum / totalBatchSum) * 100).toFixed(1)}%` : "—"}</td>
                       <td className="p-2 border-r border-slate-200 font-mono font-semibold text-emerald-800">{totalBatchSum > 0 && totalMBSum > 0 ? `${((totalMBSum / totalBatchSum) * 100).toFixed(1)}%` : "—"}</td>
                       <td className="p-2 border-r border-slate-200 font-mono font-semibold text-emerald-800">{totalBatchSum > 0 && totalRP1Sum > 0 ? `${((totalRP1Sum / totalBatchSum) * 100).toFixed(1)}%` : "—"}</td>
                       <td className="p-2 border-r border-slate-200 font-mono font-semibold text-emerald-800">{totalBatchSum > 0 && totalRP2Sum > 0 ? `${((totalRP2Sum / totalBatchSum) * 100).toFixed(1)}%` : "—"}</td>

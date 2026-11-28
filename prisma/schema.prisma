@@ -1886,39 +1886,47 @@ model TapePlantBobbinIssue {
 }
 
 model TapePlantRecipe {
-  id              String   @id @default(cuid())
-  code            String   @unique // e.g. "AMB/PP/YL/74/500/S1"
-  tapeType        String   // "PP" | "LPP" | "HDPE"
-  rpMode          String   @default("WITH_RP") // "WITH_RP" | "WITHOUT_RP"
-  denier          Float?
-  tapeWidth       Float?
-  strength        Float?
-  eloPercent      Float?
-  bobbinMarking   String?
-  colour          String?
-  spacerSize      Float?
-  requiredAsh     Float?
-  ashPercent      Float?
-  ppPercent       Float?
-  ccPercent       Float?
-  mbPercent       Float?
-  rp1Percent      Float?
-  rp2Percent      Float?
-  hdrpPercent     Float?
-  omega           Float?
-  vistamaxPercent Float?
-  tptPercent      Float?
-  totalPercent    Float?   @default(100)
-  defaultQtyKg    Float?
-  colorGroup      String?  // "Yellow" | "White" | "Light Green" | "Dark Green" | "Grey" | "Dark Blue" | "Light Blue"
-  recipeGroup     String?  // Shared recipe family e.g. "860D PP Family", "900D LPP White"
-  copiedFromCode  String?  // Reference to source recipe code if copied/cloned
-  remarks         String?
-  isActive        Boolean  @default(true)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id                   String   @id @default(cuid())
+  code                 String   @unique // e.g. "AMB-NVCO/LPP/WHT/500/64/S1"
+  vendor               String?  // e.g. "ADANI", "CCI", "UTCL", "WONDER"
+  tapeType             String   // "PP" | "LPP" | "HDPE"
+  rpMode               String   @default("WITH_RP") // "WITH_RP" | "WITHOUT_RP"
+  denier               Float?
+  tapeWidth            Float?
+  strength             Float?
+  eloPercent           Float?
+  bobbinMarking        String?
+  colour               String?
+  spacerSize           Float?
+  requiredAsh          Float?
+  ashPercent           Float?
+  permissibleFabAsh    Float?
+  permissibleTapeAsh   Float?
+  ppPercent            Float?
+  ccPercent            Float?
+  ldpePercent          Float?
+  mbPercent            Float?
+  rp1Percent           Float?
+  rp2Percent           Float?
+  hdrpPercent          Float?
+  omega                Float?
+  vistamaxPercent      Float?
+  tptPercent           Float?
+  tptFillerPercent     Float?
+  totalPercent         Float?   @default(100)
+  withRpComposition    Json?    // Dual profile: full WITH RP blend + ash
+  withoutRpComposition Json?    // Dual profile: full WITHOUT RP blend + ash
+  defaultQtyKg         Float?
+  colorGroup           String?  // "Yellow" | "White" | "Light Green" | "Dark Green" | "Grey" | "Dark Blue" | "Light Blue"
+  recipeGroup          String?  // Shared recipe family e.g. "860D PP Family", "900D LPP White"
+  copiedFromCode       String?  // Reference to source recipe code if copied/cloned
+  remarks              String?
+  isActive             Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 
   @@index([code])
+  @@index([vendor])
   @@index([tapeType])
   @@index([colorGroup])
   @@index([recipeGroup])

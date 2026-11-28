@@ -4,8 +4,19 @@ import { requireApiAuth } from "@/lib/api-auth";
 import { Module } from "@/generated/prisma";
 import { logEvent } from "@/lib/logging";
 import { inferRpModeFromComposition, normalizeRpMode } from "@/lib/tape-plant/material-names";
+import {
+  calculatePermissibleTapeAsh,
+  normalizeBlendProfile,
+  resolveRecipeProfileForMode,
+} from "@/lib/tape-plant/recipe-formulation";
 
 export const dynamic = "force-dynamic";
+
+function toNullableNumber(val: unknown): number | null {
+  if (val === "" || val === null || val === undefined) return null;
+  const n = Number(val);
+  return Number.isFinite(n) ? n : null;
+}
 
 export async function GET(request: NextRequest) {
   const auth = await requireApiAuth({
@@ -16,6 +27,7 @@ export async function GET(request: NextRequest) {
 
   const { searchParams } = new URL(request.url);
   const search = searchParams.get("search")?.trim();
+  const vendor = searchParams.get("vendor")?.trim();
   const tapeType = searchParams.get("tapeType")?.trim();
   const rpMode = searchParams.get("rpMode")?.trim();
   const colorGroup = searchParams.get("colorGroup")?.trim();
@@ -32,6 +44,10 @@ export async function GET(request: NextRequest) {
 
     if (code) {
       where.code = { equals: code, mode: "insensitive" };
+    }
+
+    if (vendor && vendor !== "ALL") {
+      where.vendor = { equals: vendor, mode: "insensitive" };
     }
 
     if (tapeType && tapeType !== "ALL") {
@@ -53,6 +69,7 @@ export async function GET(request: NextRequest) {
     if (search) {
       where.OR = [
         { code: { contains: search, mode: "insensitive" } },
+        { vendor: { contains: search, mode: "insensitive" } },
         { colour: { contains: search, mode: "insensitive" } },
         { bobbinMarking: { contains: search, mode: "insensitive" } },
         { remarks: { contains: search, mode: "insensitive" } },
@@ -64,11 +81,9 @@ export async function GET(request: NextRequest) {
 
     const recipes = await db.tapePlantRecipe.findMany({
       where,
-      orderBy: [{ colorGroup: "asc" }, { tapeType: "asc" }, { code: "asc" }],
+      orderBy: [{ vendor: "asc" }, { tapeType: "asc" }, { code: "asc" }],
     });
 
-    // Compute shared qualities for each recipe
-    // All active recipes mapped by recipeGroup
     const allRecipes = await db.tapePlantRecipe.findMany({
       where: { isActive: true },
       select: { id: true, code: true, recipeGroup: true, copiedFromCode: true },
@@ -82,7 +97,11 @@ export async function GET(request: NextRequest) {
           .map((item) => item.code);
       } else if (r.copiedFromCode) {
         sharedCodes = allRecipes
-          .filter((item) => (item.code === r.copiedFromCode || item.copiedFromCode === r.copiedFromCode) && item.code !== r.code)
+          .filter(
+            (item) =>
+              (item.code === r.copiedFromCode || item.copiedFromCode === r.copiedFromCode) &&
+              item.code !== r.code
+          )
           .map((item) => item.code);
       }
       return {
@@ -116,6 +135,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const {
       code,
+      vendor,
       tapeType,
       rpMode,
       denier,
@@ -127,8 +147,11 @@ export async function POST(request: NextRequest) {
       spacerSize,
       requiredAsh,
       ashPercent,
+      permissibleFabAsh,
+      permissibleTapeAsh,
       ppPercent,
       ccPercent,
+      ldpePercent,
       mbPercent,
       rp1Percent,
       rp2Percent,
@@ -136,7 +159,10 @@ export async function POST(request: NextRequest) {
       omega,
       vistamaxPercent,
       tptPercent,
+      tptFillerPercent,
       totalPercent,
+      withRpComposition,
+      withoutRpComposition,
       defaultQtyKg,
       colorGroup,
       recipeGroup,
@@ -152,7 +178,6 @@ export async function POST(request: NextRequest) {
     }
 
     const trimmedCode = String(code).trim();
-
     const existing = await db.tapePlantRecipe.findUnique({
       where: { code: trimmedCode },
     });
@@ -164,36 +189,91 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const resolvedType = tapeType ? String(tapeType).trim().toUpperCase() : "PP";
     const resolvedRpMode =
       rpMode !== undefined && rpMode !== null && String(rpMode).trim() !== ""
         ? normalizeRpMode(rpMode)
         : inferRpModeFromComposition({ rp1Percent, rp2Percent, hdrpPercent, tptPercent });
 
+    const fabAshNum = toNullableNumber(permissibleFabAsh);
+    const tapeAshNum =
+      toNullableNumber(permissibleTapeAsh) ??
+      calculatePermissibleTapeAsh(resolvedType, fabAshNum);
+
+    let normalizedWithRp = normalizeBlendProfile(withRpComposition, "WITH_RP");
+    let normalizedWithoutRp = normalizeBlendProfile(withoutRpComposition, "WITHOUT_RP");
+
+    const flatBlend = normalizeBlendProfile(
+      {
+        ppPercent,
+        ccPercent,
+        ldpePercent,
+        mbPercent,
+        rp1Percent,
+        rp2Percent,
+        hdrpPercent,
+        tptPercent,
+        tptFillerPercent,
+      },
+      resolvedRpMode
+    );
+
+    if (resolvedRpMode === "WITH_RP" && !normalizedWithRp && flatBlend) {
+      normalizedWithRp = flatBlend;
+    } else if (resolvedRpMode === "WITHOUT_RP" && !normalizedWithoutRp && flatBlend) {
+      normalizedWithoutRp = flatBlend;
+    }
+
+    const activeProfile = resolveRecipeProfileForMode(
+      {
+        ppPercent: toNullableNumber(ppPercent),
+        ccPercent: toNullableNumber(ccPercent),
+        ldpePercent: toNullableNumber(ldpePercent),
+        mbPercent: toNullableNumber(mbPercent),
+        rp1Percent: toNullableNumber(rp1Percent),
+        rp2Percent: toNullableNumber(rp2Percent),
+        hdrpPercent: toNullableNumber(hdrpPercent),
+        tptPercent: toNullableNumber(tptPercent),
+        tptFillerPercent: toNullableNumber(tptFillerPercent),
+        withRpComposition: normalizedWithRp,
+        withoutRpComposition: normalizedWithoutRp,
+      },
+      resolvedRpMode
+    );
+
     const recipe = await db.tapePlantRecipe.create({
       data: {
         code: trimmedCode,
-        tapeType: tapeType ? String(tapeType).trim().toUpperCase() : "PP",
+        vendor: vendor ? String(vendor).trim().toUpperCase() : null,
+        tapeType: resolvedType,
         rpMode: resolvedRpMode,
-        denier: denier !== "" && denier !== null && denier !== undefined ? Number(denier) : null,
-        tapeWidth: tapeWidth !== "" && tapeWidth !== null && tapeWidth !== undefined ? Number(tapeWidth) : null,
-        strength: strength !== "" && strength !== null && strength !== undefined ? Number(strength) : null,
-        eloPercent: eloPercent !== "" && eloPercent !== null && eloPercent !== undefined ? Number(eloPercent) : null,
+        denier: toNullableNumber(denier),
+        tapeWidth: toNullableNumber(tapeWidth),
+        strength: toNullableNumber(strength),
+        eloPercent: toNullableNumber(eloPercent),
         bobbinMarking: bobbinMarking ? String(bobbinMarking).trim() : null,
         colour: colour ? String(colour).trim() : null,
-        spacerSize: spacerSize !== "" && spacerSize !== null && spacerSize !== undefined ? Number(spacerSize) : null,
-        requiredAsh: requiredAsh !== "" && requiredAsh !== null && requiredAsh !== undefined ? Number(requiredAsh) : null,
-        ashPercent: ashPercent !== "" && ashPercent !== null && ashPercent !== undefined ? Number(ashPercent) : null,
-        ppPercent: ppPercent !== "" && ppPercent !== null && ppPercent !== undefined ? Number(ppPercent) : null,
-        ccPercent: ccPercent !== "" && ccPercent !== null && ccPercent !== undefined ? Number(ccPercent) : null,
-        mbPercent: mbPercent !== "" && mbPercent !== null && mbPercent !== undefined ? Number(mbPercent) : null,
-        rp1Percent: rp1Percent !== "" && rp1Percent !== null && rp1Percent !== undefined ? Number(rp1Percent) : null,
-        rp2Percent: rp2Percent !== "" && rp2Percent !== null && rp2Percent !== undefined ? Number(rp2Percent) : null,
-        hdrpPercent: hdrpPercent !== "" && hdrpPercent !== null && hdrpPercent !== undefined ? Number(hdrpPercent) : null,
-        omega: omega !== "" && omega !== null && omega !== undefined ? Number(omega) : null,
-        vistamaxPercent: vistamaxPercent !== "" && vistamaxPercent !== null && vistamaxPercent !== undefined ? Number(vistamaxPercent) : null,
-        tptPercent: tptPercent !== "" && tptPercent !== null && tptPercent !== undefined ? Number(tptPercent) : null,
-        totalPercent: totalPercent !== "" && totalPercent !== null && totalPercent !== undefined ? Number(totalPercent) : 100,
-        defaultQtyKg: defaultQtyKg !== "" && defaultQtyKg !== null && defaultQtyKg !== undefined ? Number(defaultQtyKg) : null,
+        spacerSize: toNullableNumber(spacerSize),
+        permissibleFabAsh: fabAshNum,
+        permissibleTapeAsh: tapeAshNum,
+        requiredAsh: toNullableNumber(requiredAsh) ?? tapeAshNum,
+        ashPercent: toNullableNumber(ashPercent) ?? activeProfile.actualAshPercent ?? null,
+        ppPercent: activeProfile.ppPercent,
+        ccPercent: activeProfile.ccPercent,
+        ldpePercent: activeProfile.ldpePercent,
+        mbPercent: activeProfile.mbPercent,
+        rp1Percent: activeProfile.rp1Percent,
+        rp2Percent: activeProfile.rp2Percent,
+        hdrpPercent: activeProfile.hdrpPercent,
+        omega: toNullableNumber(omega),
+        vistamaxPercent: toNullableNumber(vistamaxPercent),
+        tptPercent: activeProfile.tptPercent,
+        tptFillerPercent: activeProfile.tptFillerPercent ?? null,
+        totalPercent:
+          toNullableNumber(totalPercent) ?? activeProfile.totalPercent ?? 100,
+        withRpComposition: (normalizedWithRp as any) ?? undefined,
+        withoutRpComposition: (normalizedWithoutRp as any) ?? undefined,
+        defaultQtyKg: toNullableNumber(defaultQtyKg),
         colorGroup: colorGroup ? String(colorGroup).trim() : null,
         recipeGroup: recipeGroup ? String(recipeGroup).trim() : null,
         copiedFromCode: copiedFromCode ? String(copiedFromCode).trim() : null,
@@ -202,7 +282,6 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Automatically sync/upsert into Loom Machine Mapping
     try {
       await db.loomMachineMapping.upsert({
         where: { qualityCode: recipe.code },
@@ -238,7 +317,13 @@ export async function POST(request: NextRequest) {
       action: "CREATE_RECIPE",
       module: "DATA_CENTRE",
       severity: "INFO",
-      payload: { id: recipe.id, code: recipe.code, colorGroup: recipe.colorGroup, recipeGroup: recipe.recipeGroup },
+      payload: {
+        id: recipe.id,
+        code: recipe.code,
+        vendor: recipe.vendor,
+        colorGroup: recipe.colorGroup,
+        recipeGroup: recipe.recipeGroup,
+      },
       meta: { description: `Created Tape Plant Recipe ${recipe.code}` },
       userId: auth.user.id,
     });

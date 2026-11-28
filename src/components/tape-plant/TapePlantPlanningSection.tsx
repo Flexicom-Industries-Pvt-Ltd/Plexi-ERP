@@ -23,15 +23,22 @@ import dynamic from "next/dynamic";
 import { generateTapePlantPlanningExcel } from "@/lib/tape-plant/planning-export";
 import { parseRecipeQuality } from "@/lib/tape-plant/recipe-format";
 import {
+  formatRpModeLabel,
   inferRpModeFromComposition,
   normalizeRpMode,
   normalizeTapeMaterialName,
   RecipeRpMode,
+  TAPE_MATERIAL_LDPE_040,
   TAPE_MATERIAL_MIXED_RP,
   TAPE_MATERIAL_NATURAL_RP,
   TAPE_MATERIAL_RP_WHITE,
   TAPE_MATERIAL_RP_YELLOW,
 } from "@/lib/tape-plant/material-names";
+import {
+  buildMaterialsForRecipeMode,
+  calculateActualAshContent,
+  resolveRecipeProfileForMode,
+} from "@/lib/tape-plant/recipe-formulation";
 import { QualityCombobox } from "./QualityCombobox";
 import { useProductionShifts } from "@/hooks/useProductionShifts";
 import { useProductionRealtime } from "@/hooks/useProductionRealtime";
@@ -51,6 +58,7 @@ export interface MaterialRow {
 export const DEFAULT_MATERIALS: MaterialRow[] = [
   { material: "PP", quantity: "", percentage: "" },
   { material: "CC", quantity: "", percentage: "" },
+  { material: TAPE_MATERIAL_LDPE_040, quantity: "", percentage: "" },
   { material: "MB", quantity: "", percentage: "" },
   { material: TAPE_MATERIAL_RP_WHITE, quantity: "", percentage: "" },
   { material: TAPE_MATERIAL_RP_YELLOW, quantity: "", percentage: "" },
@@ -366,29 +374,29 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName, shifts }: T
     );
   };
 
-  // Auto-fetch and apply master recipe
-  const applyRecipeMaster = (recipe: any) => {
-    const plannedQty = currentPlan.plannedQtyKg ? currentPlan.plannedQtyKg : "";
+  // Shared builder for auto-populating row parameters & dual-mode blend
+  const buildUpdatesFromRecipe = (
+    recipe: any,
+    plannedQty: number | string,
+    overrideMode?: RecipeRpMode
+  ): Partial<RecipePlanItem> => {
+    const resolvedMode = overrideMode
+      ? normalizeRpMode(overrideMode)
+      : recipe.rpMode
+      ? normalizeRpMode(recipe.rpMode)
+      : inferRpModeFromComposition(recipe);
 
-    const computeQty = (percent: number | null | undefined) => {
-      if (!percent || !plannedQty || Number(plannedQty) <= 0) return "";
-      return Number(((Number(plannedQty) * Number(percent)) / 100).toFixed(2));
-    };
+    const activeProfile = resolveRecipeProfileForMode(recipe, resolvedMode);
+    const updatedMaterials: MaterialRow[] = buildMaterialsForRecipeMode(
+      recipe,
+      resolvedMode,
+      plannedQty
+    );
 
-    const updatedMaterials: MaterialRow[] = [
-      { material: "PP", percentage: recipe.ppPercent ?? "", quantity: computeQty(recipe.ppPercent) },
-      { material: "CC", percentage: recipe.ccPercent ?? "", quantity: computeQty(recipe.ccPercent) },
-      { material: "MB", percentage: recipe.mbPercent ?? "", quantity: computeQty(recipe.mbPercent) },
-      { material: TAPE_MATERIAL_RP_WHITE, percentage: recipe.rp1Percent ?? "", quantity: computeQty(recipe.rp1Percent) },
-      { material: TAPE_MATERIAL_RP_YELLOW, percentage: recipe.rp2Percent ?? "", quantity: computeQty(recipe.rp2Percent) },
-      { material: TAPE_MATERIAL_MIXED_RP, percentage: recipe.hdrpPercent ?? "", quantity: computeQty(recipe.hdrpPercent) },
-      { material: TAPE_MATERIAL_NATURAL_RP, percentage: recipe.tptPercent ?? "", quantity: computeQty(recipe.tptPercent) },
-    ];
-
-    updateCurrentPlan({
+    return {
       recipeQuality: recipe.code,
       tapeType: recipe.tapeType || "PP",
-      rpMode: recipe.rpMode ? normalizeRpMode(recipe.rpMode) : inferRpModeFromComposition(recipe),
+      rpMode: resolvedMode,
       denier: recipe.denier ?? "",
       tapeWidth: recipe.tapeWidth ?? "",
       strength: recipe.strength ?? "",
@@ -401,14 +409,22 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName, shifts }: T
       bobbinMarking: recipe.bobbinMarking || "",
       colour: recipe.colour || "",
       spacerSize: recipe.spacerSize ? String(recipe.spacerSize) : "",
-      requiredAsh: recipe.requiredAsh ?? "",
-      ashPercent: recipe.ashPercent ?? "",
+      requiredAsh: recipe.permissibleTapeAsh ?? recipe.requiredAsh ?? "",
+      ashPercent:
+        activeProfile.actualAshPercent !== undefined && activeProfile.actualAshPercent !== null
+          ? activeProfile.actualAshPercent
+          : calculateActualAshContent(activeProfile, resolvedMode),
       plannedQtyKg: plannedQty,
       vistPercent: recipe.vistamaxPercent ?? "",
       remarks: recipe.remarks || "",
       materials: updatedMaterials,
-    });
+    };
+  };
 
+  // Auto-fetch and apply master recipe
+  const applyRecipeMaster = (recipe: any) => {
+    const plannedQty = currentPlan.plannedQtyKg ? currentPlan.plannedQtyKg : "";
+    updateCurrentPlan(buildUpdatesFromRecipe(recipe, plannedQty));
     toast.success(`Auto-fetched parameters & formulation for ${recipe.code}`);
   };
 
@@ -870,47 +886,40 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName, shifts }: T
   const applyRecipeMasterForRow = (index: number, recipe: any) => {
     const plan = recipePlans[index];
     const plannedQty = plan.plannedQtyKg ? plan.plannedQtyKg : "";
+    updatePlanAt(index, buildUpdatesFromRecipe(recipe, plannedQty));
+    toast.success(`Auto-fetched parameters & formulation for ${recipe.code}`);
+  };
 
-    const computeQty = (percent: number | null | undefined) => {
-      if (!percent || !plannedQty || Number(plannedQty) <= 0) return "";
-      return Number(((Number(plannedQty) * Number(percent)) / 100).toFixed(2));
-    };
+  // Switching With RP / Without RP automatically swaps the quality's dual formulation & recalculates KG
+  const handleRowRpModeChange = (index: number, nextMode: RecipeRpMode) => {
+    const plan = recipePlans[index];
+    const normalizedNext = normalizeRpMode(nextMode);
+    const match = masterRecipes.find(
+      (r) => r.code?.toUpperCase() === plan.recipeQuality?.trim().toUpperCase()
+    );
 
-    const updatedMaterials: MaterialRow[] = [
-      { material: "PP", percentage: recipe.ppPercent ?? "", quantity: computeQty(recipe.ppPercent) },
-      { material: "CC", percentage: recipe.ccPercent ?? "", quantity: computeQty(recipe.ccPercent) },
-      { material: "MB", percentage: recipe.mbPercent ?? "", quantity: computeQty(recipe.mbPercent) },
-      { material: TAPE_MATERIAL_RP_WHITE, percentage: recipe.rp1Percent ?? "", quantity: computeQty(recipe.rp1Percent) },
-      { material: TAPE_MATERIAL_RP_YELLOW, percentage: recipe.rp2Percent ?? "", quantity: computeQty(recipe.rp2Percent) },
-      { material: TAPE_MATERIAL_MIXED_RP, percentage: recipe.hdrpPercent ?? "", quantity: computeQty(recipe.hdrpPercent) },
-      { material: TAPE_MATERIAL_NATURAL_RP, percentage: recipe.tptPercent ?? "", quantity: computeQty(recipe.tptPercent) },
-    ];
+    if (!match) {
+      updatePlanAt(index, { rpMode: normalizedNext });
+      return;
+    }
+
+    const activeProfile = resolveRecipeProfileForMode(match, normalizedNext);
+    const updatedMaterials = buildMaterialsForRecipeMode(
+      match,
+      normalizedNext,
+      plan.plannedQtyKg ?? ""
+    );
 
     updatePlanAt(index, {
-      recipeQuality: recipe.code,
-      tapeType: recipe.tapeType || "PP",
-      rpMode: recipe.rpMode ? normalizeRpMode(recipe.rpMode) : inferRpModeFromComposition(recipe),
-      denier: recipe.denier ?? "",
-      tapeWidth: recipe.tapeWidth ?? "",
-      strength: recipe.strength ?? "",
-      eloPercent:
-        recipe.eloPercent !== null && recipe.eloPercent !== undefined
-          ? typeof recipe.eloPercent === "number" && recipe.eloPercent < 1
-            ? (recipe.eloPercent * 100).toFixed(0)
-            : recipe.eloPercent
-          : "",
-      bobbinMarking: recipe.bobbinMarking || "",
-      colour: recipe.colour || "",
-      spacerSize: recipe.spacerSize ? String(recipe.spacerSize) : "",
-      requiredAsh: recipe.requiredAsh ?? "",
-      ashPercent: recipe.ashPercent ?? "",
-      plannedQtyKg: plannedQty,
-      vistPercent: recipe.vistamaxPercent ?? "",
-      remarks: recipe.remarks || "",
+      rpMode: normalizedNext,
+      requiredAsh: match.permissibleTapeAsh ?? match.requiredAsh ?? plan.requiredAsh,
+      ashPercent:
+        activeProfile.actualAshPercent !== undefined && activeProfile.actualAshPercent !== null
+          ? activeProfile.actualAshPercent
+          : calculateActualAshContent(activeProfile, normalizedNext),
       materials: updatedMaterials,
     });
-
-    toast.success(`Auto-fetched parameters & formulation for ${recipe.code}`);
+    toast.success(`Switched ${match.code} to ${formatRpModeLabel(normalizedNext)} blend`);
   };
 
   // Handle materials change for a specific row
@@ -1262,7 +1271,7 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName, shifts }: T
                         <select
                           value={normalizeRpMode(plan.rpMode)}
                           onChange={(e) =>
-                            updatePlanAt(index, { rpMode: normalizeRpMode(e.target.value) })
+                            handleRowRpModeChange(index, normalizeRpMode(e.target.value))
                           }
                           onFocus={() => setActiveRecipeIndex(index)}
                           className={`w-full h-8.5 px-1.5 text-[11px] font-bold rounded border cursor-pointer transition-colors outline-none focus:ring-1 ${
@@ -1674,7 +1683,7 @@ export function TapePlantPlanningSection({ date, shiftId, shiftName, shifts }: T
                       <select
                         value={normalizeRpMode(plan.rpMode)}
                         onChange={(e) =>
-                          updatePlanAt(index, { rpMode: normalizeRpMode(e.target.value) })
+                          handleRowRpModeChange(index, normalizeRpMode(e.target.value))
                         }
                         onFocus={() => setActiveRecipeIndex(index)}
                         className={`w-full h-9 px-2 text-xs font-bold rounded-lg border outline-none focus:ring-1 ${
